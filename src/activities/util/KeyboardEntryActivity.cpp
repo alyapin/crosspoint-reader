@@ -11,6 +11,7 @@
 #include "KeyboardLayoutSet.h"
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
+#include "components/setka/SetkaStyle.h"
 #include "fontIds.h"
 
 namespace fui = freeink::ui;
@@ -18,12 +19,10 @@ namespace fui = freeink::ui;
 namespace {
 
 constexpr fui::ActionId ACTION_KEY = 1;
-constexpr int KEYBOARD_MIN_GAP = 6;
-constexpr int KEYBOARD_PANEL_PADDING = 4;
 constexpr int BUTTON_KEY_HEIGHT = 42;
 constexpr int BUTTON_KEYBOARD_HINT_GAP = 4;
-
-int keyboardGap(const ThemeMetrics& metrics) { return std::max(metrics.keyboardKeySpacing, KEYBOARD_MIN_GAP); }
+// Hit rects this close to the keys' side edges snap to them (ensureMinTouchRect).
+constexpr int KEY_EDGE_SNAP = 12;
 
 uint16_t rowUnits(const fui::KeyboardRow& row) {
   uint16_t units = row.insetUnits * 2;
@@ -65,7 +64,7 @@ bool keyLabelsFit(const GfxRenderer& renderer, const fui::KeyboardLayout& layout
 
 int keyboardKeysHeight(const ThemeMetrics& metrics, const int rows, const bool hasTouch) {
   const int keyHeight = hasTouch ? metrics.keyboardKeyHeight : BUTTON_KEY_HEIGHT;
-  return rows * keyHeight + (rows > 1 ? (rows - 1) * keyboardGap(metrics) : 0) + KEYBOARD_PANEL_PADDING * 2;
+  return rows * keyHeight;
 }
 
 // ---------------------------------------------------------------------------
@@ -908,15 +907,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
       renderer.drawText(UI_12_FONT_ID, cursorPixelX, cursorLineY, cursorChar, false);
     }
   } else if (cursorPos <= displayText.length()) {
-    static constexpr int serifW = 3;
-    const int cX = cursorPixelX;
-    const int cY = cursorLineY;
-    const int cBottom = cursorLineY + lineHeight - 1;
-    renderer.fillRect(cX, cY, 2, lineHeight, true);
-    renderer.drawLine(cX - serifW, cY, cX - 1, cY, 2, true);
-    renderer.drawLine(cX + 1, cY, cX + serifW, cY, 2, true);
-    renderer.drawLine(cX - serifW, cBottom, cX - 1, cBottom, 2, true);
-    renderer.drawLine(cX + 1, cBottom, cX + serifW, cBottom, 2, true);
+    renderer.fillRect(cursorPixelX, cursorLineY, 2, lineHeight, true);
   }
 
   if (isPassword) {
@@ -934,7 +925,9 @@ void KeyboardEntryActivity::render(RenderLock&&) {
     }
   }
 
-  if (hintVisible && cursorMode && !text.empty()) {
+  // Tips name buttons, so only button boards show them.
+  const bool showTips = !mappedInput.hasTouch();
+  if (showTips && hintVisible && cursorMode && !text.empty()) {
     const int hintLh = renderer.getLineHeight(SMALL_FONT_ID);
     const int underlineY = inputStartY + inputHeight + lineHeight + metrics.verticalSpacing;
     const int hintY = underlineY + 4;
@@ -970,7 +963,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   // Reserve cursor instructions even for an empty field; passwords need a second row.
   const int tipsTop = underlineBottom + (cursorMode ? (isPassword ? 2 : 1) * tipsLh : 0);
 
-  if (kbRect.y - tipsTop >= tipsHeight) {
+  if (showTips && kbRect.y - tipsTop >= tipsHeight) {
     int y = tipsTop + (kbRect.y - tipsTop - tipsHeight) / 2;
     drawTip(tr(STR_KB_TIPS), y);
     y += tipsLh;
@@ -1040,14 +1033,26 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   props.labelText.font = layoutId == fui::KeyboardLayoutId::ArabicAr && !symbols ? fui::GfxRendererTarget::FONT_SMALL
                                                                                  : fui::GfxRendererTarget::FONT_BODY;
   props.altText.font = fui::GfxRendererTarget::FONT_SMALL;
-  props.gap = props.rowGap = static_cast<int16_t>(keyboardGap(metrics));
   if (urlPanel) props.uniformKeyWidth = false;  // Shortcut rows stretch independently.
-  if (!mappedInput.hasTouch()) props.background = fui::Paint::none();
-  frame.target().fill(kbRect, props.background);
+  // Setka keyboard, like the scanword one: flat keys on one grid of 1 px
+  // lines under a 2 px rule, the focused key a 4 px inset frame.
+  props.gap = props.rowGap = 0;
+  props.padding = fui::Insets{};
+  props.keyRadius = 0;
+  props.background = fui::Paint::none();
+  props.okLabel = "";  // drawn below as the primary action
+  props.keyStyles.explicitlySet = true;
+  props.keyStyles.normal.background = fui::Paint::solid(fui::Color::White);
+  props.keyStyles.disabled = props.keyStyles.normal;
+  props.keyStyles.selected = props.keyStyles.normal;
+  props.keyStyles.selected.border = fui::Paint::solid(fui::Color::Black);
+  props.keyStyles.selected.borderWidth = setka::kCellFrameWidth;
+  props.keyStyles.focused = props.keyStyles.active = props.keyStyles.selected;
   const int bottomEdge =
       mappedInput.hasTouch() ? renderer.getScreenHeight() : renderer.getScreenHeight() - metrics.buttonHintsHeight;
   props.bottomHitOverflow = static_cast<int16_t>(std::max(0, bottomEdge - keysRect.bottom()));
   fui::keyboard(frame, keysRect, props);
+  drawKeyGrid(keysRect, layout.rowCount);
   interactions.publish();
   interactionsReady = true;
 
@@ -1057,6 +1062,40 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   GUI.drawSideButtonHints(renderer, ">", "<");
 
   renderer.displayBuffer();
+}
+
+// Draws the grid over the keys keyboard() just registered: a 2 px rule on
+// top, 1 px lines under every row and between keys, and the OK key as the
+// primary action (bar + SemiBold). Key edges come from their hit rects, which
+// match the drawn keys away from the side edges.
+void KeyboardEntryActivity::drawKeyGrid(const fui::Rect& keysRect, const int rowCount) const {
+  using namespace setka;
+  const int width = renderer.getScreenWidth();
+  const int rowHeight = keysRect.height / rowCount;
+  drawRule(renderer, 0, keysRect.y - kRuleWidth, width);
+  for (int r = 1; r <= rowCount; ++r) {
+    const int y = keysRect.y + r * rowHeight - 1;
+    renderer.drawLine(0, y, width - 1, y);
+  }
+  const fui::Interaction* hits = interactions.data();
+  for (size_t i = 0; i < interactions.count(); ++i) {
+    const fui::Rect& key = hits[i].rect;
+    if (hits[i].action != ACTION_KEY) continue;
+    const int bottom = key.y + rowHeight - 1;
+    if (key.x - keysRect.x >= KEY_EDGE_SNAP) renderer.drawLine(key.x, key.y, key.x, bottom);
+    const int right = key.x + key.width;
+    if (keysRect.right() - right >= KEY_EDGE_SNAP) renderer.drawLine(right, key.y, right, bottom);
+    if (hits[i].value != fui::QWERTY_KEY_ENTER) continue;
+    const int fontId = keyLabelFont(keysRect.width);
+    const char* label = tr(STR_OK_BUTTON);
+    const int lineHeight = renderer.getLineHeight(fontId);
+    const int labelWidth = renderer.getTextWidth(fontId, label, kSemiBold);
+    const int keyWidth = std::min<int>(right, keysRect.right()) - key.x;
+    const int labelX = key.x + (keyWidth - labelWidth + kSelectionBarWidth + 6) / 2;
+    const int labelY = key.y + (rowHeight - lineHeight) / 2;
+    drawSelectionBar(renderer, labelX - kSelectionBarWidth - 6, labelY, lineHeight);
+    renderer.drawText(fontId, labelX, labelY, label, true, kSemiBold);
+  }
 }
 
 // Key labels use the body font unless a letter would not fit its key (the wide
@@ -1073,12 +1112,9 @@ int KeyboardEntryActivity::keyLabelFont(const int keysWidth) const {
     layers[1] = &URL_LAYOUT;
     layers[2] = &URL_SHIFT_LAYOUT;
   }
-  const fui::Insets panel = fui::KeyboardProps{}.padding;
-  const int width = keysWidth - panel.left - panel.right;
-  const int gap = keyboardGap(UITheme::getInstance().getMetrics());
   for (const int fontId : {UI_12_FONT_ID, UI_10_FONT_ID}) {
     if (std::all_of(std::begin(layers), std::end(layers), [&](const fui::KeyboardLayout* layer) {
-          return layer == nullptr || keyLabelsFit(renderer, *layer, fontId, width, gap, !urlPanel);
+          return layer == nullptr || keyLabelsFit(renderer, *layer, fontId, keysWidth, 0, !urlPanel);
         })) {
       return fontId;
     }
