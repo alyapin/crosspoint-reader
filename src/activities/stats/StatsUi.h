@@ -20,8 +20,8 @@ class MappedInputManager;
 // cover thumbs and the menu box.
 namespace statsui {
 
-constexpr int kSelectionBarX = setka::kSidePadding - setka::kSelectionBarWidth;
-constexpr int kRowTextX = setka::kSidePadding + 12;
+using setka::kRowTextX;
+using setka::kSelectionBarX;
 constexpr int kIconSize = 24;
 constexpr int kIconGap = 16;
 constexpr int kMenuRowHeight = 56;
