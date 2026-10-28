@@ -93,6 +93,8 @@ sips -s format png --resampleWidth 480 /tmp/shots/home.bmp --out /tmp/shots/home
 
 Use a fresh SD folder per run (the firmware reopens the last book). Taps are in logical 480×800 coordinates.
 
+Close the simulator after every run: end the input script with `QUIT`, run it behind a guard that kills the process after ~40 s, and confirm `pgrep -fl simulator_x4_pro/program` is empty. Never leave windows open on Aleksei's screen.
+
 ## Common mistakes
 
 - Gray or dithered text, thin gray rules: invisible or noisy on the panel. Use black.
