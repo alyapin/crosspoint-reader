@@ -10,6 +10,7 @@
 void MoreActivity::onEnter() {
   entryCount = 0;
   entries[entryCount++] = Entry::Games;
+  entries[entryCount++] = Entry::ReceiveBooks;
   entries[entryCount++] = Entry::FileTransfer;
   entries[entryCount++] = Entry::Catalogs;
   if (SETTINGS.pluginsEnabled) entries[entryCount++] = Entry::Plugins;
@@ -23,6 +24,8 @@ const char* MoreActivity::rowLabel(const int index) const {
   switch (entries[index]) {
     case Entry::Games:
       return tr(STR_GAMES);
+    case Entry::ReceiveBooks:
+      return tr(STR_LOCALSEND_TITLE);
     case Entry::FileTransfer:
       return tr(STR_FILE_TRANSFER);
     case Entry::Catalogs:
@@ -39,6 +42,8 @@ const freeink::Icon* MoreActivity::rowIcon(const int index) const {
   switch (entries[index]) {
     case Entry::Games:
       return &icon_gamepad_24;
+    case Entry::ReceiveBooks:
+      return &icon_download_24;
     case Entry::FileTransfer:
       return &icon_send_24;
     case Entry::Catalogs:
@@ -56,6 +61,9 @@ void MoreActivity::activateIndex(const int index) {
   switch (entries[index]) {
     case Entry::Games:
       openChild(std::make_unique<GamesActivity>(renderer, mappedInput));
+      break;
+    case Entry::ReceiveBooks:
+      activityManager.goToLocalSend();
       break;
     case Entry::FileTransfer:
       activityManager.goToFileTransfer();
