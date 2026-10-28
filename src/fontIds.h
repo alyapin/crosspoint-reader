@@ -12,6 +12,8 @@
 #define GOLOS_12_FONT_ID (1989595752)
 #define UNBOUNDED_61_FONT_ID (-362337940)
 #define UNBOUNDED_31_FONT_ID (-983976302)
+#define UNBOUNDED_19_FONT_ID (-1971734942)
+#define UNBOUNDED_14_FONT_ID (-2012058546)
 
 // Font ID 0 is reserved as the "not found" sentinel.
 // Guard against any hash accidentally producing 0.
@@ -26,3 +28,5 @@ static_assert(GOLOS_10_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(GOLOS_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(UNBOUNDED_61_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(UNBOUNDED_31_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(UNBOUNDED_19_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(UNBOUNDED_14_FONT_ID != 0, "Font ID collision with sentinel");
