@@ -196,6 +196,8 @@ bool isHiddenOrSidecar(const std::string_view name) {
 }
 
 std::string stemOf(const std::string& name) {
+  // "Book.fb2.zip" is "Book", not "Book.fb2".
+  if (FsHelpers::checkFileExtension(name, ".fb2.zip") && name.size() > 8) return name.substr(0, name.size() - 8);
   const size_t dot = name.find_last_of('.');
   return (dot == std::string::npos || dot == 0) ? name : name.substr(0, dot);
 }
@@ -306,7 +308,8 @@ int findPrior(WalkState& st, const uint64_t pathHash) {
   const int priorIndex = findPrior(st, entry.pathHash);
 
   const bool isXtc = FsHelpers::hasXtcExtension(name);
-  const bool extractionExpected = st.readMetadata && (FsHelpers::hasEpubExtension(name) || isXtc);
+  const bool extractionExpected =
+      st.readMetadata && (FsHelpers::hasEpubExtension(name) || FsHelpers::hasFb2Extension(name) || isXtc);
   const uint8_t expectedStatus = extractionExpected ? CLIX_METADATA_EXTRACTED : CLIX_METADATA_NOT_ATTEMPTED;
   bool reuseMetadata = false;
   ClixRecord priorRecord{};
@@ -1068,7 +1071,8 @@ bool isLibraryBookFile(const std::string_view path) {
     start = slash + 1;
   }
   return FsHelpers::checkFileExtension(path, ".epub") || FsHelpers::checkFileExtension(path, ".txt") ||
-         FsHelpers::checkFileExtension(path, ".md") || FsHelpers::hasXtcExtension(path);
+         FsHelpers::checkFileExtension(path, ".md") || FsHelpers::hasXtcExtension(path) ||
+         FsHelpers::hasFb2Extension(path);
 }
 
 bool markLibraryIndexDirty() {

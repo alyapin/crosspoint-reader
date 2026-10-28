@@ -56,12 +56,15 @@ TEST(LibraryBookFileTest, AcceptsBookFilesTheWalkLists) {
   EXPECT_TRUE(isLibraryBookFile("/Comics/issue.xtc"));
   EXPECT_TRUE(isLibraryBookFile("/Comics/issue.xtch"));
   EXPECT_TRUE(isLibraryBookFile("/Books/./book.epub"));
+  EXPECT_TRUE(isLibraryBookFile("/Books/book.fb2"));
+  EXPECT_TRUE(isLibraryBookFile("/Books/book.fb2.zip"));
 }
 
 TEST(LibraryBookFileTest, RejectsOtherFilesAndHiddenNames) {
   EXPECT_FALSE(isLibraryBookFile(""));
   EXPECT_FALSE(isLibraryBookFile("/Books/book.pdf"));
   EXPECT_FALSE(isLibraryBookFile("/Books/book.epub.part"));
+  EXPECT_FALSE(isLibraryBookFile("/Books/book.zip"));
   EXPECT_FALSE(isLibraryBookFile("/.crosspoint/library.dirty"));
   EXPECT_FALSE(isLibraryBookFile("/.crosspoint/plugins/foo/README.md"));
   EXPECT_FALSE(isLibraryBookFile("/.plugins/foo/notes.txt"));
@@ -125,6 +128,31 @@ TEST_F(LibraryBuilderTest, XtcTitleAndAuthorComeFromTheFile) {
   }
   EXPECT_TRUE(sawXtc);
   EXPECT_TRUE(sawXtch);
+}
+
+TEST_F(LibraryBuilderTest, Fb2TitleAndAuthorComeFromTheBook) {
+  fake::add("/Books/one.fb2");
+  fake::add("/Books/two.fb2.zip");
+  bookMetadata["/Books/one.fb2"] = {"Война и мир", "Лев Толстой", true};
+  bookMetadata["/Books/two.fb2.zip"] = {"Анна Каренина", "Лев Толстой", true};
+  initial();
+
+  LibraryIndexFile index;
+  ASSERT_TRUE(index.open(INDEX));
+  ASSERT_EQ(index.header().bookCount, 4u);
+  int seen = 0;
+  for (uint16_t ordinal = 0; ordinal < index.header().bookCount; ordinal++) {
+    ClixRecord record{};
+    std::string path;
+    std::string title;
+    ASSERT_TRUE(index.readRecord(ordinal, record));
+    ASSERT_TRUE(index.readPath(record, path));
+    if (path != "/Books/one.fb2" && path != "/Books/two.fb2.zip") continue;
+    ASSERT_TRUE(index.readTitle(record, title));
+    EXPECT_EQ(title, bookMetadata[path].title);
+    seen++;
+  }
+  EXPECT_EQ(seen, 2);
 }
 
 TEST_F(LibraryBuilderTest, UnchangedRebuildReusesMetadataAndDoesNotReplaceIndex) {

@@ -66,6 +66,9 @@ inline bool hasTxtExtension(const String& fileName) {
 // Check for .md extension (case-insensitive)
 bool hasMarkdownExtension(std::string_view fileName);
 
+// Check for .fb2 or .fb2.zip extension (case-insensitive)
+bool hasFb2Extension(std::string_view fileName);
+
 bool hasReflowableBookExtension(std::string_view fileName);
 
 // Check for .css extension (case-insensitive)
