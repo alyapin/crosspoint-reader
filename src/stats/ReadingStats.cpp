@@ -129,10 +129,12 @@ bool readAll(HalFile& f, void* data, const size_t size) {
   return size == 0 || f.read(data, size) == static_cast<int>(size);
 }
 
-void keepAsBad(const char* path) {
+bool keepAsBad(const char* path) {
   const std::string bad = withSuffix(path, ".bad");
   if (Storage.exists(bad.c_str())) Storage.remove(bad.c_str());
-  if (!Storage.rename(path, bad.c_str())) LOG_ERR("STAT", "Cannot set aside damaged %s", path);
+  if (Storage.rename(path, bad.c_str())) return true;
+  LOG_ERR("STAT", "Cannot set aside damaged %s", path);
+  return false;
 }
 
 enum class Load : uint8_t { Ok, Missing, Damaged, Failed };
@@ -171,6 +173,13 @@ bool decodeLog(const uint8_t (&in)[LOG_RECORD], LogEntry& e) {
   return true;
 }
 
+bool writeLogHeader(HalFile& f) {
+  uint8_t head[LOG_HEADER] = {};
+  std::memcpy(head, LOG_MAGIC, sizeof(LOG_MAGIC));
+  head[4] = VERSION;
+  return writeAll(f, head, sizeof(head));
+}
+
 using LogVisitor = bool (*)(const LogEntry& entry, void* ctx);
 
 struct LogInfo {
@@ -188,7 +197,11 @@ Load scanLog(const LogVisitor visit, void* ctx, LogInfo* info = nullptr) {
   HalFile f;
   if (!Storage.openFileForRead("STAT", LOG_PATH, f)) return Load::Failed;
   uint8_t head[LOG_HEADER];
-  if (!readAll(f, head, sizeof(head)) || std::memcmp(head, LOG_MAGIC, sizeof(LOG_MAGIC)) != 0 || head[4] != VERSION) {
+  // A read error is not damage: a damaged log may be reset in place (prepareLog).
+  const int got = f.read(head, sizeof(head));
+  if (got < 0) return Load::Failed;
+  if (got != static_cast<int>(sizeof(head)) || std::memcmp(head, LOG_MAGIC, sizeof(LOG_MAGIC)) != 0 ||
+      head[4] != VERSION) {
     return Load::Damaged;
   }
   LogInfo scanned;
@@ -627,7 +640,14 @@ bool ReadingStats::prepareLog() {
   if (state == Load::Failed) return false;
   if (state == Load::Damaged) {
     LOG_ERR("STAT", "Damaged reading log header");
-    keepAsBad(LOG_PATH);
+    // Appends behind a bad header are never read back: start the log over in place.
+    if (!keepAsBad(LOG_PATH)) {
+      HalFile f = Storage.open(LOG_PATH, O_RDWR);
+      if (!f || !f.truncate(0) || !writeLogHeader(f) || !f.close()) {
+        LOG_ERR("STAT", "Cannot reset reading log");
+        return false;
+      }
+    }
     info = LogInfo{};
   } else if (state == Load::Ok && info.validSize != info.fileSize) {
     // A torn append: cut it off so the next record lands on a record boundary.
@@ -668,13 +688,7 @@ bool ReadingStats::appendSegment(const int bookId, const ReadingSegment& segment
     LOG_ERR("STAT", "Cannot open reading log");
     return false;
   }
-  bool ok = true;
-  if (f.size() == 0) {
-    uint8_t head[LOG_HEADER] = {};
-    std::memcpy(head, LOG_MAGIC, sizeof(LOG_MAGIC));
-    head[4] = VERSION;
-    ok = writeAll(f, head, sizeof(head));
-  }
+  bool ok = f.size() > 0 || writeLogHeader(f);
   uint8_t record[LOG_RECORD];
   encodeLog(record, nextSeq, bookId >= 0 ? static_cast<uint16_t>(bookId) : NO_BOOK_ID, segment);
   ok = ok && writeAll(f, record, sizeof(record));

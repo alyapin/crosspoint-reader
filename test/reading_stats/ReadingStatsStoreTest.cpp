@@ -380,6 +380,32 @@ TEST(ReadingStatsStore, DamagedHeadersStartOverWithoutMisattribution) {
   EXPECT_EQ(summary(reboot(), days2).todaySeconds, 50u);
 }
 
+TEST(ReadingStatsStore, DamagedLogThatCannotBeSetAsideStartsOver) {
+  auto& store = freshStore();
+  const int a = store.openBook("/a.epub", "A", "", TODAY, 0);
+  ASSERT_TRUE(store.appendSegment(a, segment(TODAY, 100)));
+  fake::files.at(LOG)->bytes[1] = 'X';
+  // Neither moved aside nor reset: nothing is appended behind the bad header.
+  const auto damaged = fake::files.at(LOG)->bytes;
+  fake::failRename = 0;
+  fake::failTruncate = 0;
+  EXPECT_FALSE(reboot().appendSegment(a, segment(TODAY, 50)));
+  EXPECT_EQ(fake::files.at(LOG)->bytes, damaged);
+  // A read error is not damage: the log is left alone.
+  fake::failRead = 0;
+  EXPECT_FALSE(reboot().appendSegment(a, segment(TODAY, 50)));
+  EXPECT_EQ(fake::files.at(LOG)->bytes, damaged);
+  fake::failRename = 0;  // the move to log.bin.bad fails
+  auto& again = reboot();
+  ASSERT_TRUE(again.appendSegment(a, segment(TODAY, 50)));
+  EXPECT_TRUE(fake::failureTriggered);
+  EXPECT_FALSE(fake::files.count(std::string(LOG) + ".bad"));
+  // The new record sits behind a valid header and is read back after a reboot.
+  DayWindow days;
+  EXPECT_EQ(summary(reboot(), days).todaySeconds, 50u);
+  EXPECT_EQ(book(again, "/a.epub").seconds, 50u);
+}
+
 TEST(ReadingStatsStore, PathsTooLongAreNotTracked) {
   auto& store = freshStore();
   EXPECT_EQ(store.openBook(std::string(300, 'a'), "A", "", TODAY, 0), ReadingStats::NO_BOOK);
