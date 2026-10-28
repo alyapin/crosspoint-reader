@@ -22,7 +22,8 @@ class StatisticsActivity final : public Activity {
   static constexpr uint8_t kFuture = 0xFF;
 
   void drawCalendar(int top, int width) const;
-  void drawStat(int x, int capTop, int width, unsigned value, const char* label) const;
+  // Returns the bottom of what it drew.
+  int drawStat(int x, int capTop, int width, unsigned value, const char* label) const;
 
   stats::StatsSummary summary;
   // Shade of each calendar day, Monday-first weeks, oldest week first: 0

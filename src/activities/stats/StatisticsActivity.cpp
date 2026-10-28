@@ -7,11 +7,30 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <string>
 
 #include "CrossPointSettings.h"
 #include "StatsUi.h"
 
 using namespace setka;
+
+namespace {
+
+// True when no word of `text` is wider than `width`, so wrapping never splits one.
+bool wordsFit(const GfxRenderer& renderer, const int fontId, const char* text, const int width) {
+  std::string word;
+  for (const char* p = text;; ++p) {
+    if (*p != ' ' && *p != '\0') {
+      word += *p;
+      continue;
+    }
+    if (!word.empty() && renderer.getTextWidth(fontId, word.c_str()) > width) return false;
+    word.clear();
+    if (*p == '\0') return true;
+  }
+}
+
+}  // namespace
 
 void StatisticsActivity::onEnter() {
   Activity::onEnter();
@@ -38,21 +57,32 @@ void StatisticsActivity::loop() {
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) finish();
 }
 
-void StatisticsActivity::drawStat(const int x, const int capTop, const int width, const unsigned value,
-                                  const char* label) const {
+int StatisticsActivity::drawStat(const int x, const int capTop, const int width, const unsigned value,
+                                 const char* label) const {
   char number[8];
   snprintf(number, sizeof(number), "%u", value);
   const int numberWidth = drawHeroNumber(renderer, kHeroSmallFont, x, capTop, number);
   const int baseline = capTop + heroCapHeight(renderer, kHeroSmallFont);
-  // A label wider than the rest of its column wraps upward from the number's baseline.
   constexpr int kLabelGap = 12;
   const int line12 = renderer.getLineHeight(kText12Font);
-  const auto lines = renderer.wrappedText(kText12Font, label, width - numberWidth - kLabelGap, 2);
-  int top = baseline - renderer.getFontAscenderSize(kText12Font) - (static_cast<int>(lines.size()) - 1) * line12;
-  for (const auto& line : lines) {
-    renderer.drawText(kText12Font, x + numberWidth + kLabelGap, top, line.c_str());
+  const int besideWidth = width - numberWidth - kLabelGap;
+  // Beside the number, wrapping upward from its baseline, while every word
+  // fits there; under it once the number leaves too little room.
+  if (wordsFit(renderer, kText12Font, label, besideWidth)) {
+    const auto lines = renderer.wrappedText(kText12Font, label, besideWidth, 2);
+    int top = baseline - renderer.getFontAscenderSize(kText12Font) - (static_cast<int>(lines.size()) - 1) * line12;
+    for (const auto& line : lines) {
+      renderer.drawText(kText12Font, x + numberWidth + kLabelGap, top, line.c_str());
+      top += line12;
+    }
+    return baseline;
+  }
+  int top = baseline + kLabelGap;
+  for (const auto& line : renderer.wrappedText(kText12Font, label, width, 2)) {
+    renderer.drawText(kText12Font, x, top, line.c_str());
     top += line12;
   }
+  return top;
 }
 
 void StatisticsActivity::drawCalendar(const int top, const int width) const {
@@ -101,11 +131,13 @@ void StatisticsActivity::render(RenderLock&&) {
   y += kProgressHeight + kGap + 4;
 
   const int statWidth = width / 2 - kSidePadding * 3 / 2;
-  drawStat(kSidePadding, y, statWidth, summary.currentStreak,
-           I18N.get(statsui::plural(summary.currentStreak, StrId::STR_STATS_STREAK_ONE, StrId::STR_STATS_STREAK_FEW,
-                                    StrId::STR_STATS_STREAK_MANY)));
-  drawStat(width / 2 + kSidePadding / 2, y, statWidth, summary.bestStreak, tr(STR_STATS_RECORD));
-  y += heroCapHeight(renderer, kHeroSmallFont) + kGap;
+  const int streakBottom =
+      drawStat(kSidePadding, y, statWidth, summary.currentStreak,
+               I18N.get(statsui::plural(summary.currentStreak, StrId::STR_STATS_STREAK_ONE, StrId::STR_STATS_STREAK_FEW,
+                                        StrId::STR_STATS_STREAK_MANY)));
+  const int recordBottom =
+      drawStat(width / 2 + kSidePadding / 2, y, statWidth, summary.bestStreak, tr(STR_STATS_RECORD));
+  y = std::max(streakBottom, recordBottom) + kGap;
 
   drawRule(renderer, 0, y, width);
   y += kRuleWidth + 20;
