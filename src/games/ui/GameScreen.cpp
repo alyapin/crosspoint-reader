@@ -14,6 +14,7 @@
 #include <variant>
 
 #include "CrossPointSettings.h"
+#include "ElapsedText.h"
 
 namespace fui = freeink::ui;
 using namespace setka;
@@ -33,7 +34,7 @@ void GameScreen::onEnter() {
     RenderLock lock(*this);
     hasGame = restore();
     if (hasGame) resumeGame();
-    clockShown = shownSeconds();
+    clockShown = shownMinutes();
   }
   if (!hasGame) openNewGame();
   requestRepaint(RepaintEntry);
@@ -81,7 +82,7 @@ void GameScreen::openPicker(const char* title, const GamePickerActivity::Row* ro
       return;
     }
     resumeGame();
-    clockShown = shownSeconds();
+    clockShown = shownMinutes();
     requestRepaint(RepaintEntry);
   });
 }
@@ -125,9 +126,10 @@ void GameScreen::loop() {
     }
   }
 
-  const int32_t seconds = shownSeconds();
-  if (seconds != clockShown) {
-    clockShown = seconds;
+  // The timer repaints when its minute turns; a change in the same pass merges into one refresh.
+  const int32_t minutes = shownMinutes();
+  if (games::ui::timerStale(clockShown, minutes)) {
+    clockShown = minutes;
     requestRepaint(RepaintClock);
   }
   if (savePending && hasGame) {
@@ -228,14 +230,8 @@ void GameScreen::drawCursor(const int x, const int y, const int width, const int
   }
 }
 
-void GameScreen::formatClock(const uint32_t ms, char* out, const size_t cap) {
-  const uint32_t seconds = ms / 1000;
-  if (seconds >= 3600) {
-    snprintf(out, cap, "%u:%02u:%02u", static_cast<unsigned>(seconds / 3600), static_cast<unsigned>(seconds / 60 % 60),
-             static_cast<unsigned>(seconds % 60));
-  } else {
-    snprintf(out, cap, "%u:%02u", static_cast<unsigned>(seconds / 60), static_cast<unsigned>(seconds % 60));
-  }
+void GameScreen::formatElapsed(const uint32_t ms, char* out, const size_t cap) {
+  games::ui::formatElapsed(out, cap, ms, tr(STR_GAMES_MINUTES), tr(STR_GAMES_UNDER_MINUTE));
 }
 
 uint32_t GameScreen::nowMs() { return static_cast<uint32_t>(millis()); }

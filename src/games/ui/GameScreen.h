@@ -11,10 +11,10 @@
 
 // The shell of the Sudoku, Minesweeper and Klondike boards (ui-style Setka):
 // the clock/battery line, a top line with "‹ Выйти" and a status on the right,
-// the board, and a bottom
-// bar of up to three actions. HALF on entry, cadence FAST after each change,
-// a plain FAST once a second while the timer runs. The game is saved after
-// each change, on exit and before sleep. A screen without a saved game opens
+// the board, and a bottom bar of up to three actions. HALF on entry, cadence
+// FAST after each change, and a plain FAST when the shown minute of the timer
+// turns; nothing else repaints while the player is idle. The game is saved
+// after each change, on exit and before sleep. A screen without a saved game opens
 // the new-game picker first; cancelling it leaves.
 //
 // Keys (the X4 has no touch): the subclass walks its own cursor with
@@ -71,8 +71,8 @@ class GameScreen : public Activity, protected UiAppHost {
   virtual void onKey(int dx, int dy, bool confirm) = 0;
   // Back with something to drop first; true when consumed.
   virtual bool onBack() { return false; }
-  // Shown play time in whole seconds, or -1 when no timer is shown.
-  virtual int32_t shownSeconds() const { return -1; }
+  // Shown play time in whole minutes (ElapsedText.h), or -1 when no timer is shown.
+  virtual int32_t shownMinutes() const { return -1; }
   // Board hits carry InputLongPress (event.longPress on a held tap).
   virtual bool wantsLongPress() const { return false; }
 
@@ -94,7 +94,8 @@ class GameScreen : public Activity, protected UiAppHost {
                     EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
   // Key cursor: corner brackets inside the box.
   void drawCursor(int x, int y, int width, int height) const;
-  static void formatClock(uint32_t ms, char* out, size_t cap);
+  // "4 мин" / "<1 мин".
+  static void formatElapsed(uint32_t ms, char* out, size_t cap);
   // The games' clock source.
   static uint32_t nowMs();
 

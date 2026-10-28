@@ -30,7 +30,7 @@ class MinesweeperActivity final : public GameScreen {
   void onTouch(const freeink::ui::ActionEvent& event, int x, int y) override;
   void onKey(int dx, int dy, bool confirm) override;
   bool onBack() override;
-  int32_t shownSeconds() const override { return static_cast<int32_t>(game.elapsedMs() / 1000); }
+  int32_t shownMinutes() const override;
   bool wantsLongPress() const override { return true; }
 
   void runAction(Action action);

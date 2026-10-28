@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <iterator>
 
+#include "ElapsedText.h"
 #include "gameIcons.h"
 #include "games/GameSave.h"
 
@@ -176,6 +177,8 @@ void MinesweeperActivity::onKey(const int dx, const int dy, const bool confirm) 
   if (!std::equal(std::begin(before), std::end(before), std::begin(after))) requestRepaint(RepaintUpdate);
 }
 
+int32_t MinesweeperActivity::shownMinutes() const { return games::ui::shownMinute(true, game.elapsedMs()); }
+
 bool MinesweeperActivity::onBack() {
   if (barFocus < 0) return false;
   barFocus = -1;
@@ -192,9 +195,9 @@ int MinesweeperActivity::boardLeft() const { return (renderer.getScreenWidth() -
 // --- render task -------------------------------------------------------------
 
 void MinesweeperActivity::build(UiScreen& screen) {
-  char clock[16];
-  formatClock(game.elapsedMs(), clock, sizeof(clock));
-  char value[32];
+  char clock[24];
+  formatElapsed(game.elapsedMs(), clock, sizeof(clock));
+  char value[40];
   const char* label;
   if (game.status() == minesweeper::Status::Won) {
     label = tr(STR_MINES_WON);
@@ -204,7 +207,7 @@ void MinesweeperActivity::build(UiScreen& screen) {
     snprintf(value, sizeof(value), "%s", clock);
   } else {
     label = tr(STR_MINES_LEFT);
-    snprintf(value, sizeof(value), "%d  %s", game.minesLeft(), clock);
+    snprintf(value, sizeof(value), "%d \xC2\xB7 %s", game.minesLeft(), clock);
   }
   drawTopLine(screen, label, value, false);
 

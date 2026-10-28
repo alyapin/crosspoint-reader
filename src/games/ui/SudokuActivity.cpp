@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <iterator>
 
+#include "ElapsedText.h"
 #include "gameIcons.h"
 #include "games/GameSave.h"
 
@@ -255,6 +256,8 @@ void SudokuActivity::onKey(const int dx, const int dy, const bool confirm) {
   if (!std::equal(std::begin(before), std::end(before), std::begin(after))) requestRepaint(RepaintUpdate);
 }
 
+int32_t SudokuActivity::shownMinutes() const { return games::ui::shownMinute(!game.isSolved(), game.elapsedMs()); }
+
 bool SudokuActivity::onBack() {
   if (area == Area::Grid) return false;
   area = Area::Grid;
@@ -276,8 +279,8 @@ int SudokuActivity::cellAt(const int x, const int y) const {
 // --- render task -------------------------------------------------------------
 
 void SudokuActivity::build(UiScreen& screen) {
-  char clock[16];
-  formatClock(game.elapsedMs(), clock, sizeof(clock));
+  char clock[24];
+  formatElapsed(game.elapsedMs(), clock, sizeof(clock));
   drawTopLine(screen, levelStatus(game.level()), clock, true, area == Area::Status);
 
   drawGrid();
