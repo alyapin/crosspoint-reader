@@ -6,6 +6,7 @@
 #include <Xtc.h>
 
 #include "ClippingStore.h"
+#include "stats/ReadingStats.h"
 
 bool isBookCacheDirectoryName(const char* name) {
   if (!name) {
@@ -32,8 +33,13 @@ void clearBookCache(const std::string& path) {
   LOG_DBG("BookCache", "Done checking metadata cache for: %s", path.c_str());
 }
 
+void forgetBookStats(const std::string& path) {
+  if (FsHelpers::hasReflowableBookExtension(path) || FsHelpers::hasXtcExtension(path)) READING_STATS.forgetPath(path);
+}
+
 bool removeBookFile(const std::string& path) {
   if (!Storage.remove(path.c_str())) return false;
   clearBookCache(path);
+  forgetBookStats(path);
   return ClippingStore::deleteForFilePath(path, "epub");
 }

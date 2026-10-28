@@ -11,3 +11,7 @@ bool isBookCacheDirectoryName(const char* name);
 
 // Delete a local book and its local clipping state after the file is removed.
 bool removeBookFile(const std::string& path);
+
+// The book at `path` was deleted or replaced by a different file: its reading
+// statistics, status and shelves start over. Does nothing for other files.
+void forgetBookStats(const std::string& path);

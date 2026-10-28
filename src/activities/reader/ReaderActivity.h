@@ -8,6 +8,7 @@
 #include "EndOfBookOptions.h"
 #include "ReaderSession.h"
 #include "activities/Activity.h"
+#include "stats/ReadingTracker.h"
 
 class ReaderActivity : public Activity {
   friend class ActivityManager;  // turns pages for a Bluetooth remote (ActivityManager::remoteTurn)
@@ -20,6 +21,9 @@ class ReaderActivity : public Activity {
   std::unique_ptr<EndOfBookOptions> endOfBookOptions;
   std::atomic<bool> endOfBookOptionsReady{false};
   ReaderSession readerSession;
+  // Reading statistics: active time, pages and status of this visit (stats/ReadingStats.h).
+  ReadingTracker readingTracker;
+  int statsBookId = -1;
   std::atomic<bool> pageRendered{false};
   bool bookRemembered = false;
   void markPageRendered() { pageRendered.store(true, std::memory_order_release); }
@@ -70,6 +74,8 @@ class ReaderActivity : public Activity {
   void disableFastInitialRefresh();
   void notePageTurn(bool forward, bool succeeded);
   void flushReaderSession();
+  // Writes reading-statistics segments the tracker closed; call from loop().
+  void serviceReadingStats();
 
  public:
   ~ReaderActivity() override = default;
@@ -86,4 +92,8 @@ class ReaderActivity : public Activity {
   bool isReaderActivity() const final { return true; }
   bool acceptsRemoteInput() const final { return pageRendered.load(std::memory_order_acquire); }
   bool handleForcedRefresh() final;
+
+ private:
+  void notePageShown(bool atEnd);
+  void writeReadingStats(const ReadingSegment* segment, bool finished);
 };
