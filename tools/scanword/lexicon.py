@@ -22,7 +22,7 @@ import pymorphy3
 import wordfreq
 
 MIN_LEN, MAX_LEN = 3, 10
-MAX_CLUE = 26
+MAX_CLUE = 20
 MIN_ZIPF = 1.8
 
 TITLE_RE = re.compile(rf"^[а-яё]{{{MIN_LEN},{MAX_LEN}}}$")

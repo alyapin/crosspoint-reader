@@ -545,7 +545,7 @@ def validate(p, lexicon=None):
     return errors
 
 
-def generate(entries, level, rng, uses, width=10, height=14, attempts=40):
+def generate(entries, level, rng, uses, width=8, height=11, attempts=40):
     min_zipf, noise = LEVELS[level]
     pool = [
         e
@@ -571,11 +571,11 @@ def main():
     ap.add_argument("out")
     ap.add_argument("--count", type=int, default=200)
     ap.add_argument("--seed", type=int, default=1)
-    ap.add_argument("--width", type=int, default=10)
-    ap.add_argument("--height", type=int, default=14)
-    ap.add_argument("--max-clue", type=int, default=MAX_CLUE, help="skip words with longer clues")
-    ap.add_argument("--split-clue", type=int, default=MAX_CLUE, help="clue length cap in two-clue cells")
-    ap.add_argument("--line-chars", type=int, default=0, help="skip clues longer than 3 lines of this many chars")
+    ap.add_argument("--width", type=int, default=8)
+    ap.add_argument("--height", type=int, default=11)
+    ap.add_argument("--max-clue", type=int, default=18, help="skip words with longer clues")
+    ap.add_argument("--split-clue", type=int, default=9, help="clue length cap in two-clue cells")
+    ap.add_argument("--line-chars", type=int, default=6, help="skip clues longer than 3 lines of this many chars")
     args = ap.parse_args()
     global SPLIT_CLUE
     SPLIT_CLUE = args.split_clue
