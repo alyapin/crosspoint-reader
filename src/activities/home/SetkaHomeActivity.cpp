@@ -17,6 +17,7 @@
 
 #include "CrossPointSettings.h"
 #include "MoreActivity.h"
+#include "activities/stats/StatsScreens.h"
 #include "components/UITheme.h"
 #include "components/icons/listIcons.h"
 #include "components/setka/setkaIcons.h"
@@ -49,6 +50,7 @@ struct TabSpec {
   const freeink::Icon* icon;
 };
 const TabSpec kTabs[] = {{StrId::STR_LIBRARY, &icon_library_32},
+                         {StrId::STR_STATS_TITLE, &icon_chart_column_32},
                          {StrId::STR_MORE, &icon_layout_grid_32},
                          {StrId::STR_SETTINGS_TITLE, &icon_sliders_32}};
 
@@ -142,7 +144,7 @@ void SetkaHomeActivity::onTab(const fui::ActionEvent& event, void* user) {
 }
 
 void SetkaHomeActivity::onOpenLibrary(const fui::ActionEvent&, void* user) {
-  static_cast<SetkaHomeActivity*>(user)->openTab(TabLibrary);
+  static_cast<SetkaHomeActivity*>(user)->openAllBooks();
 }
 
 void SetkaHomeActivity::openBook(const int index) {
@@ -155,7 +157,10 @@ void SetkaHomeActivity::openTab(const int tab) {
   app.clearTapFlash();
   switch (tab) {
     case TabLibrary:
-      activityManager.goToLibrary();
+      openLibraryTabs(renderer, mappedInput);
+      break;
+    case TabStatistics:
+      openStatistics(renderer, mappedInput);
       break;
     case TabMore:
       activityManager.replaceActivity(std::make_unique<MoreActivity>(renderer, mappedInput));
@@ -166,6 +171,11 @@ void SetkaHomeActivity::openTab(const int tab) {
     default:
       break;
   }
+}
+
+void SetkaHomeActivity::openAllBooks() {
+  app.clearTapFlash();
+  activityManager.goToLibrary();
 }
 
 void SetkaHomeActivity::moveFocus(const int delta) {
@@ -179,7 +189,7 @@ void SetkaHomeActivity::activateFocus() {
   if (index >= bookFocusCount()) {
     openTab(index - bookFocusCount());
   } else if (slotCount == 0) {
-    openTab(TabLibrary);
+    openAllBooks();
   } else {
     openBook(index);
   }
