@@ -259,13 +259,16 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t sleepScreenCoverMode = FIT;
   // Sleep screen cover filter
   uint8_t sleepScreenCoverFilter = NO_FILTER;
-  // Status bar settings
-  uint8_t statusBarChapterPageCount = 1;
-  uint8_t statusBarBookProgressPercentage = 1;
+  // Status bar settings. This build defaults to the book footer: whole-book
+  // page on the left, reading time left on the right, nothing else.
+  uint8_t statusBarChapterPageCount = 0;
+  uint8_t statusBarBookProgressPercentage = 0;
   uint8_t statusBarProgressBar = HIDE_PROGRESS;
   uint8_t statusBarProgressBarThickness = PROGRESS_BAR_NORMAL;
-  uint8_t statusBarTitle = CHAPTER_TITLE;
-  uint8_t statusBarBattery = 1;
+  uint8_t statusBarTitle = HIDE_TITLE;
+  uint8_t statusBarBattery = 0;
+  uint8_t statusBarBookPage = 1;
+  uint8_t statusBarTimeLeft = 1;
   uint8_t xtcStatusBarMode = XTC_STATUS_BAR_HIDE;
   // Clock display in status bar (any board whose RTC probe succeeds)
   uint8_t statusBarClock = STATUS_BAR_CLOCK_HIDE;
@@ -458,6 +461,8 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   struct StatusBarSpec {
     bool showChapterPageCount = false;
     bool showBookProgressPercent = false;
+    bool showBookPage = false;
+    bool showTimeLeft = false;
     uint8_t titleMode = HIDE_TITLE;  // STATUS_BAR_TITLE
     bool showBattery = false;
     bool showBatteryPercent = false;
@@ -470,10 +475,12 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     bool showsProgressBar() const { return progressBarMode != HIDE_PROGRESS; }
     bool showsTitle() const { return titleMode != HIDE_TITLE; }
     bool showsClock() const { return clockMode != STATUS_BAR_CLOCK_HIDE; }
+    // Book page or time left: drawn with a rule above the text lane.
+    bool showsBookFooter() const { return showBookPage || showTimeLeft; }
     // Visibility of the text lane. Clock hardware presence is the caller's
     // concern: pass halClock.isAvailable(), or true for layout reservation.
     bool textLaneVisible(bool clockAvailable) const {
-      return showChapterPageCount || showBookProgressPercent || showsTitle() || showBattery ||
+      return showChapterPageCount || showBookProgressPercent || showsTitle() || showBattery || showsBookFooter() ||
              (showsClock() && clockAvailable);
     }
   };

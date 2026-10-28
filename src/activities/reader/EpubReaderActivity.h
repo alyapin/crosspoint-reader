@@ -10,6 +10,7 @@
 #include <optional>
 #include <vector>
 
+#include "BookFooter.h"
 #include "BookmarkEntry.h"
 #include "ChapterPosition.h"
 #include "ClipSelectionActivity.h"
@@ -142,6 +143,18 @@ class EpubReaderActivity final : public ReaderActivity {
   // back as soon as a button is down, so a short press is seen before more pages are built.
   void backgroundBuildTick();
   bool anyButtonPressed() const;
+  // Book footer (whole-book page, time left). Chapters other than the open one are laid out off
+  // screen, one at a time, while the reader idles on a finished chapter, until every count is exact.
+  BookFooter bookFooter;
+  std::unique_ptr<Section> pagerSection;
+  int pagerSpine = -1;
+  uint32_t pagerVisit = 0;
+  uint32_t pagerLayoutKey = 0;
+  // Layout the open chapter's section was loaded or built for.
+  uint32_t sectionLayoutKey = 0;
+  static constexpr unsigned long PAGER_IDLE_MS = 3000;
+  void bookPagerTick();
+  void stopBookPager();
   // A background build failed in this spine. The error would likely recur, so from then on the
   // spine is built only as far as the reader goes; pages from earlier build steps stay readable.
   int backgroundBuildFailedSpine = -1;

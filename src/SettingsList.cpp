@@ -324,6 +324,10 @@ void forEachBaseSetting(SettingVisitor visit, void* context) {
       },
       "koSyncClippings", StrId::STR_KOREADER_SYNC));
   // --- Status Bar Settings (web-only, uses StatusBarSettingsActivity) ---
+  emit(SettingInfo::Toggle(StrId::STR_BOOK_PAGE, &CrossPointSettings::statusBarBookPage, "statusBarBookPage",
+                           StrId::STR_CUSTOMISE_STATUS_BAR));
+  emit(SettingInfo::Toggle(StrId::STR_TIME_LEFT, &CrossPointSettings::statusBarTimeLeft, "statusBarTimeLeft",
+                           StrId::STR_CUSTOMISE_STATUS_BAR));
   emit(SettingInfo::Toggle(StrId::STR_CHAPTER_PAGE_COUNT, &CrossPointSettings::statusBarChapterPageCount,
                            "statusBarChapterPageCount", StrId::STR_CUSTOMISE_STATUS_BAR));
   emit(SettingInfo::Toggle(StrId::STR_BOOK_PROGRESS_PERCENTAGE, &CrossPointSettings::statusBarBookProgressPercentage,

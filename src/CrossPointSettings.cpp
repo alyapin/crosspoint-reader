@@ -220,6 +220,18 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
     }
   }
 
+  // Saved before the book footer existed: switch the status bar to it once,
+  // as on a fresh install (whole-book page and time left only).
+  if (doc["statusBarBookPage"].isNull()) {
+    statusBarChapterPageCount = 0;
+    statusBarBookProgressPercentage = 0;
+    statusBarTitle = HIDE_TITLE;
+    statusBarBattery = 0;
+    statusBarProgressBar = HIDE_PROGRESS;
+    statusBarClock = STATUS_BAR_CLOCK_HIDE;
+    needsResave = true;
+  }
+
   if (doc["sleepTimeoutMinutes"].isNull() && !doc["sleepTimeout"].isNull()) {
     const uint8_t legacyValue =
         clamp(doc["sleepTimeout"] | (uint8_t)SLEEP_10_MIN, SLEEP_TIMEOUT_COUNT, (uint8_t)SLEEP_10_MIN);
@@ -316,6 +328,8 @@ CrossPointSettings::StatusBarSpec CrossPointSettings::statusBarSpec() const {
   StatusBarSpec spec;
   spec.showChapterPageCount = statusBarChapterPageCount != 0;
   spec.showBookProgressPercent = statusBarBookProgressPercentage != 0;
+  spec.showBookPage = statusBarBookPage != 0;
+  spec.showTimeLeft = statusBarTimeLeft != 0;
   spec.titleMode = statusBarTitle;
   spec.showBattery = statusBarBattery != 0;
   spec.showBatteryPercent = hideBatteryPercentage == HIDE_NEVER;
