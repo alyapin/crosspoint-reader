@@ -22,6 +22,8 @@ Applies only to UI changes. Non-UI changes skip the mockup steps but still need 
 
 ## Device constraints
 
+The fork targets two readers: the X4 Pro (ESP32-S3, PSRAM, touch, frontlight, no Back/Confirm keys) and the plain X4 (ESP32-C3, no PSRAM, ~400 KB RAM, no touch, no frontlight, physical Back/Confirm/Left/Right + side buttons). Every screen must work with touch on the Pro AND with buttons only on the X4 (FreeInkUI focus model: Left/Right/side buttons move focus, Confirm activates, Back exits). Touch gestures and frontlight features stay Pro-only behind capability checks. Both `x4pro-gh_release` and `gh_release` must build.
+
 | Fact | Consequence |
 |---|---|
 | 480×800 portrait, UI drawing is 1-bit | Design in pure black and white |
