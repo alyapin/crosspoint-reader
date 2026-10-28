@@ -35,9 +35,9 @@ INDEX_HEADER = "SCANWORDS 1"
 # frequency ordering gets. Level 1 sticks to everyday words.
 LEVELS = {1: (3.2, 0.35), 2: (2.7, 0.6), 3: (2.2, 0.9)}
 # Short words are the glue of a scanword and there are few of them, so they may
-# be rarer than the level allows. MAX_USES caps any word's repeats in one pack.
+# be rarer than the level allows and repeat more often across a pack.
 SHORT_LEN, SHORT_ZIPF_BONUS = 4, 0.6
-MAX_USES = 10
+MAX_USES_SHORT, MAX_USES_LONG = 25, 3
 # Template cost weights.
 W_CLUE, W_DOUBLE, W_UNCHECKED, W_SHORT, W_LONG, W_BLOCK = 1.0, 1.5, 0.2, 0.3, 1.5, 1.2
 
@@ -514,7 +514,7 @@ def generate(entries, level, rng, uses, width=10, height=14, attempts=40):
         e
         for e in entries
         if e.zipf >= min_zipf - (SHORT_ZIPF_BONUS if len(e.word) <= SHORT_LEN else 0)
-        and uses.get(fold(e.word), 0) < MAX_USES
+        and uses.get(fold(e.word), 0) < (MAX_USES_SHORT if len(e.word) <= SHORT_LEN else MAX_USES_LONG)
     ]
     for _ in range(attempts):
         template = make_template(width, height, rng)
@@ -544,12 +544,16 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     uses = {}
     index_lines = [INDEX_HEADER]
-    for n in range(1, args.count + 1):
-        level = 1 + (n - 1) % 3
+    n = 0
+    for _ in range(3 * args.count):
+        if n == args.count:
+            break
+        level = 1 + n % 3
         puzzle, words = generate(entries, level, rng, uses, args.width, args.height)
         if puzzle is None:
-            print(f"puzzle {n}: no fill", file=sys.stderr)
+            print(f"puzzle {n + 1}: no fill, retrying", file=sys.stderr)
             continue
+        n += 1
         errors = validate(puzzle, lex)
         if errors:
             raise SystemExit(f"puzzle {n} invalid: {errors[:3]}")
