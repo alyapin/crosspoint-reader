@@ -259,6 +259,10 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t sleepScreenCoverMode = FIT;
   // Sleep screen cover filter
   uint8_t sleepScreenCoverFilter = NO_FILTER;
+  // Picture the Custom sleep screen always shows, picked in Settings → Sleep
+  // image ("" = random from /.sleep and /sleep). Validated by
+  // sleep_pick::isChoicePath on load; saved manually like dictionaryName.
+  char sleepImagePath[192] = "";
   // Status bar settings. This build defaults to the book footer: whole-book
   // page on the left, reading time left on the right, nothing else.
   uint8_t statusBarChapterPageCount = 0;
@@ -407,6 +411,9 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Restore the saved on/off state after a normal boot or wake. Brightness and
   // warmth are always remembered even when this is disabled.
   uint8_t frontlightRestoreOnWake = 1;
+  // Reader: a vertical drag along the right edge sets the frontlight brightness
+  // (touch boards with a frontlight).
+  uint8_t brightnessSwipe = 1;
   // What the slide switch controls (boards with one): frontlight on/off or
   // night mode. The switch's position is applied at boot and on each change.
   enum SLIDE_SWITCH_ACTION : uint8_t {

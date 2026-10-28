@@ -20,6 +20,13 @@
 #include "XtcReaderActivity.h"
 #include "util/PluginEvents.h"
 
+#if CROSSPOINT_BRIGHTNESS_SWIPE
+#include <HalFrontlight.h>
+
+#include "BrightnessOverlay.h"
+#include "util/SlideSwitch.h"
+#endif
+
 ReaderActivity::ReaderActivity(const char* name, GfxRenderer& renderer, MappedInputManager& mappedInput,
                                std::string bookPath, const bool allowFastInitialRefresh)
     : Activity(name, renderer, mappedInput), bookPath(std::move(bookPath)) {
@@ -95,6 +102,13 @@ void ReaderActivity::rememberBookOnceRendered() {
 }
 
 void ReaderActivity::onExit() {
+#if CROSSPOINT_BRIGHTNESS_SWIPE
+  // Left mid-drag (Home key, sleep): keep the level the light is at.
+  if (brightnessGesture.dragging()) {
+    brightnessGesture.cancel();
+    finishBrightnessSwipe();
+  }
+#endif
   Activity::onExit();
 
   // Keep rebuildable font buffers from pinning the heap between reading sessions.
@@ -217,6 +231,9 @@ bool ReaderActivity::handleEndOfBookPageTurn(const bool prevTriggered, const boo
 
 void ReaderActivity::loop() {
   rememberBookOnceRendered();
+#if CROSSPOINT_BRIGHTNESS_SWIPE
+  if (handleBrightnessSwipe()) return;
+#endif
   clearEndOfBookOptionsIfNeeded();
   if (handleEndOfBookMenu()) return;
   if (handleFormatInput()) return;
@@ -241,6 +258,9 @@ void ReaderActivity::loop() {
 }
 
 void ReaderActivity::render(RenderLock&&) {
+#if CROSSPOINT_BRIGHTNESS_SWIPE
+  if (renderBrightnessOverlay()) return;
+#endif
   if (isAtEndOfBook()) {
     if (!endOfBookOptions) {
       endOfBookOptions = makeUniqueNoThrow<EndOfBookOptions>(renderer);
@@ -274,3 +294,129 @@ bool ReaderActivity::handleForcedRefresh() {
   requestUpdate();
   return true;
 }
+
+#if CROSSPOINT_BRIGHTNESS_SWIPE
+namespace {
+// Frontlight writes while dragging, at most this often; the last level always lands.
+constexpr unsigned long kLightApplyIntervalMs = 25;
+// Same floor as the control center slider: 0 is "off", which is the lamp's job.
+constexpr int kMinOnLevel = 1;
+}  // namespace
+
+void ReaderActivity::requestUpdate(const bool immediate) {
+  pageRepaintWanted.store(true, std::memory_order_release);
+  Activity::requestUpdate(immediate);
+}
+
+bool ReaderActivity::brightnessSwipeAllowed() const {
+  return SETTINGS.brightnessSwipe && SETTINGS.touchReaderControls != CrossPointSettings::TOUCH_READER_OFF &&
+         mappedInput.hasTouch() && Frontlight.present() && pageRendered.load(std::memory_order_acquire) &&
+         !isAtEndOfBook() && !inputOverPage() && (Frontlight.isOn() || !slideSwitchOwnsLight());
+}
+
+bool ReaderActivity::handleBrightnessSwipe() {
+  using Event = brightness_swipe::Gesture::Event;
+  const int screenW = renderer.getScreenWidth();
+  const int screenH = renderer.getScreenHeight();
+  int x = 0;
+  int y = 0;
+  if (mappedInput.wasScreenTouchPressed(x, y)) {
+    // A new contact while still dragging: the old release went unseen.
+    if (brightnessGesture.dragging()) finishBrightnessSwipe();
+    if (brightnessSwipeAllowed()) {
+      brightnessGesture.press(x, y, screenW, screenH);
+    } else {
+      brightnessGesture.cancel();
+    }
+  }
+  const bool held = mappedInput.isScreenTouchHeld(x, y);
+  const Event event = brightnessGesture.track(held, x, y);
+  switch (event) {
+    case Event::None:
+      return false;
+    case Event::Start:
+      // Re-checked at the claim: the page may have left the framebuffer since
+      // touch-down (a background build step can lend it out).
+      if (!brightnessSwipeAllowed()) {
+        brightnessGesture.cancel();
+        return false;
+      }
+      // An unlit light starts from 0, so the drag up is what switches it on.
+      swipeStartedOn = Frontlight.isOn();
+      swipeOriginalBrightness = Frontlight.brightness();
+      swipeStartLevel = swipeStartedOn ? std::max<int>(kMinOnLevel, swipeOriginalBrightness) : 0;
+      swipeAppliedLevel = swipeStartLevel;
+      [[fallthrough]];
+    case Event::Move: {
+      const int level = brightness_swipe::levelFor(swipeStartLevel, brightnessGesture.travel(), screenH,
+                                                   swipeStartedOn ? kMinOnLevel : 0);
+      if (event == Event::Start || level != swipeLevel) {
+        swipeLevel = level;
+        brightnessOverlayLevel.store(level, std::memory_order_release);
+        // Overlay only: the page repaint flag stays down.
+        Activity::requestUpdate();
+      }
+      applySwipeLevel(false);
+      return true;
+    }
+    case Event::Hold:
+      applySwipeLevel(false);
+      return true;
+    case Event::End:
+      finishBrightnessSwipe();
+      return true;
+  }
+  return true;
+}
+
+void ReaderActivity::applySwipeLevel(const bool force) {
+  if (swipeLevel == swipeAppliedLevel) return;
+  const unsigned long now = millis();
+  if (!force && now - swipeAppliedAt < kLightApplyIntervalMs) return;
+  swipeAppliedLevel = swipeLevel;
+  swipeAppliedAt = now;
+  if (swipeLevel <= 0) {
+    // Only reachable when the drag started with the light off.
+    Frontlight.setOn(false);
+    return;
+  }
+  Frontlight.setBrightness(static_cast<uint8_t>(swipeLevel));
+  if (!slideSwitchOwnsLight()) Frontlight.setOn(true);
+}
+
+void ReaderActivity::finishBrightnessSwipe() {
+  applySwipeLevel(true);
+  // Dragged back to 0 from off: nothing changed, keep the remembered level.
+  if (swipeLevel <= 0) Frontlight.setBrightness(swipeOriginalBrightness);
+  const bool lightOn = Frontlight.isOn();
+  bool changed = false;
+  if (SETTINGS.frontlightBrightness != Frontlight.brightness()) {
+    SETTINGS.frontlightBrightness = Frontlight.brightness();
+    changed = true;
+  }
+  if (lightOn != swipeStartedOn && SETTINGS.frontlightOn != (lightOn ? 1 : 0)) {
+    SETTINGS.frontlightOn = lightOn ? 1 : 0;
+    changed = true;
+  }
+  if (changed) SETTINGS.saveToFile();
+  brightnessOverlayLevel.store(-1, std::memory_order_release);
+  requestUpdate();  // repaint the page under the overlay, on the reader's refresh cadence
+}
+
+bool ReaderActivity::renderBrightnessOverlay() {
+  const bool pageWanted = pageRepaintWanted.exchange(false, std::memory_order_acq_rel);
+  const int level = brightnessOverlayLevel.load(std::memory_order_acquire);
+  if (level < 0) return false;
+  if (pageWanted) {
+    // The page comes first; the overlay goes back over it on the next pass.
+    Activity::requestUpdate();
+    return false;
+  }
+  brightness_overlay::draw(renderer, level);
+  renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+  // Each overlay refresh counts toward the reader's ghost-cleanup cadence, so
+  // the repaint on release takes the HALF refresh once it falls due.
+  if (pagesUntilFullRefresh > 1) --pagesUntilFullRefresh;
+  return true;
+}
+#endif

@@ -582,6 +582,7 @@ To use custom sleep images, set the sleep screen mode to **Custom** or **Cover +
 
 - **Multiple Images (recommended):** Create a `.sleep` directory in the root of the SD card and place any number of `.bmp` images inside. One will be randomly selected each time the device sleeps. (A directory named `sleep` is also accepted as a fallback.)
 - **Single Image:** Place a file named `sleep.bmp` in the root directory. This takes priority over the `.sleep`/`sleep` directories.
+- **Pick one picture:** **Settings → Display → Sleep image** shows thumbnails of the `.sleep`/`sleep` pictures. Open one and choose **Set** to show it on every sleep; it then takes priority over `sleep.bmp`. If it disappears, a random picture is used. **Random** restores the random choice.
 
 #### Transparent overlay images
 

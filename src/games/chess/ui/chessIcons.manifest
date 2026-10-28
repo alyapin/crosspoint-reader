@@ -1,0 +1,25 @@
+# Manifest for src/games/chess/ui/chessIcons.h; regenerate from the repository root with:
+#   python3 freeink-sdk/libs/assets/Icons/tools/gen_icons.py \
+#     --manifest src/games/chess/ui/chessIcons.manifest \
+#     --svgdir freeink-sdk/libs/assets/Icons/lucide/icons \
+#     --sizes 24 --out src/games/chess/ui/chessIcons.h
+# then clang-format the header.
+# chess: the games list row; the rest: chess list rows.
+chess = chess-knight
+computer = cpu
+friend = users
+level = gauge
+color = contrast
+time = timer
+rotate = rotate-ccw
+pieces = chess-pawn
+start = play
+resign = flag
+draw = handshake
+new-game = circle-plus
+flip = arrow-up-down
+minutes = clock
+increment = clock-plus
+done = check
+option = circle
+option-on = circle-dot

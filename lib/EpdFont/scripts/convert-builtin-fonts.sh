@@ -97,7 +97,8 @@ for size in 10 12; do
 done
 
 # Hero numbers: digits-only Unbounded SemiBold. Cap height is 0.75 em and the
-# converter rasterizes at 150 DPI, so 61 pt is ~96 px and 31 pt ~48 px.
+# converter rasterizes at 150 DPI, so 61 pt is ~96 px, 31 pt ~48 px, 19 pt ~30 px,
+# 14 pt ~22 px and 11 pt ~17 px.
 HERO_INTERVALS=(
   --only-additional-intervals
   --additional-intervals 0x20,0x20      # space
@@ -106,7 +107,7 @@ HERO_INTERVALS=(
   --additional-intervals 0x30,0x3A      # 0-9 :
   --additional-intervals 0x2212,0x2212  # minus sign
 )
-for size in 61 31; do
+for size in 61 31 19 14 11; do
   output_path="../builtinFonts/unbounded_${size}_digits.h"
   python fontconvert.py unbounded_${size}_digits $size ../builtinFonts/source/Unbounded/Unbounded-SemiBold.ttf \
     "${HERO_INTERVALS[@]}" > $output_path

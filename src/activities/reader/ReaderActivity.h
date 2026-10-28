@@ -1,5 +1,7 @@
 #pragma once
 
+#include <BoardConfig.h>
+
 #include <atomic>
 #include <memory>
 #include <string>
@@ -9,8 +11,32 @@
 #include "ReaderSession.h"
 #include "activities/Activity.h"
 
+// Frontlight brightness by a vertical drag along the right edge of the page.
+#define CROSSPOINT_BRIGHTNESS_SWIPE (FREEINK_CAP_TOUCH && FREEINK_CAP_FRONTLIGHT)
+#if CROSSPOINT_BRIGHTNESS_SWIPE
+#include "BrightnessSwipe.h"
+#endif
+
 class ReaderActivity : public Activity {
   friend class ActivityManager;  // turns pages for a Bluetooth remote (ActivityManager::remoteTurn)
+
+#if CROSSPOINT_BRIGHTNESS_SWIPE
+  brightness_swipe::Gesture brightnessGesture;
+  int swipeStartLevel = 0;
+  int swipeLevel = 0;
+  int swipeAppliedLevel = 0;
+  unsigned long swipeAppliedAt = 0;
+  uint8_t swipeOriginalBrightness = 0;
+  bool swipeStartedOn = false;
+  // Level the render task paints in the overlay, -1 = no overlay.
+  std::atomic<int> brightnessOverlayLevel{-1};
+  // Raised by every page repaint request, so a coalesced overlay paint never
+  // swallows one.
+  std::atomic<bool> pageRepaintWanted{false};
+  void applySwipeLevel(bool force);
+  void finishBrightnessSwipe();
+  bool renderBrightnessOverlay();
+#endif
 
  protected:
   std::string bookPath;
@@ -70,6 +96,14 @@ class ReaderActivity : public Activity {
   void disableFastInitialRefresh();
   void notePageTurn(bool forward, bool succeeded);
   void flushReaderSession();
+#if CROSSPOINT_BRIGHTNESS_SWIPE
+  // Readers call this first in loop(); true = a brightness drag owns this
+  // frame's touch input, so the reader must not act on it.
+  bool handleBrightnessSwipe();
+  // Whether a drag may start now: the page is on screen and in the
+  // framebuffer, and nothing else is painted over it.
+  virtual bool brightnessSwipeAllowed() const;
+#endif
 
  public:
   ~ReaderActivity() override = default;
@@ -82,6 +116,9 @@ class ReaderActivity : public Activity {
   void prepareForSleep() override;
   void loop() override;
   void render(RenderLock&& lock) override;
+#if CROSSPOINT_BRIGHTNESS_SWIPE
+  void requestUpdate(bool immediate = false) override;
+#endif
 
   bool isReaderActivity() const final { return true; }
   bool acceptsRemoteInput() const final { return pageRendered.load(std::memory_order_acquire); }

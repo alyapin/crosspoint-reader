@@ -1,0 +1,13 @@
+# Lucide icons for the Setka screens (home tabs, Ещё rows) — regenerate from the
+# repository root with:
+#   python3 freeink-sdk/libs/assets/Icons/tools/gen_icons.py \
+#     --manifest src/components/setka/setkaIcons.manifest \
+#     --svgdir freeink-sdk/libs/assets/Icons/lucide/icons \
+#     --sizes 24,32 --out src/components/setka/setkaIcons.h
+# Icons already in components/icons/listIcons.h (folder, download, library,
+# blocks) are reused from there.
+gamepad = gamepad-2
+send = send
+globe = globe
+layout-grid = layout-grid
+sliders = sliders-horizontal

@@ -165,6 +165,11 @@ class EpubReaderActivity final : public ReaderActivity {
   static constexpr uint32_t BUILD_ROOM_WAIT_MS = 5000;
   static constexpr uint32_t BUILD_ROOM_STEP_MS = 50;
   bool inputOverPage() const override { return overlay != Overlay::None || ReaderActivity::inputOverPage(); }
+#if CROSSPOINT_BRIGHTNESS_SWIPE
+  bool brightnessSwipeAllowed() const override {
+    return section && !pageBufferStale && ReaderActivity::brightnessSwipeAllowed();
+  }
+#endif
   // "Connecting Bluetooth…" or "Bluetooth failed" in place of the status bar title.
   mutable LinkNoteTitle linkNoteTitle;
   static constexpr size_t RENDER_MIN_FREE_HEAP = 24 * 1024;
