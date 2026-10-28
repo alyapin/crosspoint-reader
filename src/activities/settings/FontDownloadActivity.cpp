@@ -679,11 +679,12 @@ void FontDownloadActivity::promptDeleteSelectedFamily() {
     return;
   }
 
-  std::string heading = tr(STR_DELETE);
+  std::string heading = tr(STR_DELETE_ITEM_CONFIRM);
   const auto& family = families_[pendingDeleteFamilyIndex];
   std::string body = str(family.name);
-  startActivityForResult(std::make_unique<ConfirmationActivity>(renderer, mappedInput, heading, body),
-                         [this](const ActivityResult& result) { onDeleteConfirmationResult(result); });
+  startActivityForResult(
+      std::make_unique<ConfirmationActivity>(renderer, mappedInput, heading, body, tr(STR_CANCEL), tr(STR_DELETE)),
+      [this](const ActivityResult& result) { onDeleteConfirmationResult(result); });
 }
 
 void FontDownloadActivity::onDeleteConfirmationResult(const ActivityResult& result) {

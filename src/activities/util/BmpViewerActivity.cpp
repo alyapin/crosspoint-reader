@@ -483,7 +483,8 @@ void BmpViewerActivity::loop() {
     if (!canSetSleepCover()) return;
 
     auto confirmation = makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_SET_SLEEP_COVER_CONFIRM),
-                                                                filePath.substr(filePath.find_last_of('/') + 1));
+                                                                filePath.substr(filePath.find_last_of('/') + 1),
+                                                                tr(STR_CANCEL), tr(STR_SLEEP_IMAGE_SET));
     if (!confirmation) {
       LOG_ERR("BMP", "OOM: sleep cover confirmation (%zu bytes)", sizeof(ConfirmationActivity));
       return;

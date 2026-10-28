@@ -382,19 +382,19 @@ void FileBrowserActivity::showEntryActions() {
     return;
   }
 
-  const bool isDirectory = files[nav.selected].back() == '/';
-  static constexpr StrId FILE_OPTIONS[] = {StrId::STR_OPEN, StrId::STR_DELETE, StrId::STR_RENAME};
-  static constexpr StrId DIRECTORY_OPTIONS[] = {StrId::STR_OPEN, StrId::STR_DELETE};
-  optionPopup.show(StrId::STR_FILENAME, isDirectory ? DIRECTORY_OPTIONS : FILE_OPTIONS, isDirectory ? 2 : 3, 0,
-                   [this](const int index) {
-                     if (index == 0) {
-                       activateSelected();
-                     } else if (index == 1) {
-                       deleteSelected();
-                     } else if (index == 2) {
-                       startRename();
-                     }
-                   });
+  const std::string& entry = files[nav.selected];
+  const bool isDirectory = entry.back() == '/';
+  const std::string name = utf8ComposeNfc(isDirectory ? entry.substr(0, entry.size() - 1) : entry);
+  const char* options[] = {tr(STR_OPEN), tr(STR_DELETE), tr(STR_RENAME)};
+  optionPopup.show(name.c_str(), options, isDirectory ? 2 : 3, 0, [this](const int index) {
+    if (index == 0) {
+      activateSelected();
+    } else if (index == 1) {
+      deleteSelected();
+    } else if (index == 2) {
+      startRename();
+    }
+  });
   requestUpdate();
 }
 
@@ -433,7 +433,7 @@ void FileBrowserActivity::deleteSelected() {
   };
 
   auto confirmation = makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_DELETE_ITEM_CONFIRM),
-                                                              utf8ComposeNfc(entry));
+                                                              utf8ComposeNfc(entry), tr(STR_CANCEL), tr(STR_DELETE));
   if (!confirmation) {
     LOG_ERR("FileBrowser", "OOM: delete confirmation");
     return;

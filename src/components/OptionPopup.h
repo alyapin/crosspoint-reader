@@ -11,9 +11,10 @@
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "components/UiAppHelpers.h"
+#include "components/setka/SetkaStyle.h"
 
-// Modal option picker drawn over the current screen (no clear) via
-// fui::optionDialog. Touch hit-testing is the SDK's InteractionBuffer: each
+// Modal option picker drawn over the current screen (no full clear) as a Setka
+// dialog, see render(). Touch hit-testing is the SDK's InteractionBuffer: each
 // render registers the option buttons (plus a chrome guard rect) on the render
 // task, and handleInput routes touch snapshots against that table on the loop
 // task, gated by the uiReady handshake (same pattern as UiListActivity).
@@ -158,16 +159,19 @@ class OptionPopup {
     return true;
   }
 
+  // Setka dialog (sova-fonts-unbounded-v2 "Обновить прошивку?"): a white card
+  // with a 2 px frame, the title SemiBold and the body Regular, both left
+  // aligned and wrapped; one or two options sit in a row ("Отмена ▌Удалить"),
+  // more become rows like the Library book menu. The focused option carries
+  // the bar and SemiBold. A full-width band around the card is cleared and
+  // ruled so the screen underneath never shows through at its edges.
   void render(const GfxRenderer& renderer) const {
     if (!active) return;
     namespace fui = freeink::ui;
+    using namespace setka;
 
-    // Per-render target: a GfxRendererTarget is a renderer reference plus
-    // three font ids, so rebuilding it here is trivially cheap and always
-    // tracks the live orientation and uiScale fonts; a target held across
-    // show() would stale-bind both after a rotation or scale change.
+    // Per-render target: tracks the live orientation; holds no state.
     fui::GfxRendererTarget target = makeUiTarget(renderer);
-    const fui::ThemeTokens& theme = refreshSharedUiThemeTokens(target);
     // Frame stores a const DeviceContext&; keep it in a local that outlives
     // the frame (a deviceContext() temporary would dangle).
     const fui::DeviceContext device = target.deviceContext();
@@ -182,81 +186,111 @@ class OptionPopup {
     interactions.beginPublishCycle();
     fui::Frame<INTERACTION_CAPACITY> frame(target, device, noInput, interactions);
 
-    const auto& metrics = UITheme::getInstance().getMetrics();
-    const int totalOptions = static_cast<int>(ownedStrings.size());
-    const uint8_t count = static_cast<uint8_t>(totalOptions > MAX_OPTIONS ? MAX_OPTIONS : totalOptions);
+    const int screenWidth = renderer.getScreenWidth();
+    const int screenHeight = renderer.getScreenHeight();
+    const int count = std::min<int>(ownedStrings.size(), MAX_OPTIONS);
+    const int cardX = kSidePadding;
+    const int cardWidth = screenWidth - 2 * kSidePadding;
+    const int textX = cardX + kDialogSidePadding;
+    const int textWidth = cardWidth - 2 * kDialogSidePadding;
+    const int titleLine = renderer.getLineHeight(kText12Font);
+    const int bodyLine = renderer.getLineHeight(kText10Font);
 
-    fui::DialogOption options[MAX_OPTIONS];
-    for (uint8_t i = 0; i < count; ++i) {
-      options[i].label = ownedStrings[i].c_str();
-      options[i].action = ACTION_OPTION;
-      options[i].value = static_cast<int16_t>(i);
-      options[i].state = (i == selectedIndex) ? fui::StateFocused : fui::StateNormal;
-    }
+    const auto titleLines = title.empty() ? std::vector<std::string>{}
+                                          : renderer.wrappedText(kText12Font, title.c_str(), textWidth, 3, kSemiBold);
+    const auto headlineLines = headline.empty() ? std::vector<std::string>{}
+                                                : renderer.wrappedText(kText10Font, headline.c_str(), textWidth, 3);
+    const auto messageLines =
+        message.empty() ? std::vector<std::string>{} : renderer.wrappedText(kText10Font, message.c_str(), textWidth, 6);
+    const int bodyLines = static_cast<int>(headlineLines.size() + messageLines.size());
+    const int textHeight = static_cast<int>(titleLines.size()) * titleLine +
+                           (!titleLines.empty() && bodyLines > 0 ? kBodyGap : 0) + bodyLines * bodyLine;
 
-    fui::OptionDialogProps props;
-    props.title = title.empty() ? nullptr : title.c_str();
-    props.headline = headline.empty() ? nullptr : headline.c_str();
-    if (!message.empty()) {
-      props.message = message.c_str();
-      props.messageText.font = fui::GfxRendererTarget::FONT_BODY;
-      props.messageText.align = fui::TextAlign::Center;
-      props.messageText.maxLines = 6;
+    // One or two options share a row when both labels fit side by side.
+    int labelsWidth = 0;
+    for (int i = 0; i < count; ++i) {
+      labelsWidth += renderer.getTextWidth(kText12Font, ownedStrings[i].c_str(), kSemiBold) + kButtonBarSpan;
     }
-    props.options = options;
-    props.optionCount = count;
-    props.verticalOptions = true;
-    // Touch only: physical buttons stay on the legacy wrap/confirm path above,
-    // so the buffer never competes with it for focus/confirm dispatch.
-    props.inputMask = fui::InputTouch;
-    props.titleText.font = fui::GfxRendererTarget::FONT_BODY;
-    props.titleText.bold = true;
-    props.titleText.align = fui::TextAlign::Center;
-    // Captions like "Remove from Recent Books?" overflow the narrow portrait
-    // dialog in one line; let them wrap and the panel grow.
-    props.titleText.maxLines = 2;
-    props.headlineText.font = fui::GfxRendererTarget::FONT_BODY;
-    props.headlineText.align = fui::TextAlign::Center;
-    props.headlineText.maxLines = 3;
-    props.buttonText.font = fui::GfxRendererTarget::FONT_BODY;
-    const int16_t innerPadding = static_cast<int16_t>(metrics.optionPopupInnerPadding);
-    props.padding = fui::Insets{innerPadding, innerPadding, innerPadding, innerPadding};
-    props.gap = static_cast<int16_t>(metrics.optionPopupItemSpacing);
-    // Rounded invert-fill themes use a black pill, not the default gray focus cursor.
-    if (theme.listSelectionStyle == fui::SelectionStyle::InvertFill && theme.listRowRadius > 0) {
-      props.buttonStyles = fui::defaultButtonStyles();
-      props.buttonStyles.focused = props.buttonStyles.selected;
-      fui::setStyleRadius(props.buttonStyles, theme.listRowRadius);
-    }
-    // defaultPopupStyles() has no border, so opt in using the per-theme frame metrics.
-    props.styles = fui::defaultPopupStyles();
-    props.styles.normal.border = fui::Paint::solid(fui::Color::Black);
-    props.styles.normal.borderWidth = static_cast<uint8_t>(metrics.popupFrameThickness);
-    props.styles.normal.radius = static_cast<uint8_t>(metrics.popupCornerRadius);
-    props.styles.selected = props.styles.normal;
-    props.styles.focused = props.styles.normal;
-    props.styles.active = props.styles.normal;
-    props.styles.disabled = props.styles.normal;
-    props.buttonHeight =
-        fui::clampI16(target.lineHeight(fui::GfxRendererTarget::FONT_BODY) + metrics.optionPopupSelectionVPadding * 2);
+    const bool buttonRow = count <= 2 && labelsWidth + kButtonGap <= textWidth;
+    const int maxCardHeight = screenHeight - 2 * kBandMargin - 2 * kRuleWidth;
+    const int textBlock = kDialogPadding + textHeight + (textHeight > 0 ? kOptionsGap : 0);
+    const int rowHeight = buttonRow ? kButtonRowHeight
+                                    : std::clamp((maxCardHeight - textBlock - kRowsBottomPadding) / std::max(1, count),
+                                                 kMinTouch, kListRowHeight);
+    const int optionsHeight = buttonRow ? kButtonRowHeight : count * rowHeight + kRowsBottomPadding;
+    const int cardHeight = std::min(maxCardHeight, textBlock + optionsHeight);
+    const int cardY = std::max(kBandMargin + kRuleWidth, (screenHeight - cardHeight) / 2);
 
-    // Fixed fraction of the screen, clamped by the theme's side margins; the
-    // old max-text-width sizing is gone, long labels wrap inside the buttons.
-    const fui::Rect screen = device.screen();
-    const int16_t width =
-        fui::clampI16(std::min<int>(screen.width * 3 / 4, screen.width - metrics.optionPopupDialogSideMargin * 2));
-    const int16_t height = fui::clampI16(fui::optionDialogHeight(target, props, width), 0, screen.height);
-    const fui::Rect dialogRect = fui::centeredRect(screen, fui::Size{width, height});
+    if (!standalone) {
+      const int bandTop = std::max(0, cardY - kBandMargin);
+      const int bandBottom = std::min(screenHeight, cardY + cardHeight + kBandMargin);
+      renderer.fillRect(0, bandTop, screenWidth, bandBottom - bandTop, false);
+      if (bandTop > 0) drawRule(renderer, 0, bandTop - kRuleWidth, screenWidth);
+      if (bandBottom < screenHeight) drawRule(renderer, 0, bandBottom, screenWidth);
+    } else {
+      renderer.fillRect(cardX, cardY, cardWidth, cardHeight, false);
+    }
+    renderer.drawRect(cardX, cardY, cardWidth, cardHeight, kRuleWidth, true);
 
     // Chrome guard first, options after: route() scans newest-first, so the
     // option buttons win inside the dialog and the guard absorbs the rest.
-    frame.hit(dialogRect, ACTION_CHROME, 0, fui::InputTouch);
-    fui::optionDialog(frame, dialogRect, props);
+    frame.hit(fui::makeRect(cardX, cardY, cardWidth, cardHeight), ACTION_CHROME, 0, fui::InputTouch);
+
+    int y = cardY + kDialogPadding;
+    for (const auto& line : titleLines) {
+      renderer.drawText(kText12Font, textX, y, line.c_str(), true, kSemiBold);
+      y += titleLine;
+    }
+    if (!titleLines.empty() && bodyLines > 0) y += kBodyGap;
+    for (const auto* lines : {&headlineLines, &messageLines}) {
+      for (const auto& line : *lines) {
+        renderer.drawText(kText10Font, textX, y, line.c_str());
+        y += bodyLine;
+      }
+    }
+
+    const int optionsTop = cardY + textBlock;
+    if (buttonRow) {
+      // The last option is the action and sits on the right; a lone one too.
+      const int textTop = optionsTop + (kButtonRowHeight - titleLine) / 2;
+      for (int i = 0; i < count; ++i) {
+        const bool focused = i == selectedIndex;
+        const auto style = focused ? kSemiBold : EpdFontFamily::REGULAR;
+        const char* label = ownedStrings[i].c_str();
+        const bool right = i == count - 1;
+        const int labelX = right ? textX + textWidth - renderer.getTextWidth(kText12Font, label, style) : textX;
+        if (focused) drawSelectionBar(renderer, labelX - kButtonBarSpan, textTop, titleLine);
+        renderer.drawText(kText12Font, labelX, textTop, label, true, style);
+        const int hitX = right && count == 2 ? cardX + cardWidth / 2 : cardX;
+        const int hitWidth = count == 2 ? cardWidth / 2 : cardWidth;
+        frame.hit(fui::makeRect(hitX, optionsTop, hitWidth, kButtonRowHeight), ACTION_OPTION, static_cast<int16_t>(i),
+                  fui::InputTouch);
+      }
+    } else {
+      const int labelX = textX + kRowTextX - kSelectionBarX;
+      const int labelWidth = textX + textWidth - labelX;
+      for (int i = 0; i < count; ++i) {
+        const int top = optionsTop + i * rowHeight;
+        if (top + rowHeight > cardY + cardHeight) break;
+        const bool focused = i == selectedIndex;
+        const auto style = focused ? kSemiBold : EpdFontFamily::REGULAR;
+        if (focused) drawSelectionBar(renderer, textX, top, rowHeight);
+        renderer.drawText(kText12Font, labelX, top + (rowHeight - titleLine) / 2,
+                          renderer.truncatedText(kText12Font, ownedStrings[i].c_str(), labelWidth, style).c_str(), true,
+                          style);
+        frame.hit(fui::makeRect(cardX, top, cardWidth, rowHeight), ACTION_OPTION, static_cast<int16_t>(i),
+                  fui::InputTouch);
+      }
+    }
     // Atomically make this generation the one handleInput() reads, now that
     // every hit() call for this frame is done.
     interactions.publish();
     uiReady = true;
   }
+
+  // The dialog is the only thing on a cleared screen (ConfirmationActivity):
+  // no band to clear around it.
+  void setStandalone(const bool value) { standalone = value; }
 
   bool isActive() const { return active; }
 
@@ -269,12 +303,21 @@ class OptionPopup {
 
  private:
   // The dialog has no scrolling, so options past MAX_OPTIONS would render off
-  // screen anyway; a fixed cap keeps the DialogOption array on the stack and
-  // the interaction table small. +1 slot for the chrome guard rect.
+  // screen anyway; a fixed cap keeps the interaction table small. +1 slot for
+  // the chrome guard rect.
   static constexpr int MAX_OPTIONS = 16;
   static constexpr size_t INTERACTION_CAPACITY = MAX_OPTIONS + 1;
   static constexpr freeink::ui::ActionId ACTION_OPTION = 1;
   static constexpr freeink::ui::ActionId ACTION_CHROME = 2;
+  static constexpr int kDialogPadding = 24;                             // above the title
+  static constexpr int kDialogSidePadding = 32;                         // clears the bar of a left option
+  static constexpr int kBodyGap = 4;                                    // title to body
+  static constexpr int kOptionsGap = 8;                                 // text to the options
+  static constexpr int kButtonRowHeight = 56;                           // one row of 1-2 options
+  static constexpr int kButtonGap = 24;                                 // least air between two option labels
+  static constexpr int kButtonBarSpan = setka::kSelectionBarWidth + 6;  // bar + gap before an option label
+  static constexpr int kRowsBottomPadding = 8;
+  static constexpr int kBandMargin = 20;  // cleared band around the card
 
   void activate(int currentIndex, std::function<void(int)> onSelect) {
     const int count = std::min<int>(ownedStrings.size(), MAX_OPTIONS);
@@ -286,6 +329,7 @@ class OptionPopup {
   }
 
   bool active = false;
+  bool standalone = false;
   std::string title;
   std::string headline;
   std::string message;

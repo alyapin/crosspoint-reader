@@ -355,8 +355,8 @@ void LibraryListActivity::resetAfterRebuild() {
 void LibraryListActivity::promptRemoveRecentBook(const std::string& path, const std::string& title) {
   const bool reopenIndex = index.isOpen();
   index.close();
-  auto confirmation =
-      makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_REMOVE_FROM_RECENTS), title);
+  auto confirmation = makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_REMOVE_FROM_RECENTS), title,
+                                                              tr(STR_CANCEL), tr(STR_DELETE));
   if (!confirmation) {
     LOG_ERR("LIB", "OOM: recent removal confirmation");
     if (reopenIndex && !index.open(library::libraryIndexPath())) LOG_ERR("LIB", "cannot reopen library index");
@@ -401,8 +401,8 @@ void LibraryListActivity::promptDeleteBook(const int entry) {
 void LibraryListActivity::promptDeleteBookByPath(const std::string& path, const std::string& title) {
   // The dialog and the delete both want the card; reopen when we resume.
   index.close();
-  auto confirmation =
-      makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_DELETE_ITEM_CONFIRM), title);
+  auto confirmation = makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_DELETE_ITEM_CONFIRM), title,
+                                                              tr(STR_CANCEL), tr(STR_DELETE));
   if (!confirmation) {
     LOG_ERR("LIB", "OOM: delete confirmation");
     if (!index.open(library::libraryIndexPath())) LOG_ERR("LIB", "cannot reopen library index");

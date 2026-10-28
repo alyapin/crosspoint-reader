@@ -42,7 +42,7 @@ void PluginHubInstallActivity::onEnter() {
 
   auto confirmation =
       makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_INSTALL_PLUGIN_HUB),
-                                              tr(STR_PLUGIN_HUB_INSTALL_DESCRIPTION), tr(STR_CANCEL), tr(STR_YES));
+                                              tr(STR_PLUGIN_HUB_INSTALL_DESCRIPTION), tr(STR_CANCEL), tr(STR_INSTALL));
   if (!confirmation) {
     LOG_ERR("PHUB", "OOM: install confirmation");
     fail(StrId::STR_MEMORY_ERROR);
