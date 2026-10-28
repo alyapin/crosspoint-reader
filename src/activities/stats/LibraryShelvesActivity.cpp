@@ -404,11 +404,18 @@ void LibraryShelvesActivity::loop() {
 
 int LibraryShelvesActivity::drawTabs(UiScreen& screen, const int stripTop, const int width) {
   constexpr int kStripPad = 12;
-  int font = kText12Font;
-  int total = 0;
-  for (const StrId label : kTabLabels) total += renderer.getTextWidth(font, I18N.get(label), kSemiBold) + kTabGap;
   const int firstX = kSelectionBarX + kSelectionBarWidth + kTabBarGap;
-  if (total - kTabGap > width - firstX - kSidePadding) font = kText10Font;
+  int font = kCaptionFont;
+  for (const int candidate : {kText12Font, kText10Font}) {
+    int total = -kTabGap;
+    for (const StrId label : kTabLabels) {
+      total += renderer.getTextWidth(candidate, I18N.get(label), kSemiBold) + kTabGap;
+    }
+    if (total <= width - firstX - kSidePadding) {
+      font = candidate;
+      break;
+    }
+  }
   const int lineHeight = renderer.getLineHeight(font);
   const int stripHeight = std::max(kMinTouch, lineHeight + 2 * kStripPad);
   const int textTop = stripTop + (stripHeight - lineHeight) / 2;
@@ -443,11 +450,16 @@ void LibraryShelvesActivity::drawBookRow(UiScreen& screen, const int index, cons
   }
   const int textX = kRowTextX + kCoverWidth + 16;
   const int textWidth = width - textX - kSidePadding;
-  const int textTop = rowTop + (kBookRowHeight - kRuleWidth - line12 - line10) / 2;
-  renderer.drawText(kText12Font, textX, textTop,
-                    renderer.truncatedText(kText12Font, book.title.c_str(), textWidth, kSemiBold).c_str(), true,
-                    kSemiBold);
-  renderer.drawText(kText10Font, textX, textTop + line12,
+  // A long title takes a second line before it truncates.
+  const auto titleLines = renderer.wrappedText(kText12Font, book.title.c_str(), textWidth, 2, kSemiBold);
+  const int titleHeight = std::max(1, static_cast<int>(titleLines.size())) * line12;
+  const int textTop = rowTop + (kBookRowHeight - kRuleWidth - titleHeight - line10) / 2;
+  int lineTop = textTop;
+  for (const auto& line : titleLines) {
+    renderer.drawText(kText12Font, textX, lineTop, line.c_str(), true, kSemiBold);
+    lineTop += line12;
+  }
+  renderer.drawText(kText10Font, textX, textTop + titleHeight,
                     renderer.truncatedText(kText10Font, book.detail, textWidth).c_str());
   drawRule(renderer, 0, rowTop + kBookRowHeight - kRuleWidth, width);
   screen.frame().hit(fui::makeRect(0, rowTop, width, kBookRowHeight), ACTION_ROW, static_cast<int16_t>(index),

@@ -38,12 +38,21 @@ void StatisticsActivity::loop() {
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) finish();
 }
 
-void StatisticsActivity::drawStat(const int x, const int capTop, const unsigned value, const char* label) const {
+void StatisticsActivity::drawStat(const int x, const int capTop, const int width, const unsigned value,
+                                  const char* label) const {
   char number[8];
   snprintf(number, sizeof(number), "%u", value);
   const int numberWidth = drawHeroNumber(renderer, kHeroSmallFont, x, capTop, number);
   const int baseline = capTop + heroCapHeight(renderer, kHeroSmallFont);
-  renderer.drawText(kText12Font, x + numberWidth + 12, baseline - renderer.getFontAscenderSize(kText12Font), label);
+  // A label wider than the rest of its column wraps upward from the number's baseline.
+  constexpr int kLabelGap = 12;
+  const int line12 = renderer.getLineHeight(kText12Font);
+  const auto lines = renderer.wrappedText(kText12Font, label, width - numberWidth - kLabelGap, 2);
+  int top = baseline - renderer.getFontAscenderSize(kText12Font) - (static_cast<int>(lines.size()) - 1) * line12;
+  for (const auto& line : lines) {
+    renderer.drawText(kText12Font, x + numberWidth + kLabelGap, top, line.c_str());
+    top += line12;
+  }
 }
 
 void StatisticsActivity::drawCalendar(const int top, const int width) const {
@@ -91,10 +100,11 @@ void StatisticsActivity::render(RenderLock&&) {
   drawProgressBar(renderer, kSidePadding, y, width - 2 * kSidePadding, percent);
   y += kProgressHeight + kGap + 4;
 
-  drawStat(kSidePadding, y, summary.currentStreak,
+  const int statWidth = width / 2 - kSidePadding * 3 / 2;
+  drawStat(kSidePadding, y, statWidth, summary.currentStreak,
            I18N.get(statsui::plural(summary.currentStreak, StrId::STR_STATS_STREAK_ONE, StrId::STR_STATS_STREAK_FEW,
                                     StrId::STR_STATS_STREAK_MANY)));
-  drawStat(width / 2 + kSidePadding / 2, y, summary.bestStreak, tr(STR_STATS_RECORD));
+  drawStat(width / 2 + kSidePadding / 2, y, statWidth, summary.bestStreak, tr(STR_STATS_RECORD));
   y += heroCapHeight(renderer, kHeroSmallFont) + kGap;
 
   drawRule(renderer, 0, y, width);

@@ -961,7 +961,7 @@ void ScanwordActivity::drawClueCell(const uint16_t cell, const int x, const int 
   const uint8_t n = puzzle->cluesAt(cell, ids);
   const int halfHeight = n == 2 ? size / 2 : size;
   // Three lines in a cell, two per half of a two-clue cell, at a pitch that fits.
-  const int font = kCaptionFont;
+  const int font = kDenseFont;
   const uint8_t maxLines = n == 2 ? 2 : scanword::CLUE_MAX_LINES;
   const int lineHeight = std::min(renderer.getLineHeight(font), (halfHeight - 2) / maxLines);
   Measure measure{&renderer, font, EpdFontFamily::REGULAR, kClueTracking};

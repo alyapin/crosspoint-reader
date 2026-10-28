@@ -322,7 +322,7 @@ void SudokuActivity::build(UiScreen& screen) {
 void SudokuActivity::drawGrid() const {
   const int left = (renderer.getScreenWidth() - kGridSize) / 2;
   const int lineHeight = renderer.getLineHeight(kText12Font);
-  const int noteHeight = renderer.getLineHeight(kCaptionFont);
+  const int noteHeight = renderer.getLineHeight(kDenseFont);
   renderer.fillRect(left, BOARD_TOP, kGridSize, kGridSize, true);
   for (int cell = 0; cell < sudoku::CELLS; ++cell) {
     const int x = left + cellOffset(sudoku::columnOf(cell));
@@ -342,7 +342,7 @@ void SudokuActivity::drawGrid() const {
       for (int d = 1; d <= sudoku::SIZE; ++d) {
         if (!(notes & sudoku::bitFor(d))) continue;
         const char digit[2] = {static_cast<char>('0' + d), '\0'};
-        drawCentered(kCaptionFont, x + 1 + (d - 1) % 3 * kNoteCell, kNoteCell,
+        drawCentered(kDenseFont, x + 1 + (d - 1) % 3 * kNoteCell, kNoteCell,
                      y + 1 + (d - 1) / 3 * kNoteCell + (kNoteCell - noteHeight) / 2, digit);
       }
     }
