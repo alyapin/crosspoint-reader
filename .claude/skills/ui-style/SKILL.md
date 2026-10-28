@@ -13,7 +13,7 @@ Applies only to UI changes. Non-UI changes skip the mockup steps but still need 
 
 ## Workflow for every UI change
 
-1. Mockup as a picture (inline widget or HTML built from `mockup-kit.html` in this folder). Never describe UI only in words.
+1. Mockup as a picture: a standalone HTML page built from `mockup-kit.html` in this folder, rendered to PNG with headless Chrome (`--headless=new --no-proxy-server --force-device-scale-factor=2 --virtual-time-budget=6000 --screenshot=`) and sent with SendUserFile — Aleksei often reads from his phone over Remote Control, where inline widgets don't render. Check the PNG isn't clipped before sending. Never describe UI only in words.
 2. Aleksei approves the picture.
 3. Code.
 4. Simulator screenshot of the real screen, shown next to the mockup (commands below).
