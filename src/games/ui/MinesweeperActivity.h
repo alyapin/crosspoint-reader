@@ -17,6 +17,8 @@ class MinesweeperActivity final : public GameScreen {
  public:
   MinesweeperActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
+  uint32_t idleSleepBudgetMs() const override;
+
  private:
   enum class Action : uint8_t { Flag, New, Menu };
 

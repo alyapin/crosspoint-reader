@@ -258,6 +258,11 @@ void SudokuActivity::onKey(const int dx, const int dy, const bool confirm) {
 
 int32_t SudokuActivity::shownMinutes() const { return games::ui::shownMinute(!game.isSolved(), game.elapsedMs()); }
 
+// GameScreen::loop() repaints the timer when its minute turns; a stopped clock never turns.
+uint32_t SudokuActivity::idleSleepBudgetMs() const {
+  return hasGame && !game.paused() ? games::ui::msUntilNextMinute(game.elapsedMs()) : light_sleep::kNoDeadline;
+}
+
 bool SudokuActivity::onBack() {
   if (area == Area::Grid) return false;
   area = Area::Grid;

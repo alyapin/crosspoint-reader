@@ -18,6 +18,8 @@ class SudokuActivity final : public GameScreen {
  public:
   SudokuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
+  uint32_t idleSleepBudgetMs() const override;
+
  private:
   // Key focus: the grid cursor is the selected cell; the pad and bar have their own.
   // Status is the level and timer on the top line, where Confirm starts a new puzzle.

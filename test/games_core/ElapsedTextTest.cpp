@@ -44,6 +44,18 @@ TEST(GamesElapsedText, RepaintsOnlyWhenTheMinuteTurns) {
 
 // Without a timer (Klondike, a solved puzzle) nothing ever repaints for time;
 // the largest elapsed time stays clear of the -1 sentinel.
+TEST(GamesElapsedText, NextMinuteDeadlineLandsOnTheTurn) {
+  EXPECT_EQ(games::ui::msUntilNextMinute(0), kMinute);
+  EXPECT_EQ(games::ui::msUntilNextMinute(59 * kSecond), kSecond);
+  EXPECT_EQ(games::ui::msUntilNextMinute(kMinute), kMinute);
+  for (uint32_t ms : {1u, 30 * kSecond, 4 * kMinute + 1, 71582u * kMinute - 1}) {
+    EXPECT_EQ(games::ui::elapsedMinutes(ms + games::ui::msUntilNextMinute(ms)), games::ui::elapsedMinutes(ms) + 1)
+        << ms;
+    EXPECT_EQ(games::ui::elapsedMinutes(ms + games::ui::msUntilNextMinute(ms) - 1), games::ui::elapsedMinutes(ms))
+        << ms;
+  }
+}
+
 TEST(GamesElapsedText, NoTimerNeverRepaints) {
   for (uint32_t ms = 0; ms <= 10 * kMinute; ms += kSecond) {
     EXPECT_FALSE(games::ui::timerStale(-1, games::ui::shownMinute(false, ms)));

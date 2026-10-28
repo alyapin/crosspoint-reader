@@ -179,6 +179,11 @@ void MinesweeperActivity::onKey(const int dx, const int dy, const bool confirm) 
 
 int32_t MinesweeperActivity::shownMinutes() const { return games::ui::shownMinute(true, game.elapsedMs()); }
 
+// GameScreen::loop() repaints the timer when its minute turns; a stopped clock never turns.
+uint32_t MinesweeperActivity::idleSleepBudgetMs() const {
+  return hasGame && !game.paused() ? games::ui::msUntilNextMinute(game.elapsedMs()) : light_sleep::kNoDeadline;
+}
+
 bool MinesweeperActivity::onBack() {
   if (barFocus < 0) return false;
   barFocus = -1;

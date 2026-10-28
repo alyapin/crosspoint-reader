@@ -18,6 +18,9 @@ inline int32_t shownMinute(const bool timerShown, const uint32_t ms) {
   return timerShown ? static_cast<int32_t>(elapsedMinutes(ms)) : -1;
 }
 
+// Milliseconds until elapsedMinutes(ms) turns: the light-sleep deadline of a running timer.
+inline uint32_t msUntilNextMinute(const uint32_t ms) { return 60000 - ms % 60000; }
+
 // The timer needs a repaint only when the minute it shows is not the one painted.
 inline bool timerStale(const int32_t painted, const int32_t shown) { return painted != shown; }
 
