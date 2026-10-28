@@ -21,3 +21,12 @@
 #include <builtinFonts/ubuntu_12_bold.h>
 #include <builtinFonts/ubuntu_12_regular.h>
 #include <builtinFonts/ubuntu_8_regular.h>
+
+#if FREEINK_DEVICE_X4PRO
+#include <builtinFonts/golostext_10_regular.h>
+#include <builtinFonts/golostext_10_semibold.h>
+#include <builtinFonts/golostext_12_regular.h>
+#include <builtinFonts/golostext_12_semibold.h>
+#include <builtinFonts/unbounded_31_digits.h>
+#include <builtinFonts/unbounded_61_digits.h>
+#endif

@@ -1,0 +1,100 @@
+#pragma once
+#include <BoardConfig.h>
+#include <GfxRenderer.h>
+#include <HalDisplay.h>
+
+#include <algorithm>
+
+#include "fontIds.h"
+
+// Tokens of the "Setka" UI style (.claude/skills/ui-style/SKILL.md) for the
+// screens this fork adds. The Golos Text / Unbounded faces are compiled into
+// X4 Pro builds only; other boards map the same roles onto the Ubuntu UI faces
+// so shared code still builds there.
+namespace setka {
+
+#if FREEINK_DEVICE_X4PRO
+constexpr int kText10Font = GOLOS_10_FONT_ID;
+constexpr int kText12Font = GOLOS_12_FONT_ID;
+constexpr int kHeroFont = UNBOUNDED_61_FONT_ID;       // ~96 px digits: the screen's one big number
+constexpr int kHeroSmallFont = UNBOUNDED_31_FONT_ID;  // ~48 px digits: a secondary number
+#else
+constexpr int kText10Font = UI_10_FONT_ID;
+constexpr int kText12Font = UI_12_FONT_ID;
+constexpr int kHeroFont = UI_12_FONT_ID;
+constexpr int kHeroSmallFont = UI_12_FONT_ID;
+#endif
+constexpr int kCaptionFont = SMALL_FONT_ID;
+// The text faces carry SemiBold in the family's bold slot.
+constexpr EpdFontFamily::Style kSemiBold = EpdFontFamily::BOLD;
+
+constexpr int kSelectionBarWidth = 10;  // left bar on the selected list row or tab
+constexpr int kCellFrameWidth = 4;      // inset frame on the selected grid cell
+constexpr int kRuleWidth = 2;           // black rule between sections
+constexpr int kSidePadding = 20;
+constexpr int kProgressHeight = 12;
+constexpr int kMinTouch = 44;
+constexpr int kListRowHeight = 56;
+
+// Long-lived screens: HALF on entry, FAST for in-screen updates, and one HALF
+// after every kFastUpdatesPerHalf FAST updates to clear ghosting.
+constexpr HalDisplay::RefreshMode kEntryRefresh = HalDisplay::HALF_REFRESH;
+constexpr HalDisplay::RefreshMode kUpdateRefresh = HalDisplay::FAST_REFRESH;
+constexpr int kFastUpdatesPerHalf = 20;
+
+class RefreshCadence {
+ public:
+  HalDisplay::RefreshMode entry() {
+    fastSinceHalf_ = 0;
+    return kEntryRefresh;
+  }
+  HalDisplay::RefreshMode update() {
+    if (fastSinceHalf_ >= kFastUpdatesPerHalf) return entry();
+    ++fastSinceHalf_;
+    return kUpdateRefresh;
+  }
+
+ private:
+  int fastSinceHalf_ = 0;
+};
+
+inline void drawSelectionBar(const GfxRenderer& renderer, const int x, const int y, const int height) {
+  renderer.fillRect(x, y, kSelectionBarWidth, height, true);
+}
+
+inline void drawCellFrame(const GfxRenderer& renderer, const int x, const int y, const int width, const int height) {
+  renderer.drawRect(x, y, width, height, kCellFrameWidth, true);
+}
+
+inline void drawRule(const GfxRenderer& renderer, const int x, const int y, const int width) {
+  renderer.fillRect(x, y, width, kRuleWidth, true);
+}
+
+// Black fill on a LightGray-dithered track inside a 1 px black outline.
+inline void drawProgressBar(const GfxRenderer& renderer, const int x, const int y, const int width, int percent) {
+  percent = std::clamp(percent, 0, 100);
+  const int inner = width - 2;
+  const int filled = inner * percent / 100;
+  renderer.drawRect(x, y, width, kProgressHeight, true);
+  renderer.fillRect(x + 1, y + 1, filled, kProgressHeight - 2, true);
+  renderer.fillRectDither(x + 1 + filled, y + 1, inner - filled, kProgressHeight - 2, Color::LightGray);
+}
+
+// Height of the hero digits above the baseline. Unbounded's line box carries
+// a tall empty ascender, so lay hero numbers out by this, not getLineHeight().
+inline int heroCapHeight(const GfxRenderer& renderer, const int fontId) {
+  int32_t advance = 0;
+  int top = 0;
+  return renderer.getCodepointMetrics(fontId, '1', EpdFontFamily::REGULAR, advance, top)
+             ? top
+             : renderer.getFontAscenderSize(fontId);
+}
+
+// Draws a hero number with the top of its digits at capTopY; returns its width.
+inline int drawHeroNumber(const GfxRenderer& renderer, const int fontId, const int x, const int capTopY,
+                          const char* text) {
+  renderer.drawText(fontId, x, capTopY + heroCapHeight(renderer, fontId) - renderer.getFontAscenderSize(fontId), text);
+  return renderer.getTextWidth(fontId, text);
+}
+
+}  // namespace setka
