@@ -11,7 +11,7 @@
 #define GOLOS_10_FONT_ID (237734751)
 #define GOLOS_12_FONT_ID (1989595752)
 #define UNBOUNDED_61_FONT_ID (-362337940)
-#define UNBOUNDED_31_FONT_ID (-983976302)
+#define UNBOUNDED_31_FONT_ID (1729665984)
 
 // Font ID 0 is reserved as the "not found" sentinel.
 // Guard against any hash accidentally producing 0.
