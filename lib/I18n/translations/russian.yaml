@@ -5,6 +5,7 @@ _bcp47: "ru"
 
 STR_CROSSPOINT: "CrossPoint"
 STR_BOOTING: "Загрузка"
+STR_BASED_ON_CROSSPOINT: "на основе CrossPoint"
 STR_SLEEPING: "Спящий режим"
 STR_ENTERING_SLEEP: "Переход в сон"
 STR_BROWSE_FILES: "Обзор файлов"

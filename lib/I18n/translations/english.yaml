@@ -5,6 +5,7 @@ _bcp47: "en"
 
 STR_CROSSPOINT: "CrossPoint"
 STR_BOOTING: "BOOTING"
+STR_BASED_ON_CROSSPOINT: "based on CrossPoint"
 STR_SLEEPING: "SLEEPING"
 STR_ENTERING_SLEEP: "Going to sleep"
 STR_BROWSE_FILES: "Browse Files"
