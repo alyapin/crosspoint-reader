@@ -125,7 +125,7 @@ void KlondikeActivity::openNewGame() {
   const GamePickerActivity::Row rows[] = {
       {tr(STR_KLONDIKE_DRAW_ONE), &icon_card_24},
       {tr(STR_KLONDIKE_DRAW_THREE), &icon_cards_24},
-      {tr(STR_KLONDIKE_SOLVABLE), &icon_check_24},
+      {tr(STR_KLONDIKE_SOLVABLE), &icon_circle_check_24},
   };
   openPicker(tr(STR_GAMES_NEW_GAME), rows, static_cast<int>(std::size(rows)), hasGame && game.drawThree() ? 1 : 0, 2,
              solvableChoice);

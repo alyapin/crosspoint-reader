@@ -14,4 +14,4 @@ signal-high = signal-high
 signal = signal
 card = rectangle-vertical
 cards = layers
-check = circle-check
+circle-check = circle-check
