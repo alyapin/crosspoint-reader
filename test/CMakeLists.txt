@@ -95,6 +95,7 @@ add_subdirectory(plugin_manifest_classification)
 add_subdirectory(plugin_picker_layout)
 add_subdirectory(protected_paths)
 add_subdirectory(sleep_image_pick)
+add_subdirectory(boot_rescue)
 add_subdirectory(chess_core)
 add_subdirectory(chess_clock_text)
 

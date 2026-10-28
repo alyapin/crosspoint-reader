@@ -31,6 +31,7 @@
 #include <cstring>
 
 #include "BootHealth.h"
+#include "BootRescue.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "KOReaderCredentialStore.h"
@@ -180,6 +181,7 @@ static bool deepSleepInProgress = false;
 // settings. Cleared with the magic in setup().
 static void armSilentReboot(const uint32_t target) {
   boothealth::confirmNow("intentional reboot");
+  bootrescue::clearCrashCount();
   silentRebootTarget = target;
   silentRebootPayload = Frontlight.isOn() ? SILENT_REBOOT_LIGHT_ON : 0;
   silentRebootMagic = SILENT_REBOOT_MAGIC;
@@ -486,6 +488,7 @@ static bool holdSleepWhileUsbPowered() {
 // Enter deep sleep mode
 void enterDeepSleep(bool fromTimeout = false) {
   boothealth::confirmNow("entering sleep");
+  bootrescue::clearCrashCount();
   HalPowerManager::Lock powerLock;  // Ensure we are at normal CPU frequency for sleep preparation
   APP_STATE.lastSleepFromReader = activityManager.isReaderActivity();
 
@@ -594,6 +597,7 @@ void setupDisplayAndFonts(bool seamless = false) {
 
 void setup() {
   BoardConfig::holdPowerRails();
+  bootrescue::runAtBoot();
 
 #ifdef ENABLE_SERIAL_LOG
 #ifdef CROSSPOINT_WAIT_FOR_USB_SERIAL
@@ -879,6 +883,7 @@ void loop() {
   static unsigned long lastMemPrint = 0;
 
   boothealth::confirmIfHealthy();
+  bootrescue::clearIfHealthy();
   gpio.setSharedConfirmPowerShortPressEmitsPower(SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::SLEEP);
   mappedInputManager.update();
 
