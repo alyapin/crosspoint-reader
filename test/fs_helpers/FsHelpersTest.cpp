@@ -10,12 +10,19 @@ namespace {
 using namespace std::string_view_literals;
 
 TEST(ReflowableBookExtension, IncludesTextFormatsAndExcludesImageBooks) {
-  for (const auto path : {"/Books/book.epub"sv, "book.TXT"sv, "book.mD"sv}) {
+  for (const auto path : {"/Books/book.epub"sv, "book.TXT"sv, "book.mD"sv, "book.fb2"sv, "book.FB2.ZIP"sv}) {
     EXPECT_TRUE(FsHelpers::hasReflowableBookExtension(path));
   }
-  for (const auto path : {"book.xtc"sv, "book.XTCH"sv, "book.bmp"sv, "book.epub.bak"sv, ""sv}) {
+  for (const auto path : {"book.xtc"sv, "book.XTCH"sv, "book.bmp"sv, "book.epub.bak"sv, "book.zip"sv, ""sv}) {
     EXPECT_FALSE(FsHelpers::hasReflowableBookExtension(path));
   }
+}
+
+TEST(Fb2Extension, MatchesPlainAndZippedFb2) {
+  EXPECT_TRUE(FsHelpers::hasFb2Extension("Book.fb2"sv));
+  EXPECT_TRUE(FsHelpers::hasFb2Extension("Book.FB2.ZIP"sv));
+  EXPECT_FALSE(FsHelpers::hasFb2Extension("Book.zip"sv));
+  EXPECT_FALSE(FsHelpers::hasFb2Extension("Book.epub"sv));
 }
 
 TEST(IsSafePathComponent, AcceptsNamesWithRepeatedDots) {

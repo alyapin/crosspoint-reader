@@ -30,6 +30,9 @@ class Epub {
   std::string tocNavItem;
   // where is the EPUBfile?
   std::string filepath;
+  // The ZIP the book is read from: the file itself, or for FB2 the EPUB
+  // transcoded into the cache. Identity (cache key, path) stays `filepath`.
+  std::string archivePath;
   // the base path for items in the EPUB file
   std::string contentBasePath;
   // Uniq cache key based on filepath
@@ -51,6 +54,7 @@ class Epub {
                        bool metadataOnly = false, ZipFile* sharedZip = nullptr);
   bool generateThumbBmpForCover(int height, const std::string& coverImageHref) const;
   bool openProtection();
+  bool ensureArchive() const;
   bool parseTocNcxFile() const;
   bool parseTocNavFile() const;
   void discoverCssFilesFromZip();

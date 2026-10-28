@@ -9,4 +9,7 @@ inline bool hasEpubExtension(const std::string& path) { return checkFileExtensio
 inline bool hasXtcExtension(std::string_view path) {
   return checkFileExtension(path, ".xtc") || checkFileExtension(path, ".xtch");
 }
+inline bool hasFb2Extension(std::string_view path) {
+  return checkFileExtension(path, ".fb2") || checkFileExtension(path, ".fb2.zip");
+}
 }  // namespace FsHelpers
