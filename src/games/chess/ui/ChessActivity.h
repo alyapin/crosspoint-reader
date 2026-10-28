@@ -1,0 +1,130 @@
+#pragma once
+
+#if FREEINK_DEVICE_X4PRO
+
+#include <ChessMatch.h>
+
+#include <atomic>
+#include <memory>
+
+#include "ChessPrefs.h"
+#include "activities/Activity.h"
+#include "components/UiAppHost.h"
+#include "components/setka/SetkaStyle.h"
+#include "util/ButtonNavigator.h"
+
+// Games list hook for the "Шахматы" row: chessListStatus() is the row's second
+// line ("партия идёт" while a saved game exists) or nullptr, and openChess()
+// builds the screen, which resumes the saved game or opens "Новая партия".
+const char* chessListStatus();
+std::unique_ptr<Activity> openChess(GfxRenderer& renderer, MappedInputManager& mappedInput);
+
+// Chess in the Setka style. The setup list with its option pickers, the game
+// screen (board, clocks or move list, promotion and game-over panels) and the
+// game menu are views of one activity, so the ~150 KB Match is allocated once.
+//
+// The loop task alone mutates the Match and the view state, always under the
+// RenderLock (engine slices take it with a try-lock, so a panel refresh never
+// blocks the loop); the render task only reads them.
+class ChessActivity final : public Activity, private UiAppHost {
+ public:
+  ChessActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
+
+  void onEnter() override;
+  void onExit() override;
+  void loop() override;
+  void render(RenderLock&&) override;
+  void prepareForSleep() override;
+  bool skipLoopDelay() override;
+
+ private:
+  enum class View : uint8_t { Setup, Picker, CustomTime, Game, Menu };
+  enum class Row : uint8_t { Opponent, Level, Color, Time, Rotate, Pieces, Start, Resign, Draw, NewGame, Flip };
+  // Pending repaint, strongest wins: Entry = HALF, Update = cadence FAST,
+  // Clock = plain FAST that does not count toward the cadence.
+  enum Repaint : uint8_t { RepaintNone, RepaintClock, RepaintUpdate, RepaintEntry };
+  static constexpr int kMaxRows = 8;
+  static constexpr chess::Square kNoSquare = 0xFF;
+
+  struct RowText {
+    const char* label = "";
+    char value[24] = {};
+    int8_t preview = -1;     // piece set drawn as a sample on the right
+    bool ruleAbove = false;  // the action row under the settings
+  };
+
+  static void screenFn(UiScreen& screen, void* user);
+  void build(UiScreen& screen);
+  int drawHeader(UiScreen& screen, const char* back, const char* title) const;
+  void buildList(UiScreen& screen);
+  void buildCustomTime(UiScreen& screen);
+  void buildGame(UiScreen& screen);
+  void drawBoard() const;
+  void drawTopLine(UiScreen& screen) const;
+  void drawClockPanel() const;
+  void drawTurnLine(int top, bool bar) const;
+  void drawStatusPanel() const;
+  void drawMoveList(int top, int bottom) const;
+  void drawPromotion(UiScreen& screen) const;
+  void drawGameOver(UiScreen& screen) const;
+  void drawActions(UiScreen& screen) const;
+
+  int listRows(Row* out) const;
+  int rowCount() const;
+  RowText rowText(int index) const;
+  const char* rowLabel(Row row) const;
+  void rowValue(Row row, char* out, size_t cap) const;
+  int optionCount(Row row) const;
+  const char* optionLabel(Row row, int option) const;
+  int currentOption(Row row) const;
+
+  void handleAction(const freeink::ui::ActionEvent& event, int x, int y);
+  void activateRow(int index);
+  void applyOption(int option);
+  void stepCustom(int field, int delta);
+  void goBack();
+  void setView(View next);
+  void openPicker(Row row);
+  void startGame();
+  void tapSquare(chess::Square square);
+  void playMove(chess::Square from, chess::Square to, chess::PieceType promo);
+  void afterPly();
+  void clearSelection();
+  void syncShownClocks();
+  void offerDraw();
+  void tickClocks();
+  void saveGame();
+  void requestRepaint(Repaint kind);
+
+  bool boardFlipped() const;
+  chess::Color heroSide() const;
+  chess::Square squareAt(int x, int y) const;
+  void squareOrigin(chess::Square square, bool flip, int& x, int& y) const;
+  const char* turnLabel() const;
+  void lastMoveText(char* out, size_t cap) const;
+
+  std::unique_ptr<chess::Match> match;
+  chess::ui::Prefs prefs;  // the setup screen edits prefs.match
+  View view = View::Setup;
+  bool inGame = false;      // a game was started or resumed: Setup's back returns to it
+  bool rotateGame = false;  // prefs.rotateBoard as of the game's start
+  bool manualFlip = false;
+  int focus = 0;
+  Row pickerRow = Row::Opponent;
+  View pickerReturn = View::Setup;
+  uint8_t customBase = 0;  // indices into the custom time steps
+  uint8_t customIncrement = 0;
+  chess::Square selected = kNoSquare;
+  uint64_t targets = 0;
+  chess::Square promoFrom = kNoSquare;
+  chess::Square promoTo = kNoSquare;
+  bool drawDeclined = false;  // until the next move
+  uint32_t shownSeconds[2] = {0, 0};
+  bool savePending = false;
+
+  ButtonNavigator buttonNavigator;
+  setka::RefreshCadence cadence;  // render task only
+  std::atomic<uint8_t> repaint{RepaintEntry};
+};
+
+#endif  // FREEINK_DEVICE_X4PRO

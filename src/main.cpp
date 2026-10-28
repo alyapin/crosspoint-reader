@@ -46,6 +46,9 @@
 #include "activities/settings/SdFirmwareUpdateActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#if FREEINK_DEVICE_X4PRO && defined(CROSSPOINT_CHESS_STANDALONE)
+#include "games/chess/ui/ChessActivity.h"
+#endif
 #include "platform/UsbSerialJtagHandoff.h"
 #include "util/ButtonNavigator.h"
 #include "util/PluginEvents.h"
@@ -835,6 +838,11 @@ void setup() {
     APP_STATE.saveToFile();
     activityManager.goToReader(path, allowFastInitialReaderRefresh);
   }
+
+#if FREEINK_DEVICE_X4PRO && defined(CROSSPOINT_CHESS_STANDALONE)
+  // Screenshot builds open chess at boot: PLATFORMIO_BUILD_FLAGS=-DCROSSPOINT_CHESS_STANDALONE.
+  activityManager.replaceActivity(openChess(renderer, mappedInputManager));
+#endif
 
   if (resume == BootResume::Silent) {
     // Block until the first paint physically completes. refreshDisplay()
