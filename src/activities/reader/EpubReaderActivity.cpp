@@ -458,6 +458,7 @@ void EpubReaderActivity::stopBookPager() {
 void EpubReaderActivity::bookPagerTick() {
   RenderLock lock(RenderLock::Mode::Try);
   if (!lock.ownsLock()) return;
+  pagerHasWork = false;
   // Footer switched off, or the page turner's radio holds the heap: let the off-screen build go.
   if (!SETTINGS.statusBarSpec().showsBookFooter() || bleturner::holdsHeap()) {
     stopBookPager();
@@ -478,6 +479,7 @@ void EpubReaderActivity::bookPagerTick() {
   }
   // Another screen covered the reader since the build started; it may have used the CSS parser.
   if (pagerSection && (activityManager.visit() != pagerVisit || pagerLayoutKey != layoutKey)) stopBookPager();
+  pagerHasWork = pagerSection || bookFooter.nextSpineToPaginate(currentSpineIndex) >= 0;
   if (millis() - lastRenderCompleteMs < PAGER_IDLE_MS) return;
   if (buttonContactClosed() || anyButtonPressed() || pendingManualTurn != 0 || !buildTickHeapGate()) return;
 
@@ -756,7 +758,6 @@ void EpubReaderActivity::loop() {
   if (handleBrightnessSwipe()) return;
 #endif
 
-  constexpr unsigned long IDLE_PREWARM_DEBOUNCE_MS = 400;
   {
     RenderLock lock(RenderLock::Mode::Try);
     if (lock.ownsLock() && section && !section->isBuilding() && renderer.hasFrameBuffer() &&
@@ -1686,6 +1687,26 @@ bool EpubReaderActivity::skipLoopDelay() {
   // is down: a press that starts inside a long build step gets its second debounce sample ~5 ms
   // after the step instead of after a 10 ms sleep.
   return overlay == Overlay::None && !buildHeapPaused && backgroundBuildWanted();
+}
+
+// The chapter build keeps the loop running through skipLoopDelay(); the rest of the idle work is timed.
+uint32_t EpubReaderActivity::idleSleepBudgetMs() const {
+  const uint32_t now = millis();
+  uint32_t budget = light_sleep::kNoDeadline;
+  const auto wakeAt = [&budget, now](const bool pending, const unsigned long at) {
+    if (pending) budget = std::min(budget, light_sleep::msUntil(static_cast<uint32_t>(at), now));
+  };
+  // Past PAGER_IDLE_MS the book pager counts pages on every pass until it is done.
+  wakeAt(pagerHasWork && overlay == Overlay::None && !buildHeapPaused, lastRenderCompleteMs + PAGER_IDLE_MS);
+  wakeAt(section && lastRenderCompleteMs != 0 && now - lastRenderCompleteMs <= IDLE_PREWARM_DEBOUNCE_MS &&
+             (idlePrewarmSpine != currentSpineIndex || idlePrewarmPage != section->currentPage),
+         lastRenderCompleteMs + IDLE_PREWARM_DEBOUNCE_MS + 1);
+  wakeAt(automaticPageTurnActive && overlay == Overlay::None, lastPageTurnTime + pageTurnDuration);
+  wakeAt(showBookmarkMessage, bookmarkMessageTime + ReaderUtils::BOOKMARK_MESSAGE_DURATION_MS);
+  wakeAt(showDictionaryMessage, dictionaryMessageTime + ReaderUtils::BOOKMARK_MESSAGE_DURATION_MS);
+  wakeAt(showFontDamagedMessage, fontDamagedMessageTime + ReaderUtils::BOOKMARK_MESSAGE_DURATION_MS);
+  wakeAt(showClippingMessage, clippingMessageTime + ReaderUtils::BOOKMARK_MESSAGE_DURATION_MS);
+  return budget;
 }
 
 void EpubReaderActivity::renderBook() {

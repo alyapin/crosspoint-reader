@@ -33,4 +33,12 @@ inline ClockText clockText(const uint32_t remainingMs) {
   return clock;
 }
 
+// Milliseconds until a running clock shows its next text; the last step is the flag at 0.
+inline uint32_t msUntilClockTextChange(const uint32_t remainingMs) {
+  if (remainingMs == 0) return 0;
+  const ClockText clock = clockText(remainingMs);
+  const uint32_t nextShownMs = (clock.shownSeconds - (clock.minutes ? 60 : 10)) * 1000;
+  return remainingMs - nextShownMs;
+}
+
 }  // namespace chess::ui

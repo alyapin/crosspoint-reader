@@ -36,6 +36,7 @@ class ChessActivity final : public Activity, private UiAppHost {
   void render(RenderLock&&) override;
   void prepareForSleep() override;
   bool skipLoopDelay() override;
+  uint32_t idleSleepBudgetMs() const override;
 
  private:
   enum class View : uint8_t { Setup, Picker, CustomTime, Game, Menu };

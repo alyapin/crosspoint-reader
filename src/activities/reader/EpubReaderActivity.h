@@ -56,6 +56,7 @@ class EpubReaderActivity final : public ReaderActivity {
   bool currentPageBookmarked = false;
   int idlePrewarmSpine = -1;
   int idlePrewarmPage = -1;
+  static constexpr unsigned long IDLE_PREWARM_DEBOUNCE_MS = 400;
   unsigned long lastRenderCompleteMs = 0;
   bool bookmarkRemoved = false;
   std::vector<BookmarkEntry> cachedBookmarks;
@@ -153,6 +154,8 @@ class EpubReaderActivity final : public ReaderActivity {
   // Layout the open chapter's section was loaded or built for.
   uint32_t sectionLayoutKey = 0;
   static constexpr unsigned long PAGER_IDLE_MS = 3000;
+  // At the last pager tick some chapter was still uncounted for this layout.
+  bool pagerHasWork = true;
   void bookPagerTick();
   void stopBookPager();
   // A background build failed in this spine. The error would likely recur, so from then on the
@@ -279,6 +282,7 @@ class EpubReaderActivity final : public ReaderActivity {
   void onReturnFromEndOfBook() override;
 
   bool skipLoopDelay() override;
+  uint32_t idleSleepBudgetMs() const override;
 
   ScreenshotInfo getScreenshotInfo() const override;
   CrossPointPosition getCurrentPosition() const;

@@ -11,6 +11,7 @@
 #include "GfxRenderer.h"
 #include "MappedInputManager.h"
 #include "RenderLock.h"
+#include "util/LightSleep.h"
 #include "util/ScreenshotInfo.h"
 
 class Activity {
@@ -45,6 +46,11 @@ class Activity {
 
   virtual bool skipLoopDelay() { return false; }
   virtual bool preventAutoSleep() { return false; }
+  // Light sleep between inputs (util/LightSleep.h): how long the idle loop may
+  // sleep before loop() must run without input, e.g. for a timed repaint.
+  // light_sleep::kNoDeadline when only input matters, 0 for work that needs
+  // the loop running. Called by the main loop under the render lock.
+  virtual uint32_t idleSleepBudgetMs() const { return light_sleep::kNoDeadline; }
   // Exclusive storage activities suspend global controls and normal activity
   // transitions so no filesystem code races a raw SD-card owner.
   virtual bool requiresExclusiveStorageLoop() const { return false; }

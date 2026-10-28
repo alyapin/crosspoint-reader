@@ -54,6 +54,22 @@ TEST(ChessClockText, RepaintsOnlyWhenTheShownValueChanges) {
   EXPECT_EQ(repaints, 15);
 }
 
+// A light-sleeping game screen wakes exactly when the running clock's text changes.
+TEST(ChessClockText, MsUntilTextChangeLandsOnTheNextText) {
+  using chess::ui::msUntilClockTextChange;
+  for (const uint32_t ms : {10 * kMinute, 9 * kMinute + 1, kMinute + 500, kMinute, 50 * kSecond + 1, 5 * kSecond, 1u}) {
+    const uint32_t wait = msUntilClockTextChange(ms);
+    ASSERT_GT(wait, 0u) << ms;
+    EXPECT_EQ(text(ms - wait + 1), text(ms)) << ms;
+    EXPECT_NE(text(ms - wait), text(ms)) << ms;
+  }
+  EXPECT_EQ(msUntilClockTextChange(10 * kMinute), kMinute);
+  EXPECT_EQ(msUntilClockTextChange(kMinute + 500), 500u);
+  EXPECT_EQ(msUntilClockTextChange(5 * kSecond), 5 * kSecond);  // the flag falls
+  EXPECT_EQ(msUntilClockTextChange(0), 0u);
+  EXPECT_GT(msUntilClockTextChange(UINT32_MAX), 0u);
+}
+
 // After a move the increment can push a clock back across a boundary; the
 // shown value follows it both ways.
 TEST(ChessClockText, IncrementCrossesBackIntoMinutes) {
