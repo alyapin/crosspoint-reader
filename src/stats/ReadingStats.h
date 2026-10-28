@@ -26,6 +26,8 @@
 //   books.bin   the book catalog: path, title, author, status, dates, shelf
 //               membership and reading totals as of its own applied sequence
 //               number, plus the shelf names.
+//   seeded      empty; written once the books read before statistics started
+//               are seeded.
 // A query adds the log records past a file's applied sequence number, so the
 // files may be rewritten in any order and a crash between two rewrites
 // neither loses nor double-counts reading. totals.bin and books.bin are
@@ -149,11 +151,14 @@ class ReadingStats {
 
   // Mutations. ensureBook() adds a book without changing its status.
   int ensureBook(const std::string& path, const std::string& title, const std::string& author);
-  // First run: no catalog file yet (false when storage fails).
-  bool catalogMissing();
-  // A book read before statistics started gets seedStatus(progressBp) and that
-  // progress, unless it already has a status. NO_BOOK when nothing applies.
-  int seedBook(const std::string& path, const std::string& title, const std::string& author, int progressBp);
+  // First run: books read before statistics started are seeded until
+  // markSeedingDone(), so seeding cut short by a reset resumes on the next boot.
+  bool seedingDone();
+  bool markSeedingDone();
+  // Such a book gets seedStatus(progressBp) and that progress, unless it
+  // already has a status. False when it could not be stored (storage, memory
+  // or a full catalog); nothing to seed counts as stored.
+  bool seedBook(const std::string& path, const std::string& title, const std::string& author, int progressBp);
   bool setStatus(int bookId, BookStatus status, uint16_t today);
   // Free shelf slot holding `name`, or -1 when all are used or storage fails.
   int createShelf(const char* name);

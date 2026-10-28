@@ -557,13 +557,15 @@ void enterDeepSleep(bool fromTimeout = false) {
   powerManager.startDeepSleep(gpio, wakeOnHeldButton);
 }
 
-// Statistics start with the books already being read: until the first catalog
-// exists, recent books with saved progress get Читаю or Прочитано.
+// Statistics start with the books already being read: recent books with saved
+// progress get Читаю or Прочитано, retried each boot until all are stored.
 static void seedReadingStats() {
-  if (!READING_STATS.catalogMissing()) return;
+  if (READING_STATS.seedingDone()) return;
+  bool stored = true;
   for (const auto& book : RECENT_BOOKS.getBooks()) {
-    READING_STATS.seedBook(book.path, book.title, book.author, loadBookProgress(book.path) * 100);
+    stored = READING_STATS.seedBook(book.path, book.title, book.author, loadBookProgress(book.path) * 100) && stored;
   }
+  if (stored) READING_STATS.markSeedingDone();
 }
 
 void setupDisplayAndFonts(bool seamless = false) {

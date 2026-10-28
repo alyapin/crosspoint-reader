@@ -497,13 +497,13 @@ TEST(ReadingStatsStore, SeedStatusFollowsSavedProgress) {
 
 TEST(ReadingStatsStore, SeedingAddsBooksReadBeforeStatsAndKeepsStatuses) {
   auto& store = freshStore();
-  EXPECT_TRUE(store.catalogMissing());
-  EXPECT_EQ(store.seedBook("/new.epub", "New", "", 0), ReadingStats::NO_BOOK);
-  EXPECT_TRUE(store.catalogMissing());
-  const int a = store.seedBook("/a.epub", "A", "", 1500);
-  ASSERT_GE(a, 0);
-  ASSERT_GE(store.seedBook("/b.epub", "B", "", 10000), 0);
-  EXPECT_FALSE(reboot().catalogMissing());
+  // Nothing to seed counts as done, so a first run without progress ends.
+  EXPECT_TRUE(store.seedBook("/new.epub", "New", "", 0));
+  EXPECT_TRUE(store.seedBook(std::string(300, 'a'), "Long", "", 5000));
+  EXPECT_FALSE(fake::files.count(BOOKS));
+  ASSERT_TRUE(store.seedBook("/a.epub", "A", "", 1500));
+  ASSERT_TRUE(store.seedBook("/b.epub", "B", "", 10000));
+  const int a = book(store, "/a.epub").id;
 
   BookInfo info = book(store, "/a.epub");
   EXPECT_EQ(info.status, BookStatus::Reading);
@@ -515,8 +515,8 @@ TEST(ReadingStatsStore, SeedingAddsBooksReadBeforeStatsAndKeepsStatuses) {
   // A status already set stays, and seeding again writes nothing.
   ASSERT_TRUE(store.setStatus(a, BookStatus::Paused, TODAY));
   const unsigned writes = fake::writesByPath[std::string(BOOKS) + ".tmp"];
-  EXPECT_EQ(store.seedBook("/a.epub", "A", "", 5000), a);
-  EXPECT_EQ(store.seedBook("/b.epub", "B", "", 10000), book(store, "/b.epub").id);
+  EXPECT_TRUE(store.seedBook("/a.epub", "A", "", 5000));
+  EXPECT_TRUE(store.seedBook("/b.epub", "B", "", 10000));
   EXPECT_EQ(fake::writesByPath[std::string(BOOKS) + ".tmp"], writes);
   info = book(store, "/a.epub");
   EXPECT_EQ(info.status, BookStatus::Paused);
@@ -529,4 +529,23 @@ TEST(ReadingStatsStore, SeedingAddsBooksReadBeforeStatsAndKeepsStatuses) {
   EXPECT_EQ(info.firstDay, TODAY);
   EXPECT_EQ(info.startProgressBp, 1500u);
   EXPECT_EQ(info.status, BookStatus::Paused);
+}
+
+TEST(ReadingStatsStore, SeedingCutShortResumesUntilMarkedDone) {
+  auto& store = freshStore();
+  EXPECT_FALSE(store.seedingDone());
+  ASSERT_TRUE(store.seedBook("/a.epub", "A", "", 1500));
+  fake::failWritePath = std::string(BOOKS) + ".tmp";
+  EXPECT_FALSE(store.seedBook("/b.epub", "B", "", 10000));
+
+  // The catalog exists now, yet the next boot still seeds the book that failed.
+  auto& again = reboot();
+  EXPECT_FALSE(again.seedingDone());
+  const unsigned writes = fake::writesByPath[std::string(BOOKS) + ".tmp"];
+  EXPECT_TRUE(again.seedBook("/a.epub", "A", "", 1500));
+  EXPECT_EQ(fake::writesByPath[std::string(BOOKS) + ".tmp"], writes);
+  EXPECT_TRUE(again.seedBook("/b.epub", "B", "", 10000));
+  EXPECT_EQ(book(again, "/b.epub").status, BookStatus::Finished);
+  ASSERT_TRUE(again.markSeedingDone());
+  EXPECT_TRUE(reboot().seedingDone());
 }

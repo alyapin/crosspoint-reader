@@ -20,6 +20,7 @@ constexpr char STATS_DIR[] = "/.crosspoint/stats";
 constexpr char LOG_PATH[] = "/.crosspoint/stats/log.bin";
 constexpr char TOTALS_PATH[] = "/.crosspoint/stats/totals.bin";
 constexpr char BOOKS_PATH[] = "/.crosspoint/stats/books.bin";
+constexpr char SEEDED_PATH[] = "/.crosspoint/stats/seeded";
 
 constexpr uint8_t VERSION = 1;
 constexpr char LOG_MAGIC[4] = {'S', 'L', 'O', 'G'};
@@ -80,6 +81,8 @@ void copyText(char* out, const size_t cap, const char* text, size_t len) {
   out[len] = '\0';
 }
 void copyText(char* out, const size_t cap, const std::string& text) { copyText(out, cap, text.data(), text.size()); }
+
+bool trackablePath(const std::string& path) { return !path.empty() && path.size() < PATH_BYTES; }
 
 uint32_t epoch32(const int64_t epoch) { return static_cast<uint32_t>(std::clamp<int64_t>(epoch, 0, UINT32_MAX)); }
 
@@ -960,7 +963,7 @@ bool pathUnder(const char* path, const std::string& prefix) {
 
 int ReadingStats::trackBook(const std::string& path, const std::string& title, const std::string& author,
                             const uint16_t today, const int progressBp, const bool opening, const BookStatus seed) {
-  if (path.empty() || path.size() >= PATH_BYTES) {
+  if (!trackablePath(path)) {
     LOG_ERR("STAT", "Book path not tracked (%u B)", static_cast<unsigned>(path.size()));
     return NO_BOOK;
   }
@@ -1025,18 +1028,20 @@ int ReadingStats::ensureBook(const std::string& path, const std::string& title, 
   return trackBook(path, title, author, NO_DAY, 0, false);
 }
 
-bool ReadingStats::catalogMissing() {
-  auto catalog = makeUniqueNoThrow<Catalog>();
-  if (!catalog) return false;
+bool ReadingStats::seedingDone() { return Storage.exists(SEEDED_PATH); }
+
+bool ReadingStats::markSeedingDone() {
+  Storage.mkdir(STATS_DIR);
   HalFile f;
-  return openCatalog(*catalog, f) == Load::Missing;
+  return Storage.openFileForWrite("STAT", SEEDED_PATH, f) && f.close();
 }
 
-int ReadingStats::seedBook(const std::string& path, const std::string& title, const std::string& author,
-                           const int progressBp) {
+bool ReadingStats::seedBook(const std::string& path, const std::string& title, const std::string& author,
+                            const int progressBp) {
   const BookStatus status = seedStatus(progressBp);
-  if (status == BookStatus::None) return NO_BOOK;
-  return trackBook(path, title, author, NO_DAY, progressBp, false, status);
+  // Nothing to seed, or a path statistics never track.
+  if (status == BookStatus::None || !trackablePath(path)) return true;
+  return trackBook(path, title, author, NO_DAY, progressBp, false, status) != NO_BOOK;
 }
 
 uint32_t estimateSecondsLeft(const BookInfo& book) {
