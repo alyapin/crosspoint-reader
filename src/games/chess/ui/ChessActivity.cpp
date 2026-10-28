@@ -36,7 +36,6 @@ constexpr fui::ActionId ACTION_NEW_GAME = 8;
 constexpr int kHeaderTop = 16;  // game view top line; clears the X4 Pro top bezel
 constexpr int kRuleGap = 16;
 constexpr int kBarX = kSidePadding - kSelectionBarWidth;
-constexpr int kRowTextX = kSidePadding + 12;
 constexpr int kRowHeight = 68;
 constexpr int kRowGap = 8;
 constexpr int kIconSize = 24;
