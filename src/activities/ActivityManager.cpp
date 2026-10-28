@@ -25,6 +25,7 @@
 #include "home/SetkaHomeActivity.h"
 #include "library/LibraryListActivity.h"
 #include "network/CrossPointWebServerActivity.h"
+#include "network/LocalSendActivity.h"
 #include "network/UsbDriveActivity.h"
 #include "plugins/PluginCatalogActivity.h"
 #include "reader/ReaderActivity.h"
@@ -274,6 +275,8 @@ void ActivityManager::replaceActivity(std::unique_ptr<Activity>&& newActivity) {
 void ActivityManager::goToFileTransfer() {
   replaceActivity(std::make_unique<CrossPointWebServerActivity>(renderer, mappedInput));
 }
+
+void ActivityManager::goToLocalSend() { replaceActivity(std::make_unique<LocalSendActivity>(renderer, mappedInput)); }
 
 void ActivityManager::goToJoinNetwork() {
   // Post heap-defrag reboot: enter the web-server activity straight in Join

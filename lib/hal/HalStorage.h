@@ -62,6 +62,9 @@ class HalStorage {
   // Move a fully written temp file over `path`, replacing any existing file.
   bool replaceFile(const char* tmpPath, const char* path);
   bool rmdir(const char* path);
+  // Free bytes on the card, 0 when unmounted. The first call scans the FAT
+  // (seconds on a large card); the SDK caches the result for 20 s.
+  uint64_t freeBytes();
 
   bool openFileForRead(const char* moduleName, const char* path, HalFile& file);
   bool openFileForRead(const char* moduleName, const std::string& path, HalFile& file);
