@@ -41,8 +41,8 @@ bool runningPendingVerify() {
   return running && esp_ota_get_state_partition(running, &state) == ESP_OK && state == ESP_OTA_IMG_PENDING_VERIFY;
 }
 
-bool comboFired() {
-  ComboHold hold;
+bool comboFired(const uint32_t startWindowMs) {
+  ComboHold hold(startWindowMs);
   for (;;) {
     switch (hold.update(millis(), comboHeld())) {
       case ComboState::Fired:
@@ -92,7 +92,7 @@ void restartInto(const esp_partition_t* slot, const char* why) {
 
 }  // namespace
 
-void runAtBoot() {
+void runAtBoot(const bool silentRestart) {
   const esp_reset_reason_t reason = esp_reset_reason();
   const uint32_t count = nextCrashCount(crashCountMagic, crashCount, isCrashReset(reason));
   storeCrashCount(count);
@@ -110,7 +110,7 @@ void runAtBoot() {
     if (const esp_partition_t* other = usableOtherSlot()) restartInto(other, "Crash loop");
   }
 
-  if (!comboFired()) return;
+  if (!comboFired(comboStartWindowMs(reason, silentRestart))) return;
   LOG_INF("RESCUE", "Rescue combo held");
   const esp_partition_t* other = usableOtherSlot();
   if (!other) return;
@@ -140,7 +140,7 @@ void clearCrashCount() { storeCrashCount(0); }
 #else
 
 namespace bootrescue {
-void runAtBoot() {}
+void runAtBoot(bool) {}
 void clearIfHealthy() {}
 void clearCrashCount() {}
 }  // namespace bootrescue

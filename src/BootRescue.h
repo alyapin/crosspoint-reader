@@ -1,14 +1,16 @@
 #pragma once
 
 // Escape hatches for a build that cannot reach Settings -> SD firmware update:
-// Left + Right held for 3 s at boot, or three crash resets in a row, restart
+// Left + Right held for 3 s at boot (already held on a deep-sleep wake, pressed up to
+// 1.5 s into any other boot), or three crash resets in a row, restart
 // into the other OTA slot when it holds a usable app. X4 Pro only; elsewhere
 // and in the simulator these are no-ops.
 namespace bootrescue {
 
 // Call first in setup(), right after the power rails are latched, before any
-// other peripheral init. Does not return when it switches slots.
-void runAtBoot();
+// other peripheral init. Does not return when it switches slots. silentRestart: this boot
+// follows the firmware's own silentRestart(), so the combo is not waited for.
+void runAtBoot(bool silentRestart);
 
 // Call from loop(): ends the crash streak once this boot has run HEALTHY_UPTIME_MS.
 void clearIfHealthy();

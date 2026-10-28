@@ -61,6 +61,46 @@ TEST(BootRescueCombo, SurvivesMillisWrap) {
   EXPECT_EQ(hold.update(start + COMBO_HOLD_MS, true), ComboState::Fired);
 }
 
+TEST(BootRescueCombo, StartWindowWaitsForALatePress) {
+  ComboHold hold(COMBO_START_WINDOW_MS);
+  EXPECT_EQ(hold.update(400, false), ComboState::Holding);
+  EXPECT_EQ(hold.update(400 + COMBO_START_WINDOW_MS - 1, false), ComboState::Holding);
+  // Pressed just inside the window: the hold runs its full time from the press.
+  const uint32_t pressed = 400 + COMBO_START_WINDOW_MS - 1;
+  EXPECT_EQ(hold.update(pressed, true), ComboState::Holding);
+  EXPECT_EQ(hold.update(pressed + COMBO_HOLD_MS - 1, true), ComboState::Holding);
+  EXPECT_EQ(hold.update(pressed + COMBO_HOLD_MS, true), ComboState::Fired);
+}
+
+TEST(BootRescueCombo, StartWindowClosesWithoutAPress) {
+  ComboHold hold(COMBO_START_WINDOW_MS);
+  EXPECT_EQ(hold.update(400, false), ComboState::Holding);
+  EXPECT_EQ(hold.update(400 + COMBO_START_WINDOW_MS, false), ComboState::Released);
+  EXPECT_EQ(hold.update(400 + COMBO_START_WINDOW_MS + 10, true), ComboState::Released);
+}
+
+TEST(BootRescueCombo, StartWindowKeepsTheReleaseRules) {
+  ComboHold hold(COMBO_START_WINDOW_MS);
+  EXPECT_EQ(hold.update(0, false), ComboState::Holding);
+  EXPECT_EQ(hold.update(500, true), ComboState::Holding);
+  EXPECT_EQ(hold.update(1500, true), ComboState::Holding);
+  // Let go before the hold time: a later press in the same boot does not count.
+  EXPECT_EQ(hold.update(1500 + COMBO_GAP_MS, false), ComboState::Released);
+  EXPECT_EQ(hold.update(1600, true), ComboState::Released);
+}
+
+TEST(BootRescueCombo, OnlyDeepSleepWakesAndSilentRestartsSkipTheWindow) {
+  EXPECT_EQ(comboStartWindowMs(ESP_RST_DEEPSLEEP, false), 0u);
+  EXPECT_EQ(comboStartWindowMs(ESP_RST_SW, true), 0u);
+  // A stale silent-restart flag does not hide the window from a press of Reset.
+  EXPECT_EQ(comboStartWindowMs(ESP_RST_POWERON, true), COMBO_START_WINDOW_MS);
+  EXPECT_EQ(comboStartWindowMs(ESP_RST_POWERON, false), COMBO_START_WINDOW_MS);
+  EXPECT_EQ(comboStartWindowMs(ESP_RST_EXT, false), COMBO_START_WINDOW_MS);
+  EXPECT_EQ(comboStartWindowMs(ESP_RST_SW, false), COMBO_START_WINDOW_MS);
+  EXPECT_EQ(comboStartWindowMs(ESP_RST_PANIC, false), COMBO_START_WINDOW_MS);
+  EXPECT_EQ(comboStartWindowMs(ESP_RST_UNKNOWN, false), COMBO_START_WINDOW_MS);
+}
+
 TEST(BootRescueResetReason, OnlyPanicsAndWatchdogsAreCrashes) {
   EXPECT_TRUE(isCrashReset(ESP_RST_PANIC));
   EXPECT_TRUE(isCrashReset(ESP_RST_INT_WDT));

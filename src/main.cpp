@@ -626,7 +626,7 @@ void setupDisplayAndFonts(bool seamless = false) {
 
 void setup() {
   BoardConfig::holdPowerRails();
-  bootrescue::runAtBoot();
+  bootrescue::runAtBoot(silentRebootMagic == SILENT_REBOOT_MAGIC);
 
 #ifdef ENABLE_SERIAL_LOG
 #ifdef CROSSPOINT_WAIT_FOR_USB_SERIAL

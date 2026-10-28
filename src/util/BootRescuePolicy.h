@@ -11,20 +11,34 @@ namespace bootrescue {
 constexpr uint32_t COMBO_HOLD_MS = 3000;
 // A contact gap shorter than this does not end the hold.
 constexpr uint32_t COMBO_GAP_MS = 50;
+// Left is GPIO0, the ROM's download-mode strap: held through Reset or a power-on it stops the
+// chip before this firmware runs. So after those boots the combo may still begin this long after
+// the first sample, once Reset is released.
+constexpr uint32_t COMBO_START_WINDOW_MS = 1500;
 constexpr uint32_t CRASH_BOOTS_BEFORE_ROLLBACK = 3;
 constexpr uint32_t HEALTHY_UPTIME_MS = 120000;
 constexpr uint32_t CRASH_COUNT_MAGIC = 0x52534355;
 
 enum class ComboState : uint8_t { Holding, Fired, Released };
 
-// Fed one sample per poll from the first instant of setup(). The combo must already be
-// held at the first sample, so an ordinary boot ends after one read.
+// Fed one sample per poll from the first instant of setup(). The combo must begin within
+// startWindowMs of the first sample; with no window it must already be held then, so an
+// ordinary wake ends after one read.
 class ComboHold {
  public:
+  explicit ComboHold(uint32_t startWindowMs = 0) : startWindowMs(startWindowMs) {}
+
   ComboState update(uint32_t nowMs, bool held) {
     if (state != ComboState::Holding) return state;
     if (!started) {
-      if (!held) return state = ComboState::Released;
+      if (!sampled) {
+        sampled = true;
+        firstMs = nowMs;
+      }
+      if (!held) {
+        if (nowMs - firstMs >= startWindowMs) state = ComboState::Released;
+        return state;
+      }
       started = true;
       startMs = nowMs;
       lastHeldMs = nowMs;
@@ -39,11 +53,20 @@ class ComboHold {
   }
 
  private:
+  uint32_t startWindowMs;
   ComboState state = ComboState::Holding;
+  bool sampled = false;
   bool started = false;
+  uint32_t firstMs = 0;
   uint32_t startMs = 0;
   uint32_t lastHeldMs = 0;
 };
+
+// A deep-sleep wake stays instant, and so does the software restart behind silentRestart(): the
+// firmware's own heap-defrag reboot, with nobody at the buttons. Any other boot may follow Reset or Power.
+constexpr uint32_t comboStartWindowMs(esp_reset_reason_t reason, bool silentRestart) {
+  return reason == ESP_RST_DEEPSLEEP || (silentRestart && reason == ESP_RST_SW) ? 0 : COMBO_START_WINDOW_MS;
+}
 
 // Panics and watchdog resets. Brownout, power-on, deep-sleep wake and software restarts are not crashes.
 constexpr bool isCrashReset(esp_reset_reason_t reason) {

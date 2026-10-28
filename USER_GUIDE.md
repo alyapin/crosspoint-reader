@@ -98,13 +98,12 @@ To reboot the device (for example after a firmware update or if it's frozen), pr
 
 ### Going Back to the Previous Firmware (X4 Pro)
 
-An SD card firmware update keeps the previous firmware in a second slot. If a new firmware cannot reach **Settings → System → SD Card Firmware Update**, switch back to the previous one:
+An SD card firmware update keeps the previous firmware in a second slot. If a new firmware cannot reach **Settings → System → SD Card Firmware Update**, switch back to the previous one with **Left** (Prev) and **Right** (Next):
 
-1. Put the device to sleep. If it keeps restarting on its own, skip this step.
-2. Hold **Left** and **Right** together, then press **Power**.
-3. Keep **Left** and **Right** held for 3 to 5 seconds, then release them. The device restarts into the previous firmware.
+- **From sleep:** hold **Left** and **Right** together, then press **Power**. Keep them held for 3 to 5 seconds, then release them.
+- **When the device is frozen or keeps restarting:** press and release the **Reset** button on the top edge (if the device does not start again by itself, also press **Power**), then straight away press and hold **Left** and **Right** for about 5 seconds, then release them. The same works right after turning the device on from a full power-off: press **Power** first, then hold **Left** and **Right**.
 
-The screen does not change while you hold the buttons. Releasing them in under 3 seconds, or holding them for more than 30 seconds, continues with the current firmware. Start from sleep: **Left** is also the chip's boot-mode pin, and holding it while the device starts from a full power-off (for example after the battery ran flat) can stop it from starting. If the screen stays frozen, release all buttons, unplug USB, and turn the device on again.
+The device restarts into the previous firmware once you release the buttons. The screen does not change while you hold them. Releasing them in under 3 seconds, or holding them for more than 30 seconds, continues with the current firmware. After **Reset**, or **Power** from a full power-off, start holding them within about 1.5 seconds. Never hold **Left** while pressing **Reset**, or while turning the device on from a full power-off (for example after the battery ran flat): **Left** is also the chip's boot-mode pin, and the device then does not start. If the screen stays frozen, release all buttons, unplug USB, and turn the device on again.
 
 The combo only works once the current firmware has run for about 10 seconds after it was installed; before that, a crash already returns the device to the previous firmware on its own. The device also switches back by itself after three crashes in a row. In both cases it stays on the current firmware when the other slot is empty or holds a firmware that already failed to start. Afterwards, install a fixed firmware from the SD card as usual.
 
