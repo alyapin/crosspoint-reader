@@ -1,4 +1,4 @@
-# Lucide icons for the Setka screens (home tabs, Ещё rows) — regenerate from the
+# Lucide icons for the Setka screens (home tabs, Ещё rows, value pickers) — regenerate from the
 # repository root with:
 #   python3 freeink-sdk/libs/assets/Icons/tools/gen_icons.py \
 #     --manifest src/components/setka/setkaIcons.manifest \
@@ -12,3 +12,5 @@ globe = globe
 layout-grid = layout-grid
 sliders = sliders-horizontal
 chart-column = chart-column
+radio = circle
+radio-on = circle-dot
