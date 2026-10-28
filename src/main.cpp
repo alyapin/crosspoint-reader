@@ -132,6 +132,10 @@ EpdFont unbounded61Font(&unbounded_61_digits);
 EpdFontFamily unbounded61FontFamily(61, &unbounded61Font);
 EpdFont unbounded31Font(&unbounded_31_digits);
 EpdFontFamily unbounded31FontFamily(31, &unbounded31Font);
+EpdFont unbounded19Font(&unbounded_19_digits);
+EpdFontFamily unbounded19FontFamily(19, &unbounded19Font);
+EpdFont unbounded14Font(&unbounded_14_digits);
+EpdFontFamily unbounded14FontFamily(14, &unbounded14Font);
 #endif
 
 // Definitions for SilentRestart.h. RTC_NOINIT survives ESP.restart() but not power loss.
@@ -572,6 +576,8 @@ void setupDisplayAndFonts(bool seamless = false) {
   renderer.insertFont(GOLOS_12_FONT_ID, golos12FontFamily);
   renderer.insertFont(UNBOUNDED_61_FONT_ID, unbounded61FontFamily);
   renderer.insertFont(UNBOUNDED_31_FONT_ID, unbounded31FontFamily);
+  renderer.insertFont(UNBOUNDED_19_FONT_ID, unbounded19FontFamily);
+  renderer.insertFont(UNBOUNDED_14_FONT_ID, unbounded14FontFamily);
 #endif
 
   // Discover and load SD card fonts
