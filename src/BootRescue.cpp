@@ -34,9 +34,6 @@ bool comboHeld() {
 }
 
 bool comboFired() {
-  pinMode(BoardConfig::ACTIVE.input.up, INPUT_PULLUP);
-  pinMode(BoardConfig::ACTIVE.input.down, INPUT_PULLUP);
-  delay(1);  // pull-up settling before the first sample
   ComboHold hold;
   for (;;) {
     switch (hold.update(millis(), comboHeld())) {
@@ -95,7 +92,11 @@ void runAtBoot() {
     LOG_ERR("RESCUE", "Crash reset %lu in a row (reason %d)", static_cast<unsigned long>(count),
             static_cast<int>(reason));
   }
-  if (shouldRollBack(count)) {
+  pinMode(BoardConfig::ACTIVE.input.up, INPUT_PULLUP);
+  pinMode(BoardConfig::ACTIVE.input.down, INPUT_PULLUP);
+  delay(1);  // pull-up settling before the first sample
+  // A held combo is left to the combo path, which restarts only after the release.
+  if (shouldRollBack(count) && !comboHeld()) {
     if (const esp_partition_t* other = usableOtherSlot()) restartInto(other, "Crash loop");
   }
 
