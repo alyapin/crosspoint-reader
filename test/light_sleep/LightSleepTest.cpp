@@ -72,9 +72,22 @@ TEST(LightSleep, MsUntilIsWrapSafe) {
   EXPECT_EQ(msUntil(UINT32_MAX - 99, 100), 0u);
 }
 
+TEST(LightSleep, UsbListenWindowKeepsTheLoopAwake) {
+  State s = idle();
+  s.usbListenAgeMs = 0;
+  EXPECT_EQ(sleepMs(s), 0u);
+  s.usbListenAgeMs = kUsbListenMs - 1;
+  EXPECT_EQ(sleepMs(s), 0u);
+  s.usbListenAgeMs = kUsbListenMs;
+  EXPECT_EQ(sleepMs(s), kMaxSleepMs);
+}
+
+// Arguments: proven so far, woke by the touch INT alone, woke by the timer, touch seen.
 TEST(LightSleep, FirstTouchAfterASleepProvesOrDisprovesTouchWake) {
-  EXPECT_TRUE(touchWakeProven(false, true, true));    // the INT line woke the chip for it
-  EXPECT_FALSE(touchWakeProven(true, false, true));   // the timer found it: INT slept through
-  EXPECT_TRUE(touchWakeProven(true, false, false));   // no touch: nothing learned
-  EXPECT_FALSE(touchWakeProven(false, true, false));  // a button woke it
+  EXPECT_TRUE(touchWakeProven(false, true, false, true));    // the INT line woke the chip for it
+  EXPECT_FALSE(touchWakeProven(true, false, true, true));    // the timer found it: INT slept through
+  EXPECT_TRUE(touchWakeProven(true, false, false, false));   // no touch: nothing learned
+  EXPECT_FALSE(touchWakeProven(false, true, false, false));  // INT woke it but no touch followed
+  EXPECT_FALSE(touchWakeProven(false, false, false, true));  // a button or a reject woke it
+  EXPECT_TRUE(touchWakeProven(true, false, false, true));    // ... and does not disprove either
 }

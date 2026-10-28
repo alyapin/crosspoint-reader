@@ -888,13 +888,16 @@ void setup() {
 // as short as the idle poll they replace.
 namespace idlesleep {
 bool slept = false;
-bool wokeByLine = false;
+HalPowerManager::LightSleepWake wake = HalPowerManager::LightSleepWake::Timer;
 bool touchWakeProven = false;
+unsigned long usbListenAt = 0;  // when the last USB listen window opened
 
 // The idle loop's wait. False: poll as without light sleep.
 bool wait(const unsigned long idleMs, const uint32_t activityBudgetMs, const bool workPending) {
   if (!SETTINGS.sleepBetweenInputs) return false;
+  if (millis() - usbListenAt >= light_sleep::kUsbListenEveryMs) usbListenAt = millis();
   light_sleep::State state;
+  state.usbListenAgeMs = millis() - usbListenAt;
   const auto ble = bleturner::status();
   state.radioOn = WiFi.getMode() != WIFI_MODE_NULL || ble.running || ble.starting || ble.stopping;
   state.usbConnected = gpio.isUsbConnected() || usb_serial_jtag_is_connected();
@@ -914,7 +917,7 @@ bool wait(const unsigned long idleMs, const uint32_t activityBudgetMs, const boo
     delay(10);
     return true;
   }
-  wokeByLine = powerManager.lightSleep(ms, state.frontlightOn);
+  wake = powerManager.lightSleep(ms, state.frontlightOn);
   slept = true;
   return true;
 }
@@ -933,8 +936,9 @@ void loop() {
 #if CROSSPOINT_LIGHT_SLEEP
   if (idlesleep::slept) {
     idlesleep::slept = false;
-    idlesleep::touchWakeProven =
-        light_sleep::touchWakeProven(idlesleep::touchWakeProven, idlesleep::wokeByLine, gpio.wasTouchActivity());
+    idlesleep::touchWakeProven = light_sleep::touchWakeProven(
+        idlesleep::touchWakeProven, idlesleep::wake == HalPowerManager::LightSleepWake::Touch,
+        idlesleep::wake == HalPowerManager::LightSleepWake::Timer, gpio.wasTouchActivity());
   }
 #endif
 
