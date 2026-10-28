@@ -97,6 +97,7 @@ add_subdirectory(protected_paths)
 add_subdirectory(sleep_image_pick)
 add_subdirectory(chess_core)
 add_subdirectory(chess_clock_text)
+add_subdirectory(games_core)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_test(NAME TrustedTimeTimezone COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_trusted_time.py)
