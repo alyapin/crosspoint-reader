@@ -38,7 +38,7 @@ The fork targets two readers: the X4 Pro (ESP32-S3, PSRAM, touch, frontlight, no
 ## Tokens
 
 - **Hero digits:** Unbounded SemiBold, digits-only face (0-9 % : . − space), 72–120 px for the screen's one big number, 40–56 px for a secondary number. ~20 KB.
-- **Text:** Golos Text Regular/SemiBold at 10 and 12 pt (to be added as built-in faces; until then fall back to `UI_10_FONT_ID` / `UI_12_FONT_ID` Ubuntu). Titles 12 pt SemiBold, body 10–12 pt, captions 8 pt (`SMALL_FONT_ID`).
+- **Text:** Golos Text Regular/SemiBold everywhere in the UI on the X4 Pro, including upstream system screens, the status bar and the reader footer (approved 2026-10-28, variant Б of `~/Downloads/sova-fonts-v1.png`); Ubuntu stays only as the fallback on boards without Golos. Unbounded is only for hero numbers. Titles 12 pt SemiBold, body 10–12 pt, captions 8 pt (`SMALL_FONT_ID`).
 - **One hero per screen.** Everything else is small and quiet. Content-first screens (game boards, covers) have no hero number: the content is the hero. Unbounded is only for that one hero number; digits inside grids, cells and lists use the text font (12 pt SemiBold for fixed values, Regular for user input).
 - **Selected / active in lists and tabs:** 10 px black bar on the left + SemiBold label. In grids and boards (cells, squares, keys): 4 px black inset frame. No pills, no inverted blocks, no shadows.
 - **Unavailable actions:** hide them. There is no gray text to show a disabled state.
