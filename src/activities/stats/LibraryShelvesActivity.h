@@ -34,8 +34,8 @@ class LibraryShelvesActivity final : public Activity, private UiAppHost {
     char detail[48] = "";
     std::string path;
     std::string title;
-    std::string author;
-    std::string thumb;  // resolved when first drawn
+    char author[stats::AUTHOR_BYTES] = "";  // fixed, like detail: no heap per row on the C3
+    std::string thumb;                      // resolved when first drawn
     bool thumbResolved = false;
   };
   struct ShelfRow {

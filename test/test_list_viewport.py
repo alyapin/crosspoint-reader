@@ -17,8 +17,6 @@ harness = r"""
 namespace fui = freeink::ui;
 struct UiScreen {
   int16_t height = 80;
-  fui::ThemeTokens tokens;
-  const fui::ThemeTokens& theme() const { return tokens; }
   void syncListViewport(fui::ListNav& nav, fui::ListProps& props, int count, int offset) {
     nav.syncToProps({0, 0, 200, height}, 20, 0, count, props, offset);
   }

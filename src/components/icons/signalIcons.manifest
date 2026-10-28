@@ -1,4 +1,4 @@
-# Wi-Fi rows and difficulty levels. Regenerate from the repository root with:
+# Wi-Fi rows. Regenerate from the repository root with:
 #   python3 freeink-sdk/libs/assets/Icons/tools/gen_icons.py \
 #     --manifest src/components/icons/signalIcons.manifest \
 #     --svgdir freeink-sdk/libs/assets/Icons/lucide/icons \
@@ -7,8 +7,4 @@ wifi-full = wifi
 wifi-high = wifi-high
 wifi-low = wifi-low
 wifi-lock = lock
-level-1 = signal-low
-level-2 = signal-medium
-level-3 = signal-high
-level-4 = signal
 network-add = plus

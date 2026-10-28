@@ -220,8 +220,6 @@ void UiListActivity::syncListViewport(UiScreen& screen, fui::ListProps& props, c
   const int drawn = n.drawnRows;
 
   screen.syncListViewport(n, props, listCount(), selectionOffset);
-  // Setka rows have no pill edge: values and checkboxes end on the side padding.
-  if (screen.theme().listSelectionStyle == fui::SelectionStyle::LeftBar) props.valueInset = -props.sidePadding;
 
   // When the selection is already visible in the current viewport (based on
   // the measured drawnRows rather than the unweighted visibleRows estimate),

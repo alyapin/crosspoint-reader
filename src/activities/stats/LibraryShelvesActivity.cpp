@@ -33,9 +33,11 @@ constexpr int kShelfRowHeight = kNavRowHeight;
 constexpr int kCoverWidth = 60;
 constexpr int kCoverHeight = 88;
 constexpr int kTabGap = 26;
-constexpr int kTabGapMin = 16;
+constexpr int kTabGapMin = 10;
 // The active tab's bar ends this far left of its label.
 constexpr int kTabBarGap = 6;
+// Gap before the active tab: its bar, plus air on both sides.
+constexpr int kTabBarRun = kSelectionBarWidth + 2 * kTabBarGap;
 // Rows kept per status tab, newest first: each holds its path and title.
 constexpr size_t kMaxRows = FREEINK_MCU_C3 ? 80 : 200;
 
@@ -54,6 +56,7 @@ stats::BookStatus tabStatus(const int tab) {
       return stats::BookStatus::Reading;
   }
 }
+
 }  // namespace
 
 void LibraryShelvesActivity::onEnter() {
@@ -125,7 +128,7 @@ void LibraryShelvesActivity::reload() {
           row.path = book.path;
           const char* slash = std::strrchr(book.path, '/');
           row.title = book.title[0] ? book.title : slash ? slash + 1 : book.path;
-          row.author = book.author;
+          snprintf(row.author, sizeof(row.author), "%s", book.author);
           const unsigned percent = (book.progressBp + 50) / 100;
           const uint32_t left = book.status == stats::BookStatus::Reading ? stats::estimateSecondsLeft(book) : 0;
           if (left > 0) {
@@ -406,26 +409,32 @@ void LibraryShelvesActivity::loop() {
 
 int LibraryShelvesActivity::drawTabs(UiScreen& screen, const int stripTop, const int width) {
   constexpr int kStripPad = 12;
+  constexpr int kStripRightPad = 12;  // the strip may run past the content padding, clear of the bezel
   const int firstX = kSelectionBarX + kSelectionBarWidth + kTabBarGap;
-  const int room = width - firstX - kSidePadding;
-  // Regular labels, plus the widest SemiBold gain so the choice does not
-  // change with the active tab. The text role never drops to the caption.
+  const int room = width - firstX - kStripRightPad;
+  // Regular labels plus the widest SemiBold gain pick the font, so it does not
+  // change with the active tab; the text role never drops to the caption.
   int font = kText10Font;
-  int textWidth = 0;
+  int regularWidth = 0;
   for (const int candidate : {kText12Font, kText10Font}) {
-    int total = 0;
     int boldGain = 0;
+    regularWidth = 0;
     for (const StrId label : kTabLabels) {
       const int regular = renderer.getTextWidth(candidate, I18N.get(label));
-      total += regular;
+      regularWidth += regular;
       boldGain = std::max(boldGain, renderer.getTextWidth(candidate, I18N.get(label), kSemiBold) - regular);
     }
     font = candidate;
-    textWidth = total + boldGain;
-    if (textWidth + (TabCount - 1) * kTabGapMin <= room) break;
+    if (regularWidth + boldGain + kTabBarRun + (TabCount - 2) * kTabGapMin <= room) break;
   }
-  // Spare room widens the gaps up to kTabGap.
-  const int tabGap = std::clamp((room - textWidth) / (TabCount - 1), kTabGapMin, kTabGap);
+  // Only the active label is SemiBold. The gap before it also holds its bar
+  // clear of the previous label; the other gaps share what is left.
+  const char* activeLabel = I18N.get(kTabLabels[tab]);
+  const int textWidth =
+      regularWidth + renderer.getTextWidth(font, activeLabel, kSemiBold) - renderer.getTextWidth(font, activeLabel);
+  const int spare = room - textWidth - (tab > 0 ? kTabBarRun : 0);
+  const int plainGaps = tab > 0 ? TabCount - 2 : TabCount - 1;
+  const int tabGap = std::clamp(spare / plainGaps, kTabGapMin, kTabGap);
   const int lineHeight = renderer.getLineHeight(font);
   const int stripHeight = std::max(kMinTouch, lineHeight + 2 * kStripPad);
   const int textTop = stripTop + (stripHeight - lineHeight) / 2;
@@ -439,7 +448,7 @@ int LibraryShelvesActivity::drawTabs(UiScreen& screen, const int stripTop, const
     renderer.drawText(font, x, textTop, label, true, style);
     screen.frame().hit(fui::makeRect(x - tabGap / 2, stripTop, labelWidth + tabGap, stripHeight), ACTION_TAB,
                        static_cast<int16_t>(i), fui::InputTouch);
-    x += labelWidth + tabGap;
+    x += labelWidth + (i + 1 == tab ? std::max(tabGap, kTabBarRun) : tabGap);
   }
   drawRule(renderer, 0, stripTop + stripHeight, width);
   return stripTop + stripHeight + kRuleWidth;
@@ -469,11 +478,11 @@ void LibraryShelvesActivity::drawBookRow(UiScreen& screen, const int index, cons
     lineTop += line10;
   }
   std::string detail = book.detail;
-  if (!book.author.empty()) {
+  if (book.author[0] != '\0') {
     // The author gives way first, so the progress always shows.
     static constexpr char kDot[] = " \u00B7 ";
     const int room = textWidth - renderer.getTextWidth(kText10Font, (std::string(kDot) + book.detail).c_str());
-    detail = renderer.truncatedText(kText10Font, book.author.c_str(), std::max(0, room)) + kDot + book.detail;
+    detail = renderer.truncatedText(kText10Font, book.author, std::max(0, room)) + kDot + book.detail;
   }
   renderer.drawText(kText10Font, textX, lineTop,
                     renderer.truncatedText(kText10Font, detail.c_str(), textWidth).c_str());

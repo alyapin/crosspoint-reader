@@ -369,13 +369,16 @@ void SetkaHomeActivity::drawTabs(UiScreen& screen, const int top, const int bott
   const int blockTop = top + kRuleWidth + (bottom - top - kRuleWidth - blockHeight) / 2;
   const int focusedTab = focus - bookFocusCount();
   // Four labels do not fit equal quarters, so each column is its label plus
-  // an equal share of the spare width.
+  // an equal share of the spare width. Where keys can focus a tab, columns
+  // fit the SemiBold label so they stay put as the focus moves.
+  const bool focusable = !mappedInput.hasTouch();
   std::array<int, TabCount> columnWidths{};
   int spare = width;
   for (int tab = 0; tab < TabCount; ++tab) {
-    columnWidths[tab] =
-        std::max(kTabIconSize, renderer.getTextWidth(kText10Font, I18N.get(kTabs[tab].label),
-                                                     tab == focusedTab ? kSemiBold : EpdFontFamily::REGULAR));
+    const char* label = I18N.get(kTabs[tab].label);
+    const int labelWidth =
+        focusable ? renderer.getTextWidth(kText10Font, label, kSemiBold) : renderer.getTextWidth(kText10Font, label);
+    columnWidths[tab] = std::max(kTabIconSize, labelWidth);
     spare -= columnWidths[tab];
   }
   int columnX = 0;

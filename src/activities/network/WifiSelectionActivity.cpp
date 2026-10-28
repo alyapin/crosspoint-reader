@@ -281,7 +281,8 @@ void WifiSelectionActivity::rebuildNetworkRowItems() {
     // Signal strength leads the row, a lock trails it on secured networks.
     item.icon = signalIcon(network);
     if (network.hasSavedPassword) item.value = tr(STR_NETWORK_SAVED);
-    if (network.isEncrypted && !network.isHiddenPlaceholder) item.valueIcon = fui::bitmapFromIcon(icon_wifi_lock_16);
+    static const fui::BitmapRef lock = fui::bitmapFromIcon(icon_wifi_lock_16);
+    if (network.isEncrypted && !network.isHiddenPlaceholder) item.valueIcon = &lock;
     item.actionValue = static_cast<int16_t>(i);
     networkRowItems.push_back(item);
   }
@@ -929,7 +930,6 @@ void WifiSelectionActivity::buildListScreen(UiScreen& screen) {
   listNav.selected = static_cast<int>(selectedNetworkIndex);
   props.partialTrailingRow = true;
   screen.syncListViewport(listNav, props, static_cast<int>(networks.size()));
-  if (screen.theme().listSelectionStyle == fui::SelectionStyle::LeftBar) props.valueInset = -props.sidePadding;
   screen.list(props);
 }
 

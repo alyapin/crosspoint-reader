@@ -163,11 +163,12 @@ void UiTabListActivity::buildTabBar(UiScreen& screen) {
   if (setka) {
     // No fills: a black underline marks the active tab, a frame shows key focus on the band.
     tabStyles.selected.foreground = fui::Paint::solid(fui::Color::Black);
-    if (tabsFocused) {
+    if (tabsFocused && !mappedInput.hasTouch()) {
       tabStyles.selected.border = fui::Paint::solid(fui::Color::Black);
       tabStyles.selected.borderWidth = 2;
     }
     tabProps.selectedUnderline = 4;
+    tabProps.tabInset = fui::Insets{2, 4, 0, 4};  // the underline stays on the divider in both states
   } else if (tabsFocused) {
     tabStyles.selected.background = fui::Paint::solid(fui::Color::Black);
     tabStyles.selected.foreground = fui::Paint::solid(fui::Color::White);

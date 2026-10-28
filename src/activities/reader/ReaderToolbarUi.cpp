@@ -286,12 +286,11 @@ void ReaderToolbarUi::buildPanel(UiScreen& screen) {
   listProps_.rowInset = tokens.spaceLg;
   if (tokens.listSelectionStyle == fui::SelectionStyle::LeftBar) {
     // Setka: label + value rows in the small text role, labels past the
-    // selection bar, values on the side padding.
+    // selection bar (the theme puts values on the side padding).
     listProps_.labelText = tokens.smallText;
     listProps_.labelText.maxLines = 2;
     listProps_.rowInset = tokens.listInset;
     listProps_.sidePadding = tokens.listSidePadding;
-    listProps_.valueInset = static_cast<int16_t>(-tokens.listSidePadding);
   }
   const fui::Rect listRect = screen.body();
   const int count = std::max(0, model_.itemCount);
