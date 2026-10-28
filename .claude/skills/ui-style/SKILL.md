@@ -38,7 +38,7 @@ The fork targets two readers: the X4 Pro (ESP32-S3, PSRAM, touch, frontlight, no
 ## Tokens
 
 - **Typeface (approved 2026-10-28, `~/Downloads/sova-fonts-unbounded-v2.png`):** the whole UI on the X4 Pro is Unbounded. Body text Regular, titles/headers/selected row SemiBold, small captions (status bar, reader footer, hints) Light, hero numbers SemiBold digits faces. Book text keeps the book font. Inside games, dense tiny text (scanword clue cells) uses Golos; game chrome follows the UI roles. Long book titles wrap to 2 lines before falling back to an ellipsis; Russian labels that do not fit get shorter wording. Ubuntu stays only as glyph fallback and on boards without these faces.
-- **One hero per screen.** Everything else is small and quiet. Content-first screens (game boards, covers) have no hero number: the content is the hero. Unbounded is only for that one hero number; digits inside grids, cells and lists use the text font (12 pt SemiBold for fixed values, Regular for user input).
+- **One hero per screen.** Everything else is small and quiet. Content-first screens (game boards, covers) have no hero number: the content is the hero. Only that one number uses the large hero digit faces; digits inside grids, cells and lists use the text roles (SemiBold for fixed values, Regular for user input).
 - **Selected / active in lists and tabs:** 10 px black bar on the left + SemiBold label. In grids and boards (cells, squares, keys): 4 px black inset frame. No pills, no inverted blocks, no shadows.
 - **Unavailable actions:** hide them. There is no gray text to show a disabled state.
 - **Text never sits on a dither fill.** Dither only behind empty areas, tracks and cover placeholders.
