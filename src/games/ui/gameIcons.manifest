@@ -1,0 +1,17 @@
+# Lucide icons for the game screens and their pickers — regenerate from the
+# repository root with:
+#   python3 freeink-sdk/libs/assets/Icons/tools/gen_icons.py \
+#     --manifest src/games/ui/gameIcons.manifest \
+#     --svgdir freeink-sdk/libs/assets/Icons/lucide/icons \
+#     --sizes 24 --out src/games/ui/gameIcons.h
+grid = grid-3x3
+grid-small = grid-2x2
+bomb = bomb
+spade = spade
+signal-low = signal-low
+signal-medium = signal-medium
+signal-high = signal-high
+signal = signal
+card = rectangle-vertical
+cards = layers
+check = circle-check
