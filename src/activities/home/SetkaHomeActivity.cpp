@@ -307,7 +307,7 @@ void SetkaHomeActivity::drawBooks(UiScreen& screen, const int top, const int bot
       thumbsChecked = false;
     }
     drawCover(slot, x, y, coverWidth, coverHeight);
-    // The current book is marked by its row below; the others show button focus with a frame.
+    // Focus on the current book shows as the bar on its row below; the others get a frame.
     if (i > 0 && i == focused) {
       drawCellFrame(renderer, x - kCoverRing, y - kCoverRing, coverWidth + 2 * kCoverRing,
                     coverHeight + 2 * kCoverRing);
@@ -323,7 +323,7 @@ void SetkaHomeActivity::drawBooks(UiScreen& screen, const int top, const int bot
   const int ruleY = digitsTop + digitsHeight + kGap;
   drawRule(renderer, 0, ruleY, width);
   const int rowTop = ruleY + kRuleWidth + kGap;
-  drawSelectionBar(renderer, kSelectionBarX, rowTop, rowHeight);
+  if (focused == 0) drawSelectionBar(renderer, kSelectionBarX, rowTop, rowHeight);
   const int textWidth = width - kRowTextX - kSidePadding;
   renderer.drawText(kText12Font, kRowTextX, rowTop,
                     renderer.truncatedText(kText12Font, slots[0].book.title.c_str(), textWidth, kSemiBold).c_str(),
@@ -346,7 +346,7 @@ void SetkaHomeActivity::drawEmpty(UiScreen& screen, const int top, const int wid
   const int ruleY = y + kGap;
   drawRule(renderer, 0, ruleY, width);
   const int rowTop = ruleY + kRuleWidth + kGap;
-  drawSelectionBar(renderer, kSelectionBarX, rowTop, line12);
+  if (focus == 0) drawSelectionBar(renderer, kSelectionBarX, rowTop, line12);
   renderer.drawText(kText12Font, kRowTextX, rowTop, tr(STR_OPEN_LIBRARY), true, kSemiBold);
   screen.frame().hit(fui::makeRect(0, ruleY + kRuleWidth, width, line12 + 2 * kGap), ACTION_OPEN_LIBRARY, 0,
                      fui::InputTouch);

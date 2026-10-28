@@ -8,13 +8,13 @@
 #include "components/setka/setkaIcons.h"
 
 void MoreActivity::onEnter() {
-  SetkaListActivity::onEnter();
   entryCount = 0;
   entries[entryCount++] = Entry::Games;
   entries[entryCount++] = Entry::FileTransfer;
   entries[entryCount++] = Entry::Catalogs;
   if (SETTINGS.pluginsEnabled) entries[entryCount++] = Entry::Plugins;
   entries[entryCount++] = Entry::SdFiles;
+  SetkaListActivity::onEnter();
 }
 
 const char* MoreActivity::headerTitle() const { return tr(STR_MORE); }
