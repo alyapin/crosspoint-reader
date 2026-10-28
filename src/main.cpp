@@ -120,6 +120,20 @@ EpdFont ui12RegularFont(&ubuntu_12_regular);
 EpdFont ui12BoldFont(&ubuntu_12_bold);
 EpdFontFamily ui12FontFamily(12, &ui12RegularFont, &ui12BoldFont);
 
+#if FREEINK_DEVICE_X4PRO
+// Setka faces (components/setka/SetkaStyle.h): SemiBold fills the bold slot.
+EpdFont golos10RegularFont(&golostext_10_regular);
+EpdFont golos10SemiBoldFont(&golostext_10_semibold);
+EpdFontFamily golos10FontFamily(10, &golos10RegularFont, &golos10SemiBoldFont);
+EpdFont golos12RegularFont(&golostext_12_regular);
+EpdFont golos12SemiBoldFont(&golostext_12_semibold);
+EpdFontFamily golos12FontFamily(12, &golos12RegularFont, &golos12SemiBoldFont);
+EpdFont unbounded61Font(&unbounded_61_digits);
+EpdFontFamily unbounded61FontFamily(61, &unbounded61Font);
+EpdFont unbounded31Font(&unbounded_31_digits);
+EpdFontFamily unbounded31FontFamily(31, &unbounded31Font);
+#endif
+
 // Definitions for SilentRestart.h. RTC_NOINIT survives ESP.restart() but not power loss.
 RTC_NOINIT_ATTR uint32_t silentRebootMagic;
 RTC_NOINIT_ATTR uint32_t silentRebootTarget;
@@ -553,6 +567,12 @@ void setupDisplayAndFonts(bool seamless = false) {
   renderer.insertFont(UI_10_FONT_ID, ui10FontFamily);
   renderer.insertFont(UI_12_FONT_ID, ui12FontFamily);
   renderer.insertFont(SMALL_FONT_ID, smallFontFamily);
+#if FREEINK_DEVICE_X4PRO
+  renderer.insertFont(GOLOS_10_FONT_ID, golos10FontFamily);
+  renderer.insertFont(GOLOS_12_FONT_ID, golos12FontFamily);
+  renderer.insertFont(UNBOUNDED_61_FONT_ID, unbounded61FontFamily);
+  renderer.insertFont(UNBOUNDED_31_FONT_ID, unbounded31FontFamily);
+#endif
 
   // Discover and load SD card fonts
   sdFontSystem.begin(renderer);

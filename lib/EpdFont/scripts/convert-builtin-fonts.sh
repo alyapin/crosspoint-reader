@@ -78,6 +78,41 @@ python fontconvert.py ubuntu_8_regular 8 \
   ../builtinFonts/source/Ubuntu/Ubuntu-Vietnamese-Regular.ttf \
   --additional-intervals 0x05D0,0x05EA "${ARABIC_INTERVALS[@]}" > ../builtinFonts/ubuntu_8_regular.h
 
+# Setka faces, compiled into X4 Pro builds only (src/components/setka/SetkaStyle.h).
+# google/fonts ships Golos Text and Unbounded as variable fonts; the committed
+# static cuts come from:
+#   fonttools varLib.instancer 'GolosText[wght].ttf' wght=400 --static --update-name-table -o GolosText-Regular.ttf
+# (wght=600 for GolosText-SemiBold and Unbounded-SemiBold). Both are unhinted,
+# so the text face uses the auto-hinter for even 1-bit stems. Golos alone
+# covers Latin and Cyrillic (plus the numero sign Russian UI copy uses); no
+# Hebrew/Arabic fallbacks.
+for size in 10 12; do
+  for style in Regular SemiBold; do
+    font_name="golostext_${size}_$(echo $style | tr '[:upper:]' '[:lower:]')"
+    output_path="../builtinFonts/${font_name}.h"
+    python fontconvert.py $font_name $size ../builtinFonts/source/GolosText/GolosText-${style}.ttf \
+      --force-autohint --additional-intervals 0x2116,0x2116 > $output_path
+    echo "Generated $output_path"
+  done
+done
+
+# Hero numbers: digits-only Unbounded SemiBold. Cap height is 0.75 em and the
+# converter rasterizes at 150 DPI, so 61 pt is ~96 px and 31 pt ~48 px.
+HERO_INTERVALS=(
+  --only-additional-intervals
+  --additional-intervals 0x20,0x20      # space
+  --additional-intervals 0x25,0x25      # %
+  --additional-intervals 0x2B,0x2E      # + , - .
+  --additional-intervals 0x30,0x3A      # 0-9 :
+  --additional-intervals 0x2212,0x2212  # minus sign
+)
+for size in 61 31; do
+  output_path="../builtinFonts/unbounded_${size}_digits.h"
+  python fontconvert.py unbounded_${size}_digits $size ../builtinFonts/source/Unbounded/Unbounded-SemiBold.ttf \
+    "${HERO_INTERVALS[@]}" > $output_path
+  echo "Generated $output_path"
+done
+
 echo ""
 echo "Running compression verification..."
 python verify_compression.py ../builtinFonts/
