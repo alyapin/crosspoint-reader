@@ -18,6 +18,7 @@
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
 #include "XtcReaderActivity.h"
+#include "stats/ReadingStats.h"
 #include "util/PluginEvents.h"
 
 #if CROSSPOINT_BRIGHTNESS_SWIPE
@@ -59,6 +60,7 @@ void ReaderActivity::disableFastInitialRefresh() { pagesUntilFullRefresh = 0; }
 void ReaderActivity::notePageTurn(const bool forward, const bool succeeded) {
   RenderLock lock(*this);
   readerSession.noteTurn(forward, succeeded);
+  readingTracker.noteTurn(forward, succeeded);
 }
 
 void ReaderActivity::onEnter() {
@@ -97,6 +99,9 @@ void ReaderActivity::rememberBookOnceRendered() {
   APP_STATE.openEpubPath = bookPath;
   APP_STATE.saveToFile();
   RECENT_BOOKS.addBook(bookPath, getBookTitle(), getBookAuthor(), getBookThumbBmpPath());
+  statsBookId =
+      READING_STATS.openBook(bookPath, getBookTitle(), getBookAuthor(), stats::today(), getProgressBasisPoints());
+  READING_STATS.compactIfNeeded();
   const pluginevents::Var openVars[] = {{"book", bookPath.c_str()}};
   pluginevents::emit(pluginevents::Event::ReaderOpen, openVars, 1);
 }
@@ -139,7 +144,34 @@ void ReaderActivity::onExit() {
 
 void ReaderActivity::prepareForSleep() { flushReaderSession(); }
 
+void ReaderActivity::serviceReadingStats() {
+  if (!bookRemembered) return;
+  ReadingSegment segment;
+  bool hasSegment = false;
+  bool finished = false;
+  {
+    // Never wait for a page being drawn; the segment keeps until the next loop.
+    RenderLock lock(RenderLock::Mode::Try);
+    if (!lock.ownsLock()) return;
+    hasSegment = readingTracker.hasReady();
+    if (hasSegment) segment = readingTracker.takeReady();
+    finished = readingTracker.takeFinished();
+  }
+  writeReadingStats(hasSegment ? &segment : nullptr, finished);
+}
+
+void ReaderActivity::writeReadingStats(const ReadingSegment* segment, const bool finished) {
+  if (segment) READING_STATS.appendSegment(statsBookId, *segment);
+  if (finished && statsBookId >= 0) READING_STATS.markFinished(statsBookId, stats::today());
+}
+
 void ReaderActivity::flushReaderSession() {
+  readingTracker.close(millis());
+  if (bookRemembered) {
+    const ReadingSegment segment = readingTracker.hasReady() ? readingTracker.takeReady() : ReadingSegment{};
+    writeReadingStats(&segment, readingTracker.takeFinished());
+  }
+
   if (!readerSession.isEmitWorthy() || !pluginevents::anySubscriber(pluginevents::Event::ReaderSession)) {
     readerSession.reset();
     return;
@@ -231,6 +263,7 @@ bool ReaderActivity::handleEndOfBookPageTurn(const bool prevTriggered, const boo
 
 void ReaderActivity::loop() {
   rememberBookOnceRendered();
+  serviceReadingStats();
 #if CROSSPOINT_BRIGHTNESS_SWIPE
   if (handleBrightnessSwipe()) return;
 #endif
@@ -277,12 +310,20 @@ void ReaderActivity::render(RenderLock&&) {
     renderer.displayBuffer();
     onEndOfBookRendered();
     markPageRendered();
-    readerSession.onRenderComplete(millis(), trustedtime::trustedNow(), getProgressBasisPoints());
+    notePageShown(true);
     return;
   }
 
   renderBook();
-  readerSession.onRenderComplete(millis(), trustedtime::trustedNow(), getProgressBasisPoints());
+  notePageShown(false);
+}
+
+void ReaderActivity::notePageShown(const bool atEnd) {
+  const uint32_t now = millis();
+  const int64_t epoch = trustedtime::trustedNow();
+  const int progressBp = getProgressBasisPoints();
+  readerSession.onRenderComplete(now, epoch, progressBp);
+  readingTracker.onPageShown(now, epoch, progressBp, atEnd);
 }
 
 bool ReaderActivity::handleForcedRefresh() {

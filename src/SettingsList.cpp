@@ -136,6 +136,10 @@ void forEachBaseSetting(SettingVisitor visit, void* context) {
   emit(SettingInfo::Enum(StrId::STR_READER_MENU_STYLE, &CrossPointSettings::readerMenuStyle,
                          {StrId::STR_MENU_STYLE_LIST, StrId::STR_MENU_STYLE_TOOLBAR}, "readerMenuStyle",
                          StrId::STR_CAT_READER));
+  emit(SettingInfo::Value(StrId::STR_DAILY_READING_GOAL, &CrossPointSettings::readingGoalMinutes,
+                          {CrossPointSettings::READING_GOAL_MIN, CrossPointSettings::READING_GOAL_MAX,
+                           CrossPointSettings::READING_GOAL_STEP},
+                          "readingGoalMinutes", StrId::STR_CAT_READER));
   // --- Controls ---
 #if FREEINK_CAP_HAPTIC
   emit(SettingInfo::Enum(StrId::STR_VIBRATION, &CrossPointSettings::vibration,
