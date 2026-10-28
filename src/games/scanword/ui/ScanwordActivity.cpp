@@ -915,23 +915,29 @@ void ScanwordActivity::drawGrid(UiScreen& screen, const int visibleBottom) const
   const int size = cellSize();
   const int left = gridLeft();
   const int right = left + puzzle->width() * size;
-  const int bottom = gridBottom();
+  // Whole rows only: a row cut by the keyboard reads as broken.
+  const int bottom = std::min(gridBottom(), kGridTop + (visibleBottom - kGridTop) / size * size);
   for (uint16_t cell = 0; cell < puzzle->cellCount(); ++cell) {
     int x = 0;
     int y = 0;
     cellOrigin(cell, x, y);
-    if (y < visibleBottom) drawCell(cell, x, y);
+    if (y + size <= bottom) drawCell(cell, x, y);
   }
   const int lastX = std::min(right, renderer.getScreenWidth() - 1);
   for (int c = 0; c <= puzzle->width(); ++c) {
     const int x = std::min(left + c * size, lastX);
     renderer.drawLine(x, kGridTop, x, bottom);
   }
-  for (int r = 0; r <= puzzle->height(); ++r) renderer.drawLine(left, kGridTop + r * size, lastX, kGridTop + r * size);
+  for (int r = 0; kGridTop + r * size <= bottom; ++r) {
+    renderer.drawLine(left, kGridTop + r * size, lastX, kGridTop + r * size);
+  }
   const bool showSelection = (!touchBoard() || keyboardOpen) && !game->solved();
   if (showSelection) drawSelection();
-  screen.frame().hit(fui::makeRect(left, kGridTop, right - left, std::min(bottom, visibleBottom) - kGridTop),
-                     ACTION_GRID, 0, kTap);
+  // A selection frame running into the rows left out is cut 1 px below the last rule (its own outset).
+  if (bottom + 2 < visibleBottom) {
+    renderer.fillRect(0, bottom + 2, renderer.getScreenWidth(), visibleBottom - bottom - 2, false);
+  }
+  screen.frame().hit(fui::makeRect(left, kGridTop, right - left, bottom - kGridTop), ACTION_GRID, 0, kTap);
 }
 
 void ScanwordActivity::drawCell(const uint16_t cell, const int x, const int y) const {

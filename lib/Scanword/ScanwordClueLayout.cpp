@@ -31,6 +31,20 @@ bool isVowel(const uint8_t letter) {
 // A part starts on a consonant other than Ь, Ъ, Й (those stay with the letter before).
 bool startsPart(const uint8_t letter) { return letter != 30 && letter != 28 && letter != 11 && !isVowel(letter); }
 
+// Л, М, Н, Р.
+bool isSonorant(const uint8_t letter) { return letter == 13 || letter == 14 || letter == 15 || letter == 18; }
+
+// Break before letters[split] (a consonant that starts a part): after a vowel or Ь/Ъ/Й ("Боже-ство",
+// "Свой-ство"), between two single consonants ("Кош-ка"), after Л/М/Н/Р closing a syllable
+// ("Отвер-стие"), or before "ств" ("Цар-ство"); never inside "ств" ("Божес-тво", "Свойст-во").
+bool goodBreak(const uint8_t* letters, const size_t count, const size_t split) {
+  const uint8_t before = letters[split - 1];
+  if (!startsPart(before)) return true;
+  if (split + 2 < count && letters[split] == 19 && letters[split + 1] == 20 && letters[split + 2] == 3) return true;
+  if (!isVowel(letters[split - 2])) return false;
+  return isVowel(letters[split + 1]) || isSonorant(before);
+}
+
 uint8_t letterAt(const char* s, const size_t len) {
   const auto c = static_cast<uint8_t>(s[0]);
   if ((c == 0xD0 || c == 0xD1) && len >= 2) {
@@ -149,7 +163,7 @@ class Builder {
     }
     offsets[count] = static_cast<uint8_t>(n);
     for (size_t split = count >= 2 ? count - 2 : 0; split >= 2; --split) {
-      if (!startsPart(letters[split])) continue;
+      if (!startsPart(letters[split]) || !goodBreak(letters, count, split)) continue;
       bool headVowel = false;
       bool tailVowel = false;
       for (size_t k = 0; k < count; ++k) (k < split ? headVowel : tailVowel) |= isVowel(letters[k]);
