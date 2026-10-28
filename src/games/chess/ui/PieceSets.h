@@ -13,8 +13,8 @@ constexpr uint8_t PIECE_SET_COUNT = 4;
 
 enum class PieceColor : uint8_t { White, Black };
 
-// Same order as chess::PieceType, which starts at PAWN = 1.
-enum class PieceKind : uint8_t { Pawn, Knight, Bishop, Rook, Queen, King };
+// Values match chess::PieceType (PAWN = 1 ... KING = 6), so a static_cast converts.
+enum class PieceKind : uint8_t { Pawn = 1, Knight, Bishop, Rook, Queen, King };
 
 // Board: 56 px for 60 px squares. Small: 32 px for captured pieces and the promotion picker.
 enum class PieceSize : uint8_t { Board, Small };
@@ -29,7 +29,7 @@ struct PieceBitmap {
   const uint8_t* ink;
 };
 
-// An out-of-range set (e.g. from stale settings) falls back to Lucide.
+// Out-of-range arguments (e.g. a stale saved set) fall back to Lucide / White / Pawn / Board.
 const PieceBitmap& pieceBitmap(PieceSet set, PieceColor color, PieceKind kind, PieceSize size);
 
 // Paints the piece's mask pixels with its top-left corner at (x, y): black where
