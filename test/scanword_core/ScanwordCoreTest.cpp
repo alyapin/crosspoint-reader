@@ -121,12 +121,12 @@ TEST_F(Fixture, ParsesGridAndClues) {
   EXPECT_EQ(puzzle->solution(at(1, 2)), LETTER_YO);
   EXPECT_EQ(puzzle->solution(at(1, 3)), LETTER_E);
 
-  const Word& abvo = puzzle->word(W_ABVO);
+  const Word& abvo = puzzle->wordAt(W_ABVO);
   EXPECT_EQ(abvo.arrow, Arrow::RightDown);
   EXPECT_EQ(abvo.dir, Dir::Down);
   EXPECT_EQ(abvo.start, at(0, 1));
   EXPECT_EQ(abvo.length, 4);
-  const Word& no = puzzle->word(W_NO);
+  const Word& no = puzzle->wordAt(W_NO);
   EXPECT_EQ(no.arrow, Arrow::DownRight);
   EXPECT_EQ(no.dir, Dir::Across);
   EXPECT_EQ(no.start, at(3, 0));
@@ -137,13 +137,13 @@ TEST_F(Fixture, ParsesGridAndClues) {
   ASSERT_EQ(puzzle->cluesAt(at(0, 3), ids), 2);
   EXPECT_EQ(ids[0], W_LZMK);
   EXPECT_EQ(ids[1], W_EEIY);
-  EXPECT_EQ(puzzle->word(W_EEIY).half, 1);
+  EXPECT_EQ(puzzle->wordAt(W_EEIY).half, 1);
   EXPECT_EQ(puzzle->cluesAt(at(4, 0), ids), 0);
 
   EXPECT_EQ(puzzle->wordAt(at(1, 3), Dir::Across), W_BYOEZ);
   EXPECT_EQ(puzzle->wordAt(at(1, 3), Dir::Down), W_EEIY);
   EXPECT_EQ(puzzle->wordAt(at(1, 2), Dir::Down), NO_WORD);
-  EXPECT_EQ(puzzle->cellOf(puzzle->word(W_LZMK), 3), at(3, 4));
+  EXPECT_EQ(puzzle->cellOf(puzzle->wordAt(W_LZMK), 3), at(3, 4));
 }
 
 TEST_F(Fixture, ChunkingAndLineEndingsDoNotMatter) {
@@ -388,7 +388,7 @@ TEST_F(Fixture, SolvingEndsTheGame) {
   };
   for (const auto& a : answers) {
     game->selectWord(a.word);
-    game->tapCell(game->puzzle().word(a.word).start);
+    game->tapCell(game->puzzle().wordAt(a.word).start);
     if (game->selectedWord() != a.word) game->toggleDirection();
     ASSERT_EQ(game->selectedWord(), a.word);
     for (const uint8_t l : a.letters) EXPECT_EQ(game->enter(l), EntryResult::Entered);
@@ -634,7 +634,7 @@ TEST(ScanwordSamples, LoadAndSolve) {
     auto g = std::make_unique<Game>(*p);
     EntryResult last = EntryResult::Ignored;
     for (uint8_t w = 0; w < p->wordCount() && last != EntryResult::Solved; ++w) {
-      const Word& word = p->word(w);
+      const Word& word = p->wordAt(w);
       ASSERT_GE(word.length, 3) << id;
       ASSERT_TRUE(g->selectWord(w));
       // The cursor sits on the first empty cell; earlier ones came from crossings.

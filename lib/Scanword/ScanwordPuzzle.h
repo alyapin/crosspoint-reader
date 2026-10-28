@@ -74,7 +74,7 @@ class Puzzle {
   // Display letter of a letter cell: Ё only where every answer through it has Ё.
   uint8_t solution(uint16_t cell) const { return letters[cell]; }
   uint8_t wordCount() const { return words; }
-  const Word& word(uint8_t index) const { return list[index]; }
+  const Word& wordAt(uint8_t index) const { return list[index]; }
   std::string_view clue(uint8_t index) const;
   // Answer through a letter cell in `dir`, NO_WORD if none.
   uint8_t wordAt(uint16_t cell, Dir dir) const { return dir == Dir::Across ? across[cell] : down[cell]; }

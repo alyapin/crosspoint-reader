@@ -339,7 +339,7 @@ void ScanwordActivity::tapGrid(const int x, const int y) {
 void ScanwordActivity::typeLetter(const uint8_t letter) {
   const uint8_t selected = game->selectedWord();
   if (selected == scanword::NO_WORD) return;
-  const Word& w = puzzle->word(selected);
+  const Word& w = puzzle->wordAt(selected);
   // enter() skips revealed cells: find the cell it types into and whether one follows it.
   uint8_t pos = 0;
   while (pos < w.length && puzzle->cellOf(w, pos) != game->cursor()) ++pos;
@@ -385,7 +385,7 @@ void ScanwordActivity::showCheck(const uint16_t wrong, const bool wholeGrid) {
 bool ScanwordActivity::wordHasEntry() const {
   const uint8_t selected = game->selectedWord();
   if (selected == scanword::NO_WORD) return false;
-  const Word& w = puzzle->word(selected);
+  const Word& w = puzzle->wordAt(selected);
   for (uint8_t i = 0; i < w.length; ++i) {
     if (game->entry(puzzle->cellOf(w, i)) != scanword::NO_LETTER) return true;
   }
@@ -520,7 +520,7 @@ void ScanwordActivity::handleAction(const fui::ActionEvent& event, const int x, 
     case ACTION_BOX:
       // The hit carries the box pitch.
       if (input && event.value > 0) {
-        const Word& w = puzzle->word(game->selectedWord());
+        const Word& w = puzzle->wordAt(game->selectedWord());
         const int pos = (x - kSidePadding) / event.value;
         if (pos >= 0 && pos < w.length) {
           game->tapCell(puzzle->cellOf(w, static_cast<uint8_t>(pos)), false);
@@ -674,7 +674,7 @@ void ScanwordActivity::handleBoardKeys() {
   }
   if (left || right) {
     RenderLock lock(*this);
-    const Word& w = puzzle->word(game->selectedWord());
+    const Word& w = puzzle->wordAt(game->selectedWord());
     int pos = 0;
     while (pos < w.length && puzzle->cellOf(w, static_cast<uint8_t>(pos)) != game->cursor()) ++pos;
     pos += right ? 1 : -1;
@@ -985,7 +985,7 @@ void ScanwordActivity::drawClueCell(const uint16_t cell, const int x, const int 
   if (n == 2) renderer.drawLine(x, y + halfHeight, std::min(x + size, renderer.getScreenWidth() - 1), y + halfHeight);
   const uint8_t selected = game->selectedWord();
   const bool shown = (!touchBoard() || keyboardOpen) && !game->solved();
-  if (shown && selected != scanword::NO_WORD && puzzle->word(selected).clueCell == cell) {
+  if (shown && selected != scanword::NO_WORD && puzzle->wordAt(selected).clueCell == cell) {
     renderer.drawRect(x + 1, y + 1, size - 1, size - 1, kClueFrameWidth, true);
   }
 }
@@ -994,7 +994,7 @@ void ScanwordActivity::drawArrows(const uint16_t cell, const int x, const int y)
   const int size = cellSize();
   const int s = size / 7;
   for (uint8_t i = 0; i < puzzle->wordCount(); ++i) {
-    const Word& w = puzzle->word(i);
+    const Word& w = puzzle->wordAt(i);
     if (w.start != cell) continue;
     uint8_t ids[2];
     const bool split = puzzle->cluesAt(w.clueCell, ids) == 2;
@@ -1038,7 +1038,7 @@ void ScanwordActivity::drawArrows(const uint16_t cell, const int x, const int y)
 void ScanwordActivity::drawSelection() const {
   const uint8_t selected = game->selectedWord();
   if (selected == scanword::NO_WORD) return;
-  const Word& w = puzzle->word(selected);
+  const Word& w = puzzle->wordAt(selected);
   const int size = cellSize();
   int x = 0;
   int y = 0;
@@ -1060,7 +1060,7 @@ void ScanwordActivity::drawWordLine(const int top, const int height) const {
   const int width = renderer.getScreenWidth();
   const uint8_t selected = game->selectedWord();
   if (selected == scanword::NO_WORD) return;
-  const Word& w = puzzle->word(selected);
+  const Word& w = puzzle->wordAt(selected);
   char right[32];
   if (checkResult == 0 && !checkedGrid) {
     snprintf(right, sizeof(right), "%s", tr(STR_SCANWORD_ALL_RIGHT));
@@ -1091,7 +1091,7 @@ void ScanwordActivity::drawAnswerStrip(UiScreen& screen, const int top) const {
   drawWordLine(top + 4, 36);
   const uint8_t selected = game->selectedWord();
   if (selected == scanword::NO_WORD) return;
-  const Word& w = puzzle->word(selected);
+  const Word& w = puzzle->wordAt(selected);
   const int avail = width - 2 * kSidePadding;
   const int box = std::min(kBoxSize, (avail + kBoxGap) / w.length - kBoxGap);
   const int boxTop = top + 44;

@@ -154,7 +154,7 @@ void Game::reset() {
 }
 
 uint8_t Game::positionOf(const uint8_t word, const uint16_t cell) const {
-  const Word& w = p.word(word);
+  const Word& w = p.wordAt(word);
   for (uint8_t i = 0; i < w.length; ++i) {
     if (p.cellOf(w, i) == cell) return i;
   }
@@ -166,7 +166,7 @@ bool Game::inSelection(const uint16_t cell) const {
 }
 
 uint16_t Game::firstOpenCell(const uint8_t word) const {
-  const Word& w = p.word(word);
+  const Word& w = p.wordAt(word);
   for (uint8_t i = 0; i < w.length; ++i) {
     const uint16_t cell = p.cellOf(w, i);
     if (entries[cell] == NO_LETTER && !locked(cell)) return cell;
@@ -191,7 +191,7 @@ bool Game::tapCell(const uint16_t cell, const bool toggle) {
     return true;
   }
   if (!inSelection(cell)) {
-    const bool wantAcross = selected == NO_WORD || p.word(selected).dir == Dir::Across;
+    const bool wantAcross = selected == NO_WORD || p.wordAt(selected).dir == Dir::Across;
     const uint8_t preferred = wantAcross ? across : down;
     selected = preferred != NO_WORD ? preferred : (wantAcross ? down : across);
   }
@@ -223,7 +223,7 @@ bool Game::moveCursor(const int dRow, const int dCol) {
     if (row < 0 || col < 0 || row >= p.height() || col >= p.width()) return false;
     const auto cell = static_cast<uint16_t>(row * p.width() + col);
     if (p.kind(cell) != CellKind::Letter) continue;
-    const Dir keep = selected == NO_WORD ? (dCol != 0 ? Dir::Across : Dir::Down) : p.word(selected).dir;
+    const Dir keep = selected == NO_WORD ? (dCol != 0 ? Dir::Across : Dir::Down) : p.wordAt(selected).dir;
     const uint8_t same = p.wordAt(cell, keep);
     selected = same != NO_WORD ? same : p.wordAt(cell, keep == Dir::Across ? Dir::Down : Dir::Across);
     cursorCell = cell;
@@ -233,7 +233,7 @@ bool Game::moveCursor(const int dRow, const int dCol) {
 
 bool Game::toggleDirection() {
   if (selected == NO_WORD) return false;
-  const Dir other = p.word(selected).dir == Dir::Across ? Dir::Down : Dir::Across;
+  const Dir other = p.wordAt(selected).dir == Dir::Across ? Dir::Down : Dir::Across;
   const uint8_t word = p.wordAt(cursorCell, other);
   if (word == NO_WORD) return false;
   selected = word;
@@ -263,7 +263,7 @@ EntryResult Game::afterChange() {
 
 EntryResult Game::enter(const uint8_t letter) {
   if (letter == NO_LETTER || letter > LETTER_COUNT || selected == NO_WORD || state.solved) return EntryResult::Ignored;
-  const Word& w = p.word(selected);
+  const Word& w = p.wordAt(selected);
   uint8_t pos = positionOf(selected, cursorCell);
   while (pos < w.length && locked(p.cellOf(w, pos))) ++pos;
   if (pos >= w.length) return EntryResult::Ignored;
@@ -289,7 +289,7 @@ bool Game::erase() {
   }
   const uint8_t at = positionOf(selected, cursorCell);
   if (at == NOWHERE) return false;
-  const Word& w = p.word(selected);
+  const Word& w = p.wordAt(selected);
   for (int pos = at - 1; pos >= 0; --pos) {
     const uint16_t cell = p.cellOf(w, static_cast<uint8_t>(pos));
     if (locked(cell)) continue;
@@ -319,7 +319,7 @@ bool Game::undo() {
     marks[r.cell] = r.flags;
     cursorCell = r.cursorBefore;
     if (!inSelection(cursorCell)) {
-      const Dir keep = selected == NO_WORD ? Dir::Across : p.word(selected).dir;
+      const Dir keep = selected == NO_WORD ? Dir::Across : p.wordAt(selected).dir;
       const uint8_t same = p.wordAt(cursorCell, keep);
       selected = same != NO_WORD ? same : p.wordAt(cursorCell, keep == Dir::Across ? Dir::Down : Dir::Across);
     }
@@ -329,7 +329,7 @@ bool Game::undo() {
 }
 
 uint16_t Game::markWrong(const uint8_t word) {
-  const Word& w = p.word(word);
+  const Word& w = p.wordAt(word);
   uint16_t wrong = 0;
   for (uint8_t i = 0; i < w.length; ++i) {
     const uint16_t cell = p.cellOf(w, i);
@@ -364,7 +364,7 @@ EntryResult Game::revealLetter() {
   if (selected == NO_WORD || state.solved) return EntryResult::Ignored;
   uint16_t target = cursorCell;
   if (correct(target)) {
-    const Word& w = p.word(selected);
+    const Word& w = p.wordAt(selected);
     target = MAX_CELLS;
     for (uint8_t i = 0; i < w.length && target == MAX_CELLS; ++i) {
       if (!correct(p.cellOf(w, i))) target = p.cellOf(w, i);
@@ -380,7 +380,7 @@ EntryResult Game::revealLetter() {
 
 EntryResult Game::revealWord() {
   if (selected == NO_WORD || state.solved) return EntryResult::Ignored;
-  const Word& w = p.word(selected);
+  const Word& w = p.wordAt(selected);
   bool any = false;
   for (uint8_t i = 0; i < w.length; ++i) {
     const uint16_t cell = p.cellOf(w, i);
@@ -394,7 +394,7 @@ EntryResult Game::revealWord() {
 }
 
 bool Game::wordFilled(const uint8_t word) const {
-  const Word& w = p.word(word);
+  const Word& w = p.wordAt(word);
   for (uint8_t i = 0; i < w.length; ++i) {
     if (entries[p.cellOf(w, i)] == NO_LETTER) return false;
   }
