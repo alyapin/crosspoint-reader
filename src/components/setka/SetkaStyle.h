@@ -45,7 +45,13 @@ constexpr int kSelectionBarX = kSidePadding - kSelectionBarWidth;
 constexpr int kRowTextX = kSidePadding + 12;
 constexpr int kProgressHeight = 12;
 constexpr int kMinTouch = 44;
+// Row pitch, no gap between rows: a navigation row (icon + label) and a
+// label + value row (settings).
+constexpr int kNavRowHeight = 64;
 constexpr int kListRowHeight = 56;
+// Game boards: "‹ Выйти" and the game status under the status line, then the board.
+constexpr int kGameTopLineY = 40;
+constexpr int kGameBoardTop = 84;
 
 // Long-lived screens: HALF on entry, FAST for in-screen updates, and one HALF
 // after every kFastUpdatesPerHalf FAST updates to clear ghosting.
@@ -80,6 +86,11 @@ inline void drawCellFrame(const GfxRenderer& renderer, const int x, const int y,
 inline void drawRule(const GfxRenderer& renderer, const int x, const int y, const int width) {
   renderer.fillRect(x, y, width, kRuleWidth, true);
 }
+
+// The clock and battery line exactly as the Lyra header draws it (Light
+// caption, battery glyph after the percent, same corners), for screens that
+// draw their own top. Returns the y just below it.
+int drawStatusLine(const GfxRenderer& renderer);
 
 // Black fill on a LightGray-dithered track inside a 1 px black outline.
 inline void drawProgressBar(const GfxRenderer& renderer, const int x, const int y, const int width, int percent) {

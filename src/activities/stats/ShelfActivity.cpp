@@ -32,7 +32,7 @@ constexpr int kCoverHeight = 184;
 constexpr int kCaptionGap = 8;
 constexpr int kGridGap = 20;
 constexpr int kFocusRing = 6;  // the focus frame sits this far outside a cover
-constexpr int kPickerRowHeight = 68;
+constexpr int kPickerRowHeight = kNavRowHeight;
 // Books listed at most, the most recently read first: each holds its path and title.
 constexpr size_t kMaxBooks = FREEINK_MCU_C3 ? 80 : 200;
 }  // namespace

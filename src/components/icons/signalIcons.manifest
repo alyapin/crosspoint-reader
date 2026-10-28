@@ -1,0 +1,10 @@
+# Wi-Fi rows. Regenerate from the repository root with:
+#   python3 freeink-sdk/libs/assets/Icons/tools/gen_icons.py \
+#     --manifest src/components/icons/signalIcons.manifest \
+#     --svgdir freeink-sdk/libs/assets/Icons/lucide/icons \
+#     --sizes 16,24 --out src/components/icons/signalIcons.h
+wifi-full = wifi
+wifi-high = wifi-high
+wifi-low = wifi-low
+wifi-lock = lock
+network-add = plus

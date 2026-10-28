@@ -10,7 +10,7 @@
 #include "components/setka/SetkaStyle.h"
 
 // The shell of the Sudoku, Minesweeper and Klondike boards (ui-style Setka):
-// the clock/battery line, a top line with "‹ Выйти" and a status on the right,
+// the shared clock/battery line (setka::drawStatusLine), a top line with "‹ Выйти" and a status on the right,
 // the board, and a bottom bar of up to three actions. HALF on entry, cadence
 // FAST after each change, and a plain FAST when the shown minute of the timer
 // turns; nothing else repaints while the player is idle. The game is saved
@@ -31,9 +31,8 @@ class GameScreen : public Activity, protected UiAppHost {
   void loop() override;
   void render(RenderLock&&) override;
 
-  static constexpr int STATUS_Y = 12;  // clock and battery, clear of the X4 Pro top bezel
-  static constexpr int TOP_LINE_Y = 40;
-  static constexpr int BOARD_TOP = 84;
+  static constexpr int TOP_LINE_Y = setka::kGameTopLineY;
+  static constexpr int BOARD_TOP = setka::kGameBoardTop;
   static constexpr int BAR_SLOTS = 3;
   static constexpr int BAR_HEIGHT = 70;  // the rule and the action bar, at the bottom edge
 

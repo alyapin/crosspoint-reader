@@ -10,9 +10,9 @@
 namespace fui = freeink::ui;
 
 namespace {
-// Row pitch of the CrossPoint 2.0 home menu.
-constexpr int kRowHeight = 68;
-constexpr int kRowGap = 8;
+// Setka navigation row pitch.
+constexpr int kRowHeight = setka::kNavRowHeight;
+constexpr int kRowGap = 0;
 constexpr int kIconSize = 24;
 constexpr int kIconGap = 16;
 }  // namespace

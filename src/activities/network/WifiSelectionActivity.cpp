@@ -1,5 +1,6 @@
 #include "WifiSelectionActivity.h"
 
+#include <FreeInkUIIcon.h>
 #include <GfxRenderer.h>
 #include <HalClock.h>
 #include <I18n.h>
@@ -15,6 +16,7 @@
 #include "WifiCredentialStore.h"
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
+#include "components/icons/signalIcons.h"
 #include "fontIds.h"
 #include "util/PluginEvents.h"
 
@@ -100,7 +102,6 @@ void WifiSelectionActivity::onEnter() {
   // Reset state
   selectedNetworkIndex = 0;
   networks.clear();
-  networkStatuses.clear();
   networkRowItems.clear();
   realNetworkCount = 0;
   state = WifiSelectionState::SCANNING;
@@ -116,21 +117,6 @@ void WifiSelectionActivity::onEnter() {
   autoAttemptedSsids.clear();
   const size_t savedCredentialCount = WIFI_STORE.getCredentialCount();
   autoAttemptedSsids.reserve(savedCredentialCount);
-
-  // Read the hardware-derived station MAC directly. WiFi.macAddress() depends
-  // on the STA netif already existing, but this screen is entered while WiFi
-  // is often still off (notably after an X4 Pro WiFi session).
-  uint8_t mac[6] = {};
-  char macStr[64];
-  const esp_err_t macResult = esp_read_mac(mac, ESP_MAC_WIFI_STA);
-  if (macResult == ESP_OK) {
-    snprintf(macStr, sizeof(macStr), "%s %02x-%02x-%02x-%02x-%02x-%02x", tr(STR_MAC_ADDRESS), mac[0], mac[1], mac[2],
-             mac[3], mac[4], mac[5]);
-  } else {
-    LOG_ERR("WIFI", "Failed to read station MAC (err=%d)", static_cast<int>(macResult));
-    snprintf(macStr, sizeof(macStr), "%s --", tr(STR_MAC_ADDRESS));
-  }
-  cachedMacAddress = std::string(macStr);
 
   listNav.reset();
   resetUi();
@@ -186,7 +172,6 @@ void WifiSelectionActivity::startWifiScan(const bool autoScan) {
   state = WifiSelectionState::SCANNING;
   networks.clear();
   // The cached rows point into the cleared networks' strings; drop them too.
-  networkStatuses.clear();
   networkRowItems.clear();
   requestUpdate();
 
@@ -283,23 +268,21 @@ void WifiSelectionActivity::appendHiddenNetworkEntry() {
   networks.push_back(std::move(placeholder));
 }
 
-// Derives networkStatuses/networkRowItems from `networks`. Called whenever
-// `networks` changes (both branches of processWifiScanResults()) so
-// buildListScreen() reuses the cached rows on every repaint instead of
-// re-deriving a "+ * ||||" status string per network each time.
+// Derives networkRowItems from `networks`. Called whenever `networks` changes
+// (both branches of processWifiScanResults()) so buildListScreen() reuses the
+// cached rows on every repaint.
 void WifiSelectionActivity::rebuildNetworkRowItems() {
-  networkStatuses.assign(networks.size(), std::string());
   networkRowItems.clear();
   networkRowItems.reserve(networks.size());
   for (size_t i = 0; i < networks.size(); i++) {
     const auto& network = networks[i];
-    if (!network.isHiddenPlaceholder) {
-      networkStatuses[i] = std::string(network.hasSavedPassword ? "+ " : "") + (network.isEncrypted ? "* " : "") +
-                           getSignalStrengthIndicator(network.rssi);
-    }
     fui::ListItem item;
     item.label = network.isHiddenPlaceholder ? tr(STR_ADD_HIDDEN_NETWORK) : network.ssid.c_str();
-    if (!networkStatuses[i].empty()) item.value = networkStatuses[i].c_str();
+    // Signal strength leads the row, a lock trails it on secured networks.
+    item.icon = signalIcon(network);
+    if (network.hasSavedPassword) item.value = tr(STR_NETWORK_SAVED);
+    static const fui::BitmapRef lock = fui::bitmapFromIcon(icon_wifi_lock_16);
+    if (network.isEncrypted && !network.isHiddenPlaceholder) item.valueIcon = &lock;
     item.actionValue = static_cast<int16_t>(i);
     networkRowItems.push_back(item);
   }
@@ -823,18 +806,11 @@ void WifiSelectionActivity::loop() {
   }
 }
 
-std::string WifiSelectionActivity::getSignalStrengthIndicator(const int32_t rssi) {
-  // Convert RSSI to signal bars representation
-  if (rssi >= -50) {
-    return "||||";  // Excellent
-  }
-  if (rssi >= -60) {
-    return " |||";  // Good
-  }
-  if (rssi >= -70) {
-    return "  ||";  // Fair
-  }
-  return "   |";  // Very weak
+freeink::ui::BitmapRef WifiSelectionActivity::signalIcon(const WifiNetworkInfo& network) {
+  if (network.isHiddenPlaceholder) return fui::bitmapFromIcon(icon_network_add_24);
+  if (network.rssi >= -60) return fui::bitmapFromIcon(icon_wifi_full_24);
+  if (network.rssi >= -70) return fui::bitmapFromIcon(icon_wifi_high_24);
+  return fui::bitmapFromIcon(icon_wifi_low_24);
 }
 
 void WifiSelectionActivity::render(RenderLock&&) {
@@ -860,9 +836,6 @@ void WifiSelectionActivity::render(RenderLock&&) {
   // safe-area `screen` would inset it twice.
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.headerHeight},
                  tr(STR_WIFI_NETWORKS), countStr);
-  GUI.drawSubHeader(renderer,
-                    Rect{screen.x, metrics.topPadding + metrics.headerHeight, screen.width, metrics.tabBarHeight},
-                    cachedMacAddress.c_str());
 
   switch (state) {
     case WifiSelectionState::AUTO_CONNECTING:
@@ -908,10 +881,9 @@ void WifiSelectionActivity::listScreen(UiScreen& screen, void* user) {
 void WifiSelectionActivity::buildListScreen(UiScreen& screen) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-  // Content below the header + MAC sub-band, above the legend line.
+  // Content below the header.
   screen.setContentMarginFromScreen(fui::Insets{
-      static_cast<int16_t>(safe.y + metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight +
-                           metrics.verticalSpacing),
+      static_cast<int16_t>(safe.y + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing),
       static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width)),
       static_cast<int16_t>(renderer.getScreenHeight() - (safe.y + safe.height) + metrics.verticalSpacing * 2),
       static_cast<int16_t>(safe.x)});
@@ -941,7 +913,7 @@ void WifiSelectionActivity::buildListScreen(UiScreen& screen) {
     return;
   }
 
-  // networkStatuses/networkRowItems are built once per processWifiScanResults()
+  // networkRowItems are built once per processWifiScanResults()
   // call (see rebuildNetworkRowItems()) and reused here on every repaint.
   fui::ListProps props;
   props.items = networkRowItems.data();
@@ -1026,10 +998,6 @@ void WifiSelectionActivity::renderNetworkList(const Rect* screen, const ThemeMet
     const auto top = screen->y + (screen->height - height) / 2;
     UITheme::drawCenteredText(renderer, *screen, SMALL_FONT_ID, top + height + 10, tr(STR_PRESS_OK_SCAN));
   }
-
-  GUI.drawHelpText(renderer,
-                   Rect{screen->x, screen->y + screen->height - metrics->contentSidePadding - 15, screen->width, 20},
-                   tr(STR_NETWORK_LEGEND));
 
   const bool hasSavedPassword = !networks.empty() && networks[selectedNetworkIndex].hasSavedPassword;
   const char* forgetLabel = hasSavedPassword ? tr(STR_FORGET_BUTTON) : "";

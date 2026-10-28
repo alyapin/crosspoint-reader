@@ -20,15 +20,15 @@ constexpr ThemeMetrics values = {.batteryWidth = 16,
                                  .listRowHeight = 40,
                                  .listWithSubtitleRowHeight = 60,
                                  .listRowGap = 0,
-                                 .listRowRadius = 6,
+                                 .listRowRadius = 0,
                                  .listInset = 20,
-                                 .listSidePadding = 8,
-                                 .listSelectionStyle = 1,  // light pill
+                                 .listSidePadding = 12,    // label at x = 32, clear of the selection bar
+                                 .listSelectionStyle = 4,  // Setka left bar + bold label
                                  .listScrollWidth = 4,
                                  .listScrollSide = 0,
                                  .listTitleBold = false,
                                  .headerSidePadding = 18,
-                                 .headerUnderlineSize = 3,
+                                 .headerUnderlineSize = 2,
                                  .headerTitleAlign = 0,  // left
                                  .headerBatterySide = 0,
                                  .headerClockCentered = false,
@@ -77,9 +77,9 @@ constexpr ThemeMetrics values = {.batteryWidth = 16,
                                  .textFieldNormalThickness = 1,
                                  .textFieldCursorThickness = 3,
                                  .textFieldLineEndOffset = 0,
-                                 .controlRadius = 6,
-                                 .sheetRadius = 6,
-                                 .capsuleRadius = 6};
+                                 .controlRadius = 0,
+                                 .sheetRadius = 0,
+                                 .capsuleRadius = 0};
 }  // namespace LyraMetrics
 
 class LyraTheme : public BaseTheme {

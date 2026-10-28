@@ -48,7 +48,6 @@ class SetkaHomeActivity final : public Activity, private UiAppHost {
 
   void loadBooks();
   void draw(UiScreen& screen);
-  void drawStatusLine(int top, int width) const;
   void drawBooks(UiScreen& screen, int top, int bottom, int width);
   void drawEmpty(UiScreen& screen, int top, int width);
   void drawTabs(UiScreen& screen, int top, int bottom, int width);

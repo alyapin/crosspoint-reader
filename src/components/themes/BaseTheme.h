@@ -50,7 +50,7 @@ struct ThemeMetrics {
   int listRowRadius;       // row corner radius (RoundedRaff cards, Lyra pill)
   int listInset;           // horizontal inset of the whole list band
   int listSidePadding;     // text inset within a row
-  int listSelectionStyle;  // 0=invert fill, 1=light pill, 2=underline, 3=triangle (fui::SelectionStyle order)
+  int listSelectionStyle;  // fui::SelectionStyle: 0=invert fill, 1=light pill, 2=underline, 3=triangle, 4=left bar
   int listScrollWidth;     // scroll indicator thickness
   int listScrollSide;      // 0 = right edge, 1 = left edge
   bool listTitleBold;      // bold row titles (RoundedRaff)

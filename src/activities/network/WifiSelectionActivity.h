@@ -57,11 +57,8 @@ class WifiSelectionActivity final : public Activity, private UiAppHost {
   // Number of real (scanned) networks, excluding the synthetic hidden-network entry
   size_t realNetworkCount = 0;
 
-  // Row buffers derived from `networks`, rebuilt only when it changes
-  // (processWifiScanResults()) instead of on every repaint — buildListScreen()
-  // used to re-derive a "+ * ||||" status string per network on every render
-  // (cursor move, tap flash, ...).
-  std::vector<std::string> networkStatuses;
+  // Rows derived from `networks`, rebuilt only when it changes
+  // (processWifiScanResults()) instead of on every repaint.
   std::vector<freeink::ui::ListItem> networkRowItems;
   void rebuildNetworkRowItems();
 
@@ -75,9 +72,6 @@ class WifiSelectionActivity final : public Activity, private UiAppHost {
 
   // Password to potentially save (from keyboard or saved credentials)
   std::string enteredPassword;
-
-  // Cached MAC address string for display
-  std::string cachedMacAddress;
 
   // Whether network was connected using a saved password (skip save prompt)
   bool usedSavedPassword = false;
@@ -136,7 +130,7 @@ class WifiSelectionActivity final : public Activity, private UiAppHost {
   void handleAutoConnectFailure();
   void showNetworkListFromAutoConnect();
   bool hasAttemptedAutoSsid(const std::string& ssid) const;
-  static std::string getSignalStrengthIndicator(int32_t rssi);
+  static freeink::ui::BitmapRef signalIcon(const WifiNetworkInfo& network);
 
   void onComplete(bool connected);
 

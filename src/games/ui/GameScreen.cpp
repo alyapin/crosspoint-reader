@@ -2,8 +2,6 @@
 
 #include <Arduino.h>
 #include <GfxRenderer.h>
-#include <HalClock.h>
-#include <HalPowerManager.h>
 #include <I18n.h>
 #include <Logging.h>
 #include <Memory.h>
@@ -13,7 +11,6 @@
 #include <cstdio>
 #include <variant>
 
-#include "CrossPointSettings.h"
 #include "ElapsedText.h"
 
 namespace fui = freeink::ui;
@@ -157,15 +154,7 @@ void GameScreen::screenFn(UiScreen& screen, void* user) {
 void GameScreen::drawTopLine(UiScreen& screen, const char* label, const char* value, const bool tappable,
                              const bool focused) const {
   const int width = renderer.getScreenWidth();
-  char status[12];
-  if (SETTINGS.clockShowInHeader && halClock.isAvailable() &&
-      halClock.formatTime(status, sizeof(status), SETTINGS.clockFormat == 1)) {
-    renderer.drawText(kText10Font, kSidePadding, STATUS_Y, status);
-  }
-  if (SETTINGS.hideBatteryPercentage != CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS) {
-    snprintf(status, sizeof(status), "%u%%", std::min<unsigned>(powerManager.getBatteryPercentage(), 100));
-    renderer.drawText(kText10Font, width - kSidePadding - renderer.getTextWidth(kText10Font, status), STATUS_Y, status);
-  }
+  drawStatusLine(renderer);
 
   const char* exitLabel = tr(STR_GAMES_EXIT);
   renderer.drawText(kText12Font, kSidePadding, TOP_LINE_Y, exitLabel);
