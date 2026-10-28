@@ -610,8 +610,8 @@ void FileBrowserActivity::buildScreen(UiScreen& screen) {
   screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
 
   // Full path band at the bottom: separator on top, left-truncated so the
-  // deepest directory stays visible.
-  {
+  // deepest directory stays visible. The card root needs no path.
+  if (basepath != "/") {
     const int pathLineHeight = renderer.getLineHeight(SMALL_FONT_ID);
     const fui::Rect band = screen.takeBottom(static_cast<int16_t>(pathLineHeight + metrics.verticalSpacing));
     screen.target().fill(fui::Rect{band.x, band.y, band.width, 3}, fui::Paint::solid(fui::Color::Black));
@@ -678,7 +678,7 @@ void FileBrowserActivity::drawChrome() {
   std::string folderName =
       (mode == Mode::PickFirmware)
           ? std::string(tr(STR_SELECT_FIRMWARE_FILE))
-          : ((basepath == "/") ? std::string(tr(STR_SD_CARD)) : basepath.substr(basepath.rfind('/') + 1));
+          : ((basepath == "/") ? std::string(tr(STR_SD_FILES)) : basepath.substr(basepath.rfind('/') + 1));
   // Header via GUI.drawHeader (already FreeInkUI-themed) for the battery
   // indicator; the rest of the screen renders through the app.
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, folderName.c_str());

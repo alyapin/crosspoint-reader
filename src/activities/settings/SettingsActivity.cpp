@@ -56,6 +56,8 @@ bool showOnDevice(const SettingInfo& setting) {
   if (setting.valuePtr == &CrossPointSettings::fadingFix && (BoardConfig::isX4Pro() || BoardConfig::isX4Classic())) {
     return false;
   }
+  // The fork's screens are drawn for Lyra; another theme breaks them.
+  if (setting.valuePtr == &CrossPointSettings::uiTheme) return false;
   // Merged into the Text Settings screen.
   if (setting.category == StrId::STR_CAT_READER && setting.inTextSettings) return false;
   if (setting.valuePtr == &CrossPointSettings::pwrBtnFootnoteBack &&

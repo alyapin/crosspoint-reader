@@ -375,7 +375,7 @@ void KlondikeActivity::build(UiScreen& screen) {
   }
 
   BarItem items[BAR_SLOTS];
-  const char* labels[BAR_SLOTS] = {tr(STR_GAMES_UNDO), tr(STR_KLONDIKE_HINT), tr(STR_GAMES_MENU)};
+  const char* labels[BAR_SLOTS] = {tr(STR_GAMES_UNDO), tr(STR_KLONDIKE_HINT), tr(STR_GAMES_NEW_GAME)};
   for (int i = 0; i < BAR_SLOTS; ++i) {
     if (barShown(i)) items[i].label = labels[i];
   }
