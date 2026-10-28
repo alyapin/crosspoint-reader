@@ -159,7 +159,16 @@ void UiTabListActivity::buildTabBar(UiScreen& screen) {
   fui::StyleSet tabStyles;
   tabStyles.explicitlySet = true;
   tabStyles.normal.foreground = fui::Paint::solid(fui::Color::Black);
-  if (tabsFocused) {
+  const bool setka = screen.theme().listSelectionStyle == fui::SelectionStyle::LeftBar;
+  if (setka) {
+    // No fills: a black underline marks the active tab, a frame shows key focus on the band.
+    tabStyles.selected.foreground = fui::Paint::solid(fui::Color::Black);
+    if (tabsFocused) {
+      tabStyles.selected.border = fui::Paint::solid(fui::Color::Black);
+      tabStyles.selected.borderWidth = 2;
+    }
+    tabProps.selectedUnderline = 4;
+  } else if (tabsFocused) {
     tabStyles.selected.background = fui::Paint::solid(fui::Color::Black);
     tabStyles.selected.foreground = fui::Paint::solid(fui::Color::White);
     tabStyles.selected.radius = screen.theme().listRowRadius;
@@ -188,7 +197,7 @@ void UiTabListActivity::buildTabBar(UiScreen& screen) {
                           contentTabRect.height};
   // Focused band wash is the Lyra treatment; legacy RoundedRaff keeps the
   // band plain in both states.
-  if (tabsFocused && !metrics.tabPillFullSlot) {
+  if (tabsFocused && !metrics.tabPillFullSlot && !setka) {
     screen.target().fill(tabRect, fui::Paint::dither(fui::Color::LightGray));
   }
   // Leave space on both sides of the tab labels and selection highlights.

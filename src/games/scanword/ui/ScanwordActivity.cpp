@@ -34,11 +34,12 @@ constexpr fui::ActionId ACTION_HINT = 8;
 constexpr fui::ActionId ACTION_DONE = 9;
 constexpr fui::ActionId ACTION_CHECK_ALL = 10;
 
-constexpr int kHeaderTop = 16;  // board top line; clears the X4 Pro top bezel
-constexpr int kGridTop = 50;
-constexpr int kBandMin = 90;  // below the grid: check-all, clue bar, letter strip
-constexpr int kRowHeight = 68;
-constexpr int kRowGap = 8;
+constexpr int kHeaderTop = kGameTopLineY;  // board top line, under the status line
+constexpr int kGridTop = kGameBoardTop;
+constexpr int kBandMin = 90;    // below the grid on button boards: clue bar, letter strip
+constexpr int kBandTouch = 56;  // touch boards: only the check-all row (the keyboard overlays the grid)
+constexpr int kRowHeight = setka::kNavRowHeight;
+constexpr int kRowGap = 0;
 constexpr int kIconSize = 24;
 constexpr int kIconGap = 16;
 constexpr int kFooterHeight = 56;
@@ -691,7 +692,7 @@ void ScanwordActivity::handleBoardKeys() {
 // --- geometry -------------------------------------------------------------------
 
 int ScanwordActivity::cellSize() const {
-  const int areaHeight = renderer.getScreenHeight() - kBandMin - kGridTop;
+  const int areaHeight = renderer.getScreenHeight() - (touchBoard() ? kBandTouch : kBandMin) - kGridTop;
   return std::min(renderer.getScreenWidth() / puzzle->width(), areaHeight / puzzle->height());
 }
 
@@ -883,6 +884,7 @@ void ScanwordActivity::buildBoard(UiScreen& screen) {
 
 void ScanwordActivity::drawTopLine(UiScreen& screen) const {
   const int width = renderer.getScreenWidth();
+  drawStatusLine(renderer);
   const char* exitLabel = tr(STR_SCANWORD_EXIT);
   renderer.drawText(kText12Font, kSidePadding, kHeaderTop, exitLabel);
   const int exitWidth = renderer.getTextWidth(kText12Font, exitLabel) + 2 * kSidePadding;

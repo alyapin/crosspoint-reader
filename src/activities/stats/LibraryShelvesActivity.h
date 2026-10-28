@@ -34,6 +34,7 @@ class LibraryShelvesActivity final : public Activity, private UiAppHost {
     char detail[48] = "";
     std::string path;
     std::string title;
+    std::string author;
     std::string thumb;  // resolved when first drawn
     bool thumbResolved = false;
   };

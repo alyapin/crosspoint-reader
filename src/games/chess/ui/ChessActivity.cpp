@@ -34,11 +34,11 @@ constexpr fui::ActionId ACTION_PROMOTE = 7;
 constexpr fui::ActionId ACTION_NEW_GAME = 8;
 
 // List screens: the CrossPoint 2.0 header and row pitch, Setka selection bar.
-constexpr int kHeaderTop = 16;  // game view top line; clears the X4 Pro top bezel
+constexpr int kHeaderTop = kGameTopLineY;  // game view top line, under the status line
 constexpr int kRuleGap = 16;
 constexpr int kBarX = kSidePadding - kSelectionBarWidth;
-constexpr int kRowHeight = 68;
-constexpr int kRowGap = 8;
+constexpr int kRowHeight = setka::kNavRowHeight;
+constexpr int kRowGap = 0;
 constexpr int kIconSize = 24;
 constexpr int kIconGap = 16;
 constexpr int kStepperSize = 56;
@@ -46,7 +46,7 @@ constexpr int kCustomDoneRow = 2;
 
 // Game screen: top line, full-bleed 8x8 board, panel, actions.
 constexpr int kSquare = 60;
-constexpr int kBoardTop = 60;
+constexpr int kBoardTop = kGameBoardTop;
 constexpr int kBoardSize = 8 * kSquare;
 constexpr int kPanelTop = kBoardTop + kBoardSize;
 constexpr int kActionsTop = 718;
@@ -1047,7 +1047,10 @@ void ChessActivity::buildList(UiScreen& screen) {
         x -= kPreviewGap;
       }
     } else if (row.value[0] != '\0') {
-      drawRightAligned(renderer, kText12Font, width - kSidePadding, top + textOffset, row.value);
+      // The row value role: small text on the label's baseline.
+      const int valueTop =
+          top + textOffset + renderer.getFontAscenderSize(kText12Font) - renderer.getFontAscenderSize(kText10Font);
+      drawRightAligned(renderer, kText10Font, width - kSidePadding, valueTop, row.value);
     }
     screen.frame().hit(fui::makeRect(0, top, width, kRowHeight), ACTION_ROW, static_cast<int16_t>(i), fui::InputTouch);
   }
@@ -1110,6 +1113,7 @@ void ChessActivity::buildGame(UiScreen& screen) {
 
 void ChessActivity::drawTopLine(UiScreen& screen) const {
   const int width = renderer.getScreenWidth();
+  drawStatusLine(renderer);
   const char* exitLabel = tr(STR_CHESS_NAV_EXIT);
   renderer.drawText(kText12Font, kSidePadding, kHeaderTop, exitLabel);
   const int exitWidth = renderer.getTextWidth(kText12Font, exitLabel) + 2 * kSidePadding;

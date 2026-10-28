@@ -284,6 +284,15 @@ void ReaderToolbarUi::buildPanel(UiScreen& screen) {
   // panel edge (theme bezel inset included) exactly like a full-screen list.
   // rowInset pulls the rows back to the title's spaceLg alignment.
   listProps_.rowInset = tokens.spaceLg;
+  if (tokens.listSelectionStyle == fui::SelectionStyle::LeftBar) {
+    // Setka: label + value rows in the small text role, labels past the
+    // selection bar, values on the side padding.
+    listProps_.labelText = tokens.smallText;
+    listProps_.labelText.maxLines = 2;
+    listProps_.rowInset = tokens.listInset;
+    listProps_.sidePadding = tokens.listSidePadding;
+    listProps_.valueInset = static_cast<int16_t>(-tokens.listSidePadding);
+  }
   const fui::Rect listRect = screen.body();
   const int count = std::max(0, model_.itemCount);
   // The nav owns selection + viewport (same fui::ListNav idiom as the list
@@ -310,8 +319,12 @@ void ReaderToolbarUi::buildPanel(UiScreen& screen) {
   listProps_.items = windowItems_;
   listProps_.itemsWindowFirst = static_cast<uint16_t>(nav_.top);
   listProps_.itemsWindowCount = static_cast<uint16_t>(std::max(0, windowCount));
-  listProps_.valueText = tokens.bodyText;
-  listProps_.valueText.bold = true;
+  if (tokens.listSelectionStyle == fui::SelectionStyle::LeftBar) {
+    listProps_.valueText = tokens.smallText;
+  } else {
+    listProps_.valueText = tokens.bodyText;
+    listProps_.valueText.bold = true;
+  }
   if (count > 0) {
     screen.list(listProps_);
   }

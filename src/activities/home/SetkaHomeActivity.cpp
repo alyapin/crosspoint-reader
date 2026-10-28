@@ -4,8 +4,6 @@
 #include <FreeInkUIIcon.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
-#include <HalClock.h>
-#include <HalPowerManager.h>
 #include <I18n.h>
 #include <Logging.h>
 #include <Memory.h>
@@ -15,7 +13,6 @@
 #include <cstdio>
 #include <memory>
 
-#include "CrossPointSettings.h"
 #include "MoreActivity.h"
 #include "activities/stats/StatsScreens.h"
 #include "components/UITheme.h"
@@ -31,7 +28,6 @@ constexpr fui::ActionId ACTION_BOOK = 1;
 constexpr fui::ActionId ACTION_TAB = 2;
 constexpr fui::ActionId ACTION_OPEN_LIBRARY = 3;
 
-constexpr int kStatusTop = 12;  // clears the X4 Pro top bezel
 constexpr int kGap = 16;        // between the stacked sections
 constexpr int kDigitsGap = 12;  // cover to its percent
 constexpr int kMinCoverGap = 12;
@@ -251,8 +247,7 @@ void SetkaHomeActivity::draw(UiScreen& screen) {
   int insetLeft = 0;
   renderer.getOrientedViewableTRBL(&insetTop, &insetRight, &insetBottom, &insetLeft);
 
-  drawStatusLine(kStatusTop, width);
-  const int headingTop = kStatusTop + renderer.getLineHeight(kText10Font) + kGap;
+  const int headingTop = drawStatusLine(renderer) + kGap;
   renderer.drawText(kText12Font, kSidePadding, headingTop, tr(STR_READING_NOW), true, kSemiBold);
   if (readingCount > 0) {
     char count[32];
@@ -272,18 +267,6 @@ void SetkaHomeActivity::draw(UiScreen& screen) {
     drawEmpty(screen, bodyTop, width);
   }
   drawTabs(screen, tabTop, tabBottom, width);
-}
-
-void SetkaHomeActivity::drawStatusLine(const int top, const int width) const {
-  char text[12];
-  if (SETTINGS.clockShowInHeader && halClock.isAvailable() &&
-      halClock.formatTime(text, sizeof(text), SETTINGS.clockFormat == 1)) {
-    renderer.drawText(kText10Font, kSidePadding, top, text);
-  }
-  if (SETTINGS.hideBatteryPercentage != CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS) {
-    snprintf(text, sizeof(text), "%u%%", std::min<unsigned>(powerManager.getBatteryPercentage(), 100));
-    renderer.drawText(kText10Font, width - kSidePadding - renderer.getTextWidth(kText10Font, text), top, text);
-  }
 }
 
 void SetkaHomeActivity::drawBooks(UiScreen& screen, const int top, const int bottom, const int width) {
@@ -380,20 +363,21 @@ void SetkaHomeActivity::drawEmpty(UiScreen& screen, const int top, const int wid
 
 void SetkaHomeActivity::drawTabs(UiScreen& screen, const int top, const int bottom, const int width) {
   drawRule(renderer, 0, top, width);
-  // Captions under the icons: four body-size labels overflow the row in Unbounded.
-  const int captionHeight = renderer.getLineHeight(kCaptionFont);
+  // Labels in the text role under the icons; only the focused one is SemiBold.
+  const int captionHeight = renderer.getLineHeight(kText10Font);
   const int blockHeight = kTabIconSize + kTabIconGap + captionHeight;
   const int blockTop = top + kRuleWidth + (bottom - top - kRuleWidth - blockHeight) / 2;
-  // Four labels do not fit equal quarters, so each column is its SemiBold
-  // label plus an equal share of the spare width.
+  const int focusedTab = focus - bookFocusCount();
+  // Four labels do not fit equal quarters, so each column is its label plus
+  // an equal share of the spare width.
   std::array<int, TabCount> columnWidths{};
   int spare = width;
   for (int tab = 0; tab < TabCount; ++tab) {
     columnWidths[tab] =
-        std::max(kTabIconSize, renderer.getTextWidth(kCaptionFont, I18N.get(kTabs[tab].label), kSemiBold));
+        std::max(kTabIconSize, renderer.getTextWidth(kText10Font, I18N.get(kTabs[tab].label),
+                                                     tab == focusedTab ? kSemiBold : EpdFontFamily::REGULAR));
     spare -= columnWidths[tab];
   }
-  const int focusedTab = focus - bookFocusCount();
   int columnX = 0;
   for (int tab = 0; tab < TabCount; ++tab) {
     const bool focused = tab == focusedTab;
@@ -401,13 +385,13 @@ void SetkaHomeActivity::drawTabs(UiScreen& screen, const int top, const int bott
     const char* label = I18N.get(kTabs[tab].label);
     const int columnWidth = tab + 1 < TabCount ? columnWidths[tab] + std::max(0, spare) / TabCount : width - columnX;
     const int iconX = columnX + (columnWidth - kTabIconSize) / 2;
-    const int textX = columnX + (columnWidth - renderer.getTextWidth(kCaptionFont, label, style)) / 2;
+    const int textX = columnX + (columnWidth - renderer.getTextWidth(kText10Font, label, style)) / 2;
     screen.target().bitmap(fui::makeRect(iconX, blockTop, kTabIconSize, kTabIconSize),
                            fui::bitmapFromIcon(*kTabs[tab].icon), fui::BitmapMode::Center);
     // Same bar-to-content distance as the list rows, beside the icon: the
     // labels leave no room for it.
     if (focused) drawSelectionBar(renderer, iconX - (kRowTextX - kSelectionBarX), blockTop, kTabIconSize);
-    renderer.drawText(kCaptionFont, textX, blockTop + kTabIconSize + kTabIconGap, label, true, style);
+    renderer.drawText(kText10Font, textX, blockTop + kTabIconSize + kTabIconGap, label, true, style);
     screen.frame().hit(fui::makeRect(columnX, top, columnWidth, bottom - top), ACTION_TAB, static_cast<int16_t>(tab),
                        fui::InputTouch);
     columnX += columnWidth;

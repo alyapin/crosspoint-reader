@@ -7,30 +7,11 @@
 
 #include <algorithm>
 #include <cstdio>
-#include <string>
 
 #include "CrossPointSettings.h"
 #include "StatsUi.h"
 
 using namespace setka;
-
-namespace {
-
-// True when no word of `text` is wider than `width`, so wrapping never splits one.
-bool wordsFit(const GfxRenderer& renderer, const int fontId, const char* text, const int width) {
-  std::string word;
-  for (const char* p = text;; ++p) {
-    if (*p != ' ' && *p != '\0') {
-      word += *p;
-      continue;
-    }
-    if (!word.empty() && renderer.getTextWidth(fontId, word.c_str()) > width) return false;
-    word.clear();
-    if (*p == '\0') return true;
-  }
-}
-
-}  // namespace
 
 void StatisticsActivity::onEnter() {
   Activity::onEnter();
@@ -61,28 +42,19 @@ int StatisticsActivity::drawStat(const int x, const int capTop, const int width,
                                  const char* label) const {
   char number[8];
   snprintf(number, sizeof(number), "%u", value);
-  const int numberWidth = drawHeroNumber(renderer, kHeroSmallFont, x, capTop, number);
-  const int baseline = capTop + heroCapHeight(renderer, kHeroSmallFont);
-  constexpr int kLabelGap = 12;
-  const int line12 = renderer.getLineHeight(kText12Font);
-  const int besideWidth = width - numberWidth - kLabelGap;
-  // Beside the number, wrapping upward from its baseline, while every word
-  // fits there; under it once the number leaves too little room.
-  if (wordsFit(renderer, kText12Font, label, besideWidth)) {
-    const auto lines = renderer.wrappedText(kText12Font, label, besideWidth, 2);
-    int top = baseline - renderer.getFontAscenderSize(kText12Font) - (static_cast<int>(lines.size()) - 1) * line12;
-    for (const auto& line : lines) {
-      renderer.drawText(kText12Font, x + numberWidth + kLabelGap, top, line.c_str());
-      top += line12;
-    }
+  // A secondary number in the digits face, so it does not compete with the hero.
+  const int numberWidth = drawHeroNumber(renderer, kDigitsFont, x, capTop, number);
+  const int baseline = capTop + heroCapHeight(renderer, kDigitsFont);
+  constexpr int kLabelGap = 10;
+  const int ascender = renderer.getFontAscenderSize(kText10Font);
+  // One line on the number's baseline; under it when a wide number leaves too little room.
+  if (renderer.getTextWidth(kText10Font, label) <= width - numberWidth - kLabelGap) {
+    renderer.drawText(kText10Font, x + numberWidth + kLabelGap, baseline - ascender, label);
     return baseline;
   }
-  int top = baseline + kLabelGap;
-  for (const auto& line : renderer.wrappedText(kText12Font, label, width, 2)) {
-    renderer.drawText(kText12Font, x, top, line.c_str());
-    top += line12;
-  }
-  return top;
+  const int top = baseline + kLabelGap;
+  renderer.drawText(kText10Font, x, top, renderer.truncatedText(kText10Font, label, width).c_str());
+  return top + renderer.getLineHeight(kText10Font);
 }
 
 void StatisticsActivity::drawCalendar(const int top, const int width) const {
@@ -109,7 +81,7 @@ void StatisticsActivity::drawCalendar(const int top, const int width) const {
 
 void StatisticsActivity::render(RenderLock&&) {
   renderer.clearScreen();
-  const auto bands = statsui::drawHeader(renderer, tr(STR_STATS_TITLE), false);
+  const auto bands = statsui::drawHeader(renderer, tr(STR_STATS_TITLE), true);
   const int width = bands.width;
   const int line12 = renderer.getLineHeight(kText12Font);
   constexpr int kGap = 24;

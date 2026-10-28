@@ -39,6 +39,9 @@ constexpr int16_t kGrabberHeight = 5;     // fui::SheetProps default, mirrored h
 constexpr int16_t kSliderRowHeight = 56;  // the pill itself (finger-sized)
 constexpr int16_t kQuickControlSize = kSliderRowHeight;
 constexpr int16_t kQuickIconSize = 32;
+constexpr int16_t kQuickLabelGap = 6;  // tile to its caption
+constexpr int16_t kQuickFrameOn = 4;   // Setka selected cell: 4 px inset frame
+constexpr int16_t kQuickFrameOff = 2;
 // One percent per press, on the -/+ buttons and on the physical Left/Right keys
 // alike (both repeat while held), so a level can be set exactly.
 constexpr int BRIGHTNESS_STEP = 1;
@@ -301,7 +304,9 @@ int FrontlightPanelActivity::computePanelBottom() const {
   }
   // Icons are touch targets, so a buttons-only board gets no row and the
   // sheet is exactly the frontlight controls.
-  if (mappedInput.hasTouch()) y += kQuickControlSize;
+  if (mappedInput.hasTouch()) {
+    y += kQuickControlSize + kQuickLabelGap + uiTarget.lineHeight(fui::GfxRendererTarget::FONT_LABEL);
+  }
   // The sheet's grabber band: content margin + grabber + air to the edge.
   // buildPanelScreen() feeds the same theme spacings into SheetProps.
   y += 2 * (tokens.spaceLg + tokens.spaceMd) + kGrabberHeight;
@@ -399,7 +404,16 @@ void FrontlightPanelActivity::buildPanelScreen(UiScreen& screen) {
                                                   fui::Rotation::CCW90};
     // The underline rotates around the same 32px square as the toolbar's T.
     static constexpr fui::Rect underlines[] = {{4, 29, 24, 3}, {0, 4, 3, 24}, {4, 0, 24, 3}, {29, 4, 3, 24}};
-    const fui::Rect row = screen.takeTop(kQuickControlSize);
+    static constexpr StrId captions[kTileCount] = {StrId::STR_QUICK_NIGHT, StrId::STR_QUICK_REFRESH,
+                                                   StrId::STR_QUICK_ROTATE, StrId::STR_QUICK_TOUCH,
+                                                   StrId::STR_QUICK_REMOTE};
+    // Caption role (Light): five tiles leave under 90 px per caption.
+    fui::TextStyle captionStyle = theme.smallText;
+    captionStyle.font = fui::GfxRendererTarget::FONT_LABEL;
+    captionStyle.bold = false;
+    captionStyle.align = fui::TextAlign::Center;
+    const int16_t captionHeight = screen.target().lineHeight(captionStyle.font);
+    const fui::Rect row = screen.takeTop(static_cast<int16_t>(kQuickControlSize + kQuickLabelGap + captionHeight));
     const fui::Paint ink = fui::Paint::solid(fui::Color::Black);
     for (int id = 0; id < tileCount; ++id) {
       const int16_t left = static_cast<int16_t>(row.x + row.width * id / tileCount);
@@ -407,17 +421,13 @@ void FrontlightPanelActivity::buildPanelScreen(UiScreen& screen) {
       const fui::Rect slot{left, row.y, static_cast<int16_t>(right - left), row.height};
       const fui::Rect control{static_cast<int16_t>(slot.x + (slot.width - kQuickControlSize) / 2), row.y,
                               kQuickControlSize, kQuickControlSize};
-      if (enabled[id]) {
-        screen.target().fill(control, ink, theme.controlRadius);
-      } else {
-        screen.target().stroke(control, ink, 2, theme.controlRadius);
-      }
+      // A mode that is on gets the thick inset frame, never an inverted tile.
+      screen.target().stroke(control, ink, enabled[id] ? kQuickFrameOn : kQuickFrameOff, theme.controlRadius);
       const fui::Rect iconRect{static_cast<int16_t>(control.x + (control.width - kQuickIconSize) / 2),
                                static_cast<int16_t>(control.y + (control.height - kQuickIconSize) / 2), kQuickIconSize,
                                kQuickIconSize};
-      const fui::Paint foreground = fui::Paint::solid(enabled[id] ? fui::Color::White : fui::Color::Black);
       const int orientation = SETTINGS.orientation % CrossPointSettings::ORIENTATION_COUNT;
-      screen.target().bitmap(iconRect, icons[id], fui::BitmapMode::Center, foreground,
+      screen.target().bitmap(iconRect, icons[id], fui::BitmapMode::Center, ink,
                              id == 2 ? rotations[orientation] : fui::Rotation::None);
       if (id == 2) {
         const auto& line = underlines[orientation];
@@ -425,6 +435,9 @@ void FrontlightPanelActivity::buildPanelScreen(UiScreen& screen) {
                                        static_cast<int16_t>(iconRect.y + line.y), line.width, line.height},
                              ink);
       }
+      screen.target().text(fui::Rect{slot.x, static_cast<int16_t>(row.y + kQuickControlSize + kQuickLabelGap),
+                                     slot.width, captionHeight},
+                           I18N.get(captions[id]), captionStyle);
       screen.frame().hit(slot, ACTION_TILE, static_cast<int16_t>(id), fui::InputTouch);
     }
   }

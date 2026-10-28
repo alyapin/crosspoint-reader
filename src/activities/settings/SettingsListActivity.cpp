@@ -4,20 +4,18 @@
 #include <Logging.h>
 #include <Memory.h>
 
-#include <algorithm>
-
 #include "MappedInputManager.h"
 #include "SettingsActivity.h"
 #include "components/UITheme.h"
 #include "components/UiAppHelpers.h"
+#include "components/setka/SetkaStyle.h"
 
 namespace fui = freeink::ui;
 
 namespace {
-constexpr int16_t ICON_SIZE = 32;
-// Row icons, indexed by SettingsSection.
+// Row icons, indexed by SettingsSection: 24 px, as in every Setka list.
 constexpr const freeink::Icon* SECTION_ICONS[SETTINGS_SECTION_COUNT] = {
-    &icon_settings_32, &icon_smartphone_32, &icon_book_open_32, &icon_pointer_32, &icon_library_32, &icon_wifi_32,
+    &icon_settings_24, &icon_smartphone_24, &icon_book_open_24, &icon_pointer_24, &icon_library_24, &icon_wifi_24,
 };
 }  // namespace
 
@@ -68,12 +66,7 @@ void SettingsListActivity::buildScreen(UiScreen& screen) {
   props.count = static_cast<uint16_t>(rowItems_.size());
   props.action = ACTION_ROW;
   props.inputMask = fui::InputTouch;  // physical buttons stay in loop()
-  // Rows are as tall as a label plus a small second line, giving the icons air.
-  const auto& theme = screen.theme();
-  const int16_t textHeight = static_cast<int16_t>(screen.target().lineHeight(theme.bodyText.font) +
-                                                  screen.target().lineHeight(theme.smallText.font));
-  const int16_t paddingY = mappedInput.hasTouch() ? theme.listTouchRowPaddingY : theme.listRowPaddingY;
-  props.rowHeight = static_cast<int16_t>(std::max<int16_t>(textHeight, ICON_SIZE) + 2 * paddingY);
+  props.rowHeight = setka::kNavRowHeight;
   syncListViewport(screen, props);
   screen.list(props);
 }

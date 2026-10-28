@@ -29,10 +29,11 @@ constexpr fui::ActionId ACTION_MENU = 3;
 constexpr fui::ActionId ACTION_DISMISS = 4;
 
 constexpr int kBookRowHeight = 112;
-constexpr int kShelfRowHeight = 68;
+constexpr int kShelfRowHeight = kNavRowHeight;
 constexpr int kCoverWidth = 60;
 constexpr int kCoverHeight = 88;
 constexpr int kTabGap = 26;
+constexpr int kTabGapMin = 16;
 // The active tab's bar ends this far left of its label.
 constexpr int kTabBarGap = 6;
 // Rows kept per status tab, newest first: each holds its path and title.
@@ -124,6 +125,7 @@ void LibraryShelvesActivity::reload() {
           row.path = book.path;
           const char* slash = std::strrchr(book.path, '/');
           row.title = book.title[0] ? book.title : slash ? slash + 1 : book.path;
+          row.author = book.author;
           const unsigned percent = (book.progressBp + 50) / 100;
           const uint32_t left = book.status == stats::BookStatus::Reading ? stats::estimateSecondsLeft(book) : 0;
           if (left > 0) {
@@ -405,17 +407,25 @@ void LibraryShelvesActivity::loop() {
 int LibraryShelvesActivity::drawTabs(UiScreen& screen, const int stripTop, const int width) {
   constexpr int kStripPad = 12;
   const int firstX = kSelectionBarX + kSelectionBarWidth + kTabBarGap;
-  int font = kCaptionFont;
+  const int room = width - firstX - kSidePadding;
+  // Regular labels, plus the widest SemiBold gain so the choice does not
+  // change with the active tab. The text role never drops to the caption.
+  int font = kText10Font;
+  int textWidth = 0;
   for (const int candidate : {kText12Font, kText10Font}) {
-    int total = -kTabGap;
+    int total = 0;
+    int boldGain = 0;
     for (const StrId label : kTabLabels) {
-      total += renderer.getTextWidth(candidate, I18N.get(label), kSemiBold) + kTabGap;
+      const int regular = renderer.getTextWidth(candidate, I18N.get(label));
+      total += regular;
+      boldGain = std::max(boldGain, renderer.getTextWidth(candidate, I18N.get(label), kSemiBold) - regular);
     }
-    if (total <= width - firstX - kSidePadding) {
-      font = candidate;
-      break;
-    }
+    font = candidate;
+    textWidth = total + boldGain;
+    if (textWidth + (TabCount - 1) * kTabGapMin <= room) break;
   }
+  // Spare room widens the gaps up to kTabGap.
+  const int tabGap = std::clamp((room - textWidth) / (TabCount - 1), kTabGapMin, kTabGap);
   const int lineHeight = renderer.getLineHeight(font);
   const int stripHeight = std::max(kMinTouch, lineHeight + 2 * kStripPad);
   const int textTop = stripTop + (stripHeight - lineHeight) / 2;
@@ -427,9 +437,9 @@ int LibraryShelvesActivity::drawTabs(UiScreen& screen, const int stripTop, const
     const int labelWidth = renderer.getTextWidth(font, label, style);
     if (active) drawSelectionBar(renderer, x - kTabBarGap - kSelectionBarWidth, textTop, lineHeight);
     renderer.drawText(font, x, textTop, label, true, style);
-    screen.frame().hit(fui::makeRect(x - kTabGap / 2, stripTop, labelWidth + kTabGap, stripHeight), ACTION_TAB,
+    screen.frame().hit(fui::makeRect(x - tabGap / 2, stripTop, labelWidth + tabGap, stripHeight), ACTION_TAB,
                        static_cast<int16_t>(i), fui::InputTouch);
-    x += labelWidth + kTabGap;
+    x += labelWidth + tabGap;
   }
   drawRule(renderer, 0, stripTop + stripHeight, width);
   return stripTop + stripHeight + kRuleWidth;
@@ -442,7 +452,6 @@ void LibraryShelvesActivity::drawBookRow(UiScreen& screen, const int index, cons
     book.thumbResolved = true;
   }
   const int line10 = renderer.getLineHeight(kText10Font);
-  const int line12 = renderer.getLineHeight(kText12Font);
   const int coverY = rowTop + (kBookRowHeight - kRuleWidth - kCoverHeight) / 2;
   covers.draw(renderer, book.thumb, book.title.c_str(), kRowTextX, coverY, kCoverWidth, kCoverHeight);
   if (buttonsUsed && focus == index && menu == Menu::None) {
@@ -450,17 +459,24 @@ void LibraryShelvesActivity::drawBookRow(UiScreen& screen, const int index, cons
   }
   const int textX = kRowTextX + kCoverWidth + 16;
   const int textWidth = width - textX - kSidePadding;
-  // A long title takes a second line before it truncates.
-  const auto titleLines = renderer.wrappedText(kText12Font, book.title.c_str(), textWidth, 2, kSemiBold);
-  const int titleHeight = std::max(1, static_cast<int>(titleLines.size())) * line12;
+  // Title in the text role, SemiBold, up to two lines; under it "author · progress".
+  const auto titleLines = renderer.wrappedText(kText10Font, book.title.c_str(), textWidth, 2, kSemiBold);
+  const int titleHeight = std::max(1, static_cast<int>(titleLines.size())) * line10;
   const int textTop = rowTop + (kBookRowHeight - kRuleWidth - titleHeight - line10) / 2;
   int lineTop = textTop;
   for (const auto& line : titleLines) {
-    renderer.drawText(kText12Font, textX, lineTop, line.c_str(), true, kSemiBold);
-    lineTop += line12;
+    renderer.drawText(kText10Font, textX, lineTop, line.c_str(), true, kSemiBold);
+    lineTop += line10;
   }
-  renderer.drawText(kText10Font, textX, textTop + titleHeight,
-                    renderer.truncatedText(kText10Font, book.detail, textWidth).c_str());
+  std::string detail = book.detail;
+  if (!book.author.empty()) {
+    // The author gives way first, so the progress always shows.
+    static constexpr char kDot[] = " \u00B7 ";
+    const int room = textWidth - renderer.getTextWidth(kText10Font, (std::string(kDot) + book.detail).c_str());
+    detail = renderer.truncatedText(kText10Font, book.author.c_str(), std::max(0, room)) + kDot + book.detail;
+  }
+  renderer.drawText(kText10Font, textX, lineTop,
+                    renderer.truncatedText(kText10Font, detail.c_str(), textWidth).c_str());
   drawRule(renderer, 0, rowTop + kBookRowHeight - kRuleWidth, width);
   screen.frame().hit(fui::makeRect(0, rowTop, width, kBookRowHeight), ACTION_ROW, static_cast<int16_t>(index),
                      fui::InputTouch | fui::InputLongPress);
@@ -523,7 +539,7 @@ void LibraryShelvesActivity::drawMenu(UiScreen& screen, const int areaTop, const
 }
 
 void LibraryShelvesActivity::draw(UiScreen& screen) {
-  const auto bands = statsui::drawHeader(renderer, tr(STR_LIBRARY), false);
+  const auto bands = statsui::drawHeader(renderer, tr(STR_LIBRARY), true);
   const int width = bands.width;
   const int listTop = drawTabs(screen, bands.contentTop, width);
   const int rowHeight = tab == TabShelves ? kShelfRowHeight : kBookRowHeight;

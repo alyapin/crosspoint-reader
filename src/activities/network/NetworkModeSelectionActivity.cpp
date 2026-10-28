@@ -43,7 +43,7 @@ NetworkModeSelectionActivity::NetworkModeSelectionActivity(GfxRenderer& renderer
     fui::ListItem item;
     item.label = I18N.get(menuItems[i]);
     item.subtitle = I18N.get(menuDescs[i]);
-    item.icon = listIconFor(menuIcons[i], 32);  // subtitle rows carry the larger icon
+    item.icon = listIconFor(menuIcons[i]);
     item.actionValue = static_cast<int16_t>(i);
     rowItems_[i] = item;
   }
@@ -77,7 +77,9 @@ void NetworkModeSelectionActivity::buildScreen(UiScreen& screen) {
   props.action = ACTION_ROW;
   props.inputMask = fui::InputTouch;  // physical buttons stay in loop()
   props.subtitleText = screen.theme().smallText;
+  props.subtitleText.bold = false;  // the title carries the weight
   props.subtitleText.maxLines = 2;
+  props.iconOnFirstLine = true;
   syncListViewport(screen, props);
   screen.list(props);
 }

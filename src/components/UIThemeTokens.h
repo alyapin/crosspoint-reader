@@ -22,6 +22,8 @@ inline freeink::ui::ThemeTokens uiThemeTokens(const freeink::ui::GfxRendererTarg
   tokens.listInset = static_cast<int16_t>(metrics.listInset);
   tokens.listSidePadding = static_cast<int16_t>(metrics.listSidePadding);
   tokens.listSelectionStyle = static_cast<fui::SelectionStyle>(metrics.listSelectionStyle);
+  // The bar marks the row without a pill, so rows sit edge to edge (Setka pitch).
+  if (tokens.listSelectionStyle == fui::SelectionStyle::LeftBar) tokens.listTouchRowGap = 0;
   tokens.listScrollWidth = static_cast<int16_t>(metrics.listScrollWidth);
   tokens.listScrollSide = static_cast<uint8_t>(metrics.listScrollSide);
   // No extra scroll-track inset: the bezel is already compensated once at the
