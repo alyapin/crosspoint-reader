@@ -131,7 +131,7 @@ bool PuzzleParser::line(const char* text, const size_t len) {
           !readNumber(text, len, pos, b) || pos != len) {
         return fail("bad size");
       }
-      if (a < 3 || a > MAX_WIDTH || b < 3 || b > MAX_HEIGHT) return fail("size out of range");
+      if (a < 3 || a > MAX_GRID_WIDTH || b < 3 || b > MAX_GRID_HEIGHT) return fail("size out of range");
       p.cols = static_cast<uint8_t>(a);
       p.rows = static_cast<uint8_t>(b);
       stage = Stage::Level;

@@ -23,9 +23,9 @@
 
 namespace scanword {
 
-constexpr uint8_t MAX_WIDTH = 12;
-constexpr uint8_t MAX_HEIGHT = 16;
-constexpr uint16_t MAX_CELLS = MAX_WIDTH * MAX_HEIGHT;
+constexpr uint8_t MAX_GRID_WIDTH = 12;
+constexpr uint8_t MAX_GRID_HEIGHT = 16;
+constexpr uint16_t MAX_CELLS = MAX_GRID_WIDTH * MAX_GRID_HEIGHT;
 constexpr uint8_t MAX_WORDS = 96;
 constexpr uint8_t MIN_ANSWER = 2;
 constexpr size_t MAX_CLUE_BYTES = 80;
