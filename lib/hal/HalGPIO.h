@@ -86,6 +86,9 @@ class HalGPIO {
   // expander key, one I2C read), without going through the debounced state.
   // Cheap enough to call every few ms.
   bool rawInputActive();
+  // True while a button or the screen is down, or a button change still waits
+  // for its second debounce sample.
+  bool isInputHeld();
   bool hasTouch() const;
   // Capacitive Home key reported by the touch controller (X4 Pro). The tap
   // event fires on release and excludes a long hold.

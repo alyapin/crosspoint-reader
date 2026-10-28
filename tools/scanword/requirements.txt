@@ -1,0 +1,4 @@
+pillow
+wordfreq
+pymorphy3
+pymorphy3-dicts-ru

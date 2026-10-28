@@ -25,6 +25,7 @@
 #include "home/SetkaHomeActivity.h"
 #include "library/LibraryListActivity.h"
 #include "network/CrossPointWebServerActivity.h"
+#include "network/LocalSendActivity.h"
 #include "network/UsbDriveActivity.h"
 #include "plugins/PluginCatalogActivity.h"
 #include "reader/ReaderActivity.h"
@@ -82,6 +83,7 @@ void ActivityManager::renderTaskLoop() {
     // Acquire the lock before reading currentActivity to avoid a TOCTOU race
     // where the main task deletes the activity between the null-check and render().
     RenderLock lock;
+    renderNotified.store(false);
     if (currentActivity) {
       HalPowerManager::Lock powerLock;  // Ensure we don't go into low-power mode while rendering
       // Night mode is a global output polarity applied to every activity.
@@ -111,9 +113,7 @@ void ActivityManager::loop() {
     // An exclusive-storage activity must restart rather than navigate away:
     // processing a pending action here could re-enable filesystem users while
     // the USB host still owns the raw SD card.
-    if (requestedUpdate.exchange(false) && renderTaskHandle) {
-      xTaskNotify(renderTaskHandle, 1, eIncrement);
-    }
+    if (requestedUpdate.exchange(false)) notifyRenderTask();
     return;
   }
 
@@ -236,13 +236,14 @@ void ActivityManager::loop() {
     }
   }
 
-  if (requestedUpdate.exchange(false)) {
-    // Using direct notification to signal the render task to update
-    // Increment counter so multiple rapid calls won't be lost
-    if (renderTaskHandle) {
-      xTaskNotify(renderTaskHandle, 1, eIncrement);
-    }
-  }
+  if (requestedUpdate.exchange(false)) notifyRenderTask();
+}
+
+void ActivityManager::notifyRenderTask() {
+  if (!renderTaskHandle) return;
+  renderNotified.store(true);
+  // Increment counter so multiple rapid calls won't be lost
+  xTaskNotify(renderTaskHandle, 1, eIncrement);
 }
 
 void ActivityManager::exitActivity(const RenderLock& lock) {
@@ -274,6 +275,8 @@ void ActivityManager::replaceActivity(std::unique_ptr<Activity>&& newActivity) {
 void ActivityManager::goToFileTransfer() {
   replaceActivity(std::make_unique<CrossPointWebServerActivity>(renderer, mappedInput));
 }
+
+void ActivityManager::goToLocalSend() { replaceActivity(std::make_unique<LocalSendActivity>(renderer, mappedInput)); }
 
 void ActivityManager::goToJoinNetwork() {
   // Post heap-defrag reboot: enter the web-server activity straight in Join
@@ -466,6 +469,12 @@ bool ActivityManager::handleForcedRefresh() { return currentActivity && currentA
 
 bool ActivityManager::skipLoopDelay() const { return currentActivity && currentActivity->skipLoopDelay(); }
 
+uint32_t ActivityManager::idleSleepBudgetMs() const {
+  // A screen change in progress (the radio's teardown can span passes) continues on the next pass.
+  if (pendingAction != PendingAction::None) return 0;
+  return currentActivity ? currentActivity->idleSleepBudgetMs() : light_sleep::kNoDeadline;
+}
+
 ScreenshotInfo ActivityManager::getScreenshotInfo() const {
   if (currentActivity) {
     return currentActivity->getScreenshotInfo();
@@ -481,9 +490,7 @@ void ActivityManager::prepareForSleep() {
 
 void ActivityManager::requestUpdate(bool immediate) {
   if (immediate) {
-    if (renderTaskHandle) {
-      xTaskNotify(renderTaskHandle, 1, eIncrement);
-    }
+    notifyRenderTask();
   } else {
     // Deferring the update until current loop is finished
     // This is to avoid multiple updates being requested in the same loop
@@ -516,7 +523,7 @@ void ActivityManager::requestUpdateAndWait() {
   // Cannot call while holding RenderLock or it will cause a deadlock
   assert(!holdingRenderLock && "Cannot call requestUpdateAndWait() while holding RenderLock");
 
-  xTaskNotify(renderTaskHandle, 1, eIncrement);
+  notifyRenderTask();
   ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 }
 

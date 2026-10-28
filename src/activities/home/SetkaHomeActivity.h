@@ -16,7 +16,7 @@
 // Home of the fork's readers (X4 Pro, X4) in the Setka style
 // (.claude/skills/ui-style, layout "3в"): up to three books in progress as
 // covers with their percent, the current one as a row, and tabs to the
-// library, "Ещё" and settings. Touch taps and button focus both drive it.
+// library, statistics, "Ещё" and settings. Touch taps and button focus both drive it.
 // Other boards keep the theme-driven HomeActivity.
 class SetkaHomeActivity final : public Activity, private UiAppHost {
  public:
@@ -29,7 +29,7 @@ class SetkaHomeActivity final : public Activity, private UiAppHost {
 
  private:
   static constexpr int kMaxCovers = 3;
-  enum Tab : int16_t { TabLibrary, TabMore, TabSettings, TabCount };
+  enum Tab : int16_t { TabLibrary, TabStatistics, TabMore, TabSettings, TabCount };
 
   struct Slot {
     RecentBook book;
@@ -60,6 +60,9 @@ class SetkaHomeActivity final : public Activity, private UiAppHost {
   void activateFocus();
   void openBook(int index);
   void openTab(int tab);
+  // The empty-state row: every book on the card, since the status tabs list
+  // only books opened before.
+  void openAllBooks();
 
   std::array<Slot, kMaxCovers> slots;
   int slotCount = 0;

@@ -52,6 +52,7 @@
 #include "html/assets/iconsSvg.generated.h"
 #include "html/assets/webCss.generated.h"
 #include "html/js/jszip_minJs.generated.h"
+#include "stats/ReadingStats.h"
 #include "util/BookCacheUtils.h"
 #include "util/DictionaryRegistry.h"
 #include "util/FirmwareIdentity.h"
@@ -974,7 +975,8 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
           state.error = keepStaged ? "Replace failed; the new file is kept as " + state.fileName + ".part"
                                    : "Failed to replace the existing file";
           if (keepStaged) {
-            // The original is gone: drop its cache and Library entry.
+            // The original is gone: drop its cache, reading history and Library entry.
+            forgetBookStats(dest.c_str());
             clearBookCache(dest.c_str());
             if (library::isLibraryBookFile(dest.c_str())) library::markLibraryIndexDirty();
           }
@@ -996,6 +998,8 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
         String filePath = state.path;
         if (!filePath.endsWith("/")) filePath += "/";
         filePath += state.fileName;
+        // An overwritten book is a different file: its reading history starts over, like its cache.
+        if (state.staged) forgetBookStats(filePath.c_str());
         clearBookCache(filePath.c_str());
         if (library::isLibraryBookFile(filePath.c_str())) library::markLibraryIndexDirty();
       }
@@ -1155,6 +1159,7 @@ void CrossPointWebServer::handleRename() const {
   const bool success = ClippingStore::moveBook(itemPath.c_str(), newPath.c_str());
 
   if (success) {
+    READING_STATS.movePath(itemPath.c_str(), newPath.c_str());
     LOG_DBG("WEB", "Renamed file: %s -> %s", itemPath.c_str(), newPath.c_str());
     server->send(200, "text/plain", "Renamed successfully");
   } else {
@@ -1253,6 +1258,7 @@ void CrossPointWebServer::handleMove() const {
   const bool success = ClippingStore::moveBook(itemPath.c_str(), newPath.c_str());
 
   if (success) {
+    READING_STATS.movePath(itemPath.c_str(), newPath.c_str());
     LOG_DBG("WEB", "Moved file: %s -> %s", itemPath.c_str(), newPath.c_str());
     server->send(200, "text/plain", "Moved successfully");
   } else {

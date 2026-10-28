@@ -66,6 +66,10 @@ class ActivityManager {
   // Whether to trigger a render after the current loop()
   // This variable must only be set by the main loop, to avoid race conditions
   std::atomic<bool> requestedUpdate{false};
+  // Set when the render task is notified, cleared once it holds the RenderLock:
+  // with the lock free and this clear, no render is waiting.
+  std::atomic<bool> renderNotified{false};
+  void notifyRenderTask();
 
   // Counts screen changes, so the Bluetooth page turner can tell one visit of a book from the next.
   // Written by the main loop under RenderLock; the render task captures it under that lock.
@@ -85,6 +89,7 @@ class ActivityManager {
 
   // goTo... functions are convenient wrapper for replaceActivity()
   void goToFileTransfer();
+  void goToLocalSend();    // «Приём книг»
   void goToJoinNetwork();  // File Transfer straight into Join Network (post heap-defrag reboot)
   void goToUsbDrive();
   // openSection jumps straight into one group (End = the section list).
@@ -123,6 +128,10 @@ class ActivityManager {
   bool remoteShortcut(bool readerMenu);
   bool handleForcedRefresh();
   bool skipLoopDelay() const;
+  // Light sleep between inputs: the activity's budget, 0 while a screen change is pending.
+  uint32_t idleSleepBudgetMs() const;
+  // A render was requested and the render task has not taken the RenderLock for it yet.
+  bool isRenderQueued() const { return requestedUpdate.load() || renderNotified.load(); }
   ScreenshotInfo getScreenshotInfo() const;
   void prepareForSleep();
 

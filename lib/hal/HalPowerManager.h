@@ -53,6 +53,15 @@ class HalPowerManager {
   bool holdWhileUsbPowered(HalGPIO& gpio, void (*onStatus)(bool charging, uint16_t percent)) const;
 #endif
 
+#if FREEINK_DEVICE_X4PRO
+  // Light sleep between inputs (see src/util/LightSleep.h) for at most ms, until
+  // a button is pressed or the touch INT line changes. keepCrystal keeps the main
+  // crystal running, which clocks the frontlight PWM. Touch only when the INT
+  // line alone woke the chip from rest; a reject or a button wake is Line.
+  enum class LightSleepWake : uint8_t { Timer, Line, Touch };
+  LightSleepWake lightSleep(uint32_t ms, bool keepCrystal) const;
+#endif
+
   // Get battery percentage (range 0-100)
   uint16_t getBatteryPercentage() const;
 

@@ -256,6 +256,14 @@ void ChessActivity::prepareForSleep() { saveGame(); }
 
 bool ChessActivity::skipLoopDelay() { return view == View::Game && match && match->engineThinking(); }
 
+// tickClocks() repaints a clock whose text changed and update() flags it at 0.
+uint32_t ChessActivity::idleSleepBudgetMs() const {
+  if (view != View::Game || !match || !match->timed() || match->paused() || match->game().isOver()) {
+    return light_sleep::kNoDeadline;
+  }
+  return chess::ui::msUntilClockTextChange(match->remainingMs(match->game().sideToMove()));
+}
+
 void ChessActivity::saveGame() {
   if (!match || !inGame) return;
   match->pause();

@@ -51,10 +51,17 @@
 #include "games/chess/ui/ChessActivity.h"
 #endif
 #include "platform/UsbSerialJtagHandoff.h"
+#include "stats/ReadingStats.h"
+#include "util/BookProgress.h"
 #include "util/ButtonNavigator.h"
+#include "util/LightSleep.h"
 #include "util/PluginEvents.h"
 #include "util/ScreenshotUtil.h"
 #include "util/Timezones.h"
+
+#if CROSSPOINT_LIGHT_SLEEP
+#include <driver/usb_serial_jtag.h>
+#endif
 
 #if CROSSPOINT_VECTOR_FONTS
 // Rendering (incl. FreeType TTF rasterization) runs on the Arduino loop task.
@@ -550,6 +557,15 @@ void enterDeepSleep(bool fromTimeout = false) {
   powerManager.startDeepSleep(gpio, wakeOnHeldButton);
 }
 
+// Statistics start with the books already being read: until the first catalog
+// exists, recent books with saved progress get Читаю or Прочитано.
+static void seedReadingStats() {
+  if (!READING_STATS.catalogMissing()) return;
+  for (const auto& book : RECENT_BOOKS.getBooks()) {
+    READING_STATS.seedBook(book.path, book.title, book.author, loadBookProgress(book.path) * 100);
+  }
+}
+
 void setupDisplayAndFonts(bool seamless = false) {
 #if !FREEINK_MCU_C3
   // C3 resolves its controller in HalGPIO::begin() before SPI claims the
@@ -711,6 +727,7 @@ void setup() {
   // UTC-offset setting on first boot after the update).
   timezones::applyToClock();
   RECENT_BOOKS.loadFromFile();
+  seedReadingStats();
   I18N.setLanguage(static_cast<Language>(SETTINGS.language));
   KOREADER_STORE.loadFromFile();
   OPDS_STORE.loadFromFile();
@@ -890,6 +907,48 @@ void setup() {
   allowSleepAt = millis() + 2000;
 }
 
+#if CROSSPOINT_LIGHT_SLEEP
+// Light sleep between inputs (util/LightSleep.h). The first touch after a sleep
+// tells whether the touch INT line wakes the chip; until it has, sleeps stay
+// as short as the idle poll they replace.
+namespace idlesleep {
+bool slept = false;
+HalPowerManager::LightSleepWake wake = HalPowerManager::LightSleepWake::Timer;
+bool touchWakeProven = false;
+unsigned long usbListenAt = 0;  // when the last USB listen window opened
+
+// The idle loop's wait. False: poll as without light sleep.
+bool wait(const unsigned long idleMs, const uint32_t activityBudgetMs, const bool workPending) {
+  if (!SETTINGS.sleepBetweenInputs) return false;
+  if (millis() - usbListenAt >= light_sleep::kUsbListenEveryMs) usbListenAt = millis();
+  light_sleep::State state;
+  state.usbListenAgeMs = millis() - usbListenAt;
+  const auto ble = bleturner::status();
+  state.radioOn = WiFi.getMode() != WIFI_MODE_NULL || ble.running || ble.starting || ble.stopping;
+  state.usbConnected = gpio.isUsbConnected() || usb_serial_jtag_is_connected();
+  state.workPending = workPending;
+  state.inputHeld = gpio.isInputHeld();
+  state.frontlightOn = Frontlight.isOn();
+  state.frontlightOnCrystal = ledcGetClockSource() == LEDC_USE_XTAL_CLK;
+  state.idleMs = idleMs;
+  state.autoSleepMs = SETTINGS.getSleepTimeoutMs();
+  state.activityBudgetMs = activityBudgetMs;
+  state.touchWakeProven = touchWakeProven;
+  const uint32_t ms = light_sleep::sleepMs(state);
+  if (ms == 0) {
+    if (!state.inputHeld) return false;
+    // A press that woke the chip commits on its second debounce sample: take
+    // it in 10 ms, not after a 50 ms idle slice it may not outlast.
+    delay(10);
+    return true;
+  }
+  wake = powerManager.lightSleep(ms, state.frontlightOn);
+  slept = true;
+  return true;
+}
+}  // namespace idlesleep
+#endif
+
 void loop() {
   static unsigned long maxLoopDuration = 0;
   const unsigned long loopStartTime = millis();
@@ -899,6 +958,14 @@ void loop() {
   bootrescue::clearIfHealthy();
   gpio.setSharedConfirmPowerShortPressEmitsPower(SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::SLEEP);
   mappedInputManager.update();
+#if CROSSPOINT_LIGHT_SLEEP
+  if (idlesleep::slept) {
+    idlesleep::slept = false;
+    idlesleep::touchWakeProven = light_sleep::touchWakeProven(
+        idlesleep::touchWakeProven, idlesleep::wake == HalPowerManager::LightSleepWake::Touch,
+        idlesleep::wake == HalPowerManager::LightSleepWake::Timer, gpio.wasTouchActivity());
+  }
+#endif
 
   // Bluetooth page turner, before the USB drive's early return: a card handed to USB stops the radio
   // before anything else.
@@ -1135,6 +1202,10 @@ void loop() {
   }
 
   bool skipLoopDelay = false;
+#if CROSSPOINT_LIGHT_SLEEP
+  uint32_t sleepBudgetMs = 0;
+  bool workPending = true;
+#endif
   {
     RenderLock lock(RenderLock::Mode::Try);
     if (!lock.ownsLock()) {
@@ -1143,6 +1214,10 @@ void loop() {
       return;
     }
     skipLoopDelay = activityManager.skipLoopDelay();
+#if CROSSPOINT_LIGHT_SLEEP
+    sleepBudgetMs = activityManager.idleSleepBudgetMs();
+    workPending = activityManager.isRenderQueued() || display.refreshBusy() || gaugeCapacityPending;
+#endif
   }
 
   // Add delay at the end of the loop to prevent tight spinning
@@ -1155,6 +1230,9 @@ void loop() {
     if (millis() - lastActivityTime >= HalPowerManager::IDLE_POWER_SAVING_MS && !pageturner::holdsCpu.load()) {
       // If we've been inactive for a while, increase the delay to save power
       powerManager.setPowerSaving(true);  // Lower CPU frequency after extended inactivity
+#if CROSSPOINT_LIGHT_SLEEP
+      if (idlesleep::wait(millis() - lastActivityTime, sleepBudgetMs, workPending)) return;
+#endif
       // Sleep in short slices and wake the poll as soon as a button contact closes.
       // InputManager commits a press only when two consecutive polls agree, so a
       // press shorter than one 50 ms sleep could land in a single sample and be lost.

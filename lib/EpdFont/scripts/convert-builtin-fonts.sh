@@ -137,10 +137,19 @@ HERO_INTERVALS=(
   --additional-intervals 0x30,0x3A      # 0-9 :
   --additional-intervals 0x2212,0x2212  # minus sign
 )
+# The 31 pt cut also spells the device name «Сова» for the receive screen.
+SOVA_INTERVALS=(
+  --additional-intervals 0x0421,0x0421  # С
+  --additional-intervals 0x0430,0x0430  # а
+  --additional-intervals 0x0432,0x0432  # в
+  --additional-intervals 0x043E,0x043E  # о
+)
 for size in 61 31 19 14 11; do
   output_path="../builtinFonts/unbounded_${size}_digits.h"
+  extra=()
+  [ "$size" = 31 ] && extra=("${SOVA_INTERVALS[@]}")
   python fontconvert.py unbounded_${size}_digits $size ../builtinFonts/source/Unbounded/Unbounded-SemiBold.ttf \
-    "${HERO_INTERVALS[@]}" > $output_path
+    "${HERO_INTERVALS[@]}" "${extra[@]}" > $output_path
   echo "Generated $output_path"
 done
 

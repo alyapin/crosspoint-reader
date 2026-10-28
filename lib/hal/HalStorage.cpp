@@ -204,6 +204,13 @@ bool HalStorage::replaceFile(const char* tmpPath, const char* path) {
 
 bool HalStorage::rmdir(const char* path) { HAL_STORAGE_WRAPPED_CALL(rmdir, path); }
 
+uint64_t HalStorage::freeBytes() {
+  StorageLock lock;
+  const uint64_t total = SDCard.sdTotalBytes();
+  const uint64_t used = SDCard.sdUsedBytes();
+  return total > used ? total - used : 0;
+}
+
 bool HalStorage::openFileForRead(const char* moduleName, const char* path, HalFile& file) {
   StorageLock lock;  // ensure thread safety for the duration of this function
   FsFile fsFile;

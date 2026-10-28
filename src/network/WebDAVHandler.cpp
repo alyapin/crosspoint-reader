@@ -6,6 +6,7 @@
 #include <Logging.h>
 
 #include "ClippingStore.h"
+#include "stats/ReadingStats.h"
 #include "util/BookCacheUtils.h"
 #include "util/TaskWatchdog.h"
 
@@ -402,6 +403,8 @@ void WebDAVHandler::handlePut(WebServer& s) {
     return;
   }
 
+  // The path now holds a different file: its reading history starts over, like its cache.
+  if (_putExisted) forgetBookStats(path.c_str());
   clearBookCache(path.c_str());
   s.send(_putExisted ? 204 : 201);
   LOG_DBG("DAV", "PUT complete: %s", path.c_str());
@@ -565,6 +568,7 @@ void WebDAVHandler::handleMove(WebServer& s) {
   const bool success = ClippingStore::moveBook(srcPath.c_str(), dstPath.c_str());
 
   if (success) {
+    READING_STATS.movePath(srcPath.c_str(), dstPath.c_str());
     s.send(dstExists ? 204 : 201);
   } else {
     s.send(500, "text/plain", "Move failed");
@@ -632,6 +636,7 @@ void WebDAVHandler::handleCopy(WebServer& s) {
 
   if (dstExists) {
     Storage.remove(dstPath.c_str());
+    forgetBookStats(dstPath.c_str());
   }
 
   HalFile dstFile;

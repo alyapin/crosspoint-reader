@@ -23,10 +23,13 @@
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "SovaLogo.h"
 #include "activities/reader/ReaderUtils.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#if !SOVA_LOGO
 #include "images/Logo120.h"
+#endif
 #include "images/MoonIcon.h"
 #include "util/SleepImagePick.h"
 
@@ -707,6 +710,34 @@ bool SleepActivity::renderSleepBmp(const std::string& path) const {
 // sequence, used once for the sleep image. It never runs the multi-flash GC
 // waveform (0xF7) that FULL_REFRESH selects (#2471's blinking complaint).
 void SleepActivity::renderDefaultSleepScreen() const {
+#if SOVA_LOGO
+  // Make sleep screen dark unless light is selected in settings
+  const bool dark = SETTINGS.sleepScreen != CrossPointSettings::SLEEP_SCREEN_MODE::LIGHT;
+  const auto grayMode = sleepGrayscaleMode(renderer);
+  const bool gray = renderer.grayscaleCapabilities(grayMode).supported();
+  const auto drawFrame = [&](const bool grayFollows) {
+    renderer.clearScreen(dark ? 0x00 : 0xFF);
+    sova::drawLogo(renderer, grayFollows, dark);
+  };
+
+  drawFrame(gray);
+  if (gray) cleanBeforeAbsoluteGray(renderer);
+  if (!gray || !renderer.displayGrayscaleBase(grayMode)) {
+    if (gray) drawFrame(false);
+    renderer.displayBuffer(kSleepClean);
+    return;
+  }
+  for (const auto plane : {GfxRenderer::GRAYSCALE_LSB, GfxRenderer::GRAYSCALE_MSB}) {
+    renderer.setRenderMode(plane);
+    drawFrame(true);
+    if (plane == GfxRenderer::GRAYSCALE_LSB)
+      renderer.copyGrayscaleLsbBuffers();
+    else
+      renderer.copyGrayscaleMsbBuffers();
+  }
+  renderer.displayGrayBuffer();
+  renderer.setRenderMode(GfxRenderer::BW);
+#else
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
 
@@ -721,6 +752,7 @@ void SleepActivity::renderDefaultSleepScreen() const {
   }
 
   renderer.displayBuffer(kSleepClean);
+#endif
 }
 
 bool SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap, const bool preserveBackground) const {

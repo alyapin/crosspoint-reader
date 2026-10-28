@@ -1,0 +1,5 @@
+Clues and answers are derived from the Russian Wiktionary
+(https://ru.wiktionary.org), licensed under CC BY-SA 4.0
+(https://creativecommons.org/licenses/by-sa/4.0/). Words were ranked with
+wordfreq (CC BY-SA 4.0) and pymorphy3 / OpenCorpora data. These puzzles are
+shared under the same licence, CC BY-SA 4.0.

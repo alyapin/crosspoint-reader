@@ -17,6 +17,7 @@
 
 #include "CrossPointSettings.h"
 #include "MoreActivity.h"
+#include "activities/stats/StatsScreens.h"
 #include "components/UITheme.h"
 #include "components/icons/listIcons.h"
 #include "components/setka/setkaIcons.h"
@@ -49,6 +50,7 @@ struct TabSpec {
   const freeink::Icon* icon;
 };
 const TabSpec kTabs[] = {{StrId::STR_LIBRARY, &icon_library_32},
+                         {StrId::STR_STATS_TITLE, &icon_chart_column_32},
                          {StrId::STR_MORE, &icon_layout_grid_32},
                          {StrId::STR_SETTINGS_TITLE, &icon_sliders_32}};
 
@@ -142,7 +144,7 @@ void SetkaHomeActivity::onTab(const fui::ActionEvent& event, void* user) {
 }
 
 void SetkaHomeActivity::onOpenLibrary(const fui::ActionEvent&, void* user) {
-  static_cast<SetkaHomeActivity*>(user)->openTab(TabLibrary);
+  static_cast<SetkaHomeActivity*>(user)->openAllBooks();
 }
 
 void SetkaHomeActivity::openBook(const int index) {
@@ -155,7 +157,10 @@ void SetkaHomeActivity::openTab(const int tab) {
   app.clearTapFlash();
   switch (tab) {
     case TabLibrary:
-      activityManager.goToLibrary();
+      openLibraryTabs(renderer, mappedInput);
+      break;
+    case TabStatistics:
+      openStatistics(renderer, mappedInput);
       break;
     case TabMore:
       activityManager.replaceActivity(std::make_unique<MoreActivity>(renderer, mappedInput));
@@ -166,6 +171,11 @@ void SetkaHomeActivity::openTab(const int tab) {
     default:
       break;
   }
+}
+
+void SetkaHomeActivity::openAllBooks() {
+  app.clearTapFlash();
+  activityManager.goToLibrary();
 }
 
 void SetkaHomeActivity::moveFocus(const int delta) {
@@ -179,7 +189,7 @@ void SetkaHomeActivity::activateFocus() {
   if (index >= bookFocusCount()) {
     openTab(index - bookFocusCount());
   } else if (slotCount == 0) {
-    openTab(TabLibrary);
+    openAllBooks();
   } else {
     openBook(index);
   }
@@ -373,24 +383,33 @@ void SetkaHomeActivity::drawTabs(UiScreen& screen, const int top, const int bott
   const int line10 = renderer.getLineHeight(kText10Font);
   const int blockHeight = kTabIconSize + kTabIconGap + line10;
   const int blockTop = top + kRuleWidth + (bottom - top - kRuleWidth - blockHeight) / 2;
-  const int columnWidth = width / TabCount;
+  // Four labels do not fit equal quarters, so each column is its SemiBold
+  // label plus an equal share of the spare width.
+  std::array<int, TabCount> columnWidths{};
+  int spare = width;
+  for (int tab = 0; tab < TabCount; ++tab) {
+    columnWidths[tab] =
+        std::max(kTabIconSize, renderer.getTextWidth(kText10Font, I18N.get(kTabs[tab].label), kSemiBold));
+    spare -= columnWidths[tab];
+  }
   const int focusedTab = focus - bookFocusCount();
+  int columnX = 0;
   for (int tab = 0; tab < TabCount; ++tab) {
     const bool focused = tab == focusedTab;
     const auto style = focused ? kSemiBold : EpdFontFamily::REGULAR;
     const char* label = I18N.get(kTabs[tab].label);
-    const int columnX = tab * columnWidth;
+    const int columnWidth = tab + 1 < TabCount ? columnWidths[tab] + std::max(0, spare) / TabCount : width - columnX;
     const int iconX = columnX + (columnWidth - kTabIconSize) / 2;
     const int textX = columnX + (columnWidth - renderer.getTextWidth(kText10Font, label, style)) / 2;
     screen.target().bitmap(fui::makeRect(iconX, blockTop, kTabIconSize, kTabIconSize),
                            fui::bitmapFromIcon(*kTabs[tab].icon), fui::BitmapMode::Center);
-    // Same bar-to-content distance as the list rows.
-    if (focused) {
-      drawSelectionBar(renderer, std::min(iconX, textX) - (kRowTextX - kSelectionBarX), blockTop, blockHeight);
-    }
+    // Same bar-to-content distance as the list rows, beside the icon: the
+    // labels leave no room for it.
+    if (focused) drawSelectionBar(renderer, iconX - (kRowTextX - kSelectionBarX), blockTop, kTabIconSize);
     renderer.drawText(kText10Font, textX, blockTop + kTabIconSize + kTabIconGap, label, true, style);
     screen.frame().hit(fui::makeRect(columnX, top, columnWidth, bottom - top), ACTION_TAB, static_cast<int16_t>(tab),
                        fui::InputTouch);
+    columnX += columnWidth;
   }
 }
 
