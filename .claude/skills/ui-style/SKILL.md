@@ -46,7 +46,8 @@ The fork targets two readers: the X4 Pro (ESP32-S3, PSRAM, touch, frontlight, no
 - **Rules:** 2 px black lines between sections; no boxes around content.
 - **Grid:** left-aligned, 20 px side padding (Lyra `contentSidePadding`), full-bleed content (boards, covers) ignores the padding.
 - **Progress:** 12 px bar, black fill on a LightGray-dithered track with a 1 px black outline.
-- **Icons:** Lucide via the 1-bpp icon pipeline (`freeink-sdk/libs/assets/Icons`), 24 px in rows, 32 px in tabs.
+- **Lists and menus (approved variant Б, 2026-10-28):** shaped like CrossPoint 2.0 home/settings — header row = `arrow-left` icon + SemiBold screen title, 2 px rule under it; every row = Lucide icon + label (optional status text right-aligned, e.g. "партия идёт"); selection = the Setka 10 px left bar + SemiBold label, never the 2.0 gray pill. Reference picture: `~/Downloads/sova-menu-icons-v1.png`.
+- **Icons:** Lucide via the 1-bpp icon pipeline (`freeink-sdk/libs/assets/Icons`), 24 px in rows, 32 px in tabs. Bottom tabs show the icon above the label.
 - **Copy:** Russian first (`lib/I18n/translations/russian.yaml`, key also in `english.yaml`), sentence case, short, verb on buttons that perform an action ("Отменить ход", not "Отмена"). Toggles name the mode as a noun ("Заметки").
 - **Refresh in long-lived screens** (boards, timers): HALF on entry, FAST on the changed regions only, plus one HALF every 20 FAST updates to clear ghosting.
 
@@ -54,7 +55,7 @@ The fork targets two readers: the X4 Pro (ESP32-S3, PSRAM, touch, frontlight, no
 
 - Home = reading only. Bottom tabs: Библиотека, Статистика, Ещё, Настройки.
 - Games, file transfer, OPDS catalogs, plugins, SD files live under **Ещё**. Games never appear on Home.
-- Path to a game: Ещё → Игры (list) → game setup (list: mode, difficulty, time) → game screen. Every screen has an on-screen exit ("‹ Выйти" or "‹ Назад") at the top left.
+- Path to a game: Ещё → Игры (list) → game setup (list: mode, difficulty, time) → game screen. Every screen has an on-screen exit at the top left: the 2.0 arrow header on list/menu screens, "‹ Выйти" on game boards.
 - System screens inherited from upstream (settings, library, reader) keep the Lyra theme; only screens this fork adds or redesigns use Setka.
 
 ## Home screen (approved layout "3в")
@@ -104,3 +105,4 @@ Close the simulator after every run: end the input script with `QUIT`, run it be
 - Button-only navigation or missing on-screen confirm: X4 Pro has no Back/Confirm keys.
 - Mockups in fonts or grays the device can't render: mock with the tokens above and the dither patterns from the kit.
 - Shipping UI that Aleksei saw only as text.
+- Text-only menus: rejected as bare; every list/menu row carries an icon.
