@@ -929,7 +929,7 @@ bool pathUnder(const char* path, const std::string& prefix) {
 }  // namespace
 
 int ReadingStats::trackBook(const std::string& path, const std::string& title, const std::string& author,
-                            const uint16_t today, const int progressBp, const bool opening) {
+                            const uint16_t today, const int progressBp, const bool opening, const BookStatus seed) {
   if (path.empty() || path.size() >= PATH_BYTES) {
     LOG_ERR("STAT", "Book path not tracked (%u B)", static_cast<unsigned>(path.size()));
     return NO_BOOK;
@@ -960,6 +960,11 @@ int ReadingStats::trackBook(const std::string& path, const std::string& title, c
     b.status = BookStatus::Reading;
     changed = true;
   }
+  if (seed != BookStatus::None && b.status == BookStatus::None && !b.manualStatus) {
+    b.status = seed;
+    b.progressBp = static_cast<uint16_t>(std::clamp(progressBp, 0, 10000));
+    changed = true;
+  }
   if (opening && !b.opened) {
     b.opened = true;
     b.firstDay = today;
@@ -988,6 +993,20 @@ int ReadingStats::openBook(const std::string& path, const std::string& title, co
 
 int ReadingStats::ensureBook(const std::string& path, const std::string& title, const std::string& author) {
   return trackBook(path, title, author, NO_DAY, 0, false);
+}
+
+bool ReadingStats::catalogMissing() {
+  auto catalog = makeUniqueNoThrow<Catalog>();
+  if (!catalog) return false;
+  HalFile f;
+  return openCatalog(*catalog, f) == Load::Missing;
+}
+
+int ReadingStats::seedBook(const std::string& path, const std::string& title, const std::string& author,
+                           const int progressBp) {
+  const BookStatus status = seedStatus(progressBp);
+  if (status == BookStatus::None) return NO_BOOK;
+  return trackBook(path, title, author, NO_DAY, progressBp, false, status);
 }
 
 uint32_t estimateSecondsLeft(const BookInfo& book) {

@@ -55,6 +55,13 @@ inline uint16_t today() { return localDay(trustedtime::trustedNow()); }
 
 enum class BookStatus : uint8_t { None = 0, Reading = 1, Finished = 2, Paused = 3 };
 
+// Status of a book already being read when statistics start: Reading, or
+// Finished from FINISHED_BP; None without saved progress.
+inline BookStatus seedStatus(const int progressBp) {
+  if (progressBp <= 0) return BookStatus::None;
+  return progressBp >= ReadingTracker::FINISHED_BP ? BookStatus::Finished : BookStatus::Reading;
+}
+
 inline constexpr uint8_t MAX_SHELVES = 32;
 inline constexpr size_t SHELF_NAME_BYTES = 48;  // UTF-8 with its terminator
 inline constexpr size_t PATH_BYTES = 256;
@@ -142,6 +149,11 @@ class ReadingStats {
 
   // Mutations. ensureBook() adds a book without changing its status.
   int ensureBook(const std::string& path, const std::string& title, const std::string& author);
+  // First run: no catalog file yet (false when storage fails).
+  bool catalogMissing();
+  // A book read before statistics started gets seedStatus(progressBp) and that
+  // progress, unless it already has a status. NO_BOOK when nothing applies.
+  int seedBook(const std::string& path, const std::string& title, const std::string& author, int progressBp);
   bool setStatus(int bookId, BookStatus status, uint16_t today);
   // Free shelf slot holding `name`, or -1 when all are used or storage fails.
   int createShelf(const char* name);
@@ -164,7 +176,7 @@ class ReadingStats {
   // Scans the log once: trims a torn tail and finds the next sequence number.
   bool prepareLog();
   int trackBook(const std::string& path, const std::string& title, const std::string& author, uint16_t today,
-                int progressBp, bool opening);
+                int progressBp, bool opening, BookStatus seed = BookStatus::None);
 
   bool logReady = false;
   uint16_t logCount = 0;

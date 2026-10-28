@@ -411,3 +411,48 @@ TEST(ReadingStatsStore, DeletedBookLeavesListsButKeepsItsFinish) {
   EXPECT_GT(again, b);
   EXPECT_EQ(book(store, "/b.epub").seconds, 0u);
 }
+
+TEST(ReadingStatsStore, SeedStatusFollowsSavedProgress) {
+  EXPECT_EQ(stats::seedStatus(-100), BookStatus::None);
+  EXPECT_EQ(stats::seedStatus(0), BookStatus::None);
+  EXPECT_EQ(stats::seedStatus(100), BookStatus::Reading);
+  EXPECT_EQ(stats::seedStatus(9799), BookStatus::Reading);
+  EXPECT_EQ(stats::seedStatus(9800), BookStatus::Finished);
+  EXPECT_EQ(stats::seedStatus(10000), BookStatus::Finished);
+}
+
+TEST(ReadingStatsStore, SeedingAddsBooksReadBeforeStatsAndKeepsStatuses) {
+  auto& store = freshStore();
+  EXPECT_TRUE(store.catalogMissing());
+  EXPECT_EQ(store.seedBook("/new.epub", "New", "", 0), ReadingStats::NO_BOOK);
+  EXPECT_TRUE(store.catalogMissing());
+  const int a = store.seedBook("/a.epub", "A", "", 1500);
+  ASSERT_GE(a, 0);
+  ASSERT_GE(store.seedBook("/b.epub", "B", "", 10000), 0);
+  EXPECT_FALSE(reboot().catalogMissing());
+
+  BookInfo info = book(store, "/a.epub");
+  EXPECT_EQ(info.status, BookStatus::Reading);
+  EXPECT_FALSE(info.manualStatus);
+  EXPECT_FALSE(info.opened);
+  EXPECT_EQ(info.progressBp, 1500u);
+  EXPECT_EQ(book(store, "/b.epub").status, BookStatus::Finished);
+
+  // A status already set stays, and seeding again writes nothing.
+  ASSERT_TRUE(store.setStatus(a, BookStatus::Paused, TODAY));
+  const unsigned writes = fake::writesByPath[std::string(BOOKS) + ".tmp"];
+  EXPECT_EQ(store.seedBook("/a.epub", "A", "", 5000), a);
+  EXPECT_EQ(store.seedBook("/b.epub", "B", "", 10000), book(store, "/b.epub").id);
+  EXPECT_EQ(fake::writesByPath[std::string(BOOKS) + ".tmp"], writes);
+  info = book(store, "/a.epub");
+  EXPECT_EQ(info.status, BookStatus::Paused);
+  EXPECT_EQ(info.progressBp, 1500u);
+
+  // The first real open starts the book's pace from where it was.
+  EXPECT_EQ(store.openBook("/a.epub", "A", "", TODAY, 1500), a);
+  info = book(store, "/a.epub");
+  EXPECT_TRUE(info.opened);
+  EXPECT_EQ(info.firstDay, TODAY);
+  EXPECT_EQ(info.startProgressBp, 1500u);
+  EXPECT_EQ(info.status, BookStatus::Paused);
+}

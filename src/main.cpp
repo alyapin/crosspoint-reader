@@ -51,6 +51,8 @@
 #include "games/chess/ui/ChessActivity.h"
 #endif
 #include "platform/UsbSerialJtagHandoff.h"
+#include "stats/ReadingStats.h"
+#include "util/BookProgress.h"
 #include "util/ButtonNavigator.h"
 #include "util/LightSleep.h"
 #include "util/PluginEvents.h"
@@ -550,6 +552,15 @@ void enterDeepSleep(bool fromTimeout = false) {
   powerManager.startDeepSleep(gpio, wakeOnHeldButton);
 }
 
+// Statistics start with the books already being read: until the first catalog
+// exists, recent books with saved progress get Читаю or Прочитано.
+static void seedReadingStats() {
+  if (!READING_STATS.catalogMissing()) return;
+  for (const auto& book : RECENT_BOOKS.getBooks()) {
+    READING_STATS.seedBook(book.path, book.title, book.author, loadBookProgress(book.path) * 100);
+  }
+}
+
 void setupDisplayAndFonts(bool seamless = false) {
 #if !FREEINK_MCU_C3
   // C3 resolves its controller in HalGPIO::begin() before SPI claims the
@@ -703,6 +714,7 @@ void setup() {
   // UTC-offset setting on first boot after the update).
   timezones::applyToClock();
   RECENT_BOOKS.loadFromFile();
+  seedReadingStats();
   I18N.setLanguage(static_cast<Language>(SETTINGS.language));
   KOREADER_STORE.loadFromFile();
   OPDS_STORE.loadFromFile();
