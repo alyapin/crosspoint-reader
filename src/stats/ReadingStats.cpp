@@ -437,8 +437,11 @@ bool walkCatalog(Catalog& c, bool (*visit)(Catalog& c, void* ctx), void* ctx) {
 }
 
 // Streams books.bin into a replacement with the in-memory header, passing
-// every record through `edit` and appending c.found when `append` is set.
-bool rewriteCatalog(Catalog& c, const BookEdit edit, void* ctx, const bool append) {
+// every record through `edit` and appending c.found when `append` is set. A
+// damaged record ends the copy: the file is replaced with the readable prefix
+// and kept as .bad, unless `keepOnDamage` leaves it as it is, returns false
+// and sets c.damagedRecord.
+bool rewriteCatalog(Catalog& c, const BookEdit edit, void* ctx, const bool append, const bool keepOnDamage = false) {
   Storage.mkdir(STATS_DIR);
   const std::string tmp = withSuffix(BOOKS_PATH, ".tmp");
   auto head = makeUniqueNoThrow<uint8_t[]>(BOOKS_HEADER);
@@ -460,6 +463,10 @@ bool rewriteCatalog(Catalog& c, const BookEdit edit, void* ctx, const bool appen
       if (r == Read::End) break;
       if (r == Read::Damaged) {
         damaged = true;
+        if (keepOnDamage) {
+          c.damagedRecord = true;
+          ok = false;
+        }
         break;
       }
       if (r == Read::Failed) {
@@ -730,7 +737,14 @@ void ReadingStats::compactIfNeeded() {
           [](BookInfo& book, void* raw) {
             if (const BookDelta* d = static_cast<BookDeltas*>(raw)->find(book.id)) applyDelta(book, *d);
           },
-          deltas.get(), false)) {
+          deltas.get(), false, true)) {
+    if (catalog->damagedRecord) {
+      // The books behind a damaged record cannot be read: set the file aside
+      // unchanged and keep every log record this time; the next compaction folds.
+      LOG_ERR("STAT", "Damaged catalog record; compaction deferred");
+      catalog->applied = fold.catalogApplied;
+      rewriteCatalog(*catalog, nullptr, nullptr, false);
+    }
     return;
   }
   deltas.reset();

@@ -257,6 +257,37 @@ TEST(ReadingStatsStore, CrashBetweenCompactionStepsNeitherLosesNorDoubles) {
   EXPECT_EQ(summary(reboot(), days).totalSeconds, ReadingStats::LOG_MAX * 10u + 10u);
 }
 
+TEST(ReadingStatsStore, CompactionKeepsTheLogBehindADamagedCatalogRecord) {
+  auto& store = freshStore();
+  const int ids[] = {store.openBook("/a.epub", "A", "", TODAY, 0), store.openBook("/b.epub", "B", "", TODAY, 0),
+                     store.openBook("/c.epub", "C", "", TODAY, 0)};
+  for (uint16_t i = 0; i < ReadingStats::LOG_MAX; i++) ASSERT_TRUE(store.appendSegment(ids[i % 3], segment(TODAY, 10)));
+  // B's record is damaged, so C behind it cannot be read: this compaction keeps the whole log.
+  auto& books = fake::files.at(BOOKS)->bytes;
+  const std::string bPath = "/b.epub";
+  const auto at = std::search(books.begin(), books.end(), bPath.begin(), bPath.end());
+  ASSERT_NE(at, books.end());
+  *at = 'X';
+  const auto booksBefore = books;
+  const auto logBefore = fake::files.at(LOG)->bytes;
+  auto& again = reboot();
+  const uint32_t aSeconds = book(again, "/a.epub").seconds;
+  again.compactIfNeeded();
+  // The damaged file is set aside as it was, A is not folded into, and the log stays whole.
+  EXPECT_EQ(fake::files.at(LOG)->bytes, logBefore);
+  EXPECT_EQ(fake::files.at(std::string(BOOKS) + ".bad")->bytes, booksBefore);
+  EXPECT_EQ(paths(again), std::vector<std::string>{"/a.epub"});
+  DayWindow days;
+  EXPECT_EQ(summary(reboot(), days).totalSeconds, ReadingStats::LOG_MAX * 10u);
+  EXPECT_EQ(book(again, "/a.epub").seconds, aSeconds);
+
+  // The next compaction folds and cuts the log as usual.
+  again.compactIfNeeded();
+  EXPECT_EQ(fake::files.at(LOG)->bytes.size(), 8u + ReadingStats::LOG_KEEP * 24u);
+  EXPECT_EQ(summary(reboot(), days).totalSeconds, ReadingStats::LOG_MAX * 10u);
+  EXPECT_EQ(book(again, "/a.epub").seconds, aSeconds);
+}
+
 TEST(ReadingStatsStore, InterruptedReplaceRecoversBackup) {
   auto& store = freshStore();
   const int a = store.openBook("/a.epub", "A", "", TODAY, 0);
