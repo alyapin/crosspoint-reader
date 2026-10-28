@@ -316,6 +316,12 @@ bool Match::deserialize(const char* text, const size_t len, const uint32_t seed)
     newGame(MatchSettings{}, seed);
     return false;
   }
+  // Checked against the time control newGame() sanitized; untimed saves hold 0.
+  const uint32_t limit = timed() ? maxRemainingMs(config.time) : 0;
+  if (white > limit || black > limit) {
+    newGame(MatchSettings{}, seed);
+    return false;
+  }
 
   char uci[UCI_MAX];
   size_t i = 0;

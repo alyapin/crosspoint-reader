@@ -115,6 +115,26 @@ TEST(ChessFen, RoundTripAndValidation) {
   EXPECT_EQ(pos.ep, NO_EP);
 }
 
+TEST(ChessFen, RequiresBothCountersAndNothingAfter) {
+  Position pos;
+  const char* bad[] = {
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -",
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0",
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 junk",
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1x",
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 0",
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 256 1",
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 10000",
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -0 1",
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR wKQkq - 0 1",
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq e9 0 1",
+  };
+  for (const char* fen : bad) EXPECT_FALSE(parseFen(fen, pos)) << fen;
+  ASSERT_TRUE(parseFen("  rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w  KQkq  -  12  34  ", pos));
+  EXPECT_EQ(pos.halfmove, 12);
+  EXPECT_EQ(pos.fullmove, 34);
+}
+
 TEST(ChessFen, IncrementalKeyMatchesRecomputed) {
   Position pos;
   ASSERT_TRUE(parseFen(KIWIPETE, pos));
@@ -362,6 +382,16 @@ TEST(ChessClock, IncrementPauseAndFlag) {
 
   clock.reset(TIME_UNLIMITED, WHITE, 0);
   EXPECT_FALSE(clock.flagged(WHITE, 0xFFFFFFF0u));
+
+  // Banked increments stop at the ceiling, however many moves (or undo cycles) happen.
+  const TimeControl fast{1000, 1000};
+  clock.reset(fast, WHITE, 0);
+  for (int i = 0; i < 2 * static_cast<int>(MAX_INCREMENTS); ++i) {
+    clock.moveMade(WHITE, 0);
+    clock.setTurn(WHITE, 0);
+  }
+  EXPECT_EQ(clock.remainingMs(WHITE, 0), maxRemainingMs(fast));
+  EXPECT_EQ(maxRemainingMs(TimeControl{UINT32_MAX, UINT32_MAX}), UINT32_MAX);
 }
 
 TEST(ChessClock, MatchFlagFallAndInsufficientMaterialDraw) {
@@ -539,6 +569,38 @@ TEST(ChessSave, RejectsCorruptInput) {
 
   char tiny[16];
   EXPECT_EQ(m->serialize(tiny, sizeof(tiny)), 0u);
+}
+
+TEST(ChessSave, RejectsClockTimesOutsideTheTimeControl) {
+  auto m = std::make_unique<Match>(fakeMillis);
+  const auto save = [](const char* base, const char* inc, const char* white, const char* black) {
+    return std::string("{\"v\":1,\"mode\":1,\"human\":0,\"level\":3,\"base\":") + base + ",\"inc\":" + inc +
+           ",\"white\":" + white + ",\"black\":" + black +
+           ",\"fen\":\"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1\",\"moves\":\"e2e4\"}";
+  };
+  // 5+3: the ceiling is base + MAX_INCREMENTS increments.
+  const uint32_t ceiling = maxRemainingMs(TIME_5_3);
+  EXPECT_EQ(ceiling, 300000u + MAX_INCREMENTS * 3000u);
+  const std::string atCeiling = std::to_string(ceiling);
+  const std::string overCeiling = std::to_string(ceiling + 1);
+  std::string text = save("300000", "3000", atCeiling.c_str(), "1000");
+  EXPECT_TRUE(m->deserialize(text.data(), text.size(), 1));
+  for (const auto& bad :
+       {save("300000", "3000", overCeiling.c_str(), "1000"), save("300000", "3000", "1000", "4294967295"),
+        save("0", "0", "5", "0"), save("0", "0", "0", "300000")}) {
+    EXPECT_FALSE(m->deserialize(bad.data(), bad.size(), 1)) << bad;
+    EXPECT_EQ(m->game().plyCount(), 0);
+  }
+  // A base above MAX_BASE_MS is clamped first, so its full value no longer fits.
+  text = save("99999999", "0", "99999999", "99999999");
+  EXPECT_FALSE(m->deserialize(text.data(), text.size(), 1));
+  text = save("0", "0", "0", "0");
+  EXPECT_TRUE(m->deserialize(text.data(), text.size(), 1));
+  // A damaged start FEN fails the whole save.
+  text =
+      "{\"v\":1,\"mode\":1,\"human\":0,\"level\":3,\"base\":0,\"inc\":0,\"white\":0,\"black\":0,"
+      "\"fen\":\"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 junk\",\"moves\":\"\"}";
+  EXPECT_FALSE(m->deserialize(text.data(), text.size(), 1));
 }
 
 // --- Engine -------------------------------------------------------------------

@@ -49,9 +49,13 @@ bool save(const chess::Match& match) {
 bool load(chess::Match& match, const uint32_t seed) {
   if (!Storage.exists(SAVE_PATH)) return false;
   std::string text;
-  if (!Storage.readFileToString("CHESS", SAVE_PATH, chess::SAVE_MAX, text) ||
-      !match.deserialize(text.data(), text.size(), seed)) {
-    LOG_ERR("CHESS", "Discarding unreadable save");
+  // A read error may be transient: keep the file. Only content that fails to parse is dropped.
+  if (!Storage.readFileToString("CHESS", SAVE_PATH, chess::SAVE_MAX, text)) {
+    LOG_ERR("CHESS", "Cannot read save");
+    return false;
+  }
+  if (!match.deserialize(text.data(), text.size(), seed)) {
+    LOG_ERR("CHESS", "Discarding corrupt save");
     Storage.remove(SAVE_PATH);
     return false;
   }

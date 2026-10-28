@@ -2,6 +2,11 @@
 
 namespace chess {
 
+uint32_t maxRemainingMs(const TimeControl& control) {
+  const uint64_t ceiling = control.baseMs + static_cast<uint64_t>(MAX_INCREMENTS) * control.incrementMs;
+  return ceiling > UINT32_MAX ? UINT32_MAX : static_cast<uint32_t>(ceiling);
+}
+
 void Clock::reset(const TimeControl& control, const Color side, const uint32_t nowMs) {
   tc = control;
   remaining[WHITE] = remaining[BLACK] = control.baseMs;
@@ -47,7 +52,8 @@ void Clock::stop(const uint32_t nowMs) {
 void Clock::moveMade(const Color mover, const uint32_t nowMs) {
   charge(nowMs);
   if (!tc.unlimited() && remaining[mover] > 0) {
-    const uint32_t room = UINT32_MAX - remaining[mover];
+    const uint32_t ceiling = maxRemainingMs(tc);
+    const uint32_t room = remaining[mover] < ceiling ? ceiling - remaining[mover] : 0;
     remaining[mover] += tc.incrementMs < room ? tc.incrementMs : room;
   }
   toMove = opposite(mover);
