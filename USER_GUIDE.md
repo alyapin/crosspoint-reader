@@ -106,7 +106,7 @@ An SD card firmware update keeps the previous firmware in a second slot. If a ne
 
 The screen does not change while you hold the buttons. Releasing them in under 3 seconds, or holding them for more than 30 seconds, continues with the current firmware. Start from sleep: **Left** is also the chip's boot-mode pin, and holding it while the device starts from a full power-off (for example after the battery ran flat) can stop it from starting. If the screen stays frozen, release all buttons, unplug USB, and turn the device on again.
 
-The device also switches back by itself after three crashes in a row. In both cases it stays on the current firmware when the other slot is empty or holds a firmware that already failed to start. Afterwards, install a fixed firmware from the SD card as usual.
+The combo only works once the current firmware has run for about 10 seconds after it was installed; before that, a crash already returns the device to the previous firmware on its own. The device also switches back by itself after three crashes in a row. In both cases it stays on the current firmware when the other slot is empty or holds a firmware that already failed to start. Afterwards, install a fixed firmware from the SD card as usual.
 
 ### First Launch
 

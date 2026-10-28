@@ -33,6 +33,14 @@ bool comboHeld() {
   return digitalRead(BoardConfig::ACTIVE.input.up) == LOW && digitalRead(BoardConfig::ACTIVE.input.down) == LOW;
 }
 
+// The bootloader already rolls a PENDING_VERIFY image back if it crashes or resets, and a
+// switch made from it would leave its entry for the bootloader to ABORT on the next boot.
+bool runningPendingVerify() {
+  const esp_partition_t* running = esp_ota_get_running_partition();
+  esp_ota_img_states_t state;
+  return running && esp_ota_get_state_partition(running, &state) == ESP_OK && state == ESP_OTA_IMG_PENDING_VERIFY;
+}
+
 bool comboFired() {
   ComboHold hold;
   for (;;) {
@@ -92,11 +100,13 @@ void runAtBoot() {
     LOG_ERR("RESCUE", "Crash reset %lu in a row (reason %d)", static_cast<unsigned long>(count),
             static_cast<int>(reason));
   }
+  // Rescue only from a confirmed image: this also keeps a just-switched-to image from
+  // switching straight back while the combo is still held.
+  if (runningPendingVerify()) return;
   pinMode(BoardConfig::ACTIVE.input.up, INPUT_PULLUP);
   pinMode(BoardConfig::ACTIVE.input.down, INPUT_PULLUP);
   delay(1);  // pull-up settling before the first sample
-  // A held combo is left to the combo path, which restarts only after the release.
-  if (shouldRollBack(count) && !comboHeld()) {
+  if (shouldRollBack(count)) {
     if (const esp_partition_t* other = usableOtherSlot()) restartInto(other, "Crash loop");
   }
 
