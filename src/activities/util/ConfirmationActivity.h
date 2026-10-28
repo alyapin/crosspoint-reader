@@ -16,9 +16,9 @@ class ConfirmationActivity : public Activity {
   OptionPopup confirmPopup;
 
  public:
+  // confirmLabel names the action as a verb ("Удалить", "Обновить").
   ConfirmationActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const std::string& heading,
-                       const std::string& body, const std::string& cancelLabel = {},
-                       const std::string& confirmLabel = {});
+                       const std::string& body, const std::string& cancelLabel, const std::string& confirmLabel);
 
   void onEnter() override;
   void loop() override;

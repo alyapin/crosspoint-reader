@@ -36,6 +36,7 @@
 #include "TextSettingsActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
+#include "activities/util/ValuePickerActivity.h"
 #include "components/UITheme.h"
 #include "components/UIThemeTokens.h"
 #include "components/UiAppHelpers.h"
@@ -190,7 +191,6 @@ const char* SettingsActivity::headerTitle() const {
 }
 
 void SettingsActivity::activateIndex(const int index) {
-  if (optionPopup.isActive()) return;
   // Most rows repaint a different surface (popup, sub-activity, new value);
   // a lingering tap flash would gray an unrelated element.
   app.clearTapFlash();
@@ -211,8 +211,16 @@ void SettingsActivity::applyUiSettingChange(uint8_t CrossPointSettings::* valueP
   resetUi();
 }
 
-bool SettingsActivity::handleCustomInput() {
-  return optionPopup.handleInput(mappedInput, [this] { requestUpdate(); });
+void SettingsActivity::openValuePicker(const SettingInfo& setting, const int current,
+                                       std::function<void(int)> onSelect) {
+  std::vector<std::string> labels;
+  if (!setting.enumStringValues.empty()) {
+    labels = setting.enumStringValues;
+  } else {
+    for (const StrId id : setting.enumLabels()) labels.emplace_back(I18N.get(id));
+  }
+  ValuePickerActivity::open(*this, renderer, mappedInput, I18N.get(setting.nameId), std::move(labels), current,
+                            std::move(onSelect));
 }
 
 void SettingsActivity::toggleSelectedSetting() {
@@ -240,15 +248,13 @@ void SettingsActivity::toggleSelectedSetting() {
     const auto enumLabels = setting.enumLabels();
     if (enumLabels.size() > 2) {
       const auto valuePtr = setting.valuePtr;
-      optionPopup.show(setting.nameId, enumLabels.data(), static_cast<int>(enumLabels.size()), currentValue,
-                       [this, valuePtr, sleepScreenChanged, quickResumeTimeoutChanged](int idx) {
-                         SETTINGS.*valuePtr = idx;
-                         syncQuickResumeTimeoutForSleepScreen(sleepScreenChanged, quickResumeTimeoutChanged);
-                         SETTINGS.saveToFile();
-                         rebuildSettings();
-                         applyUiSettingChange(valuePtr);
-                       });
-      requestUpdate();
+      openValuePicker(setting, currentValue, [this, valuePtr, sleepScreenChanged, quickResumeTimeoutChanged](int idx) {
+        SETTINGS.*valuePtr = idx;
+        syncQuickResumeTimeoutForSleepScreen(sleepScreenChanged, quickResumeTimeoutChanged);
+        SETTINGS.saveToFile();
+        rebuildSettings();
+        applyUiSettingChange(valuePtr);
+      });
       return;
     }
     SETTINGS.*(setting.valuePtr) = (currentValue + 1) % static_cast<uint8_t>(enumLabels.size());
@@ -265,14 +271,7 @@ void SettingsActivity::toggleSelectedSetting() {
         SETTINGS.saveToFile();
         rebuildSettings();
       };
-      if (!setting.enumStringValues.empty()) {
-        optionPopup.show(setting.nameId, setting.enumStringValues, cur, std::move(onSelect));
-      } else {
-        const auto enumLabels = setting.enumLabels();
-        optionPopup.show(setting.nameId, enumLabels.data(), static_cast<int>(enumLabels.size()), cur,
-                         std::move(onSelect));
-      }
-      requestUpdate();
+      openValuePicker(setting, cur, std::move(onSelect));
       return;
     }
     setting.valueSetter((cur + 1) % totalValues);
@@ -396,18 +395,16 @@ void SettingsActivity::toggleSelectedSetting() {
                                });
         break;
       case SettingAction::Plugins: {
-        static constexpr StrId OPTIONS[] = {StrId::STR_ENABLED, StrId::STR_DISABLED, StrId::STR_CANCEL};
-        optionPopup.show(StrId::STR_PLUGINS, OPTIONS, 3, SETTINGS.pluginsEnabled ? 0 : 1, [this](const int idx) {
-          if (idx == 2) return;
-          SETTINGS.pluginsEnabled = idx == 0 ? 1 : 0;
-          // Turning plugins on brings back a dismissed Plugin Hub install row.
-          if (SETTINGS.pluginsEnabled) SETTINGS.pluginHubPromptHidden = 0;
-          SETTINGS.saveToFile();
-          // Applies to event delivery now, not after a reboot.
-          pluginevents::refreshSubscriptions();
-          rebuildSettings();
-        });
-        requestUpdate();
+        ValuePickerActivity::open(*this, renderer, mappedInput, tr(STR_PLUGINS), {tr(STR_ENABLED), tr(STR_DISABLED)},
+                                  SETTINGS.pluginsEnabled ? 0 : 1, [this](const int idx) {
+                                    SETTINGS.pluginsEnabled = idx == 0 ? 1 : 0;
+                                    // Turning plugins on brings back a dismissed Plugin Hub install row.
+                                    if (SETTINGS.pluginsEnabled) SETTINGS.pluginHubPromptHidden = 0;
+                                    SETTINGS.saveToFile();
+                                    // Applies to event delivery now, not after a reboot.
+                                    pluginevents::refreshSubscriptions();
+                                    rebuildSettings();
+                                  });
         return;
       }
       case SettingAction::KeyboardLayouts:
@@ -570,9 +567,4 @@ void SettingsActivity::drawFooter() {
   const auto labels =
       mappedInput.mapLabels(tr(STR_BACK), picker ? tr(STR_SELECT) : tr(STR_TOGGLE), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-}
-
-void SettingsActivity::render(RenderLock&& lock) {
-  if (optionPopup.processRender(renderer, mappedInput)) return;
-  UiListActivity::render(std::move(lock));
 }

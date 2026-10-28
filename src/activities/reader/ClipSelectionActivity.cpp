@@ -18,8 +18,8 @@
 #include "activities/ActivityResult.h"
 #include "clippings/ClippingText.h"
 #include "clippings/SelectionGeometry.h"
-#include "components/UIScale.h"
 #include "components/UITheme.h"
+#include "components/setka/SetkaStyle.h"
 #include "util/WordSelectionInput.h"
 
 using Input = WordSelectionInput;
@@ -29,6 +29,11 @@ namespace {
 constexpr int TOUCH_DRAG_MOVEMENT_PX = 4;
 constexpr unsigned long TOUCH_PAGE_ADVANCE_HOLD_MS = 1000;
 constexpr int TOUCH_PAGE_END_DWELL_SLOP_PX = 8;
+constexpr int kActionsGap = 8;  // action panel above the selection line
+constexpr int kHandleWidth = 4;
+constexpr int kHandleHeight = 20;
+
+int handleSize() { return std::max(24, UITheme::getInstance().getMetrics().verticalSpacing * 2); }
 constexpr ClippingResult::Action SELECTION_ACTIONS[] = {ClippingResult::Action::Lookup, ClippingResult::Action::Clip,
                                                         ClippingResult::Action::Bookmark};
 
@@ -637,11 +642,14 @@ bool ClipSelectionActivity::handleButtons(const uint8_t buttons) {
 Rect ClipSelectionActivity::handleRect(const int index, const bool start) const {
   const WordBox& word = words[index];
   const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-  const int size = std::max(24, UITheme::getInstance().getMetrics().verticalSpacing * 2);
+  const int size = handleSize();
   const bool left = start != word.isRtl;
   const int edge = left ? word.x : word.x + word.width;
+  // The drawn strip (drawHandle) plus a square under it to grab.
+  const int height = kHandleHeight + size;
   return Rect{std::clamp(edge - (left ? size : 0), safe.x, safe.x + safe.width - size),
-              std::clamp(word.y + textOffset() + word.height, safe.y, safe.y + safe.height - size), size, size};
+              std::clamp(word.y + textOffset() + word.height - kHandleHeight, safe.y, safe.y + safe.height - height),
+              size, height};
 }
 
 int ClipSelectionActivity::selectionTop() const {
@@ -652,6 +660,16 @@ int ClipSelectionActivity::selectionTop() const {
     if (words[i].pageOffset == currentPageOffset) top = std::min(top, static_cast<int>(words[i].y));
   }
   return top;
+}
+
+int ClipSelectionActivity::selectionBottom() const {
+  const int first = std::min(rangeStart, selected);
+  const int last = std::max(rangeStart, selected);
+  int bottom = 0;
+  for (int i = first; i <= last; ++i) {
+    if (words[i].pageOffset == currentPageOffset) bottom = std::max(bottom, words[i].y + words[i].height);
+  }
+  return bottom;
 }
 
 int ClipSelectionActivity::actionAt(const int x, const int y) const {
@@ -670,7 +688,7 @@ Rect ClipSelectionActivity::actionRect() const {
   safe.y = std::max(safe.y, top) + std::max(metrics.topPadding, metrics.verticalSpacing);
   safe.width = rightEdge - safe.x;
   safe.height = bottomEdge - safe.y;
-  const int font = uiScaleSpec().smallFontId;
+  const int font = setka::kText10Font;
   const int labelWidth =
       std::max({renderer.getTextWidth(font, tr(STR_LOOKUP)), renderer.getTextWidth(font, tr(STR_CLIP)),
                 renderer.getTextWidth(font, tr(STR_BOOKMARK_OPTION))});
@@ -682,8 +700,14 @@ Rect ClipSelectionActivity::actionRect() const {
   int first = std::min(rangeStart, selected);
   const int last = std::max(rangeStart, selected);
   while (first < last && words[first].pageOffset < currentPageOffset) ++first;
-  return selectionGeometry::actions(safe, selectionTop(), height + padding * 2, metrics.verticalSpacing, width,
-                                    words[first].x - padding);
+  Rect rect = selectionGeometry::actions(safe, selectionTop(), height + padding * 2, kActionsGap, width,
+                                         words[first].x - padding);
+  // No room above the selection: under it, past the handles.
+  const int below = selectionBottom() + handleSize() + kActionsGap;
+  if (rect.y + rect.height + kActionsGap > selectionTop() && below + rect.height <= safe.y + safe.height) {
+    rect.y = below;
+  }
+  return rect;
 }
 
 int ClipSelectionActivity::textOffset() const {
@@ -710,14 +734,20 @@ void ClipSelectionActivity::prewarmWord(const int index) const {
   }
 }
 
-void ClipSelectionActivity::ditherGapBetween(const WordBox& a, const WordBox& b, const int offsetX,
-                                             const int offset) const {
+void ClipSelectionActivity::underlineGapBetween(const WordBox& a, const WordBox& b, const int offsetX,
+                                                const int offset) const {
   if (a.row != b.row || a.pageOffset != b.pageOffset) return;
   const int leftRight = std::min(a.x + a.width, b.x + b.width);
   const int rightLeft = std::max(a.x, b.x);
   if (leftRight < rightLeft) {
-    renderer.fillRectDither(leftRight + offsetX, a.y + offset, rightLeft - leftRight, a.height, Color::LightGray);
+    renderer.fillRect(leftRight + offsetX, a.y + offset + a.height - setka::kRuleWidth, rightLeft - leftRight,
+                      setka::kRuleWidth, true);
   }
+}
+
+void ClipSelectionActivity::underlineWord(const WordBox& word, const int offsetX, const int offset) const {
+  renderer.fillRect(word.x + offsetX, word.y + offset + word.height - setka::kRuleWidth, word.width, setka::kRuleWidth,
+                    true);
 }
 
 void ClipSelectionActivity::clearGapBetween(const WordBox& a, const WordBox& b, const int offsetX,
@@ -758,16 +788,17 @@ void ClipSelectionActivity::drawWordHighlight(const int index, const int firstSe
 
   prewarmWord(index);
 
-  if (index > firstSelected) {
-    ditherGapBetween(words[index - 1], word, offsetX, offset);
-  }
-  if (index < lastSelected) {
-    ditherGapBetween(word, words[index + 1], offsetX, offset);
-  }
-
-  renderer.fillRectDither(word.x + offsetX, word.y + offset, word.width, word.height, Color::LightGray);
+  // Clears a cursor frame left from the previous frame before the underline.
+  renderer.fillRect(word.x + offsetX, word.y + offset, word.width, word.height, false);
   renderer.drawText(word.fontId, word.x + offsetX, word.y + offset, word.text, true, word.style,
                     BidiUtils::BidiBaseDir::AUTO, word.characterSpacing);
+  underlineWord(word, offsetX, offset);
+  if (index > firstSelected) {
+    underlineGapBetween(words[index - 1], word, offsetX, offset);
+  }
+  if (index < lastSelected) {
+    underlineGapBetween(word, words[index + 1], offsetX, offset);
+  }
 }
 
 bool ClipSelectionActivity::renderIncremental() {
@@ -852,6 +883,54 @@ bool ClipSelectionActivity::renderIncremental() {
   return false;
 }
 
+// Setka handle: a 4x20 black strip standing on the underline at the
+// selection's outer edge, inside handleRect().
+void ClipSelectionActivity::drawHandle(const int index, const bool start) const {
+  const WordBox& word = words[index];
+  const bool left = start != word.isRtl;
+  const int x = (left ? word.x - kHandleWidth : word.x + word.width) + textXOffset();
+  const int bottom = word.y + textOffset() + word.height;
+  renderer.fillRect(x, bottom - kHandleHeight, kHandleWidth, kHandleHeight, true);
+}
+
+// One white panel with a 2 px frame; UI 9 labels in cells split by 1 px rules.
+void ClipSelectionActivity::drawActions() const {
+  const Rect panel = actionRect();
+  const int padding = UITheme::getInstance().getMetrics().menuSpacing;
+  const int count = mode == Mode::DefinitionLookup ? 1 : 3;
+  const char* labels[] = {tr(STR_LOOKUP), tr(STR_CLIP), tr(STR_BOOKMARK_OPTION)};
+  // Clear the whole lines the panel overlaps, so no cut glyphs show around
+  // it, but never the selection and its handles.
+  int bandTop = panel.y;
+  int bandBottom = panel.y + panel.height;
+  const int offset = textOffset();
+  for (size_t i = 0; i < wordCount; ++i) {
+    const WordBox& word = words[i];
+    const int top = word.y + offset;
+    const int bottom = top + word.height;
+    if (word.pageOffset != currentPageOffset || bottom <= panel.y || top >= panel.y + panel.height) continue;
+    bandTop = std::min(bandTop, top);
+    bandBottom = std::max(bandBottom, bottom);
+  }
+  if (panel.y < selectionTop()) {
+    bandBottom = std::min(bandBottom, selectionTop());
+  } else {
+    bandTop = std::max(bandTop, selectionBottom() + handleSize());
+  }
+  if (bandBottom > bandTop) renderer.fillRect(0, bandTop, renderer.getScreenWidth(), bandBottom - bandTop, false);
+  renderer.fillRect(panel.x, panel.y, panel.width, panel.height, false);
+  renderer.drawRect(panel.x, panel.y, panel.width, panel.height, setka::kRuleWidth, true);
+  for (int i = 0; i < count; ++i) {
+    const Rect cell = selectionGeometry::button(panel, i, padding, count);
+    if (i > 0) {
+      const int x = cell.x - padding / 2;
+      renderer.drawLine(x, panel.y + setka::kRuleWidth, x, panel.y + panel.height - setka::kRuleWidth - 1);
+    }
+    UITheme::drawCenteredWrappedText(renderer, cell, setka::kText10Font, labels[i], 2, true, EpdFontFamily::REGULAR,
+                                     UITheme::TextVerticalAlignment::CENTER);
+  }
+}
+
 void ClipSelectionActivity::drawSelection() const {
   const int offset = textOffset();
   const int offsetX = textXOffset();
@@ -861,18 +940,14 @@ void ClipSelectionActivity::drawSelection() const {
   for (int i = first; i <= last; ++i) {
     const WordBox& word = words[i];
     if (word.pageOffset != currentPageOffset) continue;
-    if (previous) ditherGapBetween(*previous, word, offsetX, offset);
-    renderer.fillRectDither(word.x + offsetX, word.y + offset, word.width, word.height, Color::LightGray);
-    renderer.drawText(word.fontId, word.x + offsetX, word.y + offset, word.text, true, word.style,
-                      BidiUtils::BidiBaseDir::AUTO, word.characterSpacing);
+    if (previous) underlineGapBetween(*previous, word, offsetX, offset);
+    underlineWord(word, offsetX, offset);
     previous = &word;
   }
   if (rangeStart >= 0 && mappedInput.hasTouch()) {
-    if (words[first].pageOffset == currentPageOffset)
-      GUI.drawSelectionHandle(renderer, handleRect(first, true), !words[first].isRtl);
-    if (words[last].pageOffset == currentPageOffset)
-      GUI.drawSelectionHandle(renderer, handleRect(last, false), words[last].isRtl);
-    if (!touchDragSelecting) GUI.drawSelectionActions(renderer, actionRect(), mode == Mode::DefinitionLookup ? 1 : 3);
+    if (words[first].pageOffset == currentPageOffset) drawHandle(first, true);
+    if (words[last].pageOffset == currentPageOffset) drawHandle(last, false);
+    if (!touchDragSelecting) drawActions();
   } else {
     const WordBox& cursor = words[selected];
     renderer.drawRect(cursor.x + offsetX, cursor.y + offset, cursor.width, cursor.height, true);

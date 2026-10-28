@@ -84,6 +84,7 @@ class ClipSelectionActivity final : public Activity {
   Rect handleRect(int index, bool start) const;
   Rect actionRect() const;
   int selectionTop() const;
+  int selectionBottom() const;
   int textOffset() const;
   int textXOffset() const;
   void cancel();
@@ -92,7 +93,10 @@ class ClipSelectionActivity final : public Activity {
   bool renderIncremental();
   void drawWordHighlight(int index, int firstSelected, int lastSelected, int offsetX, int offset) const;
   void drawWordClean(int index, int offsetX, int offset) const;
-  void ditherGapBetween(const WordBox& a, const WordBox& b, int offsetX, int offset) const;
+  void underlineGapBetween(const WordBox& a, const WordBox& b, int offsetX, int offset) const;
+  void underlineWord(const WordBox& word, int offsetX, int offset) const;
+  void drawHandle(int index, bool start) const;
+  void drawActions() const;
   void clearGapBetween(const WordBox& a, const WordBox& b, int offsetX, int offset) const;
   void prewarmWord(int index) const;
 

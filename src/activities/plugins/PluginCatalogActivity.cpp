@@ -601,7 +601,8 @@ void PluginCatalogActivity::openList(const int index) {
   const std::string heading = substituted(list.noticeTitle.empty() ? list.title : list.noticeTitle, nullptr);
   const std::string message = substituted(list.noticeMessage, nullptr);
   const std::string cancel = substituted(list.noticeCancel, nullptr);
-  const std::string confirm = substituted(list.noticeConfirm, nullptr);
+  std::string confirm = substituted(list.noticeConfirm, nullptr);
+  if (confirm.empty()) confirm = tr(STR_OPEN);
   auto confirmation = makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, heading, message, cancel, confirm);
   if (!confirmation) {
     LOG_ERR("PCAT", "OOM: browse-list notice");

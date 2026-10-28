@@ -22,9 +22,11 @@ void ConfirmationActivity::onEnter() {
   // pre-truncation — the dialog wraps both to its own width.
   const char* options[] = {
       cancelLabel.empty() ? I18N.get(StrId::STR_CANCEL) : cancelLabel.c_str(),
-      confirmLabel.empty() ? I18N.get(StrId::STR_CONFIRM) : confirmLabel.c_str(),
+      confirmLabel.c_str(),
   };
-  confirmPopup.show(heading.c_str(), body.c_str(), options, 2, 0, [this](int idx) {
+  // Touch boards mark the action; button boards start on Cancel.
+  confirmPopup.setStandalone(true);
+  confirmPopup.show(heading.c_str(), body.c_str(), options, 2, mappedInput.hasTouch() ? 1 : 0, [this](int idx) {
     ActivityResult res;
     res.isCancelled = (idx != 1);
     setResult(std::move(res));

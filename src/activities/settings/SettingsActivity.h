@@ -9,7 +9,6 @@
 #include "CrossPointSettings.h"
 #include "SettingsSection.h"
 #include "activities/UiListActivity.h"
-#include "components/OptionPopup.h"
 
 enum class SettingType { TOGGLE, ENUM, ACTION, VALUE, STRING };
 
@@ -183,15 +182,13 @@ struct SettingInfo {
 };
 
 // The rows of one SettingsSection; activating a row toggles/cycles it, opens
-// its option popup, or launches its sub-screen.
+// its value picker, or launches its sub-screen.
 class SettingsActivity final : public UiListActivity {
   const SettingsSection section;
   std::vector<SettingInfo> settings;
 
   bool preserveQuickResumeTimeoutOn = false;
   bool quickResumeTimeoutAutoEnabled = false;
-
-  OptionPopup optionPopup;
 
   // Row structure (label/actionValue), rebuilt only when the setting list
   // changes; rowValues_ holds the live value text, refreshed every
@@ -203,6 +200,7 @@ class SettingsActivity final : public UiListActivity {
   void rebuildRowItems();
   void toggleSelectedSetting();
   void openSleepTimeoutPicker();
+  void openValuePicker(const SettingInfo& setting, int current, std::function<void(int)> onSelect);
   void applyUiSettingChange(uint8_t CrossPointSettings::* valuePtr);
   void syncQuickResumeTimeoutForSleepScreen(bool sleepScreenChanged, bool quickResumeTimeoutChanged);
   static std::string settingValueText(const SettingInfo& setting);
@@ -210,12 +208,10 @@ class SettingsActivity final : public UiListActivity {
   int listCount() const override { return static_cast<int>(settings.size()); }
   void buildScreen(UiScreen& screen) override;
   void activateIndex(int index) override;
-  bool handleCustomInput() override;
   const char* headerTitle() const override;
   void drawFooter() override;
 
  public:
   SettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, SettingsSection section);
   void onEnter() override;
-  void render(RenderLock&& lock) override;
 };

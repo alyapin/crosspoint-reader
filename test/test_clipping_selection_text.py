@@ -153,10 +153,6 @@ struct Renderer {
   void drawRect(int, int, int, int, bool) const {}
   void drawPixel(int, int, bool) const {}
 };
-struct Theme {
-  void drawSelectionHandle(const Renderer&, Rect, bool) const {}
-  void drawSelectionActions(const Renderer&, Rect, int = 3) const {}
-} GUI;
 struct Input { bool hasTouch() const { return false; } };
 using GfxRenderer = Renderer;
 using TextBlock = Block;
@@ -214,7 +210,10 @@ struct ClipSelectionActivity {
   void drawSelection() const;
   void prewarmWord(int) const {}
   void clearGapBetween(const WordBox&, const WordBox&, int, int) const {}
-  void ditherGapBetween(const WordBox&, const WordBox&, int, int) const {}
+  void underlineGapBetween(const WordBox&, const WordBox&, int, int) const {}
+  void underlineWord(const WordBox& word, int, int) const { renderer.fillRect(word.x, 0, word.width, 0, true); }
+  void drawHandle(int, bool) const {}
+  void drawActions() const {}
   int textOffset() const { return 0; }
   int textXOffset() const { return 0; }
   Rect handleRect(int, bool) const { return {}; }
@@ -335,15 +334,17 @@ int main() {
     activity.drawSelection();
     activity.drawWordClean(0, 0, 0);  // Cursor leaves the old word.
     activity.drawWordHighlight(1, 1, 1, 0, 0);
-    assert(activity.renderer.draws.size() == 4);
-    assert(activity.renderer.fills.size() == 4);
-    for (size_t i = 0; i < 4; ++i) {
-      const auto& draw = activity.renderer.draws[i];
-      const auto& fill = activity.renderer.fills[i];
+    // drawSelection underlines both words over the page text; the redraws
+    // clear and repaint one word each, the highlight adding its underline.
+    assert(activity.renderer.draws.size() == 2);
+    assert(activity.renderer.fills.size() == 5);
+    for (const auto& draw : activity.renderer.draws) {
       assert(draw.tracking == tracking);
       assert(draw.width == 24 + 2 * tracking);
-      assert(fill.width == draw.width);
-      assert(fill.x == draw.x);
+    }
+    for (const auto& fill : activity.renderer.fills) {
+      assert(fill.width == 24 + 2 * tracking);
+      assert(fill.x == activity.words[0].x || fill.x == activity.words[1].x);
     }
     for (size_t i = 0; i < 2; ++i) {
       assert(activity.words[i].characterSpacing == tracking);
