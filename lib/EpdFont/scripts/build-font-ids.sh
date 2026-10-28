@@ -90,6 +90,12 @@ ruby -rdigest -e 'puts [
 ].map{|f| Digest::SHA256.hexdigest(File.read(f)).to_i(16) }.sum % (2 ** 32) - (2 ** 31)'
 ))"
 
+echo "#define UNBOUNDED_11_FONT_ID ($(
+ruby -rdigest -e 'puts [
+  "./unbounded_11_digits.h",
+].map{|f| Digest::SHA256.hexdigest(File.read(f)).to_i(16) }.sum % (2 ** 32) - (2 ** 31)'
+))"
+
 FONT_ID_NAMES=(
   NOTOSANS_12_FONT_ID
   NOTOSANS_14_FONT_ID
@@ -102,6 +108,7 @@ FONT_ID_NAMES=(
   GOLOS_12_FONT_ID
   UNBOUNDED_61_FONT_ID
   UNBOUNDED_31_FONT_ID
+  UNBOUNDED_11_FONT_ID
 )
 
 echo ""

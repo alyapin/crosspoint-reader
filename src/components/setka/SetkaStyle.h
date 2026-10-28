@@ -18,11 +18,13 @@ constexpr int kText10Font = GOLOS_10_FONT_ID;
 constexpr int kText12Font = GOLOS_12_FONT_ID;
 constexpr int kHeroFont = UNBOUNDED_61_FONT_ID;       // ~96 px digits: the screen's one big number
 constexpr int kHeroSmallFont = UNBOUNDED_31_FONT_ID;  // ~48 px digits: a secondary number
+constexpr int kHeroMiniFont = UNBOUNDED_11_FONT_ID;   // ~17 px digits: the number in a narrow overlay
 #else
 constexpr int kText10Font = UI_10_FONT_ID;
 constexpr int kText12Font = UI_12_FONT_ID;
 constexpr int kHeroFont = UI_12_FONT_ID;
 constexpr int kHeroSmallFont = UI_12_FONT_ID;
+constexpr int kHeroMiniFont = UI_12_FONT_ID;
 #endif
 constexpr int kCaptionFont = SMALL_FONT_ID;
 // The text faces carry SemiBold in the family's bold slot.
@@ -78,6 +80,17 @@ inline void drawProgressBar(const GfxRenderer& renderer, const int x, const int 
   renderer.drawRect(x, y, width, kProgressHeight, true);
   renderer.fillRect(x + 1, y + 1, filled, kProgressHeight - 2, true);
   renderer.fillRectDither(x + 1 + filled, y + 1, inner - filled, kProgressHeight - 2, Color::LightGray);
+}
+
+// The same bar standing upright: it fills from the bottom.
+inline void drawProgressBarVertical(const GfxRenderer& renderer, const int x, const int y, const int width,
+                                    const int height, int percent) {
+  percent = std::clamp(percent, 0, 100);
+  const int inner = height - 2;
+  const int filled = inner * percent / 100;
+  renderer.drawRect(x, y, width, height, true);
+  renderer.fillRect(x + 1, y + 1 + inner - filled, width - 2, filled, true);
+  renderer.fillRectDither(x + 1, y + 1, width - 2, inner - filled, Color::LightGray);
 }
 
 // Height of the hero digits above the baseline. Unbounded's line box carries

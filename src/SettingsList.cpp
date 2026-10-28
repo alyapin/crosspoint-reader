@@ -57,6 +57,11 @@ void forEachBaseSetting(SettingVisitor visit, void* context) {
 #if FREEINK_CAP_FRONTLIGHT
   emit(SettingInfo::Toggle(StrId::STR_RESTORE_LIGHT_ON_WAKE, &CrossPointSettings::frontlightRestoreOnWake,
                            "frontlightRestoreOnWake", StrId::STR_CAT_DISPLAY));
+#if FREEINK_CAP_TOUCH
+  if (BoardConfig::hasTouch())
+    emit(SettingInfo::Toggle(StrId::STR_BRIGHTNESS_SWIPE, &CrossPointSettings::brightnessSwipe, "brightnessSwipe",
+                             StrId::STR_CAT_DISPLAY));
+#endif
 #endif
 #if FREEINK_DEVICE_PICCO
   emit(SettingInfo::Enum(StrId::STR_SLIDE_SWITCH, &CrossPointSettings::slideSwitchAction,

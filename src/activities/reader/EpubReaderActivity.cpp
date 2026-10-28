@@ -749,6 +749,10 @@ void EpubReaderActivity::loop() {
     return;
   }
 
+#if CROSSPOINT_BRIGHTNESS_SWIPE
+  if (handleBrightnessSwipe()) return;
+#endif
+
   constexpr unsigned long IDLE_PREWARM_DEBOUNCE_MS = 400;
   {
     RenderLock lock(RenderLock::Mode::Try);
