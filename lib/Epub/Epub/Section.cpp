@@ -138,6 +138,8 @@ uint32_t Section::onPageComplete(std::unique_ptr<Page> page) {
   return position;
 }
 
+uint8_t Section::fileVersion() { return SECTION_FILE_VERSION; }
+
 void Section::writeSectionFileHeader(const ReaderRenderSpec& spec) {
   if (!file) {
     LOG_DBG("SCT", "File not open for writing header");

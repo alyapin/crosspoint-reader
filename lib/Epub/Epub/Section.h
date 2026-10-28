@@ -105,6 +105,8 @@ class Section {
   // lay out and write several pages); true ends the call early so the caller can serve input.
   // The next call resumes where this one left off.
   bool buildSomeMore(int maxPages, bool (*yieldNow)() = nullptr);
+  // Section file format version; bumped whenever the same spec lays out differently.
+  static uint8_t fileVersion();
   bool isBuilding() const { return static_cast<bool>(build_); }
   bool isBuildComplete() const { return buildComplete_; }
   // Best-known total page count: the exact pageCount once finalized, or a smoothed byte-based

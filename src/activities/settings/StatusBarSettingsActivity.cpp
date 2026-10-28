@@ -4,6 +4,7 @@
 #include <HalClock.h>
 #include <I18n.h>
 
+#include <cstdio>
 #include <cstring>
 #include <memory>
 
@@ -19,7 +20,9 @@ namespace {
 // when the RTC probe found hardware; time, zone, and format live in Settings >
 // System > Clock.
 enum MenuItem {
-  ITEM_CHAPTER_PAGE_COUNT = 0,
+  ITEM_BOOK_PAGE = 0,
+  ITEM_TIME_LEFT,
+  ITEM_CHAPTER_PAGE_COUNT,
   ITEM_BOOK_PROGRESS_PERCENTAGE,
   ITEM_PROGRESS_BAR,
   ITEM_PROGRESS_BAR_THICKNESS,
@@ -36,6 +39,8 @@ static_assert(FULL_MENU_ITEMS == StatusBarSettingsActivity::MAX_STATUS_BAR_ITEMS
               "keep StatusBarSettingsActivity::MAX_STATUS_BAR_ITEMS in sync with ITEM_COUNT");
 
 const StrId menuNames[FULL_MENU_ITEMS] = {
+    StrId::STR_BOOK_PAGE,
+    StrId::STR_TIME_LEFT,
     StrId::STR_CHAPTER_PAGE_COUNT,
     StrId::STR_BOOK_PROGRESS_PERCENTAGE,
     StrId::STR_PROGRESS_BAR,
@@ -118,6 +123,12 @@ void StatusBarSettingsActivity::activateIndex(const int index) {
 
 void StatusBarSettingsActivity::handleSelection() {
   switch (nav.selected) {
+    case ITEM_BOOK_PAGE:
+      SETTINGS.statusBarBookPage = (SETTINGS.statusBarBookPage + 1) % 2;
+      break;
+    case ITEM_TIME_LEFT:
+      SETTINGS.statusBarTimeLeft = (SETTINGS.statusBarTimeLeft + 1) % 2;
+      break;
     case ITEM_CHAPTER_PAGE_COUNT:
       SETTINGS.statusBarChapterPageCount = (SETTINGS.statusBarChapterPageCount + 1) % 2;
       break;
@@ -201,6 +212,8 @@ void StatusBarSettingsActivity::buildScreen(UiScreen& screen) {
     rowValues_[i] = rowValueText(i);
     rowItems_[i].value = rowValues_[i].empty() ? nullptr : rowValues_[i].c_str();
   }
+  GUI.setCheckboxRow(rowItems_[ITEM_BOOK_PAGE], SETTINGS.statusBarBookPage);
+  GUI.setCheckboxRow(rowItems_[ITEM_TIME_LEFT], SETTINGS.statusBarTimeLeft);
   GUI.setCheckboxRow(rowItems_[ITEM_CHAPTER_PAGE_COUNT], SETTINGS.statusBarChapterPageCount);
   GUI.setCheckboxRow(rowItems_[ITEM_BOOK_PROGRESS_PERCENTAGE], SETTINGS.statusBarBookProgressPercentage);
   GUI.setCheckboxRow(rowItems_[ITEM_BATTERY], SETTINGS.statusBarBattery);
@@ -241,8 +254,13 @@ void StatusBarSettingsActivity::render(RenderLock&&) {
     title = tr(STR_EXAMPLE_CHAPTER);
   }
 
+  char bookPage[40];
+  char timeLeft[40];
+  snprintf(bookPage, sizeof(bookPage), tr(STR_BOOK_PAGE_OF), 212u, 486u);
+  snprintf(timeLeft, sizeof(timeLeft), tr(STR_TIME_LEFT_HOURS_MIN), 1u, 20u);
+
   // Anchor the preview as a footer directly above the button hints.
-  GUI.drawStatusBar(renderer, 75, 8, 32, title, metrics.buttonHintsHeight, 0, false);
+  GUI.drawStatusBar(renderer, 75, 8, 32, title, metrics.buttonHintsHeight, 0, false, false, false, bookPage, timeLeft);
 
   renderer.drawCenteredText(UI_10_FONT_ID,
                             renderer.getScreenHeight() - UITheme::getInstance().getStatusBarHeight() -

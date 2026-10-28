@@ -809,7 +809,8 @@ void BaseTheme::fillPopupProgress(const GfxRenderer& renderer, const Rect& layou
 
 void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, const int currentPage,
                               const int pageCount, std::string title, const int paddingBottom, const int textYOffset,
-                              const bool fillMargin, const bool isPageBookmarked, const bool pageCountEstimated) {
+                              const bool fillMargin, const bool isPageBookmarked, const bool pageCountEstimated,
+                              const char* bookPageText, const char* timeLeftText) {
   auto metrics = UITheme::getInstance().getMetrics();
   int orientedMarginTop, orientedMarginRight, orientedMarginBottom, orientedMarginLeft;
   renderer.getOrientedViewableTRBL(&orientedMarginTop, &orientedMarginRight, &orientedMarginBottom,
@@ -831,6 +832,25 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
   int leftClusterWidth = 0;
   int rightClusterWidth = 0;
 
+  // Book footer: whole-book page at the left edge, time left at the right edge,
+  // a rule above. Its reserved rule space sits above the text, so the text keeps its place.
+  if (sb.showsBookFooter()) {
+    textY += bookFooterRuleSpace;
+    if ((bookPageText && bookPageText[0] != '\0') || (timeLeftText && timeLeftText[0] != '\0')) {
+      renderer.fillRect(leftClusterX, textY - bookFooterRuleGap, rightClusterX - leftClusterX, 1, true);
+    }
+  }
+  constexpr int clusterGap = 10;
+  if (sb.showBookPage && bookPageText && bookPageText[0] != '\0') {
+    renderer.drawText(SMALL_FONT_ID, leftClusterX, textY, bookPageText);
+    leftClusterWidth += renderer.getTextWidth(SMALL_FONT_ID, bookPageText) + clusterGap;
+  }
+  if (sb.showTimeLeft && timeLeftText && timeLeftText[0] != '\0') {
+    const int width = renderer.getTextWidth(SMALL_FONT_ID, timeLeftText);
+    renderer.drawText(SMALL_FONT_ID, rightClusterX - width, textY, timeLeftText);
+    rightClusterWidth += width + clusterGap;
+  }
+
   if (sb.showBookProgressPercent || sb.showChapterPageCount) {
     // Right aligned text for progress counter
     char progressStr[32];
@@ -850,7 +870,7 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
     const int estimateWidth = showEstimate ? renderer.getTextWidth(UI_10_FONT_ID, "~") : 0;
     constexpr int estimateGap = 2;
     const int estimateSpacing = showEstimate ? estimateGap : 0;
-    const int progressX = rightClusterX - estimateWidth - estimateSpacing - progressTextWidth;
+    const int progressX = rightClusterX - rightClusterWidth - estimateWidth - estimateSpacing - progressTextWidth;
     if (showEstimate) {
       const int estimateY = textY + (renderer.getLineHeight(SMALL_FONT_ID) - renderer.getLineHeight(UI_10_FONT_ID)) / 2;
       renderer.drawText(UI_10_FONT_ID, progressX, estimateY, "~");

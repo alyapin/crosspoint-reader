@@ -51,6 +51,7 @@
 #include "SdCardFont.h"
 #include "SdCardFontSystem.h"
 #include "SilentRestart.h"
+#include "activities/ActivityManager.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/settings/TextSettingsActivity.h"
 #include "clippings/ClippingText.h"
@@ -225,6 +226,8 @@ EpubReaderActivity::~EpubReaderActivity() {
 
   if (footnoteDepth > 0 && epub) saveLinkStack();
 
+  stopBookPager();
+  if (epub) bookFooter.close();
   section.reset();
   CLIPPINGS.unload();
   if (pendingReadFolderMove && epub) {
@@ -272,6 +275,7 @@ bool EpubReaderActivity::loadBook() {
   });
 
   epub->setupCacheDir();
+  bookFooter.open(*epub);
 
   HalFile f;
   if (Storage.openFileForRead("ERS", epub->getCachePath() + "/progress.bin", f)) {
@@ -440,6 +444,81 @@ void EpubReaderActivity::backgroundBuildTick() {
     requestUpdate();
   } else if (section->isBuildComplete() && applyDeferredReposition()) {
     requestUpdate();
+  }
+}
+
+void EpubReaderActivity::stopBookPager() {
+  // Suspends the build: its pages stay on SD as a partial section for when the reader gets there.
+  pagerSection.reset();
+  pagerSpine = -1;
+}
+
+void EpubReaderActivity::bookPagerTick() {
+  RenderLock lock(RenderLock::Mode::Try);
+  if (!lock.ownsLock()) return;
+  // Footer switched off, or the page turner's radio holds the heap: let the off-screen build go.
+  if (!SETTINGS.statusBarSpec().showsBookFooter() || bleturner::holdsHeap()) {
+    stopBookPager();
+    return;
+  }
+  if (overlay != Overlay::None || !section || buildViewportWidth == 0) return;
+  // Only beside a finished chapter: a running chapter build owns the CSS parser and the heap.
+  if (section->isBuilding() || section->isPartial()) {
+    stopBookPager();
+    return;
+  }
+  // Counts are kept for the open chapter's layout; a build for any other layout is wasted.
+  const ReaderRenderSpec spec = SETTINGS.readerRenderSpec(buildViewportWidth, buildViewportHeight);
+  const uint32_t layoutKey = BookFooter::layoutKey(spec);
+  if (!bookFooter.tracksLayout(layoutKey)) {
+    stopBookPager();
+    return;
+  }
+  // Another screen covered the reader since the build started; it may have used the CSS parser.
+  if (pagerSection && (activityManager.visit() != pagerVisit || pagerLayoutKey != layoutKey)) stopBookPager();
+  if (millis() - lastRenderCompleteMs < PAGER_IDLE_MS) return;
+  if (buttonContactClosed() || anyButtonPressed() || pendingManualTurn != 0 || !buildTickHeapGate()) return;
+
+  if (!pagerSection) {
+    const int spine = bookFooter.nextSpineToPaginate(currentSpineIndex);
+    if (spine < 0) return;
+    auto next = makeUniqueNoThrow<Section>(epub, spine, renderer);
+    if (!next) return;
+    if (next->loadSectionFile(spec) && !next->isPartial()) {
+      bookFooter.noteChapter(layoutKey, spine, *next);
+      bookFooter.persist();
+      if (bookFooter.estimateOutdated()) requestUpdate();
+      return;
+    }
+    if (!next->startBuild(spec)) {
+      LOG_ERR("ERS", "Book pager: failed to start spine %d", spine);
+      bookFooter.skipSpine(spine);
+      return;
+    }
+    pagerSection = std::move(next);
+    pagerSpine = spine;
+    pagerVisit = activityManager.visit();
+    pagerLayoutKey = layoutKey;
+    return;
+  }
+
+  // Image probes may lend the framebuffer: redraw the page, as backgroundBuildTick() does.
+  const uint32_t loansBefore = renderer.frameBufferLoanCount();
+  const bool built = pagerSection->buildSomeMore(BACKGROUND_BUILD_PAGES_PER_TICK, &buttonContactClosed);
+  if (renderer.frameBufferLoanCount() != loansBefore) {
+    pageBufferStale = true;
+    requestUpdate();
+  }
+  if (!built) {
+    LOG_ERR("ERS", "Book pager: build failed in spine %d", pagerSpine);
+    bookFooter.skipSpine(pagerSpine);
+    stopBookPager();
+  } else if (pagerSection->isBuildComplete()) {
+    bookFooter.noteChapter(pagerLayoutKey, pagerSpine, *pagerSection);
+    stopBookPager();
+    bookFooter.persist();
+    // The last estimated chapter is counted: drop the "≈" now, not at the next page turn.
+    if (bookFooter.estimateOutdated()) requestUpdate();
   }
 }
 
@@ -980,8 +1059,9 @@ void EpubReaderActivity::loop() {
   prevTriggered = prevTriggered || touch.prev;
   nextTriggered = nextTriggered || touch.next;
   if (!prevTriggered && !nextTriggered) {
-    // Nothing to act on in this frame: build more of the chapter.
+    // Nothing to act on in this frame: build more of the chapter, or of the book's page counts.
     backgroundBuildTick();
+    bookPagerTick();
     return;
   }
 
@@ -1604,6 +1684,8 @@ bool EpubReaderActivity::skipLoopDelay() {
 void EpubReaderActivity::renderBook() {
   currentPageLinks.clear();
   if (!epub) return;
+  // A new chapter section may build: the off-screen one must not run beside it (they share the CSS parser).
+  if (!section) stopBookPager();
   // A radio start in flight takes ~50 KB while the stack comes up: the page waits for it rather than
   // take the heap beside it (X3: abort() in a page restore at free 22,676 B). About 20 ms, once a visit.
   bleturner::settleStart();
@@ -1661,6 +1743,7 @@ void EpubReaderActivity::renderBook() {
     const auto filepath = epub->getSpineItem(currentSpineIndex).href;
     LOG_DBG("ERS", "Loading file: %s, index: %d", filepath.c_str(), currentSpineIndex);
     section = std::unique_ptr<Section>(new Section(epub, currentSpineIndex, renderer));
+    sectionLayoutKey = BookFooter::layoutKey(renderSpec);
     partialRebuildStartFailed = false;
 
     const bool cacheLoaded = section->loadSectionFile(renderSpec);
@@ -1914,6 +1997,9 @@ void EpubReaderActivity::renderBook() {
     pageLoadRetryCount = 0;
 
     currentPageVisibleOffset = p->visibleTextOffset;
+    if (SETTINGS.statusBarSpec().showsBookFooter()) {
+      bookFooter.onPage(sectionLayoutKey, currentSpineIndex, *section, p->visibleTextOffset, !automaticPageTurnActive);
+    }
     currentPageFootnotes = std::move(p->footnotes);
     currentPageLinks = std::move(p->links);
     currentPageLinkMarginLeft = orientedMarginLeft;
@@ -1939,6 +2025,7 @@ void EpubReaderActivity::renderBook() {
       lastSavedPageCount = section->estimatedTotalPages();
     }
   }
+  bookFooter.persist();
 
   showPendingSyncSaveError();
 
@@ -2467,7 +2554,7 @@ void EpubReaderActivity::renderStatusBar() const {
   }
 
   GUI.drawStatusBar(renderer, bookProgress, currentPage, pageCount, title, 0, textYOffset, true, currentPageBookmarked,
-                    section ? section->isBuilding() : false);
+                    section ? section->isBuilding() : false, bookFooter.pageText(), bookFooter.timeText());
 }
 
 // ---------------------------------------------------------------------------
