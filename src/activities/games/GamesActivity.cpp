@@ -5,6 +5,9 @@
 #include <iterator>
 #include <memory>
 
+#include "games/chess/ui/ChessActivity.h"
+#include "games/chess/ui/chessIcons.h"
+
 namespace {
 struct Game {
   StrId name;
@@ -23,6 +26,7 @@ std::unique_ptr<Activity> openGame(GfxRenderer& renderer, MappedInputManager& ma
 //   {StrId::STR_<NAME>, &icon_<name>_24, &openGame<GameActivity>, &statusFn or nullptr},
 // The trailing empty entry keeps the array valid while no game is registered.
 constexpr Game kGames[] = {
+    {StrId::STR_CHESS, &icon_chess_24, &openChess, &chessListStatus},
     {},
 };
 constexpr int kGameCount = static_cast<int>(std::size(kGames)) - 1;
