@@ -18,6 +18,7 @@ class MoreActivity final : public SetkaListActivity {
   int listCount() const override { return entryCount; }
   const char* headerTitle() const override;
   const char* rowLabel(int index) const override;
+  const freeink::Icon* rowIcon(int index) const override;
   void activateIndex(int index) override;
 
   std::array<Entry, 5> entries{};

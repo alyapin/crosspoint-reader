@@ -1,6 +1,7 @@
 #include "SetkaHomeActivity.h"
 
 #include <Epub.h>
+#include <FreeInkUIIcon.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalClock.h>
@@ -17,6 +18,8 @@
 #include "CrossPointSettings.h"
 #include "MoreActivity.h"
 #include "components/UITheme.h"
+#include "components/icons/listIcons.h"
+#include "components/setka/setkaIcons.h"
 #include "util/ButtonNavigator.h"
 
 namespace fui = freeink::ui;
@@ -36,9 +39,18 @@ constexpr int kCoverRing = 6;  // the focus frame sits this far outside a cover
 // screen tall; the others are smaller and bottom-aligned with it.
 constexpr int kCurrentCoverHeight = 225;
 constexpr int kOtherCoverPercent = 85;
-constexpr int kTabBarHeight = 72;
+// Tabs show a 32 px icon above the label.
+constexpr int kTabBarHeight = 86;
+constexpr int kTabIconSize = 32;
+constexpr int kTabIconGap = 4;
 
-constexpr StrId kTabLabels[] = {StrId::STR_LIBRARY, StrId::STR_MORE, StrId::STR_SETTINGS_TITLE};
+struct TabSpec {
+  StrId label;
+  const freeink::Icon* icon;
+};
+const TabSpec kTabs[] = {{StrId::STR_LIBRARY, &icon_library_32},
+                         {StrId::STR_MORE, &icon_layout_grid_32},
+                         {StrId::STR_SETTINGS_TITLE, &icon_sliders_32}};
 
 // Russian plural forms. Recents hold at most 10 books, where the rule picks
 // the singular only for 1, which is also right for English.
@@ -80,7 +92,7 @@ void SetkaHomeActivity::onEnter() {
   Activity::onEnter();
   loadBooks();
   focus = 0;
-  firstPaint = true;
+  entryRefresh = true;
   thumbsChecked = false;
   resetUi();
   app.on(ACTION_BOOK, &SetkaHomeActivity::onBook, this);
@@ -188,13 +200,20 @@ void SetkaHomeActivity::loop() {
 void SetkaHomeActivity::render(RenderLock&&) {
   renderer.clearScreen();
   renderUi();
-  renderer.displayBuffer(firstPaint ? cadence.entry() : cadence.update());
-  firstPaint = false;
+  // Button boards only (drawButtonHints skips touch boards); draw() keeps the tabs above them.
+  const auto labels =
+      mappedInput.mapLabels(slotCount > 0 ? tr(STR_RESUME) : "", tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
+  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+  renderer.displayBuffer(entryRefresh ? cadence.entry() : cadence.update());
+  entryRefresh = false;
   // The layout pass above set each thumb's height; make the missing ones and
-  // repaint once with them.
+  // repaint once with them, HALF so the placeholders do not ghost through.
   if (!thumbsChecked) {
     thumbsChecked = true;
-    if (generateMissingThumbs()) requestUpdate();
+    if (generateMissingThumbs()) {
+      entryRefresh = true;
+      requestUpdate();
+    }
   }
 }
 
@@ -231,14 +250,15 @@ void SetkaHomeActivity::draw(UiScreen& screen) {
     renderer.drawText(kText10Font, width - kSidePadding - renderer.getTextWidth(kText10Font, count), countTop, count);
   }
 
-  const int tabTop = height - insetBottom - kTabBarHeight;
+  const int tabBottom = height - insetBottom - UITheme::getInstance().getMetrics().buttonHintsHeight;
+  const int tabTop = tabBottom - kTabBarHeight;
   const int bodyTop = headingTop + renderer.getLineHeight(kText12Font) + kGap;
   if (slotCount > 0) {
     drawBooks(screen, bodyTop, tabTop, width);
   } else {
     drawEmpty(screen, bodyTop, width);
   }
-  drawTabs(screen, tabTop, height - insetBottom, width);
+  drawTabs(screen, tabTop, tabBottom, width);
 }
 
 void SetkaHomeActivity::drawStatusLine(const int top, const int width) const {
@@ -335,19 +355,26 @@ void SetkaHomeActivity::drawEmpty(UiScreen& screen, const int top, const int wid
 void SetkaHomeActivity::drawTabs(UiScreen& screen, const int top, const int bottom, const int width) {
   drawRule(renderer, 0, top, width);
   const int line10 = renderer.getLineHeight(kText10Font);
-  const int textTop = top + kRuleWidth + (bottom - top - kRuleWidth - line10) / 2;
+  const int blockHeight = kTabIconSize + kTabIconGap + line10;
+  const int blockTop = top + kRuleWidth + (bottom - top - kRuleWidth - blockHeight) / 2;
   const int columnWidth = width / TabCount;
   const int focusedTab = focus - bookFocusCount();
   for (int tab = 0; tab < TabCount; ++tab) {
     const bool focused = tab == focusedTab;
     const auto style = focused ? kSemiBold : EpdFontFamily::REGULAR;
-    const char* label = I18N.get(kTabLabels[tab]);
-    const int x = tab * columnWidth + (columnWidth - renderer.getTextWidth(kText10Font, label, style)) / 2;
-    // Same bar-to-text distance as the list rows.
-    if (focused) drawSelectionBar(renderer, x - (kRowTextX - kSelectionBarX), textTop, line10);
-    renderer.drawText(kText10Font, x, textTop, label, true, style);
-    screen.frame().hit(fui::makeRect(tab * columnWidth, top, columnWidth, bottom - top), ACTION_TAB,
-                       static_cast<int16_t>(tab), fui::InputTouch);
+    const char* label = I18N.get(kTabs[tab].label);
+    const int columnX = tab * columnWidth;
+    const int iconX = columnX + (columnWidth - kTabIconSize) / 2;
+    const int textX = columnX + (columnWidth - renderer.getTextWidth(kText10Font, label, style)) / 2;
+    screen.target().bitmap(fui::makeRect(iconX, blockTop, kTabIconSize, kTabIconSize),
+                           fui::bitmapFromIcon(*kTabs[tab].icon), fui::BitmapMode::Center);
+    // Same bar-to-content distance as the list rows.
+    if (focused) {
+      drawSelectionBar(renderer, std::min(iconX, textX) - (kRowTextX - kSelectionBarX), blockTop, blockHeight);
+    }
+    renderer.drawText(kText10Font, textX, blockTop + kTabIconSize + kTabIconGap, label, true, style);
+    screen.frame().hit(fui::makeRect(columnX, top, columnWidth, bottom - top), ACTION_TAB, static_cast<int16_t>(tab),
+                       fui::InputTouch);
   }
 }
 

@@ -13,10 +13,11 @@
 #include "components/setka/SetkaStyle.h"
 #include "util/BookProgress.h"
 
-// X4 Pro home in the Setka style (.claude/skills/ui-style, layout "3в"): up to
-// three books in progress as covers with their percent, the current one as a
-// row, and tabs to the library, "Ещё" and settings. Other boards keep the
-// theme-driven HomeActivity.
+// Home of the fork's readers (X4 Pro, X4) in the Setka style
+// (.claude/skills/ui-style, layout "3в"): up to three books in progress as
+// covers with their percent, the current one as a row, and tabs to the
+// library, "Ещё" and settings. Touch taps and button focus both drive it.
+// Other boards keep the theme-driven HomeActivity.
 class SetkaHomeActivity final : public Activity, private UiAppHost {
  public:
   SetkaHomeActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
@@ -68,7 +69,7 @@ class SetkaHomeActivity final : public Activity, private UiAppHost {
   // by the loop task, read by the render task.
   std::atomic<int> focus{0};
   // Reset by onEnter, then render task only.
-  bool firstPaint = true;
+  bool entryRefresh = true;
   bool thumbsChecked = false;
   setka::RefreshCadence cadence;
   HalFile coverFile;

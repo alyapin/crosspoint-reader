@@ -4,6 +4,8 @@
 
 #include "CrossPointSettings.h"
 #include "activities/games/GamesActivity.h"
+#include "components/icons/listIcons.h"
+#include "components/setka/setkaIcons.h"
 
 void MoreActivity::onEnter() {
   SetkaListActivity::onEnter();
@@ -31,6 +33,22 @@ const char* MoreActivity::rowLabel(const int index) const {
       return tr(STR_SD_FILES);
   }
   return "";
+}
+
+const freeink::Icon* MoreActivity::rowIcon(const int index) const {
+  switch (entries[index]) {
+    case Entry::Games:
+      return &icon_gamepad_24;
+    case Entry::FileTransfer:
+      return &icon_send_24;
+    case Entry::Catalogs:
+      return &icon_globe_24;
+    case Entry::Plugins:
+      return &icon_blocks_24;
+    case Entry::SdFiles:
+      return &icon_folder_24;
+  }
+  return nullptr;
 }
 
 void MoreActivity::activateIndex(const int index) {

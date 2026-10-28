@@ -13,6 +13,8 @@ class GamesActivity final : public SetkaListActivity {
   int listCount() const override;
   const char* headerTitle() const override;
   const char* rowLabel(int index) const override;
+  const freeink::Icon* rowIcon(int index) const override;
+  const char* rowStatus(int index) const override;
   const char* emptyText() const override;
   void activateIndex(int index) override;
 };

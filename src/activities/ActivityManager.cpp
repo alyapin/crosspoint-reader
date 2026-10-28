@@ -360,8 +360,9 @@ void ActivityManager::goToFullScreenMessage(std::string message, EpdFontFamily::
 }
 
 void ActivityManager::goHome(HomeMenuItem initialMenuItem, bool cleanInitialRefresh) {
-#if FREEINK_DEVICE_X4PRO
-  // The Setka home has no menu to preselect and always paints its first frame with HALF.
+#if FREEINK_DEVICE_X4PRO || FREEINK_DEVICE_X4
+  // The fork's readers use the Setka home: no menu to preselect, and it always
+  // paints its first frame with HALF.
   (void)initialMenuItem;
   (void)cleanInitialRefresh;
   replaceActivity(std::make_unique<SetkaHomeActivity>(renderer, mappedInput));

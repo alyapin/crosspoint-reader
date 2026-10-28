@@ -1,17 +1,20 @@
 #include "SetkaListActivity.h"
 
+#include <FreeInkUIIcon.h>
 #include <GfxRenderer.h>
-#include <I18n.h>
 
-#include <algorithm>
 #include <utility>
+
+#include "components/UITheme.h"
 
 namespace fui = freeink::ui;
 
 namespace {
-constexpr int kHeaderTop = 16;  // clears the X4 Pro top bezel
-constexpr int kTitleGap = 20;
-constexpr int kRuleGap = 16;
+// Row pitch of the CrossPoint 2.0 home menu.
+constexpr int kRowHeight = 68;
+constexpr int kRowGap = 8;
+constexpr int kIconSize = 24;
+constexpr int kIconGap = 16;
 }  // namespace
 
 SetkaListActivity::SetkaListActivity(const char* name, GfxRenderer& renderer, MappedInputManager& mappedInput)
@@ -20,13 +23,6 @@ SetkaListActivity::SetkaListActivity(const char* name, GfxRenderer& renderer, Ma
 void SetkaListActivity::onEnter() {
   UiListActivity::onEnter();
   entryRefresh = true;
-  app.on(ACTION_BACK, &SetkaListActivity::onBack, this);
-}
-
-void SetkaListActivity::onBack(const fui::ActionEvent&, void* user) {
-  auto* self = static_cast<SetkaListActivity*>(user);
-  self->app.clearTapFlash();
-  self->finish();
 }
 
 void SetkaListActivity::openChild(std::unique_ptr<Activity> child) {
@@ -42,40 +38,44 @@ bool SetkaListActivity::handleCustomInput() {
 
 void SetkaListActivity::buildScreen(UiScreen& screen) {
   using namespace setka;
-  auto& frame = screen.frame();
+  const auto& metrics = UITheme::getInstance().getMetrics();
   const int width = renderer.getScreenWidth();
   const int lineHeight = renderer.getLineHeight(kText12Font);
-
-  const char* back = tr(STR_NAV_BACK);
-  renderer.drawText(kText12Font, kSidePadding, kHeaderTop, back);
-  frame.hit(
-      fui::makeRect(0, 0, renderer.getTextWidth(kText12Font, back) + 2 * kSidePadding, lineHeight + 2 * kHeaderTop),
-      ACTION_BACK, 0, fui::InputTouch);
-  const int titleTop = kHeaderTop + lineHeight + kTitleGap;
-  renderer.drawText(kText12Font, kSidePadding, titleTop, headerTitle(), true, kSemiBold);
-  const int ruleY = titleTop + lineHeight + kRuleGap;
-  drawRule(renderer, 0, ruleY, width);
-  const int listTop = ruleY + kRuleWidth;
+  const int listTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
 
   const int count = listCount();
   if (count == 0) {
-    if (const char* empty = emptyText()) renderer.drawText(kText12Font, kSidePadding, listTop + kTitleGap, empty);
+    if (const char* empty = emptyText()) renderer.drawText(kText12Font, kSidePadding, listTop + kRowGap, empty);
     return;
   }
-  const int rowHeight = std::max(kListRowHeight, lineHeight + 2 * kRuleGap);
   const int selected = nav.selected;
   for (int i = 0; i < count; ++i) {
-    const int top = listTop + i * rowHeight;
-    const int textTop = top + (rowHeight - lineHeight) / 2;
+    const int top = listTop + i * (kRowHeight + kRowGap);
     const bool focused = i == selected;
-    if (focused) drawSelectionBar(renderer, kSelectionBarX, textTop, lineHeight);
-    renderer.drawText(kText12Font, kRowTextX, textTop, rowLabel(i), true, focused ? kSemiBold : EpdFontFamily::REGULAR);
-    frame.hit(fui::makeRect(0, top, width, rowHeight), ACTION_ROW, static_cast<int16_t>(i), fui::InputTouch);
+    if (focused) drawSelectionBar(renderer, kSelectionBarX, top, kRowHeight);
+    int x = kRowTextX;
+    if (const freeink::Icon* icon = rowIcon(i)) {
+      screen.target().bitmap(fui::makeRect(x, top + (kRowHeight - kIconSize) / 2, kIconSize, kIconSize),
+                             fui::bitmapFromIcon(*icon), fui::BitmapMode::Center);
+      x += kIconSize + kIconGap;
+    }
+    const int textTop = top + (kRowHeight - lineHeight) / 2;
+    renderer.drawText(kText12Font, x, textTop, rowLabel(i), true, focused ? kSemiBold : EpdFontFamily::REGULAR);
+    if (const char* status = rowStatus(i); status && *status) {
+      // Shares the label's baseline.
+      const int statusTop =
+          textTop + renderer.getFontAscenderSize(kText12Font) - renderer.getFontAscenderSize(kText10Font);
+      renderer.drawText(kText10Font, width - kSidePadding - renderer.getTextWidth(kText10Font, status), statusTop,
+                        status);
+    }
+    screen.frame().hit(fui::makeRect(0, top, width, kRowHeight), ACTION_ROW, static_cast<int16_t>(i), fui::InputTouch);
   }
 }
 
 void SetkaListActivity::render(RenderLock&&) {
   renderer.clearScreen();
+  drawChrome();
   renderUi();
+  drawFooter();
   renderer.displayBuffer(entryRefresh.exchange(false) ? cadence.entry() : cadence.update());
 }
