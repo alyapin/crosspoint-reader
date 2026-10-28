@@ -834,16 +834,26 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
 
   // Book footer: whole-book page at the left edge, time left at the right edge,
   // a rule above. Its reserved rule space sits above the text, so the text keeps its place.
+  int footerRuleY = -1;
   if (sb.showsBookFooter()) {
     textY += bookFooterRuleSpace;
     if ((bookPageText && bookPageText[0] != '\0') || (timeLeftText && timeLeftText[0] != '\0')) {
-      renderer.fillRect(leftClusterX, textY - bookFooterRuleGap, rightClusterX - leftClusterX, 1, true);
+      footerRuleY = textY - bookFooterRuleGap;
+      renderer.fillRect(leftClusterX, footerRuleY, rightClusterX - leftClusterX, 1, true);
     }
   }
   constexpr int clusterGap = 10;
   if (sb.showBookPage && bookPageText && bookPageText[0] != '\0') {
-    renderer.drawText(SMALL_FONT_ID, leftClusterX, textY, bookPageText);
-    leftClusterWidth += renderer.getTextWidth(SMALL_FONT_ID, bookPageText) + clusterGap;
+    // An estimated page starts with "~": a size up, like the chapter estimate below, or it reads as a dash.
+    int pageX = leftClusterX;
+    if (bookPageText[0] == '~') {
+      const int estimateY = textY + (renderer.getLineHeight(SMALL_FONT_ID) - renderer.getLineHeight(UI_10_FONT_ID)) / 2;
+      renderer.drawText(UI_10_FONT_ID, pageX, estimateY, "~");
+      pageX += renderer.getTextWidth(UI_10_FONT_ID, "~") + 2;
+      ++bookPageText;
+    }
+    renderer.drawText(SMALL_FONT_ID, pageX, textY, bookPageText);
+    leftClusterWidth += pageX - leftClusterX + renderer.getTextWidth(SMALL_FONT_ID, bookPageText) + clusterGap;
   }
   if (sb.showTimeLeft && timeLeftText && timeLeftText[0] != '\0') {
     const int width = renderer.getTextWidth(SMALL_FONT_ID, timeLeftText);
@@ -894,9 +904,15 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
       // Chapter progress
       progress = (pageCount > 0) ? (static_cast<float>(currentPage) / pageCount) * 100 : 0;
     }
-    const int barWidth = progressBarMaxWidth * progress / 100;
-    const int barHeight = sb.progressBarHeightPx + (fillMargin ? orientedMarginBottom - 1 : 0);
-    renderer.fillRect(barMarginLeft, progressBarY, barWidth, barHeight, true);
+    if (footerRuleY >= 0) {
+      // The footer rule is the track; at the bottom edge the bar would run through the footer text.
+      const int filled = (rightClusterX - leftClusterX) * static_cast<int>(progress) / 100;
+      renderer.fillRect(leftClusterX, footerRuleY - 1, filled, 3, true);
+    } else {
+      const int barWidth = progressBarMaxWidth * progress / 100;
+      const int barHeight = sb.progressBarHeightPx + (fillMargin ? orientedMarginBottom - 1 : 0);
+      renderer.fillRect(barMarginLeft, progressBarY, barWidth, barHeight, true);
+    }
   }
 
   // Draw Battery
