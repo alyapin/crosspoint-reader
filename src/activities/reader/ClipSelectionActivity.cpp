@@ -18,7 +18,6 @@
 #include "activities/ActivityResult.h"
 #include "clippings/ClippingText.h"
 #include "clippings/SelectionGeometry.h"
-#include "components/UIScale.h"
 #include "components/UITheme.h"
 #include "components/setka/SetkaStyle.h"
 #include "util/WordSelectionInput.h"
@@ -33,6 +32,8 @@ constexpr int TOUCH_PAGE_END_DWELL_SLOP_PX = 8;
 constexpr int kActionsGap = 8;  // action panel above the selection line
 constexpr int kHandleWidth = 4;
 constexpr int kHandleHeight = 20;
+
+int handleSize() { return std::max(24, UITheme::getInstance().getMetrics().verticalSpacing * 2); }
 constexpr ClippingResult::Action SELECTION_ACTIONS[] = {ClippingResult::Action::Lookup, ClippingResult::Action::Clip,
                                                         ClippingResult::Action::Bookmark};
 
@@ -641,11 +642,14 @@ bool ClipSelectionActivity::handleButtons(const uint8_t buttons) {
 Rect ClipSelectionActivity::handleRect(const int index, const bool start) const {
   const WordBox& word = words[index];
   const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-  const int size = std::max(24, UITheme::getInstance().getMetrics().verticalSpacing * 2);
+  const int size = handleSize();
   const bool left = start != word.isRtl;
   const int edge = left ? word.x : word.x + word.width;
+  // The drawn strip (drawHandle) plus a square under it to grab.
+  const int height = kHandleHeight + size;
   return Rect{std::clamp(edge - (left ? size : 0), safe.x, safe.x + safe.width - size),
-              std::clamp(word.y + textOffset() + word.height, safe.y, safe.y + safe.height - size), size, size};
+              std::clamp(word.y + textOffset() + word.height - kHandleHeight, safe.y, safe.y + safe.height - height),
+              size, height};
 }
 
 int ClipSelectionActivity::selectionTop() const {
@@ -656,6 +660,16 @@ int ClipSelectionActivity::selectionTop() const {
     if (words[i].pageOffset == currentPageOffset) top = std::min(top, static_cast<int>(words[i].y));
   }
   return top;
+}
+
+int ClipSelectionActivity::selectionBottom() const {
+  const int first = std::min(rangeStart, selected);
+  const int last = std::max(rangeStart, selected);
+  int bottom = 0;
+  for (int i = first; i <= last; ++i) {
+    if (words[i].pageOffset == currentPageOffset) bottom = std::max(bottom, words[i].y + words[i].height);
+  }
+  return bottom;
 }
 
 int ClipSelectionActivity::actionAt(const int x, const int y) const {
@@ -686,8 +700,14 @@ Rect ClipSelectionActivity::actionRect() const {
   int first = std::min(rangeStart, selected);
   const int last = std::max(rangeStart, selected);
   while (first < last && words[first].pageOffset < currentPageOffset) ++first;
-  return selectionGeometry::actions(safe, selectionTop(), height + padding * 2, kActionsGap, width,
-                                    words[first].x - padding);
+  Rect rect = selectionGeometry::actions(safe, selectionTop(), height + padding * 2, kActionsGap, width,
+                                         words[first].x - padding);
+  // No room above the selection: under it, past the handles.
+  const int below = selectionBottom() + handleSize() + kActionsGap;
+  if (rect.y + rect.height + kActionsGap > selectionTop() && below + rect.height <= safe.y + safe.height) {
+    rect.y = below;
+  }
+  return rect;
 }
 
 int ClipSelectionActivity::textOffset() const {
@@ -864,7 +884,7 @@ bool ClipSelectionActivity::renderIncremental() {
 }
 
 // Setka handle: a 4x20 black strip standing on the underline at the
-// selection's outer edge; handleRect() stays the larger touch target.
+// selection's outer edge, inside handleRect().
 void ClipSelectionActivity::drawHandle(const int index, const bool start) const {
   const WordBox& word = words[index];
   const bool left = start != word.isRtl;
@@ -879,7 +899,8 @@ void ClipSelectionActivity::drawActions() const {
   const int padding = UITheme::getInstance().getMetrics().menuSpacing;
   const int count = mode == Mode::DefinitionLookup ? 1 : 3;
   const char* labels[] = {tr(STR_LOOKUP), tr(STR_CLIP), tr(STR_BOOKMARK_OPTION)};
-  // Clear the whole lines the panel overlaps, so no cut glyphs show around it.
+  // Clear the whole lines the panel overlaps, so no cut glyphs show around
+  // it, but never the selection and its handles.
   int bandTop = panel.y;
   int bandBottom = panel.y + panel.height;
   const int offset = textOffset();
@@ -891,7 +912,13 @@ void ClipSelectionActivity::drawActions() const {
     bandTop = std::min(bandTop, top);
     bandBottom = std::max(bandBottom, bottom);
   }
-  renderer.fillRect(0, bandTop, renderer.getScreenWidth(), bandBottom - bandTop, false);
+  if (panel.y < selectionTop()) {
+    bandBottom = std::min(bandBottom, selectionTop());
+  } else {
+    bandTop = std::max(bandTop, selectionBottom() + handleSize());
+  }
+  if (bandBottom > bandTop) renderer.fillRect(0, bandTop, renderer.getScreenWidth(), bandBottom - bandTop, false);
+  renderer.fillRect(panel.x, panel.y, panel.width, panel.height, false);
   renderer.drawRect(panel.x, panel.y, panel.width, panel.height, setka::kRuleWidth, true);
   for (int i = 0; i < count; ++i) {
     const Rect cell = selectionGeometry::button(panel, i, padding, count);

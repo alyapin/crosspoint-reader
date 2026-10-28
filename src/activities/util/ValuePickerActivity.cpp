@@ -42,6 +42,7 @@ void ValuePickerActivity::open(Activity& host, GfxRenderer& renderer, MappedInpu
 void ValuePickerActivity::onEnter() {
   UiListActivity::onEnter();
   pageTop = 0;
+  pageShift = 0;
   entryRefresh = true;
   if (current >= 0 && current < listCount()) nav.requestSelection(current);
 }
@@ -55,14 +56,24 @@ void ValuePickerActivity::activateIndex(const int index) {
 bool ValuePickerActivity::handleCustomInput() {
   const auto swipe = mappedInput.wasSwipe();
   if (swipe != MappedInputManager::SwipeDir::Up && swipe != MappedInputManager::SwipeDir::Down) return false;
-  const int rows = pageRows;
-  const int count = listCount();
-  if (count > rows) {
-    const int next = pageTop + (swipe == MappedInputManager::SwipeDir::Up ? rows : -rows);
-    pageTop = std::clamp(next, 0, (count - 1) / rows * rows);
+  if (listCount() > pageRows) {
+    pageShift += swipe == MappedInputManager::SwipeDir::Up ? 1 : -1;
     requestUpdate();
   }
   return true;
+}
+
+void ValuePickerActivity::navigateButtons() {
+  const auto moveTo = [this](const int index) {
+    nav.requestSelection(index);
+    requestUpdate();
+  };
+  buttonNavigator.onNextPress([&] { moveTo(ButtonNavigator::nextIndex(nav.selected, listCount())); });
+  buttonNavigator.onPreviousPress([&] { moveTo(ButtonNavigator::previousIndex(nav.selected, listCount())); });
+  buttonNavigator.onNextContinuous(
+      [&] { moveTo(ButtonNavigator::nextPageIndex(nav.selected, listCount(), pageRows)); });
+  buttonNavigator.onPreviousContinuous(
+      [&] { moveTo(ButtonNavigator::previousPageIndex(nav.selected, listCount(), pageRows)); });
 }
 
 void ValuePickerActivity::buildScreen(UiScreen& screen) {
@@ -75,12 +86,11 @@ void ValuePickerActivity::buildScreen(UiScreen& screen) {
   pageRows = rows;
 
   const int count = listCount();
-  const int selected = nav.selected;
-  int first = pageTop;
   // Buttons pull the page to the focus; a swipe pages away from it.
-  if (nav.followOnBuild.exchange(false) && selected >= 0 && (selected < first || selected >= first + rows)) {
-    first = selected / rows * rows;
-  }
+  const bool follow = nav.followOnBuild.exchange(false);
+  const int selected = nav.selected;
+  int first = pageTop + pageShift.exchange(0) * rows;
+  if (follow && selected >= 0 && (selected < first || selected >= first + rows)) first = selected / rows * rows;
   first = std::clamp(first, 0, std::max(0, count - 1) / rows * rows);
   pageTop = first;
 

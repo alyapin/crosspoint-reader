@@ -24,7 +24,7 @@ void ConfirmationActivity::onEnter() {
       cancelLabel.empty() ? I18N.get(StrId::STR_CANCEL) : cancelLabel.c_str(),
       confirmLabel.c_str(),
   };
-  // Touch marks the action with the bar; buttons start on the safe Cancel.
+  // Touch boards mark the action; button boards start on Cancel.
   confirmPopup.setStandalone(true);
   confirmPopup.show(heading.c_str(), body.c_str(), options, 2, mappedInput.hasTouch() ? 1 : 0, [this](int idx) {
     ActivityResult res;

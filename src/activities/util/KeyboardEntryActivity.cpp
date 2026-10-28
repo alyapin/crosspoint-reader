@@ -36,14 +36,14 @@ bool hasCharacterKey(const fui::KeyboardRow& row) {
 }
 
 // True when every character label of `layout` fits its key at `fontId`, with
-// the key widths fui::keyboard() lays out in `width` (panel padding removed).
+// the key widths fui::keyboard() lays out edge to edge in `width`.
 bool keyLabelsFit(const GfxRenderer& renderer, const fui::KeyboardLayout& layout, const int fontId, const int width,
-                  const int gap, const bool uniformKeyWidth) {
+                  const bool uniformKeyWidth) {
   int uniformUnit = 0;
   for (uint8_t r = 0; r < layout.rowCount; ++r) {
     const fui::KeyboardRow& row = layout.rows[r];
     if (!row.keys || row.count == 0 || row.independentKeyWidth || !hasCharacterKey(row)) continue;
-    const int unit = (width - gap * (row.count - 1)) / rowUnits(row);
+    const int unit = width / rowUnits(row);
     if (uniformUnit == 0 || unit < uniformUnit) uniformUnit = unit;
   }
   const fui::Insets text = fui::ButtonProps{}.padding;
@@ -51,7 +51,7 @@ bool keyLabelsFit(const GfxRenderer& renderer, const fui::KeyboardLayout& layout
     const fui::KeyboardRow& row = layout.rows[r];
     if (!row.keys || row.count == 0 || !hasCharacterKey(row)) continue;
     const bool uniform = uniformKeyWidth && !row.independentKeyWidth && uniformUnit > 0;
-    const int unit = uniform ? uniformUnit : (width - gap * (row.count - 1)) / rowUnits(row);
+    const int unit = uniform ? uniformUnit : width / rowUnits(row);
     for (uint8_t k = 0; k < row.count; ++k) {
       const fui::KeyboardKey& key = row.keys[k];
       if (key.kind != fui::KeyKind::Normal || !key.label) continue;
@@ -1114,7 +1114,7 @@ int KeyboardEntryActivity::keyLabelFont(const int keysWidth) const {
   }
   for (const int fontId : {UI_12_FONT_ID, UI_10_FONT_ID}) {
     if (std::all_of(std::begin(layers), std::end(layers), [&](const fui::KeyboardLayout* layer) {
-          return layer == nullptr || keyLabelsFit(renderer, *layer, fontId, keysWidth, 0, !urlPanel);
+          return layer == nullptr || keyLabelsFit(renderer, *layer, fontId, keysWidth, !urlPanel);
         })) {
       return fontId;
     }

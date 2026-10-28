@@ -30,13 +30,15 @@ class ValuePickerActivity final : public UiListActivity {
   void buildScreen(UiScreen& screen) override;
   void activateIndex(int index) override;
   bool handleCustomInput() override;
+  void navigateButtons() override;
   const char* headerTitle() const override { return title.c_str(); }
 
   const std::string title;
   const std::vector<std::string> labels;
   const int current;
 
-  std::atomic<int> pageTop{0};
+  int pageTop = 0;                // first row shown; render task only
+  std::atomic<int> pageShift{0};  // swiped pages, applied by the next build
   std::atomic<int> pageRows{1};   // rows per page, measured by the last build
   setka::RefreshCadence cadence;  // render task only
   std::atomic<bool> entryRefresh{true};

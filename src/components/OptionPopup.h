@@ -152,7 +152,9 @@ class OptionPopup {
 
   bool processRender(GfxRenderer& renderer, const MappedInputManager& input) const {
     if (!active) return false;
-    const auto popupLabels = input.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+    const bool row = buttonRow(renderer);
+    const auto popupLabels = input.mapLabels(tr(STR_BACK), tr(STR_SELECT), row ? tr(STR_DIR_LEFT) : tr(STR_DIR_UP),
+                                             row ? tr(STR_DIR_RIGHT) : tr(STR_DIR_DOWN));
     GUI.drawButtonHints(renderer, popupLabels.btn1, popupLabels.btn2, popupLabels.btn3, popupLabels.btn4);
     render(renderer);
     renderer.displayBuffer();
@@ -206,18 +208,13 @@ class OptionPopup {
     const int textHeight = static_cast<int>(titleLines.size()) * titleLine +
                            (!titleLines.empty() && bodyLines > 0 ? kBodyGap : 0) + bodyLines * bodyLine;
 
-    // One or two options share a row when both labels fit side by side.
-    int labelsWidth = 0;
-    for (int i = 0; i < count; ++i) {
-      labelsWidth += renderer.getTextWidth(kText12Font, ownedStrings[i].c_str(), kSemiBold) + kButtonBarSpan;
-    }
-    const bool buttonRow = count <= 2 && labelsWidth + kButtonGap <= textWidth;
+    const bool inRow = buttonRow(renderer);
     const int maxCardHeight = screenHeight - 2 * kBandMargin - 2 * kRuleWidth;
     const int textBlock = kDialogPadding + textHeight + (textHeight > 0 ? kOptionsGap : 0);
-    const int rowHeight = buttonRow ? kButtonRowHeight
-                                    : std::clamp((maxCardHeight - textBlock - kRowsBottomPadding) / std::max(1, count),
-                                                 kMinTouch, kListRowHeight);
-    const int optionsHeight = buttonRow ? kButtonRowHeight : count * rowHeight + kRowsBottomPadding;
+    const int rowHeight = inRow ? kButtonRowHeight
+                                : std::clamp((maxCardHeight - textBlock - kRowsBottomPadding) / std::max(1, count),
+                                             kMinTouch, kListRowHeight);
+    const int optionsHeight = inRow ? kButtonRowHeight : count * rowHeight + kRowsBottomPadding;
     const int cardHeight = std::min(maxCardHeight, textBlock + optionsHeight);
     const int cardY = std::max(kBandMargin + kRuleWidth, (screenHeight - cardHeight) / 2);
 
@@ -250,7 +247,7 @@ class OptionPopup {
     }
 
     const int optionsTop = cardY + textBlock;
-    if (buttonRow) {
+    if (inRow) {
       // The last option is the action and sits on the right; a lone one too.
       const int textTop = optionsTop + (kButtonRowHeight - titleLine) / 2;
       for (int i = 0; i < count; ++i) {
@@ -269,9 +266,12 @@ class OptionPopup {
     } else {
       const int labelX = textX + kRowTextX - kSelectionBarX;
       const int labelWidth = textX + textWidth - labelX;
-      for (int i = 0; i < count; ++i) {
-        const int top = optionsTop + i * rowHeight;
-        if (top + rowHeight > cardY + cardHeight) break;
+      // Rows that do not fit scroll with the focus.
+      const int shown =
+          std::max(1, std::min(count, (cardY + cardHeight - optionsTop - kRowsBottomPadding) / rowHeight));
+      const int first = std::clamp(selectedIndex - shown + 1, 0, count - shown);
+      for (int i = first; i < first + shown; ++i) {
+        const int top = optionsTop + (i - first) * rowHeight;
         const bool focused = i == selectedIndex;
         const auto style = focused ? kSemiBold : EpdFontFamily::REGULAR;
         if (focused) drawSelectionBar(renderer, textX, top, rowHeight);
@@ -286,6 +286,18 @@ class OptionPopup {
     // every hit() call for this frame is done.
     interactions.publish();
     uiReady = true;
+  }
+
+  // One or two options share a row when both labels fit side by side.
+  bool buttonRow(const GfxRenderer& renderer) const {
+    using namespace setka;
+    const int count = std::min<int>(ownedStrings.size(), MAX_OPTIONS);
+    if (count > 2) return false;
+    int labelsWidth = kButtonGap;
+    for (int i = 0; i < count; ++i) {
+      labelsWidth += renderer.getTextWidth(kText12Font, ownedStrings[i].c_str(), kSemiBold) + kButtonBarSpan;
+    }
+    return labelsWidth <= renderer.getScreenWidth() - 2 * (kSidePadding + kDialogSidePadding);
   }
 
   // The dialog is the only thing on a cleared screen (ConfirmationActivity):
