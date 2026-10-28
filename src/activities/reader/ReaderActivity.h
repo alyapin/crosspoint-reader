@@ -50,6 +50,11 @@ class ReaderActivity : public Activity {
   // Reading statistics: active time, pages and status of this visit (stats/ReadingStats.h).
   ReadingTracker readingTracker;
   int statsBookId = -1;
+  // Taken from the tracker but not written yet: a failed write is retried, not dropped.
+  ReadingSegment unsavedSegment;
+  bool segmentUnsaved = false;
+  bool finishUnsaved = false;
+  uint32_t statsWriteFailedMs = 0;
   std::atomic<bool> pageRendered{false};
   bool bookRemembered = false;
   void markPageRendered() { pageRendered.store(true, std::memory_order_release); }
@@ -132,5 +137,6 @@ class ReaderActivity : public Activity {
 
  private:
   void notePageShown(bool atEnd);
-  void writeReadingStats(const ReadingSegment* segment, bool finished);
+  void takeReadingStats();
+  bool writeReadingStats();
 };

@@ -312,6 +312,23 @@ TEST(ReadingStatsStore, TornLogTailIsTrimmedBeforeTheNextAppend) {
   EXPECT_EQ(summary(again, days).todaySeconds, 400u);
 }
 
+TEST(ReadingStatsStore, AppendErrorsReportWhetherTheRecordLanded) {
+  auto& store = freshStore();
+  const int a = store.openBook("/a.epub", "A", "", TODAY, 0);
+  ASSERT_TRUE(store.appendSegment(a, segment(TODAY, 100)));
+  // The record reached the card but closing reported an error: it counts, and is not retried.
+  fake::failClosePath = LOG;
+  EXPECT_TRUE(store.appendSegment(a, segment(TODAY, 200)));
+  EXPECT_TRUE(fake::failureTriggered);
+  // A short write leaves a torn record: it is trimmed and reported, so the caller retries.
+  fake::shortWrite = 5;
+  EXPECT_FALSE(store.appendSegment(a, segment(TODAY, 300)));
+  EXPECT_EQ(fake::files.at(LOG)->bytes.size(), 8u + 2 * 24u);
+  ASSERT_TRUE(store.appendSegment(a, segment(TODAY, 300)));
+  DayWindow days;
+  EXPECT_EQ(summary(reboot(), days).todaySeconds, 600u);
+}
+
 TEST(ReadingStatsStore, DamagedRecordsAreSkippedOrSetAside) {
   auto& store = freshStore();
   const int a = store.openBook("/a.epub", "A", "", TODAY, 0);

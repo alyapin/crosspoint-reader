@@ -680,8 +680,10 @@ bool ReadingStats::appendSegment(const int bookId, const ReadingSegment& segment
   ok = ok && writeAll(f, record, sizeof(record));
   if (!f.close() || !ok) {
     LOG_ERR("STAT", "Cannot append reading log");
-    logReady = false;  // rescan and trim a torn record before the next append
-    return false;
+    // Rescan and trim a torn record; one that reached the card counts, so a retry does not add it twice.
+    const uint32_t written = nextSeq;
+    logReady = false;
+    return prepareLog() && nextSeq > written;
   }
   logCount++;
   nextSeq++;

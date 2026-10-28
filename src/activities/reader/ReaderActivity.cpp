@@ -28,6 +28,11 @@
 #include "util/SlideSwitch.h"
 #endif
 
+namespace {
+// After a failed statistics write the card is left alone this long.
+constexpr uint32_t STATS_RETRY_MS = 30000;
+}  // namespace
+
 ReaderActivity::ReaderActivity(const char* name, GfxRenderer& renderer, MappedInputManager& mappedInput,
                                std::string bookPath, const bool allowFastInitialRefresh)
     : Activity(name, renderer, mappedInput), bookPath(std::move(bookPath)) {
@@ -146,30 +151,45 @@ void ReaderActivity::prepareForSleep() { flushReaderSession(); }
 
 void ReaderActivity::serviceReadingStats() {
   if (!bookRemembered) return;
-  ReadingSegment segment;
-  bool hasSegment = false;
-  bool finished = false;
+  if ((segmentUnsaved || finishUnsaved) && millis() - statsWriteFailedMs < STATS_RETRY_MS) return;
   {
     // Never wait for a page being drawn; the segment keeps until the next loop.
     RenderLock lock(RenderLock::Mode::Try);
     if (!lock.ownsLock()) return;
-    hasSegment = readingTracker.hasReady();
-    if (hasSegment) segment = readingTracker.takeReady();
-    finished = readingTracker.takeFinished();
+    takeReadingStats();
   }
-  writeReadingStats(hasSegment ? &segment : nullptr, finished);
+  writeReadingStats();
 }
 
-void ReaderActivity::writeReadingStats(const ReadingSegment* segment, const bool finished) {
-  if (segment) READING_STATS.appendSegment(statsBookId, *segment);
-  if (finished && statsBookId >= 0) READING_STATS.markFinished(statsBookId, stats::today());
+// While an older segment is unsaved, the next one waits in the tracker.
+void ReaderActivity::takeReadingStats() {
+  if (!segmentUnsaved && readingTracker.hasReady()) {
+    unsavedSegment = readingTracker.takeReady();
+    segmentUnsaved = true;
+  }
+  if (readingTracker.takeFinished()) finishUnsaved = true;
+}
+
+// False while something taken from the tracker is still unsaved.
+bool ReaderActivity::writeReadingStats() {
+  if (segmentUnsaved && READING_STATS.appendSegment(statsBookId, unsavedSegment)) segmentUnsaved = false;
+  if (finishUnsaved && (statsBookId < 0 || READING_STATS.markFinished(statsBookId, stats::today()))) {
+    finishUnsaved = false;
+  }
+  if (!segmentUnsaved && !finishUnsaved) return true;
+  statsWriteFailedMs = millis();
+  return false;
 }
 
 void ReaderActivity::flushReaderSession() {
   readingTracker.close(millis());
   if (bookRemembered) {
-    const ReadingSegment segment = readingTracker.hasReady() ? readingTracker.takeReady() : ReadingSegment{};
-    writeReadingStats(&segment, readingTracker.takeFinished());
+    // A second pass writes the segment the tracker kept behind an unsaved one.
+    for (int pass = 0; pass < 2; pass++) {
+      takeReadingStats();
+      writeReadingStats();
+      if (segmentUnsaved) break;
+    }
   }
 
   if (!readerSession.isEmitWorthy() || !pluginevents::anySubscriber(pluginevents::Event::ReaderSession)) {
