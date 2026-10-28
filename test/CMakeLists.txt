@@ -74,6 +74,7 @@ add_subdirectory(inflate_stream)
 add_subdirectory(zip_file)
 add_subdirectory(fs_helpers)
 add_subdirectory(http_header)
+add_subdirectory(localsend)
 add_subdirectory(txt_to_html)
 add_subdirectory(fb2_to_epub)
 
