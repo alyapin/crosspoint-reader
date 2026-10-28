@@ -74,7 +74,9 @@ constexpr chess::TimeControl kTimePresets[] = {chess::TIME_UNLIMITED, chess::TIM
 constexpr int kCustomTimeOption = static_cast<int>(std::size(kTimePresets));
 constexpr const char* kTimePresetLabels[] = {nullptr, "5+3", "10+5", "15+10"};
 constexpr const char* kLevelLabels[] = {"1", "2", "3", "4", "5"};
-constexpr const char* kPieceSetNames[chess::ui::PIECE_SET_COUNT] = {"Lucide", "Tabler", "Material", "Font Awesome"};
+constexpr StrId kPieceSetNames[chess::ui::PIECE_SET_COUNT] = {
+    StrId::STR_CHESS_PIECES_OUTLINE, StrId::STR_CHESS_PIECES_CLASSIC, StrId::STR_CHESS_PIECES_THIN,
+    StrId::STR_CHESS_PIECES_BOLD};
 constexpr chess::PieceType kPromotions[] = {chess::QUEEN, chess::ROOK, chess::BISHOP, chess::KNIGHT};
 constexpr chess::ui::PieceKind kPreviewKinds[] = {chess::ui::PieceKind::King, chess::ui::PieceKind::Queen,
                                                   chess::ui::PieceKind::Knight};
@@ -873,7 +875,7 @@ const char* ChessActivity::optionLabel(const Row row, const int option) const {
     case Row::Rotate:
       return option == 0 ? tr(STR_YES) : tr(STR_NO);
     case Row::Pieces:
-      return kPieceSetNames[std::clamp(option, 0, chess::ui::PIECE_SET_COUNT - 1)];
+      return I18N.get(kPieceSetNames[std::clamp(option, 0, chess::ui::PIECE_SET_COUNT - 1)]);
     default:
       return "";
   }
@@ -1187,10 +1189,9 @@ void ChessActivity::drawBoard() const {
   }
 }
 
-// Turn label on the left (with the bar when a person is to move), last move on the right.
-void ChessActivity::drawTurnLine(const int top, const bool bar) const {
+// Turn label on the left (SemiBold when a person is to move), last move on the right.
+void ChessActivity::drawTurnLine(const int top) const {
   const int width = renderer.getScreenWidth();
-  const int lineHeight = renderer.getLineHeight(kText12Font);
   char last[32];
   lastMoveText(last, sizeof(last));
   int lastWidth = 0;
@@ -1198,9 +1199,8 @@ void ChessActivity::drawTurnLine(const int top, const bool bar) const {
     drawRightAligned(renderer, kText12Font, width - kSidePadding, top, last);
     lastWidth = renderer.getTextWidth(kText12Font, last) + kTurnLineGap;
   }
-  if (bar) drawSelectionBar(renderer, kBarX, top, lineHeight);
   drawFitted(renderer, kText12Font, kRowTextX, top, turnLabel(), width - kSidePadding - lastWidth - kRowTextX,
-             kSemiBold);
+             match->isHumanTurn() ? kSemiBold : EpdFontFamily::REGULAR);
 }
 
 void ChessActivity::drawClockPanel() const {
@@ -1246,12 +1246,12 @@ void ChessActivity::drawClockPanel() const {
     // On the digits' baseline.
     renderer.drawText(kText12Font, x + kUnitGap, capTop + capHeight - renderer.getFontAscenderSize(kText12Font), unit);
   }
-  drawTurnLine(capTop + capHeight + 14, false);
+  drawTurnLine(capTop + capHeight + 14);
 }
 
 void ChessActivity::drawStatusPanel() const {
   const int top = kPanelTop + 18;
-  drawTurnLine(top, match->isHumanTurn());
+  drawTurnLine(top);
   drawMoveList(top + renderer.getLineHeight(kText12Font) + 12, kActionsTop - 6);
 }
 
