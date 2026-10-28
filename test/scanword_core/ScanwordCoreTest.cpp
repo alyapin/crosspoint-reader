@@ -8,8 +8,10 @@
 #include <string>
 #include <vector>
 
+#include "ScanwordClueLayout.h"
 #include "ScanwordGame.h"
 #include "ScanwordPuzzle.h"
+#include "ScanwordShelf.h"
 
 using namespace scanword;
 
@@ -235,6 +237,10 @@ TEST_F(Fixture, TapSelectsAndTogglesAtCrossings) {
   EXPECT_FALSE(game->tapCell(at(0, 2)));  // blank
   EXPECT_FALSE(game->tapCell(at(9, 9)));  // outside
   EXPECT_FALSE(game->toggleDirection());
+  // Without toggling a tap on the cursor keeps the answer.
+  ASSERT_TRUE(game->tapCell(at(1, 3)));
+  ASSERT_TRUE(game->tapCell(at(1, 3), false));
+  EXPECT_EQ(game->selectedWord(), W_EEIY);
 }
 
 TEST_F(Fixture, TapOnTwoClueCellCycles) {
@@ -640,5 +646,93 @@ TEST(ScanwordSamples, LoadAndSolve) {
     }
     EXPECT_EQ(last, EntryResult::Solved) << id;
     EXPECT_EQ(g->filledCount(), p->letterCount()) << id;
+  }
+}
+
+namespace {
+
+// Every character is 6 px wide.
+int fixedWidth(void*, const char* text) {
+  int n = 0;
+  for (const char* p = text; *p != '\0'; ++p) n += (static_cast<uint8_t>(*p) & 0xC0) != 0x80 ? 6 : 0;
+  return n;
+}
+
+std::vector<std::string> layout(const char* text, const int chars, const uint8_t lines = 3) {
+  ClueLines out;
+  layoutClue(text, chars * 6, lines, fixedWidth, nullptr, out);
+  return std::vector<std::string>(out.line, out.line + out.count);
+}
+
+}  // namespace
+
+TEST(ScanwordClueLayout, WrapsWords) {
+  EXPECT_EQ(layout("Часть суток", 8), (std::vector<std::string>{"Часть", "суток"}));
+  EXPECT_EQ(layout("Кот", 8), (std::vector<std::string>{"Кот"}));
+  EXPECT_EQ(layout("  Два   пробела ", 20), (std::vector<std::string>{"Два пробела"}));
+  EXPECT_TRUE(layout("", 8).empty());
+}
+
+TEST(ScanwordClueLayout, HyphenatesLongWords) {
+  // Гиппопотам: the longest prefix that fits with "-" and keeps a vowel on both sides.
+  EXPECT_EQ(layout("Гиппопотам", 8), (std::vector<std::string>{"Гиппопо-", "там"}));
+  // A word that fits a line moves down whole; a longer one starts on the current line.
+  EXPECT_EQ(layout("Самец домашней кошки", 9), (std::vector<std::string>{"Самец", "домашней", "кошки"}));
+  EXPECT_EQ(layout("Кот гиппопотам", 8), (std::vector<std::string>{"Кот гип-", "попотам"}));
+  // Ь never starts a part: "Мель-ник", not "Мел-ьник".
+  EXPECT_EQ(layout("Мельник", 5), (std::vector<std::string>{"Мель-", "ник"}));
+}
+
+TEST(ScanwordClueLayout, EllipsisWhenTooLong) {
+  const auto lines = layout("Очень длинное определение слова", 7);
+  ASSERT_EQ(lines.size(), 3u);
+  EXPECT_EQ(lines[2].substr(lines[2].size() - 3), "\xE2\x80\xA6");
+  EXPECT_LE(fixedWidth(nullptr, lines[2].c_str()), 7 * 6);
+  // Without vowels on both sides a word is cut by width.
+  const auto forced = layout("Бвгджзклмн", 4, 3);
+  EXPECT_EQ(forced[0], "Бвг-");
+}
+
+TEST(ScanwordShelf, SetFindAndRoundTrip) {
+  auto shelf = std::make_unique<Shelf>();
+  EXPECT_TRUE(shelf->set("0001", 40, false, 300));
+  EXPECT_TRUE(shelf->set("0002", 100, true, 1080));
+  EXPECT_TRUE(shelf->set("0001", 55, false, 360));
+  EXPECT_FALSE(shelf->set("../x", 1, false, 1));
+  EXPECT_EQ(shelf->count(), 2);
+  EXPECT_EQ(shelf->find("0001")->percent, 55);
+  EXPECT_EQ(shelf->find("0003"), nullptr);
+  EXPECT_TRUE(shelf->anyInProgress());
+
+  std::string text = std::string(Shelf::header()) + "\n";
+  char line[Shelf::LINE_CAP];
+  for (uint16_t i = 0; i < shelf->count(); ++i) {
+    const size_t n = shelf->formatEntry(i, line, sizeof(line));
+    ASSERT_GT(n, 0u);
+    text += std::string(line, n) + "\n";
+  }
+  auto back = std::make_unique<Shelf>();
+  back->beginParse();
+  for (size_t i = 0; i < text.size(); i += 3) back->feed(text.data() + i, std::min<size_t>(3, text.size() - i));
+  ASSERT_TRUE(back->finish());
+  ASSERT_EQ(back->count(), 2);
+  EXPECT_EQ(back->find("0002")->seconds, 1080u);
+  EXPECT_TRUE(back->find("0002")->solved);
+  EXPECT_TRUE(back->anyInProgress());
+  EXPECT_FALSE(back->find("0001")->solved);
+  back->remove("0001");
+  EXPECT_EQ(back->find("0001"), nullptr);
+  EXPECT_FALSE(back->anyInProgress());
+}
+
+TEST(ScanwordShelf, RejectsCorruptText) {
+  for (const char* bad :
+       {"", "0001 1 0 5\n", "SCANWORD-SHELF 1\n0001 101 0 5\n", "SCANWORD-SHELF 1\n0001 1 2 5\n",
+        "SCANWORD-SHELF 1\n0001 1 0\n", "SCANWORD-SHELF 1\na/b 1 0 5\n", "SCANWORD-SHELF 1\n0001 1 0 5 x\n"}) {
+    auto shelf = std::make_unique<Shelf>();
+    shelf->beginParse();
+    shelf->feed(bad, strlen(bad));
+    EXPECT_FALSE(shelf->finish()) << bad;
+    EXPECT_EQ(shelf->count(), 0) << bad;
   }
 }

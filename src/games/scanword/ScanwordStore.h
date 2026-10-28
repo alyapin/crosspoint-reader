@@ -9,6 +9,7 @@
 
 namespace scanword {
 class Game;
+class Shelf;
 struct Stats;
 }  // namespace scanword
 
@@ -31,7 +32,15 @@ bool saveProgress(const char* id, const scanword::Game& game);
 bool loadProgress(const char* id, scanword::Game& game);
 void clearProgress(const char* id);
 
+// A missing file is zero totals; false (totals zero) when it exists but cannot be read.
 bool loadStats(scanword::Stats& stats);
 bool saveStats(const scanword::Stats& stats);
+
+// The list summary (ScanwordShelf.h). A missing file is an empty summary; false
+// (summary empty) when the file exists but cannot be read.
+bool loadShelf(scanword::Shelf& shelf);
+bool saveShelf(const scanword::Shelf& shelf);
+// True while some puzzle is started and unsolved; one file check, for the games list.
+bool hasPuzzleInProgress();
 
 }  // namespace scanwordstore

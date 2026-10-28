@@ -64,9 +64,9 @@ class Game {
   bool inSelection(uint16_t cell) const;
 
   // A clue cell selects its answer (a second tap on a two-clue cell takes the
-  // other); a letter cell selects the answer through it, and a tap on the cursor
-  // cell switches direction at a crossing. False for blank cells.
-  bool tapCell(uint16_t cell);
+  // other); a letter cell selects the answer through it, and with `toggle` a tap
+  // on the cursor cell switches direction at a crossing. False for blank cells.
+  bool tapCell(uint16_t cell, bool toggle = true);
   // Selects an answer with the cursor on its first empty cell.
   bool selectWord(uint8_t word);
   // Next/previous answer in clue order, wrapping.

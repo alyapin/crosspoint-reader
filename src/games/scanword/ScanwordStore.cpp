@@ -4,8 +4,10 @@
 #include <Logging.h>
 #include <Memory.h>
 #include <ScanwordGame.h>
+#include <ScanwordShelf.h>
 
 #include <cstdio>
+#include <cstring>
 
 namespace scanwordstore {
 namespace {
@@ -14,6 +16,10 @@ constexpr size_t CHUNK = 256;
 constexpr size_t PATH_MAX_LEN = 64;
 constexpr const char* STATS_PATH = "/.crosspoint/games/scanword/stats.json";
 constexpr const char* STATS_TMP = "/.crosspoint/games/scanword/stats.json.tmp";
+constexpr const char* SHELF_PATH = "/.crosspoint/games/scanword/shelf.txt";
+constexpr const char* SHELF_TMP = "/.crosspoint/games/scanword/shelf.txt.tmp";
+// Exists while the shelf holds an unsolved puzzle.
+constexpr const char* IN_PROGRESS_PATH = "/.crosspoint/games/scanword/in-progress";
 
 bool savePath(const char* id, const char* suffix, char (&out)[PATH_MAX_LEN]) {
   if (!scanword::validId(id)) {
@@ -150,7 +156,7 @@ void clearProgress(const char* id) {
 
 bool loadStats(scanword::Stats& stats) {
   stats = scanword::Stats{};
-  if (!Storage.exists(STATS_PATH)) return false;
+  if (!Storage.exists(STATS_PATH)) return true;
   size_t len = 0;
   auto text = readSmall(STATS_PATH, scanword::STATS_MAX, len);
   return text && stats.deserialize(text.get(), len);
@@ -161,5 +167,55 @@ bool saveStats(const scanword::Stats& stats) {
   const size_t len = stats.serialize(text, sizeof(text));
   return len > 0 && writeAtomic(STATS_TMP, STATS_PATH, text, len);
 }
+
+bool loadShelf(scanword::Shelf& shelf) {
+  shelf.beginParse();
+  if (!Storage.exists(SHELF_PATH)) {
+    shelf.clear();
+    return true;
+  }
+  const FeedFn feed = [](void* p, const char* data, size_t len) {
+    return static_cast<scanword::Shelf*>(p)->feed(data, len);
+  };
+  if (streamFile(SHELF_PATH, feed, &shelf) && shelf.finish()) return true;
+  LOG_ERR("SCANW", "Ignoring unreadable %s", SHELF_PATH);
+  shelf.clear();
+  return false;
+}
+
+bool saveShelf(const scanword::Shelf& shelf) {
+  if (!Storage.ensureDirectoryExists(SAVE_DIR)) {
+    LOG_ERR("SCANW", "Cannot create %s", SAVE_DIR);
+    return false;
+  }
+  HalFile file;
+  if (!Storage.openFileForWrite("SCANW", SHELF_TMP, file)) return false;
+  bool ok =
+      file.write(scanword::Shelf::header(), strlen(scanword::Shelf::header())) == strlen(scanword::Shelf::header()) &&
+      file.write("\n", 1) == 1;
+  char line[scanword::Shelf::LINE_CAP + 1];
+  for (uint16_t i = 0; ok && i < shelf.count(); ++i) {
+    const size_t len = shelf.formatEntry(i, line, sizeof(line) - 1);
+    line[len] = '\n';
+    ok = len > 0 && file.write(line, len + 1) == len + 1;
+  }
+  file.close();
+  if (!ok || !Storage.replaceFile(SHELF_TMP, SHELF_PATH)) {
+    LOG_ERR("SCANW", "Cannot save %s", SHELF_PATH);
+    Storage.remove(SHELF_TMP);
+    return false;
+  }
+  if (shelf.anyInProgress()) {
+    if (!Storage.exists(IN_PROGRESS_PATH)) {
+      HalFile marker;
+      if (Storage.openFileForWrite("SCANW", IN_PROGRESS_PATH, marker)) marker.close();
+    }
+  } else if (Storage.exists(IN_PROGRESS_PATH)) {
+    Storage.remove(IN_PROGRESS_PATH);
+  }
+  return true;
+}
+
+bool hasPuzzleInProgress() { return Storage.exists(IN_PROGRESS_PATH); }
 
 }  // namespace scanwordstore

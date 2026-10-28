@@ -7,6 +7,8 @@
 
 #include "games/chess/ui/ChessActivity.h"
 #include "games/chess/ui/chessIcons.h"
+#include "games/scanword/ui/ScanwordActivity.h"
+#include "games/scanword/ui/scanwordIcons.h"
 
 namespace {
 struct Game {
@@ -27,6 +29,7 @@ std::unique_ptr<Activity> openGame(GfxRenderer& renderer, MappedInputManager& ma
 // The trailing empty entry keeps the array valid while no game is registered.
 constexpr Game kGames[] = {
     {StrId::STR_CHESS, &icon_chess_24, &openChess, &chessListStatus},
+    {StrId::STR_SCANWORDS, &icon_scanword_24, &openScanwords, &scanwordListStatus},
     {},
 };
 constexpr int kGameCount = static_cast<int>(std::size(kGames)) - 1;

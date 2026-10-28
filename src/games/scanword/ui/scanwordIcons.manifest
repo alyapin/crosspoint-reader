@@ -1,0 +1,18 @@
+# Manifest for src/games/scanword/ui/scanwordIcons.h; regenerate from the repository root with:
+#   python3 freeink-sdk/libs/assets/Icons/tools/gen_icons.py \
+#     --manifest src/games/scanword/ui/scanwordIcons.manifest \
+#     --svgdir freeink-sdk/libs/assets/Icons/lucide/icons \
+#     --sizes 24 --out src/games/scanword/ui/scanwordIcons.h
+# then clang-format the header.
+# scanword: the games list row and a started puzzle; the rest: list rows and board actions.
+scanword = square-pen
+scanword-new = square
+scanword-solved = circle-check
+scanword-erase = delete
+scanword-check = check-check
+scanword-check-all = list-checks
+scanword-hint = lightbulb
+scanword-reveal-word = eye
+scanword-done = check
+scanword-undo = undo-2
+scanword-to-list = list

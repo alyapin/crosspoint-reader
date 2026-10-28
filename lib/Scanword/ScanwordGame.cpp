@@ -174,7 +174,7 @@ uint16_t Game::firstOpenCell(const uint8_t word) const {
   return w.start;
 }
 
-bool Game::tapCell(const uint16_t cell) {
+bool Game::tapCell(const uint16_t cell, const bool toggle) {
   if (cell >= p.cellCount()) return false;
   if (p.kind(cell) == CellKind::Clue) {
     uint8_t ids[2];
@@ -185,7 +185,7 @@ bool Game::tapCell(const uint16_t cell) {
   if (p.kind(cell) != CellKind::Letter) return false;
   const uint8_t across = p.wordAt(cell, Dir::Across);
   const uint8_t down = p.wordAt(cell, Dir::Down);
-  if (selected != NO_WORD && cell == cursorCell) {
+  if (toggle && selected != NO_WORD && cell == cursorCell) {
     const uint8_t other = selected == across ? down : across;
     if (other != NO_WORD) selected = other;
     return true;
