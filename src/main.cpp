@@ -30,6 +30,7 @@
 #include <cstdarg>
 #include <cstring>
 
+#include "BootHealth.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "KOReaderCredentialStore.h"
@@ -155,6 +156,7 @@ static bool deepSleepInProgress = false;
 // carry the live state across the reboot instead of re-deriving it from
 // settings. Cleared with the magic in setup().
 static void armSilentReboot(const uint32_t target) {
+  boothealth::confirmNow("intentional reboot");
   silentRebootTarget = target;
   silentRebootPayload = Frontlight.isOn() ? SILENT_REBOOT_LIGHT_ON : 0;
   silentRebootMagic = SILENT_REBOOT_MAGIC;
@@ -460,6 +462,7 @@ static bool holdSleepWhileUsbPowered() {
 
 // Enter deep sleep mode
 void enterDeepSleep(bool fromTimeout = false) {
+  boothealth::confirmNow("entering sleep");
   HalPowerManager::Lock powerLock;  // Ensure we are at normal CPU frequency for sleep preparation
   APP_STATE.lastSleepFromReader = activityManager.isReaderActivity();
 
@@ -838,6 +841,7 @@ void loop() {
   const unsigned long loopStartTime = millis();
   static unsigned long lastMemPrint = 0;
 
+  boothealth::confirmIfHealthy();
   gpio.setSharedConfirmPowerShortPressEmitsPower(SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::SLEEP);
   mappedInputManager.update();
 

@@ -7,6 +7,7 @@
 #include <Logging.h>
 #include <esp_ota_ops.h>
 
+#include "BootHealth.h"
 #include "MappedInputManager.h"
 #include "activities/home/FileBrowserActivity.h"
 #include "activities/util/ConfirmationActivity.h"
@@ -166,7 +167,9 @@ void SdFirmwareUpdateActivity::performUpdate() {
   // pre-confirmation pass. The alreadyValidated parameter on the API stays
   // for callers (e.g. an OTA staging path) where the same byte stream was
   // just hashed and there's no removable-media gap.
-  const auto result = firmware_flash::flashFromSdPath(firmwarePath.c_str(), progressCb, this);
+  const auto result = boothealth::confirmNow("SD firmware update")
+                          ? firmware_flash::flashFromSdPath(firmwarePath.c_str(), progressCb, this)
+                          : firmware_flash::Result::OTADATA_FAIL;
   if (result != firmware_flash::Result::OK) {
     LOG_ERR("FW", "flash failed: %s", firmware_flash::resultName(result));
     // BAD_CHIP / WRONG_BOARD here is the TOCTOU re-validation catching a

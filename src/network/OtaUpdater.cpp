@@ -15,11 +15,12 @@
 #include <cstring>
 #include <string>
 
+#include "BootHealth.h"
 #include "FirmwareBoardTag.h"
 #include "FirmwareFlasher.h"
 
 namespace {
-constexpr char latestReleaseUrl[] = "https://api.github.com/repos/crosspoint-reader/crosspoint-reader/releases/latest";
+constexpr char latestReleaseUrl[] = "https://api.github.com/repos/alyapin/crosspoint-reader/releases/latest";
 }  // namespace
 
 OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
@@ -146,6 +147,10 @@ OtaUpdater::OtaUpdaterError OtaUpdater::installUpdate(ProgressCallback onProgres
   // ourselves and stream the firmware through HttpDownloader, which runs over
   // wolfSSL when FREEINK_NET_WOLFSSL is set, reusing its redirect handling for the
   // GitHub -> CDN hop.
+  if (!boothealth::confirmNow("OTA update")) {
+    return INTERNAL_UPDATE_ERROR;
+  }
+
   const esp_partition_t* updatePartition = esp_ota_get_next_update_partition(nullptr);
   if (!updatePartition) {
     LOG_ERR("OTA", "No OTA partition available");
