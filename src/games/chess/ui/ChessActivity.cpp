@@ -463,7 +463,7 @@ void ChessActivity::goBack() {
       }
       break;
     case View::Picker:
-      setView(pickerReturn);
+      closePicker();
       break;
     case View::CustomTime:
       setView(View::Picker);
@@ -505,6 +505,16 @@ void ChessActivity::setView(const View next) {
   requestRepaint(RepaintEntry);
 }
 
+// Back to the list the picker came from, focused on the row that opened it.
+void ChessActivity::closePicker() {
+  setView(pickerReturn);
+  Row rows[kMaxRows];
+  const int count = listRows(rows);
+  for (int i = 0; i < count; ++i) {
+    if (rows[i] == pickerRow) focus = i;
+  }
+}
+
 void ChessActivity::openPicker(const Row row) {
   pickerRow = row;
   pickerReturn = view;
@@ -530,7 +540,7 @@ void ChessActivity::activateRow(const int index) {
     prefs.match.time.baseMs = kBaseMinutes[customBase] * 60000u;
     prefs.match.time.incrementMs = kIncrementSeconds[customIncrement] * 1000u;
     chess::ui::savePrefs(prefs);
-    setView(pickerReturn);
+    closePicker();
     return;
   }
   Row rows[kMaxRows];
@@ -596,7 +606,7 @@ void ChessActivity::applyOption(const int option) {
       return;
   }
   chess::ui::savePrefs(prefs);
-  setView(pickerReturn);
+  closePicker();
 }
 
 void ChessActivity::stepCustom(const int field, const int delta) {

@@ -20,7 +20,8 @@ std::unique_ptr<Activity> openChess(GfxRenderer& renderer, MappedInputManager& m
 
 // Chess in the Setka style. The setup list with its option pickers, the game
 // screen (board, clocks or move list, promotion and game-over panels) and the
-// game menu are views of one activity, so the ~150 KB Match is allocated once.
+// game menu are views of one activity, so the Match (~150 KB, ~65 KB without
+// PSRAM) is allocated once.
 //
 // The loop task alone mutates the Match and the view state, always under the
 // RenderLock (engine slices take it with a try-lock, so a panel refresh never
@@ -93,6 +94,7 @@ class ChessActivity final : public Activity, private UiAppHost {
   void goBack();
   void setView(View next);
   void openPicker(Row row);
+  void closePicker();
   void startGame();
   void tapSquare(chess::Square square);
   void playMove(chess::Square from, chess::Square to, chess::PieceType promo);

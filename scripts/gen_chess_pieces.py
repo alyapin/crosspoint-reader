@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Chess piece bitmaps for src/games/chess/ui (X4 Pro builds).
+"""Chess piece bitmaps for src/games/chess/ui.
 
 Rasterizes four icon sets into 1-bpp mask + ink planes with a white halo baked
 in and writes src/games/chess/ui/PieceSetsData.h. --preview instead renders
