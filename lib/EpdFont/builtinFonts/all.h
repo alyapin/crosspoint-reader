@@ -28,6 +28,8 @@
 #include <builtinFonts/golostext_12_regular.h>
 #include <builtinFonts/golostext_12_semibold.h>
 #include <builtinFonts/unbounded_11_digits.h>
+#include <builtinFonts/unbounded_14_digits.h>
+#include <builtinFonts/unbounded_19_digits.h>
 #include <builtinFonts/unbounded_31_digits.h>
 #include <builtinFonts/unbounded_61_digits.h>
 #endif

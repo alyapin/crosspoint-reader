@@ -58,8 +58,9 @@ void brightness_overlay::draw(const GfxRenderer& renderer, const int level) {
 
   char text[8];
   snprintf(text, sizeof(text), "%d", level);
-  const int textW = renderer.getTextWidth(setka::kHeroMiniFont, text);
-  setka::drawHeroNumber(renderer, setka::kHeroMiniFont, panelX + (kPanelWidth - textW) / 2, panelY + kNumberTop, text);
+  const int textW = renderer.getTextWidth(setka::kDigitsMiniFont, text);
+  setka::drawHeroNumber(renderer, setka::kDigitsMiniFont, panelX + (kPanelWidth - textW) / 2, panelY + kNumberTop,
+                        text);
 
   const int barX = panelX + (kPanelWidth - kBarWidth) / 2;
   setka::drawProgressBarVertical(renderer, barX, panelY + kBarTop, kBarWidth, panelH - kBarTop - kBarBottomGap, level);

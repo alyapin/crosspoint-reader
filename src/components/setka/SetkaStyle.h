@@ -16,15 +16,19 @@ namespace setka {
 #if FREEINK_DEVICE_X4PRO
 constexpr int kText10Font = GOLOS_10_FONT_ID;
 constexpr int kText12Font = GOLOS_12_FONT_ID;
-constexpr int kHeroFont = UNBOUNDED_61_FONT_ID;       // ~96 px digits: the screen's one big number
-constexpr int kHeroSmallFont = UNBOUNDED_31_FONT_ID;  // ~48 px digits: a secondary number
-constexpr int kHeroMiniFont = UNBOUNDED_11_FONT_ID;   // ~17 px digits: the number in a narrow overlay
+constexpr int kHeroFont = UNBOUNDED_61_FONT_ID;         // ~96 px digits: the screen's one big number
+constexpr int kHeroSmallFont = UNBOUNDED_31_FONT_ID;    // ~48 px digits: a secondary number
+constexpr int kDigitsFont = UNBOUNDED_19_FONT_ID;       // ~30 px digits: numbers under covers
+constexpr int kDigitsSmallFont = UNBOUNDED_14_FONT_ID;  // ~22 px digits
+constexpr int kDigitsMiniFont = UNBOUNDED_11_FONT_ID;   // ~17 px digits: the level in the brightness overlay
 #else
 constexpr int kText10Font = UI_10_FONT_ID;
 constexpr int kText12Font = UI_12_FONT_ID;
 constexpr int kHeroFont = UI_12_FONT_ID;
 constexpr int kHeroSmallFont = UI_12_FONT_ID;
-constexpr int kHeroMiniFont = UI_12_FONT_ID;
+constexpr int kDigitsFont = UI_12_FONT_ID;
+constexpr int kDigitsSmallFont = UI_10_FONT_ID;
+constexpr int kDigitsMiniFont = UI_10_FONT_ID;
 #endif
 constexpr int kCaptionFont = SMALL_FONT_ID;
 // The text faces carry SemiBold in the family's bold slot.
@@ -34,6 +38,10 @@ constexpr int kSelectionBarWidth = 10;  // left bar on the selected list row or 
 constexpr int kCellFrameWidth = 4;      // inset frame on the selected grid cell
 constexpr int kRuleWidth = 2;           // black rule between sections
 constexpr int kSidePadding = 20;
+// The selection bar sits in the side padding, clear of the X4 Pro bezel; list
+// text starts past it, so a label does not shift when the selection moves.
+constexpr int kSelectionBarX = kSidePadding - kSelectionBarWidth;
+constexpr int kRowTextX = kSidePadding + 12;
 constexpr int kProgressHeight = 12;
 constexpr int kMinTouch = 44;
 constexpr int kListRowHeight = 56;
