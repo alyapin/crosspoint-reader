@@ -89,6 +89,9 @@ bool generateThumb(RecentBook& book, const int height) {
 }  // namespace
 
 void SetkaHomeActivity::onEnter() {
+  // The render task may run as soon as ActivityManager drops its lock; keep it
+  // out until the state below is in place (same as LibraryListActivity).
+  RenderLock lock(*this);
   Activity::onEnter();
   loadBooks();
   focus = 0;

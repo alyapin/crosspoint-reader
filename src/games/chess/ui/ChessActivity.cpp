@@ -225,6 +225,9 @@ ChessActivity::ChessActivity(GfxRenderer& renderer, MappedInputManager& mappedIn
     : Activity("Chess", renderer, mappedInput), UiAppHost(renderer) {}
 
 void ChessActivity::onEnter() {
+  // The render task may run as soon as ActivityManager drops its lock; keep it
+  // out until the state below is in place (same as LibraryListActivity).
+  RenderLock lock(*this);
   Activity::onEnter();
   resetUi();
   app.setScreen(&ChessActivity::screenFn, this);
