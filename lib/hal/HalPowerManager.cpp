@@ -15,7 +15,7 @@
 #include <HalFrontlight.h>
 #endif
 
-#if FREEINK_DEVICE_PICCO
+#if FREEINK_DEVICE_PICCO || FREEINK_DEVICE_X4PRO
 #include <driver/gpio.h>
 #endif
 
@@ -197,6 +197,44 @@ bool HalPowerManager::holdWhileUsbPowered(HalGPIO& gpio, void (*onStatus)(bool c
     if (digitalRead(powerPin) == LOW) return true;
   }
   return false;
+}
+#endif
+
+#if FREEINK_DEVICE_X4PRO
+bool HalPowerManager::lightSleep(const uint32_t ms, const bool keepCrystal) const {
+  const auto& board = BoardConfig::ACTIVE;
+  const int8_t lines[] = {board.input.back, board.input.confirm, board.input.left,  board.input.right,
+                          board.input.up,   board.input.down,    board.input.power, board.touch.irq};
+  for (const int8_t pin : lines) {
+    if (pin < 0) continue;
+    const auto line = static_cast<gpio_num_t>(pin);
+    // Wake on the level the line is not at now. Buttons rest released (the
+    // caller never sleeps with one held); the GT911 INT rests between the
+    // pulses that announce a new report, whichever polarity its config uses.
+    gpio_wakeup_enable(line, gpio_get_level(line) ? GPIO_INTR_LOW_LEVEL : GPIO_INTR_HIGH_LEVEL);
+  }
+  esp_sleep_enable_gpio_wakeup();
+  esp_sleep_enable_timer_wakeup(static_cast<uint64_t>(ms) * 1000);
+  // Arduino clocks LEDC from the crystal on the S3. Powered through the sleep,
+  // the frontlight PWM keeps its 25 kHz and duty; powered down, it would freeze
+  // the LEDs fully on or off until the wake.
+  esp_sleep_pd_config(ESP_PD_DOMAIN_XTAL, keepCrystal ? ESP_PD_OPTION_ON : ESP_PD_OPTION_AUTO);
+  // A reject means a line changed while the sleep was being entered.
+  const esp_err_t err = esp_light_sleep_start();
+  const bool byLine =
+      err == ESP_ERR_SLEEP_REJECT || (err == ESP_OK && esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_GPIO);
+  esp_sleep_pd_config(ESP_PD_DOMAIN_XTAL, ESP_PD_OPTION_AUTO);
+  esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
+  esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_GPIO);
+  for (const int8_t pin : lines) {
+    if (pin < 0) continue;
+    const auto line = static_cast<gpio_num_t>(pin);
+    gpio_wakeup_disable(line);
+    // These lines are polled. gpio_wakeup_disable() keeps the level type, and a
+    // later pinMode() would turn it into an interrupt that storms while held.
+    gpio_set_intr_type(line, GPIO_INTR_DISABLE);
+  }
+  return byLine;
 }
 #endif
 

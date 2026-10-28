@@ -3,6 +3,8 @@
 #include <array>
 #include <utility>
 
+#include "util/LightSleep.h"
+
 void forEachBaseSetting(SettingVisitor visit, void* context) {
   // Load and save walk this list, so every condition here must be fixed before
   // settings load. Runtime probes belong in getSettingsList().
@@ -206,6 +208,10 @@ void forEachBaseSetting(SettingVisitor visit, void* context) {
       StrId::STR_TIME_TO_SLEEP, &CrossPointSettings::sleepTimeoutMinutes,
       {CrossPointSettings::MIN_SLEEP_TIMEOUT_MINUTES, CrossPointSettings::MAX_SLEEP_TIMEOUT_MINUTES, 1},
       "sleepTimeoutMinutes", StrId::STR_CAT_SYSTEM));
+#if CROSSPOINT_LIGHT_SLEEP
+  emit(SettingInfo::Toggle(StrId::STR_SLEEP_BETWEEN_INPUTS, &CrossPointSettings::sleepBetweenInputs,
+                           "sleepBetweenInputs", StrId::STR_CAT_SYSTEM));
+#endif
   emit(SettingInfo::Toggle(StrId::STR_SHOW_HIDDEN_FILES, &CrossPointSettings::showHiddenFiles, "showHiddenFiles",
                            StrId::STR_CAT_SYSTEM));
   emit(SettingInfo::Toggle(StrId::STR_LIBRARY_USE_METADATA, &CrossPointSettings::libraryUseMetadata,
