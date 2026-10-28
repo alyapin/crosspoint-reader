@@ -32,7 +32,7 @@ constexpr uint32_t kMaxSleepMs = 2000;
 // ~100 ms attach debounce and bus reset. Until a host is seen, the loop stays
 // awake kUsbListenMs out of every kUsbListenEveryMs.
 constexpr uint32_t kUsbListenEveryMs = 15000;
-constexpr uint32_t kUsbListenMs = 300;
+constexpr uint32_t kUsbListenMs = 500;
 // With the crystal kept up for the frontlight, sleeps stay below the 300 ms
 // interrupt watchdog in case a timer it clocks keeps counting through them.
 constexpr uint32_t kCrystalSleepMaxMs = 250;
