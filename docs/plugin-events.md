@@ -132,8 +132,9 @@ One handler per event. A handler is either:
   response streams straight to `dest` on the SD card (1MB cap, never buffered
   in RAM). `dest` must be an absolute path without `..`. The example above
   fetches a fresh sleep image: the sleep-entry drain runs before the sleep
-  screen renders, and the CUSTOM sleep mode reads `/sleep.bmp` first, so the
-  fetched image appears on that very sleep. Downloading a book file (`.epub`,
+  screen renders, and the CUSTOM sleep mode reads `/sleep.bmp` first (unless
+  a picture is chosen in Settings → Display → Sleep image), so the fetched
+  image appears on that very sleep. Downloading a book file (`.epub`,
   `.txt`, `.md`, `.xtc`) also marks the Library index stale, so the book
   appears the next time the Library opens. Hidden files and folders don't
   mark it.

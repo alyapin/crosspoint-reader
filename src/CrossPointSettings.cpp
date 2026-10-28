@@ -18,6 +18,9 @@
 #include "fontIds.h"
 #include "util/ParagraphIndentMigration.h"
 #include "util/PluginLocations.h"
+#include "util/SleepImagePick.h"
+
+static_assert(sizeof(CrossPointSettings::sleepImagePath) == sleep_pick::kMaxPathBytes);
 
 namespace {
 
@@ -104,6 +107,10 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
   // Dictionary folder name — uses dynamic getter/setter in SettingsList, save manually
   if (dictionaryName[0] != '\0') {
     doc["dictionaryName"] = dictionaryName;
+  }
+  // Chosen sleep picture — picked on its own screen, not in SettingsList, save manually
+  if (sleepImagePath[0] != '\0') {
+    doc["sleepImagePath"] = sleepImagePath;
   }
   // The displayed option list varies by board, so this setting uses a dynamic
   // display-index mapping and is skipped by the generic persistence loop.
@@ -288,6 +295,8 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   if (storedFontFamily != STORED_NOTOSANS) needsResave = true;
   // Dictionary folder name — uses dynamic getter/setter in SettingsList, load manually
   copyToField(dictionaryName, doc["dictionaryName"] | "", sizeof(dictionaryName));
+  const char* sleepImage = doc["sleepImagePath"] | "";
+  copyToField(sleepImagePath, sleep_pick::isChoicePath(sleepImage) ? sleepImage : "", sizeof(sleepImagePath));
   // Language -- stored as code string for stability across enum reorders.
   if (doc["language"].is<const char*>()) {
     language = static_cast<uint8_t>(I18n::languageFromCode(doc["language"].as<const char*>()));

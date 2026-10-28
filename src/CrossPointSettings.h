@@ -259,6 +259,10 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t sleepScreenCoverMode = FIT;
   // Sleep screen cover filter
   uint8_t sleepScreenCoverFilter = NO_FILTER;
+  // Picture the Custom sleep screen always shows, picked in Settings → Sleep
+  // image ("" = random from /.sleep and /sleep). Validated by
+  // sleep_pick::isChoicePath on load; saved manually like dictionaryName.
+  char sleepImagePath[192] = "";
   // Status bar settings
   uint8_t statusBarChapterPageCount = 1;
   uint8_t statusBarBookProgressPercentage = 1;

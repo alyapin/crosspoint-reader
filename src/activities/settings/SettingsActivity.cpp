@@ -31,6 +31,7 @@
 #include "SdFirmwareUpdateActivity.h"
 #include "SettingsList.h"
 #include "SilentRestart.h"
+#include "SleepImagePickerActivity.h"
 #include "StatusBarSettingsActivity.h"
 #include "TextSettingsActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
@@ -120,7 +121,10 @@ void SettingsActivity::rebuildSettings() {
 
   for (auto& setting : all) {
     if (sectionFor(setting) != section || !showOnDevice(setting)) continue;
+    const bool sleepScreenRow = setting.valuePtr == &CrossPointSettings::sleepScreen;
     settings.push_back(std::move(setting));
+    // The sleep picture sits right under the sleep screen mode it feeds.
+    if (sleepScreenRow) addAction(SettingsSection::Display, StrId::STR_SLEEP_IMAGE, SettingAction::SleepImage);
   }
 
   // Clock configuration only exists where the RTC probe found hardware.
@@ -291,6 +295,20 @@ void SettingsActivity::toggleSelectedSetting() {
           return;
         }
         startActivityForResult(std::move(activity), [this](const ActivityResult&) { requestUpdate(); });
+        return;
+      }
+      case SettingAction::SleepImage: {
+        auto activity = makeUniqueNoThrow<SleepImagePickerActivity>(renderer, mappedInput);
+        if (!activity) {
+          LOG_ERR("SET", "OOM: SleepImagePickerActivity");
+          return;
+        }
+        // A pick may switch the sleep screen to Custom; keep its quick-resume pairing in step.
+        const uint8_t sleepScreenBefore = SETTINGS.sleepScreen;
+        startActivityForResult(std::move(activity), [this, sleepScreenBefore](const ActivityResult&) {
+          syncQuickResumeTimeoutForSleepScreen(SETTINGS.sleepScreen != sleepScreenBefore, false);
+          SETTINGS.saveToFile();
+        });
         return;
       }
       case SettingAction::RemapFrontButtons:
@@ -464,6 +482,10 @@ void SettingsActivity::openSleepTimeoutPicker() {
 
 std::string SettingsActivity::settingValueText(const SettingInfo& setting) {
   if (setting.action == SettingAction::HomeButton) return tr(STR_CONFIGURE);
+  if (setting.action == SettingAction::SleepImage) {
+    const char* path = SETTINGS.sleepImagePath;
+    return path[0] == '\0' ? tr(STR_SLEEP_IMAGE_RANDOM) : strrchr(path, '/') + 1;
+  }
   if (setting.action == SettingAction::Plugins) return SETTINGS.pluginsEnabled ? tr(STR_ENABLED) : tr(STR_DISABLED);
   if (setting.type == SettingType::ENUM && setting.valuePtr != nullptr) {
     // Guard like the valueGetter branch below: a corrupt/migrated settings
