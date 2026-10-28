@@ -129,7 +129,7 @@ void MinesweeperActivity::onTouch(const fui::ActionEvent& event, const int x, co
 }
 
 bool MinesweeperActivity::barShown(const int slot) const {
-  // Флажок while playing, Новая once there is something to deal again, Меню always.
+  // Флажок while playing, Заново once there is something to deal again, Новая игра always.
   if (slot == 0) return !game.isOver();
   if (slot == 1) return game.status() != minesweeper::Status::Ready;
   return slot == 2;
@@ -234,7 +234,7 @@ void MinesweeperActivity::build(UiScreen& screen) {
                      static_cast<uint16_t>(fui::InputTouch | fui::InputLongPress));
 
   BarItem items[BAR_SLOTS];
-  const char* labels[BAR_SLOTS] = {tr(STR_MINES_FLAG), tr(STR_MINES_NEW), tr(STR_GAMES_MENU)};
+  const char* labels[BAR_SLOTS] = {tr(STR_MINES_FLAG), tr(STR_MINES_NEW), tr(STR_GAMES_NEW_GAME)};
   for (int i = 0; i < BAR_SLOTS; ++i) {
     if (barShown(i)) items[i] = {labels[i], i == 0 && flagMode};
   }

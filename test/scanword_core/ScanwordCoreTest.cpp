@@ -681,6 +681,14 @@ TEST(ScanwordClueLayout, HyphenatesLongWords) {
   EXPECT_EQ(layout("Кот гиппопотам", 8), (std::vector<std::string>{"Кот гип-", "попотам"}));
   // Ь never starts a part: "Мель-ник", not "Мел-ьник".
   EXPECT_EQ(layout("Мельник", 5), (std::vector<std::string>{"Мель-", "ник"}));
+  // "ство" stays whole: after a vowel or Й, or before "ств" after a consonant.
+  EXPECT_EQ(layout("Божество", 7), (std::vector<std::string>{"Боже-", "ство"}));
+  EXPECT_EQ(layout("Свойство", 7), (std::vector<std::string>{"Свой-", "ство"}));
+  EXPECT_EQ(layout("Существо", 7), (std::vector<std::string>{"Суще-", "ство"}));
+  EXPECT_EQ(layout("Царство", 5), (std::vector<std::string>{"Цар-", "ство"}));
+  // Between two single consonants, or after Л/М/Н/Р before a cluster.
+  EXPECT_EQ(layout("Кошка", 4), (std::vector<std::string>{"Кош-", "ка"}));
+  EXPECT_EQ(layout("Отверстие", 6), (std::vector<std::string>{"Отвер-", "стие"}));
 }
 
 TEST(ScanwordClueLayout, EllipsisWhenTooLong) {

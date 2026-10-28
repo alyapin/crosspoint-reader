@@ -67,7 +67,7 @@ class ChessActivity final : public Activity, private UiAppHost {
   void drawBoard() const;
   void drawTopLine(UiScreen& screen) const;
   void drawClockPanel() const;
-  void drawTurnLine(int top, bool bar) const;
+  void drawTurnLine(int top) const;
   void drawStatusPanel() const;
   void drawMoveList(int top, int bottom) const;
   void drawPromotion(UiScreen& screen) const;
