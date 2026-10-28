@@ -18,7 +18,8 @@ bool hasGameInProgress();
 // Writes an unfinished match (pause() it first so the clocks are charged);
 // removes the save when the match is over.
 bool save(const chess::Match& match);
-// Restores the saved game, paused. False (and the unreadable file removed) on failure.
+// Restores the saved game, paused. False on failure; a file that reads but does not
+// parse is removed.
 bool load(chess::Match& match, uint32_t seed);
 void clear();
 

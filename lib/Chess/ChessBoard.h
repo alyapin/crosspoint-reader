@@ -83,8 +83,8 @@ constexpr size_t UCI_MAX = 6;   // "e7e8q" plus terminator
 extern const char* const START_FEN;
 
 void setStartPosition(Position& pos);
-// Validates the record (one king each, side not to move not in check, no pawns on
-// the back ranks). Leaves `pos` untouched on failure.
+// Validates the record: all six fields, nothing after them, one king each, side not
+// to move not in check, no pawns on the back ranks. Leaves `pos` untouched on failure.
 bool parseFen(const char* fen, Position& pos);
 void writeFen(const Position& pos, char* out);  // out holds FEN_MAX
 

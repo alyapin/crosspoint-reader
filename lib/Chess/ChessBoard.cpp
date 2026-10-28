@@ -93,6 +93,13 @@ const char* skipSpaces(const char* p) {
   return p;
 }
 
+// Moves past the spaces that must separate two FEN fields.
+bool nextField(const char*& p) {
+  if (*p != ' ') return false;
+  p = skipSpaces(p);
+  return true;
+}
+
 // Parses an unsigned decimal; returns false when no digit is present.
 bool parseNumber(const char*& p, uint32_t& out) {
   if (*p < '0' || *p > '9') return false;
@@ -175,7 +182,7 @@ bool parseFen(const char* fen, Position& out) {
   }
   if (rank != 0 || file != 8 || kings[WHITE] != 1 || kings[BLACK] != 1) return false;
 
-  p = skipSpaces(p);
+  if (!nextField(p)) return false;
   if (*p == 'w') {
     pos.side = WHITE;
   } else if (*p == 'b') {
@@ -185,7 +192,7 @@ bool parseFen(const char* fen, Position& out) {
   }
   ++p;
 
-  p = skipSpaces(p);
+  if (!nextField(p)) return false;
   if (*p == '-') {
     ++p;
   } else {
@@ -218,7 +225,7 @@ bool parseFen(const char* fen, Position& out) {
   if (pos.board[0x77] != br) pos.castling &= ~BLACK_OO;
   if (pos.board[0x70] != br) pos.castling &= ~BLACK_OOO;
 
-  p = skipSpaces(p);
+  if (!nextField(p)) return false;
   if (*p == '-') {
     ++p;
   } else if (*p >= 'a' && *p <= 'h' && (p[1] == '3' || p[1] == '6')) {
@@ -233,19 +240,18 @@ bool parseFen(const char* fen, Position& out) {
         pos.board[pusherSq] == makePiece(opposite(pos.side), PAWN) && epCapturePossible(pos, epSq)) {
       pos.ep = static_cast<uint8_t>(epSq);
     }
-  } else if (*p != '\0') {
+  } else {
     return false;
   }
 
-  uint32_t number = 0;
-  p = skipSpaces(p);
-  if (parseNumber(p, number)) {
-    pos.halfmove = static_cast<uint8_t>(number > 255 ? 255 : number);
-    p = skipSpaces(p);
-    pos.fullmove = parseNumber(p, number) && number > 0 ? static_cast<uint16_t>(number > 9999 ? 9999 : number) : 1;
-  } else {
-    pos.fullmove = 1;
-  }
+  // Both counters are required: they drive the fifty-move rule and move numbering.
+  uint32_t halfmove = 0;
+  uint32_t fullmove = 0;
+  if (!nextField(p) || !parseNumber(p, halfmove) || halfmove > 255) return false;
+  if (!nextField(p) || !parseNumber(p, fullmove) || fullmove == 0 || fullmove > 9999) return false;
+  if (*skipSpaces(p) != '\0') return false;
+  pos.halfmove = static_cast<uint8_t>(halfmove);
+  pos.fullmove = static_cast<uint16_t>(fullmove);
 
   // The side that just moved cannot have left its king in check.
   if (isAttacked(pos, pos.king[opposite(pos.side)], pos.side)) return false;

@@ -25,6 +25,12 @@ constexpr TimeControl TIME_15_10{15 * 60 * 1000, 10 * 1000};
 constexpr uint32_t MAX_BASE_MS = 3 * 60 * 60 * 1000;
 constexpr uint32_t MAX_INCREMENT_MS = 60 * 1000;
 
+// Remaining time never grows past base + this many increments. Undo keeps earned
+// increments, so without a ceiling move/undo cycles could bank time forever; the
+// same ceiling bounds what a save may restore.
+constexpr uint32_t MAX_INCREMENTS = 512;
+uint32_t maxRemainingMs(const TimeControl& control);
+
 class Clock {
  public:
   // Starts `toMove`'s clock at `nowMs` with full base time on both sides.
