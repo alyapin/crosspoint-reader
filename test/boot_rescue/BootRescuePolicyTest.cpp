@@ -126,7 +126,7 @@ TEST(BootRescueCrashCount, RollsBackOnThirdConsecutiveCrashBoot) {
 
 TEST(BootRescueSlot, UsableUnlessEmptyOrMarkedFailed) {
   EXPECT_TRUE(slotUsable(true, true, ESP_OTA_IMG_NEW));
-  EXPECT_TRUE(slotUsable(true, true, ESP_OTA_IMG_PENDING_VERIFY));
+  EXPECT_FALSE(slotUsable(true, true, ESP_OTA_IMG_PENDING_VERIFY));
   EXPECT_TRUE(slotUsable(true, true, ESP_OTA_IMG_VALID));
   EXPECT_TRUE(slotUsable(true, true, ESP_OTA_IMG_UNDEFINED));
   EXPECT_FALSE(slotUsable(true, true, ESP_OTA_IMG_INVALID));

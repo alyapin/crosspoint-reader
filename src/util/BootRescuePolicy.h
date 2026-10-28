@@ -73,7 +73,10 @@ constexpr bool shouldRollBack(uint32_t crashCount) { return crashCount >= CRASH_
 // failed. With no otadata entry (stateKnown false) nothing was recorded against it either; the
 // bootloader still verifies the image and falls back to this slot if it does not load.
 constexpr bool slotUsable(bool hasAppDescription, bool stateKnown, esp_ota_img_states_t state) {
-  return hasAppDescription && !(stateKnown && (state == ESP_OTA_IMG_INVALID || state == ESP_OTA_IMG_ABORTED));
+  // PENDING_VERIFY there means that image never proved itself; switching to it would also
+  // overwrite this slot's rollback state, so leave it alone.
+  return hasAppDescription && !(stateKnown && (state == ESP_OTA_IMG_INVALID || state == ESP_OTA_IMG_ABORTED ||
+                                               state == ESP_OTA_IMG_PENDING_VERIFY));
 }
 
 }  // namespace bootrescue
