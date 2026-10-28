@@ -118,6 +118,7 @@ class KeyboardEntryActivity : public Activity {
   int lineBreakEnd(std::string& s, int start, int maxWidth) const;
 
   const freeink::ui::KeyboardLayout& currentLayout() const;
+  int keyLabelFont(int keysWidth) const;
   const freeink::ui::KeyboardKey* selectedKey() const;
   int selectedLogicalIndex() const;
   void clampSelection();

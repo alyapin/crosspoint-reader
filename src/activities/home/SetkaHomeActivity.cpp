@@ -280,12 +280,19 @@ void SetkaHomeActivity::drawBooks(UiScreen& screen, const int top, const int bot
   const int line10 = renderer.getLineHeight(kText10Font);
   const int line12 = renderer.getLineHeight(kText12Font);
   const int digitsHeight = heroCapHeight(renderer, kDigitsFont);
-  const int rowHeight = line12 + line10;
+  const int textWidth = width - kRowTextX - kSidePadding;
+  const char* title = slots[0].book.title.c_str();
 
   // The current cover is as tall as the mockup's where it fits, and shrinks
   // (landscape) so the percent, the rule and the current-book row stay above the tabs.
   const int contentWidth = width - 2 * kSidePadding;
-  const int below = kDigitsGap + digitsHeight + kGap + kRuleWidth + kGap + rowHeight + kGap;
+  int below = kDigitsGap + digitsHeight + kGap + kRuleWidth + kGap + line12 + line10 + kGap;
+  // A long title takes a second line where that leaves the cover its full height.
+  const bool twoLineTitle = renderer.getTextWidth(kText12Font, title, kSemiBold) > textWidth &&
+                            bottom - top - below - line12 >= kCurrentCoverHeight;
+  if (twoLineTitle) below += line12;
+  const int titleHeight = twoLineTitle ? 2 * line12 : line12;
+  const int rowHeight = titleHeight + line10;
   const int heightByWidth =
       (contentWidth - 2 * kMinCoverGap) * 3 * 100 / (2 * (100 + (kMaxCovers - 1) * kOtherCoverPercent));
   const int currentHeight = std::max(1, std::min({kCurrentCoverHeight, bottom - top - below, heightByWidth}));
@@ -327,12 +334,18 @@ void SetkaHomeActivity::drawBooks(UiScreen& screen, const int top, const int bot
   drawRule(renderer, 0, ruleY, width);
   const int rowTop = ruleY + kRuleWidth + kGap;
   if (focused == 0) drawSelectionBar(renderer, kSelectionBarX, rowTop, rowHeight);
-  const int textWidth = width - kRowTextX - kSidePadding;
-  renderer.drawText(kText12Font, kRowTextX, rowTop,
-                    renderer.truncatedText(kText12Font, slots[0].book.title.c_str(), textWidth, kSemiBold).c_str(),
-                    true, kSemiBold);
+  if (twoLineTitle) {
+    int lineTop = rowTop;
+    for (const auto& line : renderer.wrappedText(kText12Font, title, textWidth, 2, kSemiBold)) {
+      renderer.drawText(kText12Font, kRowTextX, lineTop, line.c_str(), true, kSemiBold);
+      lineTop += line12;
+    }
+  } else {
+    renderer.drawText(kText12Font, kRowTextX, rowTop,
+                      renderer.truncatedText(kText12Font, title, textWidth, kSemiBold).c_str(), true, kSemiBold);
+  }
   if (!currentSubtitle.empty()) {
-    renderer.drawText(kText10Font, kRowTextX, rowTop + line12,
+    renderer.drawText(kText10Font, kRowTextX, rowTop + titleHeight,
                       renderer.truncatedText(kText10Font, currentSubtitle.c_str(), textWidth).c_str());
   }
   screen.frame().hit(fui::makeRect(0, ruleY + kRuleWidth, width, rowHeight + 2 * kGap), ACTION_BOOK, 0,

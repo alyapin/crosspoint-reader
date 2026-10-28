@@ -77,7 +77,7 @@ LibraryListActivity::LibraryListActivity(GfxRenderer& renderer, MappedInputManag
     : UiTabListActivity("Library", renderer, mappedInput, true) {
   // Three short tab labels: a full-slot pill would stretch across a third of
   // the screen, so cap it at the label plus padding (slots stay put).
-  tabPillMaxPad = 16;
+  tabPillMaxPad = 4;
 }
 
 void LibraryListActivity::onEnter() {
@@ -839,7 +839,8 @@ void LibraryListActivity::buildRows(UiScreen& screen) {
   props.action = ACTION_ROW;
   props.inputMask = fui::InputTouch | fui::InputLongPress;
   props.labelText = screen.theme().bodyText;
-  props.labelText.maxLines = 1;
+  props.labelText.maxLines = 2;  // long titles wrap before they truncate
+  props.labelText.bold = true;
   // Breathing room between rows; the dense theme default packs the two-line
   // rows edge-to-edge.
   props.rowGap = std::max<int16_t>(screen.theme().listRowGap, 6);

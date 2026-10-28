@@ -125,13 +125,18 @@ EpdFont ui12BoldFont(&ubuntu_12_bold);
 EpdFontFamily ui12FontFamily(12, &ui12RegularFont, &ui12BoldFont);
 
 #if FREEINK_DEVICE_X4PRO
-// Setka faces (components/setka/SetkaStyle.h): SemiBold fills the bold slot.
-EpdFont golos10RegularFont(&golostext_10_regular);
-EpdFont golos10SemiBoldFont(&golostext_10_semibold);
-EpdFontFamily golos10FontFamily(10, &golos10RegularFont, &golos10SemiBoldFont);
-EpdFont golos12RegularFont(&golostext_12_regular);
-EpdFont golos12SemiBoldFont(&golostext_12_semibold);
-EpdFontFamily golos12FontFamily(12, &golos12RegularFont, &golos12SemiBoldFont);
+// UI text faces behind the UI_10 / UI_12 / SMALL roles (fontIds.h): SemiBold
+// fills the bold slot.
+EpdFont unboundedUi9RegularFont(&unbounded_9_regular);
+EpdFont unboundedUi9SemiBoldFont(&unbounded_9_semibold);
+EpdFontFamily unboundedUi9FontFamily(9, &unboundedUi9RegularFont, &unboundedUi9SemiBoldFont);
+EpdFont unboundedUi11RegularFont(&unbounded_11_regular);
+EpdFont unboundedUi11SemiBoldFont(&unbounded_11_semibold);
+EpdFontFamily unboundedUi11FontFamily(11, &unboundedUi11RegularFont, &unboundedUi11SemiBoldFont);
+EpdFont unboundedLight7Font(&unbounded_7_light);
+EpdFontFamily unboundedLight7FontFamily(7, &unboundedLight7Font);
+EpdFont golos8Font(&golostext_8_regular);
+EpdFontFamily golos8FontFamily(8, &golos8Font);
 EpdFont unbounded61Font(&unbounded_61_digits);
 EpdFontFamily unbounded61FontFamily(61, &unbounded61Font);
 EpdFont unbounded31Font(&unbounded_31_digits);
@@ -576,12 +581,20 @@ void setupDisplayAndFonts(bool seamless = false) {
   renderer.insertFont(NOTOSANS_16_FONT_ID, notosans16FontFamily);
   renderer.insertFont(NOTOSANS_18_FONT_ID, notosans18FontFamily);
 #endif  // OMIT_FONTS
-  renderer.insertFont(UI_10_FONT_ID, ui10FontFamily);
-  renderer.insertFont(UI_12_FONT_ID, ui12FontFamily);
-  renderer.insertFont(SMALL_FONT_ID, smallFontFamily);
+  renderer.insertFont(UBUNTU_10_FONT_ID, ui10FontFamily);
+  renderer.insertFont(UBUNTU_12_FONT_ID, ui12FontFamily);
+  renderer.insertFont(UBUNTU_8_FONT_ID, smallFontFamily);
 #if FREEINK_DEVICE_X4PRO
-  renderer.insertFont(GOLOS_10_FONT_ID, golos10FontFamily);
-  renderer.insertFont(GOLOS_12_FONT_ID, golos12FontFamily);
+  renderer.insertFont(UNBOUNDED_UI_9_FONT_ID, unboundedUi9FontFamily);
+  renderer.insertFont(UNBOUNDED_UI_11_FONT_ID, unboundedUi11FontFamily);
+  renderer.insertFont(UNBOUNDED_LIGHT_7_FONT_ID, unboundedLight7FontFamily);
+  // Strings the Unbounded faces cannot fully draw (Hebrew, Arabic, Kazakh,
+  // Vietnamese, ...) render in Ubuntu, as on the other boards.
+  renderer.setBuiltinFallbackFont(UI_10_FONT_ID, UBUNTU_10_FONT_ID);
+  renderer.setBuiltinFallbackFont(UI_12_FONT_ID, UBUNTU_12_FONT_ID);
+  renderer.setBuiltinFallbackFont(SMALL_FONT_ID, UBUNTU_8_FONT_ID);
+  renderer.insertFont(GOLOS_8_FONT_ID, golos8FontFamily);
+  renderer.setBuiltinFallbackFont(GOLOS_8_FONT_ID, UBUNTU_8_FONT_ID);
   renderer.insertFont(UNBOUNDED_61_FONT_ID, unbounded61FontFamily);
   renderer.insertFont(UNBOUNDED_31_FONT_ID, unbounded31FontFamily);
   renderer.insertFont(UNBOUNDED_19_FONT_ID, unbounded19FontFamily);

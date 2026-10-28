@@ -106,6 +106,11 @@ class GfxRenderer {
   // appears at the same point size as the surrounding UI text. Populated by the
   // app-level SD font setup when an SD family is loaded. See resolveTextFontId().
   std::map<int, int> fallbackFontMap_;
+  // Built-in face -> the built-in face that backs it (a UI face with a narrow
+  // charset -> a wide-coverage one). A string the primary cannot fully draw is
+  // routed whole to the backing face before fallbackFontMap_ is consulted. Set
+  // at boot; clearFallbackFonts() keeps it.
+  std::map<int, int> builtinFallbackFontMap_;
   FontVariantProvider fontVariantProvider_;
 
   // If `text` contains a CJK codepoint that `fontId` cannot render and `fontId`
@@ -199,6 +204,9 @@ class GfxRenderer {
   // setFallbackFont maps a primary UI font id to an SD font id of the same size.
   void setFallbackFont(int primaryFontId, int fallbackFontId) { fallbackFontMap_[primaryFontId] = fallbackFontId; }
   void clearFallbackFonts() { fallbackFontMap_.clear(); }
+  void setBuiltinFallbackFont(const int primaryFontId, const int fallbackFontId) {
+    builtinFallbackFontMap_[primaryFontId] = fallbackFontId;
+  }
 
   void setFontVariantProvider(const FontVariantProvider& provider) { fontVariantProvider_ = provider; }
   int resolveFontVariant(const int fontId, const float scale) const {

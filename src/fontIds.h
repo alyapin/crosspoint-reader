@@ -5,16 +5,31 @@
 #define NOTOSANS_14_FONT_ID (-1413326613)
 #define NOTOSANS_16_FONT_ID (116566294)
 #define NOTOSANS_18_FONT_ID (-348426591)
-#define UI_10_FONT_ID (1322569422)
-#define UI_12_FONT_ID (1831230762)
-#define SMALL_FONT_ID (-1769521860)
-#define GOLOS_10_FONT_ID (237734751)
-#define GOLOS_12_FONT_ID (1989595752)
+#define UBUNTU_10_FONT_ID (1322569422)
+#define UBUNTU_12_FONT_ID (1831230762)
+#define UBUNTU_8_FONT_ID (-1769521860)
+#define GOLOS_8_FONT_ID (-823234061)
+#define UNBOUNDED_UI_9_FONT_ID (-624913601)
+#define UNBOUNDED_UI_11_FONT_ID (1993194276)
+#define UNBOUNDED_LIGHT_7_FONT_ID (-1694883291)
 #define UNBOUNDED_61_FONT_ID (-362337940)
 #define UNBOUNDED_31_FONT_ID (-983976302)
 #define UNBOUNDED_19_FONT_ID (-1971734942)
 #define UNBOUNDED_14_FONT_ID (-2012058546)
 #define UNBOUNDED_11_FONT_ID (455991686)
+
+// UI font roles. The X4 Pro draws its UI in Unbounded, one size below Ubuntu
+// since it runs wide, with Ubuntu as the fallback for scripts it lacks
+// (src/main.cpp). Other boards use Ubuntu.
+#if FREEINK_DEVICE_X4PRO
+#define UI_10_FONT_ID UNBOUNDED_UI_9_FONT_ID
+#define UI_12_FONT_ID UNBOUNDED_UI_11_FONT_ID
+#define SMALL_FONT_ID UNBOUNDED_LIGHT_7_FONT_ID
+#else
+#define UI_10_FONT_ID UBUNTU_10_FONT_ID
+#define UI_12_FONT_ID UBUNTU_12_FONT_ID
+#define SMALL_FONT_ID UBUNTU_8_FONT_ID
+#endif
 
 // Font ID 0 is reserved as the "not found" sentinel.
 // Guard against any hash accidentally producing 0.
@@ -22,11 +37,13 @@ static_assert(NOTOSANS_12_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(NOTOSANS_14_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(NOTOSANS_16_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(NOTOSANS_18_FONT_ID != 0, "Font ID collision with sentinel");
-static_assert(UI_10_FONT_ID != 0, "Font ID collision with sentinel");
-static_assert(UI_12_FONT_ID != 0, "Font ID collision with sentinel");
-static_assert(SMALL_FONT_ID != 0, "Font ID collision with sentinel");
-static_assert(GOLOS_10_FONT_ID != 0, "Font ID collision with sentinel");
-static_assert(GOLOS_12_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(UBUNTU_10_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(UBUNTU_12_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(UBUNTU_8_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(GOLOS_8_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(UNBOUNDED_UI_9_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(UNBOUNDED_UI_11_FONT_ID != 0, "Font ID collision with sentinel");
+static_assert(UNBOUNDED_LIGHT_7_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(UNBOUNDED_61_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(UNBOUNDED_31_FONT_ID != 0, "Font ID collision with sentinel");
 static_assert(UNBOUNDED_19_FONT_ID != 0, "Font ID collision with sentinel");

@@ -8,22 +8,23 @@
 #include "fontIds.h"
 
 // Tokens of the "Setka" UI style (.claude/skills/ui-style/SKILL.md) for the
-// screens this fork adds. The Golos Text / Unbounded faces are compiled into
-// X4 Pro builds only; other boards map the same roles onto the Ubuntu UI faces
-// so shared code still builds there.
+// screens this fork adds. Text uses the UI font roles (Unbounded on the X4 Pro,
+// Ubuntu elsewhere); the hero digit and Golos faces are compiled into X4 Pro
+// builds only, and other boards map them onto the Ubuntu UI faces so shared
+// code still builds there.
 namespace setka {
 
+constexpr int kText10Font = UI_10_FONT_ID;
+constexpr int kText12Font = UI_12_FONT_ID;
 #if FREEINK_DEVICE_X4PRO
-constexpr int kText10Font = GOLOS_10_FONT_ID;
-constexpr int kText12Font = GOLOS_12_FONT_ID;
+constexpr int kDenseFont = GOLOS_8_FONT_ID;             // narrow face for dense game text (scanword clue cells)
 constexpr int kHeroFont = UNBOUNDED_61_FONT_ID;         // ~96 px digits: the screen's one big number
 constexpr int kHeroSmallFont = UNBOUNDED_31_FONT_ID;    // ~48 px digits: a secondary number
 constexpr int kDigitsFont = UNBOUNDED_19_FONT_ID;       // ~30 px digits: numbers under covers
 constexpr int kDigitsSmallFont = UNBOUNDED_14_FONT_ID;  // ~22 px digits
 constexpr int kDigitsMiniFont = UNBOUNDED_11_FONT_ID;   // ~17 px digits: the level in the brightness overlay
 #else
-constexpr int kText10Font = UI_10_FONT_ID;
-constexpr int kText12Font = UI_12_FONT_ID;
+constexpr int kDenseFont = SMALL_FONT_ID;
 constexpr int kHeroFont = UI_12_FONT_ID;
 constexpr int kHeroSmallFont = UI_12_FONT_ID;
 constexpr int kDigitsFont = UI_12_FONT_ID;
@@ -31,7 +32,7 @@ constexpr int kDigitsSmallFont = UI_10_FONT_ID;
 constexpr int kDigitsMiniFont = UI_10_FONT_ID;
 #endif
 constexpr int kCaptionFont = SMALL_FONT_ID;
-// The text faces carry SemiBold in the family's bold slot.
+// The X4 Pro text faces carry SemiBold in the family's bold slot.
 constexpr EpdFontFamily::Style kSemiBold = EpdFontFamily::BOLD;
 
 constexpr int kSelectionBarWidth = 10;  // left bar on the selected list row or tab

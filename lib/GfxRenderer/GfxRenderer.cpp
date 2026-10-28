@@ -268,18 +268,36 @@ void GfxRenderer::insertFont(const int fontId, EpdFontFamily font) {
 }
 
 int GfxRenderer::resolveTextFontId(const int fontId, const char* text, const EpdFontFamily::Style style) const {
-  if (fallbackFontMap_.empty() || text == nullptr || *text == '\0') {
+  if ((fallbackFontMap_.empty() && builtinFallbackFontMap_.empty()) || text == nullptr || *text == '\0') {
     return fontId;
+  }
+  // The built-in backing face takes any string the primary cannot fully draw,
+  // without checking its own coverage: Arabic is tested here before shaping,
+  // and the backing face carries only the shaped forms.
+  int primaryFontId = fontId;
+  const auto builtinIt = builtinFallbackFontMap_.find(fontId);
+  if (builtinIt != builtinFallbackFontMap_.end()) {
+    const auto fontIt = fontMap.find(fontId);
+    if (fontIt != fontMap.end() && fontMap.count(builtinIt->second) != 0) {
+      const char* cursor = text;
+      uint32_t cp;
+      while ((cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&cursor)))) {
+        if (cp >= 0x80 && !fontIt->second.hasCodepoint(cp, style)) {
+          primaryFontId = builtinIt->second;
+          break;
+        }
+      }
+    }
   }
   const auto fbIt = fallbackFontMap_.find(fontId);
   if (fbIt == fallbackFontMap_.end()) {
-    return fontId;  // no fallback registered for this font
+    return primaryFontId;  // no fallback registered for this font
   }
   const int fallbackFontId = fbIt->second;
-  const auto fontIt = fontMap.find(fontId);
+  const auto fontIt = fontMap.find(primaryFontId);
   const auto fallbackIt = fontMap.find(fallbackFontId);
   if (fontIt == fontMap.end() || fallbackIt == fontMap.end()) {
-    return fontId;  // unknown primary or fallback not loaded — let the caller handle it
+    return primaryFontId;  // unknown primary or fallback not loaded — let the caller handle it
   }
   const EpdFontFamily& primary = fontIt->second;
   const EpdFontFamily& fallback = fallbackIt->second;
@@ -296,7 +314,7 @@ int GfxRenderer::resolveTextFontId(const int fontId, const char* text, const Epd
       return fallbackFontId;
     }
   }
-  return fontId;
+  return primaryFontId;
 }
 
 void GfxRenderer::prewarmFallbackText(const int fontId, const TextGetter getter, const void* ctx,
@@ -304,10 +322,10 @@ void GfxRenderer::prewarmFallbackText(const int fontId, const TextGetter getter,
   if (getter == nullptr || textCount == 0) {
     return;
   }
-  // Resolve the fallback id from the first string that actually redirects; a
-  // screen with no non-Latin strings resolves nothing and this is a no-op.
+  // Resolve the fallback id from the first string that redirects to an SD
+  // font; a screen with no such strings resolves nothing and this is a no-op.
   int fallbackFontId = fontId;
-  for (uint32_t i = 0; i < textCount && fallbackFontId == fontId; i++) {
+  for (uint32_t i = 0; i < textCount && (fallbackFontId == fontId || sdCardFonts_.count(fallbackFontId) == 0); i++) {
     const char* text = getter(ctx, i);
     if (text == nullptr || *text == '\0') continue;
     fallbackFontId = resolveTextFontId(fontId, text, style);

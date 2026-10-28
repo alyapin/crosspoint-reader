@@ -44,37 +44,49 @@ ruby -rdigest -e 'puts [
 ].map{|f| Digest::SHA256.hexdigest(File.read(f)).to_i(16) }.sum % (2 ** 32) - (2 ** 31)'
 ))"
 
-echo "#define UI_10_FONT_ID ($(
+echo "#define UBUNTU_10_FONT_ID ($(
 ruby -rdigest -e 'puts [
   "./ubuntu_10_regular.h",
   "./ubuntu_10_bold.h",
 ].map{|f| Digest::SHA256.hexdigest(File.read(f)).to_i(16) }.sum % (2 ** 32) - (2 ** 31)'
 ))"
 
-echo "#define UI_12_FONT_ID ($(
+echo "#define UBUNTU_12_FONT_ID ($(
 ruby -rdigest -e 'puts [
   "./ubuntu_12_regular.h",
   "./ubuntu_12_bold.h",
 ].map{|f| Digest::SHA256.hexdigest(File.read(f)).to_i(16) }.sum % (2 ** 32) - (2 ** 31)'
 ))"
 
-echo "#define SMALL_FONT_ID ($(
+echo "#define UBUNTU_8_FONT_ID ($(
 ruby -rdigest -e 'puts [
   "./ubuntu_8_regular.h",
 ].map{|f| Digest::SHA256.hexdigest(File.read(f)).to_i(16) }.sum % (2 ** 32) - (2 ** 31)'
 ))"
 
-echo "#define GOLOS_10_FONT_ID ($(
+echo "#define GOLOS_8_FONT_ID ($(
 ruby -rdigest -e 'puts [
-  "./golostext_10_regular.h",
-  "./golostext_10_semibold.h",
+  "./golostext_8_regular.h",
 ].map{|f| Digest::SHA256.hexdigest(File.read(f)).to_i(16) }.sum % (2 ** 32) - (2 ** 31)'
 ))"
 
-echo "#define GOLOS_12_FONT_ID ($(
+echo "#define UNBOUNDED_UI_9_FONT_ID ($(
 ruby -rdigest -e 'puts [
-  "./golostext_12_regular.h",
-  "./golostext_12_semibold.h",
+  "./unbounded_9_regular.h",
+  "./unbounded_9_semibold.h",
+].map{|f| Digest::SHA256.hexdigest(File.read(f)).to_i(16) }.sum % (2 ** 32) - (2 ** 31)'
+))"
+
+echo "#define UNBOUNDED_UI_11_FONT_ID ($(
+ruby -rdigest -e 'puts [
+  "./unbounded_11_regular.h",
+  "./unbounded_11_semibold.h",
+].map{|f| Digest::SHA256.hexdigest(File.read(f)).to_i(16) }.sum % (2 ** 32) - (2 ** 31)'
+))"
+
+echo "#define UNBOUNDED_LIGHT_7_FONT_ID ($(
+ruby -rdigest -e 'puts [
+  "./unbounded_7_light.h",
 ].map{|f| Digest::SHA256.hexdigest(File.read(f)).to_i(16) }.sum % (2 ** 32) - (2 ** 31)'
 ))"
 
@@ -108,16 +120,32 @@ ruby -rdigest -e 'puts [
 ].map{|f| Digest::SHA256.hexdigest(File.read(f)).to_i(16) }.sum % (2 ** 32) - (2 ** 31)'
 ))"
 
+echo ""
+echo "// UI font roles. The X4 Pro draws its UI in Unbounded, one size below Ubuntu"
+echo "// since it runs wide, with Ubuntu as the fallback for scripts it lacks"
+echo "// (src/main.cpp). Other boards use Ubuntu."
+echo "#if FREEINK_DEVICE_X4PRO"
+echo "#define UI_10_FONT_ID UNBOUNDED_UI_9_FONT_ID"
+echo "#define UI_12_FONT_ID UNBOUNDED_UI_11_FONT_ID"
+echo "#define SMALL_FONT_ID UNBOUNDED_LIGHT_7_FONT_ID"
+echo "#else"
+echo "#define UI_10_FONT_ID UBUNTU_10_FONT_ID"
+echo "#define UI_12_FONT_ID UBUNTU_12_FONT_ID"
+echo "#define SMALL_FONT_ID UBUNTU_8_FONT_ID"
+echo "#endif"
+
 FONT_ID_NAMES=(
   NOTOSANS_12_FONT_ID
   NOTOSANS_14_FONT_ID
   NOTOSANS_16_FONT_ID
   NOTOSANS_18_FONT_ID
-  UI_10_FONT_ID
-  UI_12_FONT_ID
-  SMALL_FONT_ID
-  GOLOS_10_FONT_ID
-  GOLOS_12_FONT_ID
+  UBUNTU_10_FONT_ID
+  UBUNTU_12_FONT_ID
+  UBUNTU_8_FONT_ID
+  GOLOS_8_FONT_ID
+  UNBOUNDED_UI_9_FONT_ID
+  UNBOUNDED_UI_11_FONT_ID
+  UNBOUNDED_LIGHT_7_FONT_ID
   UNBOUNDED_61_FONT_ID
   UNBOUNDED_31_FONT_ID
   UNBOUNDED_19_FONT_ID

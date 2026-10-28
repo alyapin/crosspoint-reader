@@ -69,7 +69,7 @@ for size in ${UI_FONT_SIZES[@]}; do
   done
 done
 
-# The small UI face is Ubuntu too, so UI text stays in one family at every size.
+# The small Ubuntu face, so Ubuntu UI text stays in one family at every size.
 python fontconvert.py ubuntu_8_regular 8 \
   ../builtinFonts/source/Ubuntu/Ubuntu-Regular.ttf \
   ../builtinFonts/source/NotoSans/NotoSans-Regular.ttf \
@@ -78,23 +78,53 @@ python fontconvert.py ubuntu_8_regular 8 \
   ../builtinFonts/source/Ubuntu/Ubuntu-Vietnamese-Regular.ttf \
   --additional-intervals 0x05D0,0x05EA "${ARABIC_INTERVALS[@]}" > ../builtinFonts/ubuntu_8_regular.h
 
-# Setka faces, compiled into X4 Pro builds only (src/components/setka/SetkaStyle.h).
+# X4 Pro faces, compiled into X4 Pro builds only (roles in src/fontIds.h and
+# src/components/setka/SetkaStyle.h, registered in src/main.cpp).
 # google/fonts ships Golos Text and Unbounded as variable fonts; the committed
 # static cuts come from:
-#   fonttools varLib.instancer 'GolosText[wght].ttf' wght=400 --static --update-name-table -o GolosText-Regular.ttf
-# (wght=600 for GolosText-SemiBold and Unbounded-SemiBold). Both are unhinted,
-# so the text face uses the auto-hinter for even 1-bit stems. Golos alone
-# covers Latin and Cyrillic (plus the numero sign Russian UI copy uses); no
-# Hebrew/Arabic fallbacks.
-for size in 10 12; do
-  for style in Regular SemiBold; do
-    font_name="golostext_${size}_$(echo $style | tr '[:upper:]' '[:lower:]')"
-    output_path="../builtinFonts/${font_name}.h"
-    python fontconvert.py $font_name $size ../builtinFonts/source/GolosText/GolosText-${style}.ttf \
-      --force-autohint --additional-intervals 0x2116,0x2116 > $output_path
-    echo "Generated $output_path"
-  done
+#   fonttools varLib.instancer 'Unbounded[wght].ttf' wght=400 --static --update-name-table -o Unbounded-Regular.ttf
+# (wght=300 for Unbounded-Light, 600 for Unbounded-SemiBold, 400 for
+# GolosText-Regular). Both are unhinted, so the text faces use the auto-hinter
+# for even 1-bit stems.
+#
+# X4 Pro UI text (the UI_10 / UI_12 / SMALL roles in fontIds.h): Unbounded
+# Regular with SemiBold in the bold slot, one size below the Ubuntu roles since
+# it runs wide, and Light for captions. Latin, Cyrillic and the punctuation the
+# UI uses only; the renderer routes any other string to Ubuntu.
+UI_TEXT_INTERVALS=(
+  --only-additional-intervals
+  --additional-intervals 0x20,0x7E      # ASCII
+  --additional-intervals 0xA0,0x17F     # Latin-1, Latin Extended-A
+  --additional-intervals 0x18F,0x18F    # Azerbaijani schwa
+  --additional-intervals 0x218,0x21B    # Romanian comma-below letters
+  --additional-intervals 0x259,0x259    # schwa
+  --additional-intervals 0x400,0x45F    # Cyrillic
+  --additional-intervals 0x490,0x491    # Ukrainian ghe with upturn
+  --additional-intervals 0x2010,0x2027  # dashes, quotes, bullet, ellipsis
+  --additional-intervals 0x2030,0x2030  # per mille
+  --additional-intervals 0x2039,0x203A  # single guillemets
+  --additional-intervals 0x20AC,0x20AC  # euro
+  --additional-intervals 0x20BD,0x20BD  # ruble
+  --additional-intervals 0x2116,0x2116  # numero sign
+  --additional-intervals 0x2122,0x2122  # trade mark
+  --additional-intervals 0x2190,0x2193  # arrows
+  --additional-intervals 0x2212,0x2212  # minus sign
+  --additional-intervals 0x2248,0x2248  # almost equal
+)
+for face in 9:Regular 9:SemiBold 11:Regular 11:SemiBold 7:Light; do
+  size=${face%%:*}
+  style=${face##*:}
+  font_name="unbounded_${size}_$(echo $style | tr '[:upper:]' '[:lower:]')"
+  output_path="../builtinFonts/${font_name}.h"
+  python fontconvert.py $font_name $size ../builtinFonts/source/Unbounded/Unbounded-${style}.ttf \
+    --force-autohint "${UI_TEXT_INTERVALS[@]}" > $output_path
+  echo "Generated $output_path"
 done
+
+# Dense game text (scanword clue cells) keeps the narrower Golos Text.
+python fontconvert.py golostext_8_regular 8 ../builtinFonts/source/GolosText/GolosText-Regular.ttf \
+  --force-autohint "${UI_TEXT_INTERVALS[@]}" > ../builtinFonts/golostext_8_regular.h
+echo "Generated ../builtinFonts/golostext_8_regular.h"
 
 # Hero numbers: digits-only Unbounded SemiBold. Cap height is 0.75 em and the
 # converter rasterizes at 150 DPI, so 61 pt is ~96 px, 31 pt ~48 px, 19 pt ~30 px,

@@ -25,6 +25,44 @@ constexpr int BUTTON_KEYBOARD_HINT_GAP = 4;
 
 int keyboardGap(const ThemeMetrics& metrics) { return std::max(metrics.keyboardKeySpacing, KEYBOARD_MIN_GAP); }
 
+uint16_t rowUnits(const fui::KeyboardRow& row) {
+  uint16_t units = row.insetUnits * 2;
+  for (uint8_t k = 0; k < row.count; ++k) units += row.keys[k].widthUnits ? row.keys[k].widthUnits : 1;
+  return units;
+}
+
+bool hasCharacterKey(const fui::KeyboardRow& row) {
+  return std::any_of(row.keys, row.keys + row.count,
+                     [](const fui::KeyboardKey& key) { return key.kind == fui::KeyKind::Normal; });
+}
+
+// True when every character label of `layout` fits its key at `fontId`, with
+// the key widths fui::keyboard() lays out in `width` (panel padding removed).
+bool keyLabelsFit(const GfxRenderer& renderer, const fui::KeyboardLayout& layout, const int fontId, const int width,
+                  const int gap, const bool uniformKeyWidth) {
+  int uniformUnit = 0;
+  for (uint8_t r = 0; r < layout.rowCount; ++r) {
+    const fui::KeyboardRow& row = layout.rows[r];
+    if (!row.keys || row.count == 0 || row.independentKeyWidth || !hasCharacterKey(row)) continue;
+    const int unit = (width - gap * (row.count - 1)) / rowUnits(row);
+    if (uniformUnit == 0 || unit < uniformUnit) uniformUnit = unit;
+  }
+  const fui::Insets text = fui::ButtonProps{}.padding;
+  for (uint8_t r = 0; r < layout.rowCount; ++r) {
+    const fui::KeyboardRow& row = layout.rows[r];
+    if (!row.keys || row.count == 0 || !hasCharacterKey(row)) continue;
+    const bool uniform = uniformKeyWidth && !row.independentKeyWidth && uniformUnit > 0;
+    const int unit = uniform ? uniformUnit : (width - gap * (row.count - 1)) / rowUnits(row);
+    for (uint8_t k = 0; k < row.count; ++k) {
+      const fui::KeyboardKey& key = row.keys[k];
+      if (key.kind != fui::KeyKind::Normal || !key.label) continue;
+      const int keyWidth = unit * (key.widthUnits ? key.widthUnits : 1);
+      if (renderer.getTextWidth(fontId, key.label) > keyWidth - text.left - text.right) return false;
+    }
+  }
+  return true;
+}
+
 int keyboardKeysHeight(const ThemeMetrics& metrics, const int rows, const bool hasTouch) {
   const int keyHeight = hasTouch ? metrics.keyboardKeyHeight : BUTTON_KEY_HEIGHT;
   return rows * keyHeight + (rows > 1 ? (rows - 1) * keyboardGap(metrics) : 0) + KEYBOARD_PANEL_PADDING * 2;
@@ -982,7 +1020,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   interactions.beginPublishCycle();
   fui::GfxRendererTarget target(renderer);
   target.setFont(fui::GfxRendererTarget::FONT_SMALL, SMALL_FONT_ID);
-  target.setFont(fui::GfxRendererTarget::FONT_BODY, UI_12_FONT_ID);
+  target.setFont(fui::GfxRendererTarget::FONT_BODY, keyLabelFont(keysRect.width));
   const fui::DeviceContext device = target.deviceContext();
   const fui::InputSnapshot noInput{};
   fui::Frame<56> frame(target, device, noInput, interactions);
@@ -1019,6 +1057,33 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   GUI.drawSideButtonHints(renderer, ">", "<");
 
   renderer.displayBuffer();
+}
+
+// Key labels use the body font unless a letter would not fit its key (the wide
+// X4 Pro face on 12-key Cyrillic rows); then the next smaller UI font. Both
+// letter layers decide, so Shift and the symbol pages keep the label size.
+int KeyboardEntryActivity::keyLabelFont(const int keysWidth) const {
+  // Arabic letter keys draw in the small slot; the body font is unused there.
+  if (layoutId == fui::KeyboardLayoutId::ArabicAr && !symbols) return UI_12_FONT_ID;
+  const fui::KeyboardLayout* layers[] = {&currentLayout(), nullptr, nullptr};
+  if (inputType != InputType::Url) {
+    layers[1] = &fui::builtinKeyboardLayout(layoutId, false, false, /*numberRow=*/true, showLangKey);
+    layers[2] = &fui::builtinKeyboardLayout(layoutId, true, false, /*numberRow=*/true, showLangKey);
+  } else if (!urlPanel) {
+    layers[1] = &URL_LAYOUT;
+    layers[2] = &URL_SHIFT_LAYOUT;
+  }
+  const fui::Insets panel = fui::KeyboardProps{}.padding;
+  const int width = keysWidth - panel.left - panel.right;
+  const int gap = keyboardGap(UITheme::getInstance().getMetrics());
+  for (const int fontId : {UI_12_FONT_ID, UI_10_FONT_ID}) {
+    if (std::all_of(std::begin(layers), std::end(layers), [&](const fui::KeyboardLayout* layer) {
+          return layer == nullptr || keyLabelsFit(renderer, *layer, fontId, width, gap, !urlPanel);
+        })) {
+      return fontId;
+    }
+  }
+  return SMALL_FONT_ID;
 }
 
 void KeyboardEntryActivity::onComplete(std::string text) {
