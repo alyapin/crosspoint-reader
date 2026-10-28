@@ -8,9 +8,12 @@
 
 namespace chess::ui {
 
-const PieceBitmap& pieceBitmap(PieceSet set, const PieceColor color, const PieceKind kind, const PieceSize size) {
+const PieceBitmap& pieceBitmap(PieceSet set, PieceColor color, PieceKind kind, PieceSize size) {
   if (static_cast<uint8_t>(set) >= PIECE_SET_COUNT) set = PieceSet::Lucide;
-  return piece_bitmaps[static_cast<uint8_t>(set)][static_cast<uint8_t>(color)][static_cast<uint8_t>(kind)]
+  if (color != PieceColor::Black) color = PieceColor::White;
+  if (kind < PieceKind::Pawn || kind > PieceKind::King) kind = PieceKind::Pawn;
+  if (size != PieceSize::Small) size = PieceSize::Board;
+  return piece_bitmaps[static_cast<uint8_t>(set)][static_cast<uint8_t>(color)][static_cast<uint8_t>(kind) - 1]
                       [static_cast<uint8_t>(size)];
 }
 

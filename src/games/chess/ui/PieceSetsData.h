@@ -6,6 +6,8 @@
 // Licence files: src/games/chess/ui/pieces/.
 // Art 52 / 28 px plus a 2 px halo. Plane format: PieceBitmap in PieceSets.h.
 
+#if FREEINK_DEVICE_X4PRO
+
 #include <cstdint>
 
 #include "PieceSets.h"
@@ -2711,7 +2713,7 @@ static const uint8_t piece_fontawesome_black_king_32_ink[] = {
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0x00, 0x00, 0x7F, 0xFC, 0x00, 0x00, 0x3F, 0xFC, 0x00,
     0x00, 0x3F, 0xFC, 0x00, 0x00, 0x3F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
-// [PieceSet][PieceColor][PieceKind][PieceSize]
+// [PieceSet][PieceColor][PieceKind - 1][PieceSize]
 static const chess::ui::PieceBitmap piece_bitmaps[chess::ui::PIECE_SET_COUNT][2][6][2] = {
     {{{{56, piece_lucide_white_pawn_56_mask, piece_lucide_white_pawn_56_ink},
        {32, piece_lucide_white_pawn_32_mask, piece_lucide_white_pawn_32_ink}},
@@ -2809,3 +2811,5 @@ static const chess::ui::PieceBitmap piece_bitmaps[chess::ui::PIECE_SET_COUNT][2]
        {32, piece_fontawesome_black_queen_32_mask, piece_fontawesome_black_queen_32_ink}},
       {{56, piece_fontawesome_black_king_56_mask, piece_fontawesome_black_king_56_ink},
        {32, piece_fontawesome_black_king_32_mask, piece_fontawesome_black_king_32_ink}}}}};
+
+#endif  // FREEINK_DEVICE_X4PRO
