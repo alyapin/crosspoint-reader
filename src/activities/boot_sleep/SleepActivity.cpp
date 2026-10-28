@@ -28,6 +28,7 @@
 #include "fontIds.h"
 #include "images/Logo120.h"
 #include "images/MoonIcon.h"
+#include "util/SleepImagePick.h"
 
 namespace {
 // Metalio: B/W sleep images use the full 0xF7 waveform instead of HALF (two
@@ -52,6 +53,14 @@ HalDisplay::GrayscaleMode sleepGrayscaleMode(const GfxRenderer& renderer) {
   return renderer.grayscaleCapabilities(HalDisplay::GrayscaleMode::Direct).supported()
              ? HalDisplay::GrayscaleMode::Direct
              : HalDisplay::GrayscaleMode::Absolute;
+}
+
+// Custom sleep pictures dither with the even thresholds only where the panel
+// shows them as absolute grays (SSD1677) and no B/W filter applies.
+bool originalSleepThresholds(const GfxRenderer& renderer) {
+  return renderer.grayscaleCapabilities(sleepGrayscaleMode(renderer)).supported() &&
+         display.getController() == HalDisplay::Controller::SSD1677 &&
+         SETTINGS.sleepScreenCoverFilter == CrossPointSettings::SLEEP_SCREEN_COVER_FILTER::NO_FILTER;
 }
 
 // Kept separate from normal custom sleep sources so alpha-overlay art does not mix with full-screen wallpapers.
@@ -656,46 +665,41 @@ void SleepActivity::onEnter() {
 }
 
 void SleepActivity::renderCustomSleepScreen() const {
-  // Look for sleep.bmp on the root of the sd card to determine if we should
-  // render a custom sleep screen instead of the default.
-  // This takes priority over both custom sleep directories.
-  HalFile file;
-  if (Storage.openFileForRead("SLP", "/sleep.bmp", file)) {
-    Bitmap bitmap(file, true,
-                  renderer.grayscaleCapabilities(sleepGrayscaleMode(renderer)).supported() &&
-                      display.getController() == HalDisplay::Controller::SSD1677 &&
-                      SETTINGS.sleepScreenCoverFilter == CrossPointSettings::SLEEP_SCREEN_COVER_FILTER::NO_FILTER);
-    if (bitmap.parseHeaders() == BmpReaderError::Ok) {
-      LOG_DBG("SLP", "Loading: /sleep.bmp");
-      renderBitmapSleepScreen(bitmap);
-      file.close();
-      return;
-    }
-    file.close();
-  }
-
-  std::string selectedPath;
-  selectRandomSleepFile("/.sleep", "/sleep", SleepRecentKind::Standard, selectedPath);
-
-  if (!selectedPath.empty()) {
-    HalFile randFile;
-    if (Storage.openFileForRead("SLP", selectedPath, randFile)) {
-      LOG_DBG("SLP", "Randomly loading: %s", selectedPath.c_str());
-      delay(100);
-      Bitmap bitmap(randFile, true,
-                    renderer.grayscaleCapabilities(sleepGrayscaleMode(renderer)).supported() &&
-                        display.getController() == HalDisplay::Controller::SSD1677 &&
-                        SETTINGS.sleepScreenCoverFilter == CrossPointSettings::SLEEP_SCREEN_COVER_FILTER::NO_FILTER);
-      if (bitmap.parseHeaders() == BmpReaderError::Ok) {
-        renderBitmapSleepScreen(bitmap);
-        randFile.close();
-        return;
+  // A picture picked in Settings → Sleep image comes first. /sleep.bmp on the
+  // card root keeps its old priority over both sleep folders only while
+  // nothing is picked (sleep_pick::sourceOrder).
+  const char* chosen = SETTINGS.sleepImagePath;
+  for (const auto source : sleep_pick::sourceOrder(chosen[0] != '\0')) {
+    switch (source) {
+      case sleep_pick::Source::Chosen:
+        if (renderSleepBmp(chosen)) return;
+        LOG_ERR("SLP", "Chosen sleep image unavailable: %s", chosen);
+        break;
+      case sleep_pick::Source::RootBmp:
+        if (renderSleepBmp("/sleep.bmp")) return;
+        break;
+      case sleep_pick::Source::Random: {
+        std::string selectedPath;
+        if (selectRandomSleepFile("/.sleep", "/sleep", SleepRecentKind::Standard, selectedPath)) {
+          delay(100);
+          if (renderSleepBmp(selectedPath)) return;
+        }
+        break;
       }
-      randFile.close();
     }
   }
 
   renderDefaultSleepScreen();
+}
+
+bool SleepActivity::renderSleepBmp(const std::string& path) const {
+  HalFile file;
+  if (!Storage.openFileForRead("SLP", path, file)) return false;
+  Bitmap bitmap(file, true, originalSleepThresholds(renderer));
+  if (bitmap.parseHeaders() != BmpReaderError::Ok) return false;
+  LOG_DBG("SLP", "Loading: %s", path.c_str());
+  // A picture whose pixels fail to read falls through to the next source.
+  return renderBitmapSleepScreen(bitmap);
 }
 
 // Sleep screens paint with a single HALF refresh (stock parity): the OEM X4
@@ -719,7 +723,7 @@ void SleepActivity::renderDefaultSleepScreen() const {
   renderer.displayBuffer(kSleepClean);
 }
 
-void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap, const bool preserveBackground) const {
+bool SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap, const bool preserveBackground) const {
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
   const auto placement = calculateBitmapPlacement(bitmap.getWidth(), bitmap.getHeight(), renderer);
@@ -738,7 +742,7 @@ void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap, const bool pre
 
   if (!renderer.drawBitmap(bitmap, x, y, pageWidth, pageHeight, cropX, cropY, preserveBackground)) {
     renderer.displayBuffer(kSleepClean);
-    return;
+    return false;
   }
 
   if (!preserveBackground &&
@@ -753,18 +757,18 @@ void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap, const bool pre
     }
     renderTransparentCustomSleepScreen();
     overlayGrayCover = nullptr;
-    return;
+    return true;
   }
 
   const bool absolute = hasGreyscale && renderer.grayscaleCapabilities(sleepGrayscaleMode(renderer)).supported();
   const BwFrameKeeper bwFrame(renderer, hasGreyscale && !absolute);
   if (!bwFrame.ready()) {
     renderer.displayBuffer(kSleepClean);
-    return;
+    return true;
   }
   if (absolute) {
     cleanBeforeAbsoluteGray(renderer);
-    if (!renderer.displayGrayscaleBase(sleepGrayscaleMode(renderer))) return;
+    if (!renderer.displayGrayscaleBase(sleepGrayscaleMode(renderer))) return false;
   } else if (hasGreyscale) {
     // OEM grayscale pipeline base. Must stay HALF: the gray nudge LUT is
     // calibrated against the pixel state the single-pass HALF waveform leaves
@@ -806,6 +810,66 @@ void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap, const bool pre
       LOG_ERR("SLP", "Incomplete grayscale image; keeping the current display");
     renderer.setRenderMode(GfxRenderer::BW);
   }
+  return true;
+}
+
+bool SleepActivity::renderPreview(GfxRenderer& renderer, const std::string& path, const PreviewChrome chrome,
+                                  void* user) {
+  // Like the sleep screen itself, the preview ignores night mode: grays need
+  // normal polarity. The render loop restores it for the next screen.
+  display.setInverted(false);
+  HalFile file;
+  if (!Storage.openFileForRead("SLP", path, file)) return false;
+  Bitmap bitmap(file, true, originalSleepThresholds(renderer));
+  if (bitmap.parseHeaders() != BmpReaderError::Ok) return false;
+
+  using Filter = CrossPointSettings::SLEEP_SCREEN_COVER_FILTER;
+  const auto placement = calculateBitmapPlacement(bitmap.getWidth(), bitmap.getHeight(), renderer);
+  const bool inverted = SETTINGS.sleepScreenCoverFilter == Filter::INVERTED_BLACK_AND_WHITE;
+  const auto drawFrame = [&](const bool grayPlane) {
+    if (bitmap.rewindToData() != BmpReaderError::Ok ||
+        !renderer.drawBitmap(bitmap, placement.x, placement.y, renderer.getScreenWidth(), renderer.getScreenHeight(),
+                             placement.cropX, placement.cropY)) {
+      return false;
+    }
+    if (inverted && !grayPlane) renderer.invertScreen();
+    if (chrome) chrome(renderer, grayPlane, user);
+    return true;
+  };
+
+  renderer.clearScreen();
+  if (!drawFrame(false)) return false;
+  if (!bitmap.hasGreyscale() || SETTINGS.sleepScreenCoverFilter != Filter::NO_FILTER) {
+    renderer.displayBuffer(kSleepClean);
+    return true;
+  }
+
+  // In-app gray pipeline (BmpViewerActivity): absolute planes where the panel
+  // has them, which render the same levels as the sleep screen's direct mode.
+  const bool absolute = renderer.grayscaleCapabilities(HalDisplay::GrayscaleMode::Absolute).supported();
+  bool ready = !absolute || renderer.displayGrayscaleBase(HalDisplay::GrayscaleMode::Absolute);
+  if (ready && !absolute) renderer.displayGrayscaleBase(HalDisplay::HALF_REFRESH);
+  for (const auto plane : {GfxRenderer::GRAYSCALE_LSB, GfxRenderer::GRAYSCALE_MSB}) {
+    if (!ready) break;
+    renderer.clearScreen(absolute ? 0xFF : 0x00);
+    renderer.setRenderMode(plane);
+    ready = drawFrame(true);
+    if (!ready) break;
+    if (plane == GfxRenderer::GRAYSCALE_LSB) {
+      renderer.copyGrayscaleLsbBuffers();
+    } else {
+      renderer.copyGrayscaleMsbBuffers();
+    }
+  }
+  if (ready) renderer.displayGrayBuffer();
+
+  // Rebuild the B/W frame for the updates that follow.
+  renderer.setRenderMode(GfxRenderer::BW);
+  renderer.clearScreen();
+  if (!drawFrame(false)) ready = false;
+  renderer.cleanupGrayscaleWithFrameBuffer();
+  if (!ready) renderer.displayBuffer(kSleepClean);
+  return ready;
 }
 
 bool SleepActivity::renderSleepOverlayFile(HalFile& file, const char* pathForLog) const {
@@ -904,7 +968,10 @@ void SleepActivity::renderTransparentCustomSleepScreen() const {
     // Show the plain cover.
     const Bitmap& cover = *overlayCover;
     overlayCover = nullptr;
-    if (cover.rewindToData() == BmpReaderError::Ok) return renderBitmapSleepScreen(cover);
+    if (cover.rewindToData() == BmpReaderError::Ok) {
+      renderBitmapSleepScreen(cover);
+      return;
+    }
   }
   renderDefaultSleepScreen();
 }
