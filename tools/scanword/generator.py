@@ -22,6 +22,8 @@ CLUE, LETTER, BLANK = "#", "L", "."
 ACROSS, DOWN = 0, 1
 MIN_LEN, MAX_LEN = 3, 10
 MAX_CLUE = 26
+# A two-clue cell has half the room, so its clues may be capped shorter.
+SPLIT_CLUE = MAX_CLUE
 ARROW_ORDER = {"R": 0, "RD": 1, "DR": 2, "D": 3}
 ATTRIBUTION = """Clues and answers are derived from the Russian Wiktionary
 (https://ru.wiktionary.org), licensed under CC BY-SA 4.0
@@ -51,6 +53,32 @@ class Entry:
     word: str
     zipf: float
     clue: str
+
+
+def clue_lines(text, chars):
+    """Lines `text` takes when wrapped at `chars` per line, splitting long words with a hyphen."""
+    lines, used = 1, 0
+    for word in text.split():
+        need = len(word) + (1 if used else 0)
+        if used + need <= chars:
+            used += need
+            continue
+        if len(word) <= chars:
+            lines, used = lines + 1, len(word)
+            continue
+        # Hyphenate: fill the current line (two letters minimum), carry the rest.
+        rest = len(word)
+        room = chars - used - (1 if used else 0) - 1
+        if room >= 2:
+            rest -= room
+        else:
+            lines += 1
+            rest -= chars - 1
+        while rest > chars:
+            lines += 1
+            rest -= chars - 1
+        lines, used = lines + 1, rest
+    return lines
 
 
 def load_lexicon(path):
@@ -275,13 +303,18 @@ class WordIndex:
             self.by_len.setdefault(len(e.word), []).append(e)
         self.all = {}
         self.bits = {}
+        self.short = {}  # words whose clue fits half a cell
         for length, words in self.by_len.items():
             pos = [[0] * len(ALPHABET) for _ in range(length)]
+            short = 0
             for i, e in enumerate(words):
                 for p, ch in enumerate(fold(e.word)):
                     pos[p][CODE[ch]] |= 1 << i
+                if len(e.clue) <= SPLIT_CLUE:
+                    short |= 1 << i
             self.bits[length] = pos
             self.all[length] = (1 << len(words)) - 1
+            self.short[length] = short
 
 
 def ordered(entries, rng, noise, uses):
@@ -300,6 +333,8 @@ def fill(template, index, rng, max_nodes=20000, branch=10):
             at.setdefault(cell, []).append((si, p))
     for si, cs in enumerate(cells):
         crossing[si] = sorted({o for cell in cs for o, _ in at[cell] if o != si})
+    owners = [o[0] for o in template.owner]
+    split = {si for si, cell in enumerate(owners) if owners.count(cell) == 2}
     letter = {}
     chosen = [None] * len(slots)
     used = {length: 0 for length in index.all}
@@ -309,6 +344,8 @@ def fill(template, index, rng, max_nodes=20000, branch=10):
     def domain(si):
         s = slots[si]
         d = index.all.get(s.length, 0) & ~used.get(s.length, 0)
+        if si in split:
+            d &= index.short.get(s.length, 0)
         bits = index.bits.get(s.length)
         for p, cell in enumerate(cells[si]):
             ch = letter.get(cell)
@@ -536,8 +573,17 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--width", type=int, default=10)
     ap.add_argument("--height", type=int, default=14)
+    ap.add_argument("--max-clue", type=int, default=MAX_CLUE, help="skip words with longer clues")
+    ap.add_argument("--split-clue", type=int, default=MAX_CLUE, help="clue length cap in two-clue cells")
+    ap.add_argument("--line-chars", type=int, default=0, help="skip clues longer than 3 lines of this many chars")
     args = ap.parse_args()
-    entries = load_lexicon(args.lexicon)
+    global SPLIT_CLUE
+    SPLIT_CLUE = args.split_clue
+    entries = [
+        e
+        for e in load_lexicon(args.lexicon)
+        if len(e.clue) <= args.max_clue and (not args.line_chars or clue_lines(e.clue, args.line_chars) <= 3)
+    ]
     lex = {fold(e.word): e for e in entries}
     rng = random.Random(args.seed)
     out = Path(args.out)

@@ -89,6 +89,28 @@ class GeneratorTest(unittest.TestCase):
         self.assertEqual(cell_11("еда"), "Е")  # ё across, е down
         self.assertEqual(cell_11("ёла"), "Ё")
 
+    def test_clue_lines(self):
+        self.assertEqual(G.clue_lines("Часть суток", 8), 2)
+        self.assertEqual(G.clue_lines("Гиппопотам", 8), 2)  # Гиппопо-/там
+        self.assertEqual(G.clue_lines("Самец домашней кошки", 7), 4)
+        self.assertEqual(G.clue_lines("Кот", 7), 1)
+
+    def test_split_cells_get_short_clues(self):
+        rng = random.Random(3)
+        entries = self.entries
+        old = G.SPLIT_CLUE
+        G.SPLIT_CLUE = 11  # "Подсказка N" with N < 10
+        try:
+            puzzle, _ = G.generate(entries, 1, rng, {}, 9, 12)
+        finally:
+            G.SPLIT_CLUE = old
+        per = {}
+        for r, c, _, t in puzzle.clues:
+            per.setdefault((r, c), []).append(t)
+        for texts in per.values():
+            if len(texts) == 2:
+                self.assertTrue(all(len(t) <= 11 for t in texts), texts)
+
     def test_validator_catches_broken_puzzles(self):
         puzzle, _ = self.puzzles[0]
         base = puzzle.text()

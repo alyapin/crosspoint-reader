@@ -1,7 +1,7 @@
 """Build the scanword lexicon: common Russian nouns with short clues.
 
     python -I lexicon.py extract ruwiktionary-pages-articles.xml.bz2 pages.jsonl
-    python -I lexicon.py build pages.jsonl lexicon.tsv
+    python -I lexicon.py build pages.jsonl lexicon.tsv [max_clue_chars]
 
 `extract` streams a ru.wiktionary pages-articles dump (text CC BY-SA 4.0) and
 keeps the Russian noun sections of 3-10 letter titles; `build` turns them into
@@ -433,7 +433,10 @@ def choose_clue(word, homonyms):
             clue = definition_clue(word, s)
             if clue:
                 # A one-word definition is as vague as a hypernym; a synonym beats it.
-                candidates.append((base + len(clue) / 40 + (1.0 if " " not in clue else 0), clue, "def"))
+                # Past two words the clue gets hard to fit into a cell.
+                words = len(clue.split())
+                cost = base + len(clue) / 40 + (1.0 if words == 1 else 0.4 * max(0, words - 2))
+                candidates.append((cost, clue, "def"))
             for syn in s.synonyms[:4]:
                 if c := word_clue(word, syn):
                     candidates.append((base + 0.9, c, "syn"))
@@ -463,4 +466,6 @@ def build(pages_path, out_path):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 4:
+        MAX_CLUE = int(sys.argv[4])
     {"extract": extract, "build": build}[sys.argv[1]](sys.argv[2], sys.argv[3])
