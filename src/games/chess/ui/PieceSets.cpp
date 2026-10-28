@@ -1,7 +1,5 @@
 #include "PieceSets.h"
 
-#if FREEINK_DEVICE_X4PRO
-
 #include <GfxRenderer.h>
 
 #include "PieceSetsData.h"
@@ -34,5 +32,3 @@ void drawPiece(const GfxRenderer& renderer, const PieceBitmap& piece, const int 
 }
 
 }  // namespace chess::ui
-
-#endif  // FREEINK_DEVICE_X4PRO

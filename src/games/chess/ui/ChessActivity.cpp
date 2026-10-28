@@ -1,9 +1,9 @@
-#if FREEINK_DEVICE_X4PRO
-
 #include "ChessActivity.h"
 
 #include <ChessEngine.h>
+#include <FreeInkUIIcon.h>
 #include <GfxRenderer.h>
+#include <HalGPIO.h>
 #include <I18n.h>
 #include <Logging.h>
 #include <esp_random.h>
@@ -14,6 +14,9 @@
 #include <new>
 
 #include "PieceSets.h"
+#include "chessIcons.h"
+#include "components/HeaderBackTapTarget.h"
+#include "components/UITheme.h"
 #include "games/chess/ChessSave.h"
 
 namespace fui = freeink::ui;
@@ -29,12 +32,15 @@ constexpr fui::ActionId ACTION_MENU = 6;
 constexpr fui::ActionId ACTION_PROMOTE = 7;
 constexpr fui::ActionId ACTION_NEW_GAME = 8;
 
-// List screens: same metrics as the other Setka lists.
-constexpr int kHeaderTop = 16;  // clears the X4 Pro top bezel
-constexpr int kTitleGap = 20;
+// List screens: the CrossPoint 2.0 header and row pitch, Setka selection bar.
+constexpr int kHeaderTop = 16;  // game view top line; clears the X4 Pro top bezel
 constexpr int kRuleGap = 16;
 constexpr int kBarX = kSidePadding - kSelectionBarWidth;
 constexpr int kRowTextX = kSidePadding + 12;
+constexpr int kRowHeight = 68;
+constexpr int kRowGap = 8;
+constexpr int kIconSize = 24;
+constexpr int kIconGap = 16;
 constexpr int kStepperSize = 56;
 constexpr int kCustomDoneRow = 2;
 
@@ -48,6 +54,15 @@ constexpr int kPieceInset = (kSquare - 56) / 2;
 constexpr int kDotSize = 16;
 constexpr int kRingWidth = 3;
 constexpr int kTurnLineGap = 16;
+constexpr int kCursorArm = 14;  // key cursor: corner brackets on the focused square
+// Key focus ring in the game view: the 64 board cells (visual order), then the actions.
+constexpr int kCells = 64;
+constexpr int kStartCursor = 6 * 8 + 4;  // the near side's e-pawn
+#if FREEINK_DEVICE_X4PRO
+constexpr int kHeroCapTarget = 0;  // the Unbounded hero face at its own size
+#else
+constexpr int kHeroCapTarget = 64;  // no hero face here: the UI digits are scaled up
+#endif
 
 constexpr uint8_t kBaseMinutes[] = {1, 2, 3, 5, 10, 15, 20, 25, 30, 45, 60, 90, 120, 180};
 constexpr uint8_t kIncrementSeconds[] = {0, 1, 2, 3, 5, 10, 15, 20, 30, 45, 60};
@@ -149,6 +164,21 @@ void drawDashedFrame(const GfxRenderer& renderer, const int x, const int y) {
   }
 }
 
+// Russian piece letters for the Russian UI, English SAN otherwise.
+const chess::Notation& notation() {
+  return I18N.getLanguage() == Language::RU ? chess::NOTATION_RU : chess::NOTATION_EN;
+}
+
+void drawCursor(const GfxRenderer& renderer, const int x, const int y) {
+  constexpr int kWidth = kCellFrameWidth;
+  for (const int cx : {x, x + kSquare - kCursorArm}) {
+    for (const int cy : {y, y + kSquare - kWidth}) renderer.fillRect(cx, cy, kCursorArm, kWidth, true);
+  }
+  for (const int cx : {x, x + kSquare - kWidth}) {
+    for (const int cy : {y, y + kSquare - kCursorArm}) renderer.fillRect(cx, cy, kWidth, kCursorArm, true);
+  }
+}
+
 const char* overTitle(const chess::Game& game) {
   switch (game.termination()) {
     case chess::Termination::Checkmate:
@@ -213,7 +243,6 @@ void ChessActivity::onEnter() {
   prefs = chess::ui::loadPrefs();
   if (chesssave::load(*match, esp_random())) {
     inGame = true;
-    rotateGame = prefs.rotateBoard;
     setView(View::Game);
   } else {
     setView(View::Setup);
@@ -228,7 +257,7 @@ void ChessActivity::onExit() {
 
 void ChessActivity::prepareForSleep() { saveGame(); }
 
-bool ChessActivity::skipLoopDelay() { return match && match->engineThinking(); }
+bool ChessActivity::skipLoopDelay() { return view == View::Game && match && match->engineThinking(); }
 
 void ChessActivity::saveGame() {
   if (!match || !inGame) return;
@@ -261,7 +290,9 @@ void ChessActivity::loop() {
   } else if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     RenderLock lock(*this);
     goBack();
-  } else if (view != View::Game) {
+  } else if (view == View::Game) {
+    handleGameKeys();
+  } else {
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
       RenderLock lock(*this);
       activateRow(focus);
@@ -283,6 +314,94 @@ void ChessActivity::loop() {
     savePending = false;
     if (inGame) chesssave::save(*match);
   }
+}
+
+int ChessActivity::gameActions(GameAction* out) const {
+  int n = 0;
+  if (match->game().isOver()) out[n++] = GameAction::NewGame;
+  if (match->canUndo()) out[n++] = GameAction::Undo;
+  out[n++] = GameAction::Menu;
+  return n;
+}
+
+ChessActivity::GameAction ChessActivity::focusedAction() const {
+  if (cursor < kCells) return GameAction::None;
+  GameAction actions[kMaxActions];
+  const int count = gameActions(actions);
+  return actions[std::min(cursor - kCells, count - 1)];
+}
+
+void ChessActivity::runAction(const GameAction action) {
+  switch (action) {
+    case GameAction::NewGame:
+      setView(View::Setup);
+      break;
+    case GameAction::Undo:
+      if (match->undo()) afterPly();
+      break;
+    case GameAction::Menu:
+      setView(View::Menu);
+      break;
+    case GameAction::None:
+      break;
+  }
+}
+
+// Keys only (X4 without touch, or by choice): a cursor walks the 64 squares and
+// then the actions; Confirm acts like a tap. Left/Right step along the ring,
+// Up/Down change rank (on edge-button boards the side buttons step instead).
+void ChessActivity::handleGameKeys() {
+  using Button = MappedInputManager::Button;
+  const bool sideStep = gpio.hasEdgeSideButtons();
+  int dx = 0;
+  int dy = 0;
+  if (mappedInput.wasPressed(Button::Left)) dx = -1;
+  if (mappedInput.wasPressed(Button::Right)) dx = 1;
+  if (mappedInput.wasPressed(Button::Up)) (sideStep ? dx : dy) = -1;
+  if (mappedInput.wasPressed(Button::Down)) (sideStep ? dx : dy) = 1;
+  const bool confirm = mappedInput.wasReleased(Button::Confirm);
+  if (dx == 0 && dy == 0 && !confirm) return;
+
+  RenderLock lock(*this);
+  if (promoFrom != kNoSquare) {
+    if (confirm) {
+      playMove(promoFrom, promoTo, kPromotions[promoFocus]);
+      return;
+    }
+    const int count = static_cast<int>(std::size(kPromotions));
+    promoFocus = (promoFocus + dx + dy + count) % count;
+    requestRepaint(RepaintUpdate);
+    return;
+  }
+  GameAction actions[kMaxActions];
+  const int ring = kCells + gameActions(actions);
+  if (cursor < 0) {
+    // The first key shows the cursor; on a finished game it lands on "Новая партия".
+    cursor = match->game().isOver() ? kCells : kStartCursor;
+    requestRepaint(RepaintUpdate);
+    return;
+  }
+  cursor = std::min(cursor, ring - 1);
+  if (confirm) {
+    if (cursor < kCells) {
+      tapSquare(squareAtCell(cursor));
+    } else {
+      runAction(actions[cursor - kCells]);
+    }
+    return;
+  }
+  if (dx != 0) cursor = (cursor + dx + ring) % ring;
+  if (dy != 0 && cursor < kCells) {
+    const int row = cursor / 8 + dy;
+    if (row > 7) {
+      cursor = kCells;
+    } else if (row >= 0) {
+      cursor = row * 8 + cursor % 8;
+    }
+  } else if (dy < 0) {
+    cursor = kStartCursor + 8;  // from the actions back to the near rank
+  }
+  requestRepaint(RepaintUpdate);
 }
 
 void ChessActivity::tickClocks() {
@@ -315,10 +434,10 @@ void ChessActivity::handleAction(const fui::ActionEvent& event, const int x, con
       if (const chess::Square square = squareAt(x, y); square != kNoSquare) tapSquare(square);
       break;
     case ACTION_UNDO:
-      if (match->undo()) afterPly();
+      runAction(GameAction::Undo);
       break;
     case ACTION_MENU:
-      setView(View::Menu);
+      runAction(GameAction::Menu);
       break;
     case ACTION_PROMOTE:
       if (promoFrom != kNoSquare && event.value >= 0 && event.value < static_cast<int>(std::size(kPromotions))) {
@@ -326,7 +445,7 @@ void ChessActivity::handleAction(const fui::ActionEvent& event, const int x, con
       }
       break;
     case ACTION_NEW_GAME:
-      setView(View::Setup);
+      runAction(GameAction::NewGame);
       break;
     default:
       break;
@@ -353,7 +472,7 @@ void ChessActivity::goBack() {
       setView(View::Game);
       break;
     case View::Game:
-      if (promoFrom != kNoSquare) {
+      if (promoFrom != kNoSquare || selected != kNoSquare) {
         promoFrom = promoTo = kNoSquare;
         clearSelection();
         requestRepaint(RepaintUpdate);
@@ -372,6 +491,7 @@ void ChessActivity::setView(const View next) {
   if (next == View::Game) {
     match->resume();
     syncShownClocks();
+    if (!mappedInput.hasTouch() && cursor < 0) cursor = kStartCursor;
   }
   if (next == View::Setup) {
     focus = rowCount() - 1;  // "Начать партию"
@@ -397,6 +517,15 @@ void ChessActivity::activateRow(const int index) {
     return;
   }
   if (view == View::CustomTime) {
+    if (index == 0 || index == 1) {
+      // Keys only: Confirm walks the value up and wraps to the smallest.
+      uint8_t& step = index == 0 ? customBase : customIncrement;
+      const int count =
+          index == 0 ? static_cast<int>(std::size(kBaseMinutes)) : static_cast<int>(std::size(kIncrementSeconds));
+      step = static_cast<uint8_t>((step + 1) % count);
+      requestRepaint(RepaintUpdate);
+      return;
+    }
     if (index != kCustomDoneRow) return;
     prefs.match.time.baseMs = kBaseMinutes[customBase] * 60000u;
     prefs.match.time.incrementMs = kIncrementSeconds[customIncrement] * 1000u;
@@ -483,8 +612,8 @@ void ChessActivity::stepCustom(const int field, const int delta) {
 void ChessActivity::startGame() {
   match->newGame(prefs.match, esp_random());
   inGame = true;
-  rotateGame = prefs.rotateBoard;
   manualFlip = false;
+  cursor = -1;
   afterPly();
   setView(View::Game);
 }
@@ -501,6 +630,7 @@ void ChessActivity::tapSquare(const chess::Square square) {
     if (match->needsPromotion(selected, square)) {
       promoFrom = selected;
       promoTo = square;
+      promoFocus = 0;
       requestRepaint(RepaintUpdate);
       return;
     }
@@ -601,6 +731,7 @@ ChessActivity::RowText ChessActivity::rowText(const int index) const {
   RowText text;
   if (view == View::Picker) {
     text.label = optionLabel(pickerRow, index);
+    text.icon = index == currentOption(pickerRow) ? &icon_option_on_24 : &icon_option_24;
     if (pickerRow == Row::Pieces) text.preview = static_cast<int8_t>(index);
     if (pickerRow == Row::Time && index == kCustomTimeOption && currentOption(Row::Time) == kCustomTimeOption) {
       formatTime(prefs.match.time, text.value, sizeof(text.value));
@@ -610,9 +741,37 @@ ChessActivity::RowText ChessActivity::rowText(const int index) const {
   Row rows[kMaxRows];
   if (index < 0 || index >= listRows(rows)) return text;
   text.label = rowLabel(rows[index]);
+  text.icon = rowIcon(rows[index]);
   rowValue(rows[index], text.value, sizeof(text.value));
-  text.ruleAbove = rows[index] == Row::Start;
   return text;
+}
+
+const freeink::Icon* ChessActivity::rowIcon(const Row row) const {
+  switch (row) {
+    case Row::Opponent:
+      return prefs.match.mode == chess::Mode::HotSeat ? &icon_friend_24 : &icon_computer_24;
+    case Row::Level:
+      return &icon_level_24;
+    case Row::Color:
+      return &icon_color_24;
+    case Row::Time:
+      return &icon_time_24;
+    case Row::Rotate:
+      return &icon_rotate_24;
+    case Row::Pieces:
+      return &icon_pieces_24;
+    case Row::Start:
+      return &icon_start_24;
+    case Row::Resign:
+      return &icon_resign_24;
+    case Row::Draw:
+      return &icon_draw_24;
+    case Row::NewGame:
+      return &icon_new_game_24;
+    case Row::Flip:
+      return &icon_flip_24;
+  }
+  return nullptr;
 }
 
 const char* ChessActivity::rowLabel(const Row row) const {
@@ -729,7 +888,7 @@ int ChessActivity::currentOption(const Row row) const {
 bool ChessActivity::boardFlipped() const {
   const bool blackAtBottom = match->settings().mode == chess::Mode::VsComputer
                                  ? match->humanColor() == chess::BLACK
-                                 : rotateGame && match->game().sideToMove() == chess::BLACK;
+                                 : prefs.rotateBoard && match->game().sideToMove() == chess::BLACK;
   return blackAtBottom != manualFlip;
 }
 
@@ -738,18 +897,25 @@ chess::Color ChessActivity::heroSide() const {
   return match->settings().mode == chess::Mode::VsComputer ? match->humanColor() : match->game().sideToMove();
 }
 
-chess::Square ChessActivity::squareAt(const int x, const int y) const {
-  if (x < 0 || x >= kBoardSize || y < kBoardTop || y >= kBoardTop + kBoardSize) return kNoSquare;
-  const int col = x / kSquare;
-  const int row = (y - kBoardTop) / kSquare;
+int ChessActivity::boardLeft() const { return (renderer.getScreenWidth() - kBoardSize) / 2; }
+
+chess::Square ChessActivity::squareAtCell(const int cell) const {
   const bool flip = boardFlipped();
+  const int col = cell % 8;
+  const int row = cell / 8;
   return chess::makeSquare(flip ? 7 - col : col, flip ? row : 7 - row);
+}
+
+chess::Square ChessActivity::squareAt(const int x, const int y) const {
+  const int left = boardLeft();
+  if (x < left || x >= left + kBoardSize || y < kBoardTop || y >= kBoardTop + kBoardSize) return kNoSquare;
+  return squareAtCell((y - kBoardTop) / kSquare * 8 + (x - left) / kSquare);
 }
 
 void ChessActivity::squareOrigin(const chess::Square square, const bool flip, int& x, int& y) const {
   const int col = flip ? 7 - chess::fileOf(square) : chess::fileOf(square);
   const int row = flip ? chess::rankOf(square) : 7 - chess::rankOf(square);
-  x = col * kSquare;
+  x = boardLeft() + col * kSquare;
   y = kBoardTop + row * kSquare;
 }
 
@@ -767,7 +933,7 @@ void ChessActivity::lastMoveText(char* out, const size_t cap) const {
   if (game.plyCount() == 0) return;
   const int ply = game.plyCount() - 1;
   char san[24];
-  chess::formatSan(game.ply(ply).san, chess::NOTATION_RU, san, sizeof(san));
+  chess::formatSan(game.ply(ply).san, notation(), san, sizeof(san));
   if (game.colorOfPly(ply) == chess::WHITE) {
     snprintf(out, cap, "%d. %s", game.moveNumberOfPly(ply), san);
   } else {
@@ -779,6 +945,12 @@ void ChessActivity::lastMoveText(char* out, const size_t cap) const {
 
 void ChessActivity::render(RenderLock&&) {
   renderer.clearScreen();
+  if (view == View::Game) {
+    HeaderBackTapTarget::clear();  // the board screen has its own "‹ Выйти"
+  } else {
+    const auto& metrics = UITheme::getInstance().getMetrics();
+    GUI.drawHeader(renderer, Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.headerHeight}, listTitle());
+  }
   renderUi();
   const uint8_t kind = repaint.exchange(RepaintNone);
   renderer.displayBuffer(kind == RepaintEntry   ? cadence.entry()
@@ -805,38 +977,48 @@ void ChessActivity::build(UiScreen& screen) {
   }
 }
 
-int ChessActivity::drawHeader(UiScreen& screen, const char* back, const char* title) const {
-  const int lineHeight = renderer.getLineHeight(kText12Font);
-  renderer.drawText(kText12Font, kSidePadding, kHeaderTop, back);
-  screen.frame().hit(
-      fui::makeRect(0, 0, renderer.getTextWidth(kText12Font, back) + 2 * kSidePadding, lineHeight + 2 * kHeaderTop),
-      ACTION_BACK, 0, fui::InputTouch);
-  const int titleTop = kHeaderTop + lineHeight + kTitleGap;
-  renderer.drawText(kText12Font, kSidePadding, titleTop, title, true, kSemiBold);
-  const int ruleY = titleTop + lineHeight + kRuleGap;
-  drawRule(renderer, 0, ruleY, renderer.getScreenWidth());
-  return ruleY + kRuleWidth;
+const char* ChessActivity::listTitle() const {
+  switch (view) {
+    case View::Setup:
+      return tr(STR_CHESS_NEW_GAME);
+    case View::Menu:
+      return tr(STR_CHESS_MENU);
+    case View::CustomTime:
+      return tr(STR_CHESS_CUSTOM_TIME);
+    default:
+      return rowLabel(pickerRow);
+  }
+}
+
+// Under the theme header (arrow-left on touch boards, tap = Back).
+int ChessActivity::listTop() const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  return metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+}
+
+// One list row: bar when focused, icon, label.
+void ChessActivity::drawRow(UiScreen& screen, const int top, const int index, const freeink::Icon* icon,
+                            const char* label) const {
+  const bool focused = index == focus;
+  if (focused) drawSelectionBar(renderer, kBarX, top, kRowHeight);
+  int x = kRowTextX;
+  if (icon != nullptr) {
+    screen.target().bitmap(fui::makeRect(x, top + (kRowHeight - kIconSize) / 2, kIconSize, kIconSize),
+                           fui::bitmapFromIcon(*icon), fui::BitmapMode::Center);
+    x += kIconSize + kIconGap;
+  }
+  renderer.drawText(kText12Font, x, top + (kRowHeight - renderer.getLineHeight(kText12Font)) / 2, label, true,
+                    focused ? kSemiBold : EpdFontFamily::REGULAR);
 }
 
 void ChessActivity::buildList(UiScreen& screen) {
-  const char* title = view == View::Setup  ? tr(STR_CHESS_NEW_GAME)
-                      : view == View::Menu ? tr(STR_CHESS_MENU)
-                                           : rowLabel(pickerRow);
-  int top = drawHeader(screen, tr(STR_CHESS_NAV_BACK), title);
   const int width = renderer.getScreenWidth();
-  const int lineHeight = renderer.getLineHeight(kText12Font);
-  const int rowHeight = std::max(kListRowHeight, lineHeight + 2 * kRuleGap);
+  const int textOffset = (kRowHeight - renderer.getLineHeight(kText12Font)) / 2;
   const int count = rowCount();
   for (int i = 0; i < count; ++i) {
+    const int top = listTop() + i * (kRowHeight + kRowGap);
     const RowText row = rowText(i);
-    if (row.ruleAbove) {
-      drawRule(renderer, 0, top, width);
-      top += kRuleWidth;
-    }
-    const int textTop = top + (rowHeight - lineHeight) / 2;
-    const bool focused = i == focus;
-    if (focused) drawSelectionBar(renderer, kBarX, textTop, lineHeight);
-    renderer.drawText(kText12Font, kRowTextX, textTop, row.label, true, focused ? kSemiBold : EpdFontFamily::REGULAR);
+    drawRow(screen, top, i, row.icon, row.label);
     if (row.preview >= 0) {
       const auto set = static_cast<chess::ui::PieceSet>(row.preview);
       constexpr int kPreviewGap = 8;
@@ -845,22 +1027,20 @@ void ChessActivity::buildList(UiScreen& screen) {
         const auto& bitmap =
             chess::ui::pieceBitmap(set, chess::ui::PieceColor::White, kPreviewKinds[k], chess::ui::PieceSize::Small);
         x -= bitmap.size;
-        chess::ui::drawPiece(renderer, bitmap, x, top + (rowHeight - bitmap.size) / 2);
+        chess::ui::drawPiece(renderer, bitmap, x, top + (kRowHeight - bitmap.size) / 2);
         x -= kPreviewGap;
       }
     } else if (row.value[0] != '\0') {
-      drawRightAligned(renderer, kText12Font, width - kSidePadding, textTop, row.value);
+      drawRightAligned(renderer, kText12Font, width - kSidePadding, top + textOffset, row.value);
     }
-    screen.frame().hit(fui::makeRect(0, top, width, rowHeight), ACTION_ROW, static_cast<int16_t>(i), fui::InputTouch);
-    top += rowHeight;
+    screen.frame().hit(fui::makeRect(0, top, width, kRowHeight), ACTION_ROW, static_cast<int16_t>(i), fui::InputTouch);
   }
 }
 
 void ChessActivity::buildCustomTime(UiScreen& screen) {
-  int top = drawHeader(screen, tr(STR_CHESS_NAV_BACK), tr(STR_CHESS_CUSTOM_TIME));
   const int width = renderer.getScreenWidth();
-  const int lineHeight = renderer.getLineHeight(kText12Font);
-  const int rowHeight = std::max(kListRowHeight, lineHeight + 2 * kRuleGap);
+  const int textOffset = (kRowHeight - renderer.getLineHeight(kText12Font)) / 2;
+  const freeink::Icon* icons[] = {&icon_minutes_24, &icon_increment_24};
   const char* labels[] = {tr(STR_CHESS_MINUTES), tr(STR_CHESS_INCREMENT)};
   const int values[] = {kBaseMinutes[customBase], kIncrementSeconds[customIncrement]};
   const bool atMin[] = {customBase == 0, customIncrement == 0};
@@ -870,12 +1050,11 @@ void ChessActivity::buildCustomTime(UiScreen& screen) {
   const int plusX = width - kSidePadding - kStepperSize;
   const int valueX = plusX - kStepperSize;
   const int minusX = valueX - kStepperSize;
+  int top = listTop();
   for (int i = 0; i < kCustomDoneRow; ++i) {
-    const int textTop = top + (rowHeight - lineHeight) / 2;
-    const int stepTop = top + (rowHeight - kStepperSize) / 2;
-    if (i == focus) drawSelectionBar(renderer, kBarX, textTop, lineHeight);
-    renderer.drawText(kText12Font, kRowTextX, textTop, labels[i], true,
-                      i == focus ? kSemiBold : EpdFontFamily::REGULAR);
+    const int textTop = top + textOffset;
+    const int stepTop = top + (kRowHeight - kStepperSize) / 2;
+    drawRow(screen, top, i, icons[i], labels[i]);
     char value[8];
     snprintf(value, sizeof(value), "%d", values[i]);
     drawCentered(renderer, kText12Font, valueX, kStepperSize, textTop, value, kSemiBold);
@@ -889,22 +1068,16 @@ void ChessActivity::buildCustomTime(UiScreen& screen) {
       screen.frame().hit(fui::makeRect(plusX, stepTop, kStepperSize, kStepperSize), ACTION_STEP,
                          static_cast<int16_t>(i * 2 + 1), fui::InputTouch);
     }
-    top += rowHeight;
+    top += kRowHeight + kRowGap;
   }
-  drawRule(renderer, 0, top, width);
-  top += kRuleWidth;
-  const int textTop = top + (rowHeight - lineHeight) / 2;
-  const bool focused = focus == kCustomDoneRow;
-  if (focused) drawSelectionBar(renderer, kBarX, textTop, lineHeight);
-  renderer.drawText(kText12Font, kRowTextX, textTop, tr(STR_CHESS_DONE), true,
-                    focused ? kSemiBold : EpdFontFamily::REGULAR);
-  screen.frame().hit(fui::makeRect(0, top, width, rowHeight), ACTION_ROW, kCustomDoneRow, fui::InputTouch);
+  drawRow(screen, top, kCustomDoneRow, &icon_done_24, tr(STR_CHESS_DONE));
+  screen.frame().hit(fui::makeRect(0, top, width, kRowHeight), ACTION_ROW, kCustomDoneRow, fui::InputTouch);
 }
 
 void ChessActivity::buildGame(UiScreen& screen) {
   drawTopLine(screen);
   drawBoard();
-  screen.frame().hit(fui::makeRect(0, kBoardTop, kBoardSize, kBoardSize), ACTION_BOARD, 0, fui::InputTouch);
+  screen.frame().hit(fui::makeRect(boardLeft(), kBoardTop, kBoardSize, kBoardSize), ACTION_BOARD, 0, fui::InputTouch);
   if (promoFrom != kNoSquare) {
     drawPromotion(screen);
     return;
@@ -978,6 +1151,9 @@ void ChessActivity::drawBoard() const {
     squareOrigin(selected, flip, x, y);
     drawCellFrame(renderer, x, y, kSquare, kSquare);
   }
+  if (cursor >= 0 && cursor < kCells) {
+    drawCursor(renderer, boardLeft() + cursor % 8 * kSquare, kBoardTop + cursor / 8 * kSquare);
+  }
   for (int square = 0; square < 64; ++square) {
     if (((targets >> square) & 1) == 0) continue;
     squareOrigin(square, flip, x, y);
@@ -1026,7 +1202,8 @@ void ChessActivity::drawClockPanel() const {
   int32_t naturalWidth = 0;  // 12.4 fixed point
   for (const char* c = clock; *c != '\0'; ++c) naturalWidth += *c == ':' ? colonAdvance : digitAdvance;
   const int maxWidth = renderer.getScreenWidth() - kRowTextX - kSidePadding;
-  const int scale256 = naturalWidth > maxWidth * 16 ? maxWidth * 16 * 256 / naturalWidth : 256;
+  int scale256 = kHeroCapTarget > 0 ? kHeroCapTarget * 256 / std::max(1, heroCapHeight(renderer, kHeroFont)) : 256;
+  if (naturalWidth * scale256 > maxWidth * 16 * 256) scale256 = maxWidth * 16 * 256 / naturalWidth;
 
   const int capTop = kPanelTop + 22;
   const int capHeight = heroCapHeight(renderer, kHeroFont) * scale256 / 256;
@@ -1071,9 +1248,9 @@ void ChessActivity::drawMoveList(const int top, const int bottom) const {
     const int number = game.moveNumberOfPly(ply);
     char white[24] = "";
     char black[24] = "";
-    if (game.colorOfPly(ply) == chess::WHITE) chess::formatSan(game.ply(ply++).san, chess::NOTATION_RU, white, 24);
+    if (game.colorOfPly(ply) == chess::WHITE) chess::formatSan(game.ply(ply++).san, notation(), white, 24);
     if (ply < plies && game.colorOfPly(ply) == chess::BLACK && game.moveNumberOfPly(ply) == number) {
-      chess::formatSan(game.ply(ply++).san, chess::NOTATION_RU, black, 24);
+      chess::formatSan(game.ply(ply++).san, notation(), black, 24);
     }
     Unit& unit = units[count++];
     if (white[0] == '\0') {
@@ -1126,6 +1303,7 @@ void ChessActivity::drawPromotion(UiScreen& screen) const {
         chess::ui::pieceBitmap(prefs.pieceSet, color, pieceKind(kPromotions[i]), chess::ui::PieceSize::Small);
     chess::ui::drawPiece(renderer, bitmap, x + (cellWidth - bitmap.size) / 2, cellTop + 8);
     drawCentered(renderer, kText10Font, x, cellWidth, cellTop + 16 + bitmap.size, names[i]);
+    if (i == promoFocus) drawCellFrame(renderer, x, cellTop, cellWidth, cellHeight);
     screen.frame().hit(fui::makeRect(x, cellTop, cellWidth, cellHeight), ACTION_PROMOTE, static_cast<int16_t>(i),
                        fui::InputTouch);
   }
@@ -1140,8 +1318,11 @@ void ChessActivity::drawGameOver(UiScreen& screen) const {
   top += lineHeight + 8;
   const int rowHeight = std::max(kListRowHeight, lineHeight + 2 * kRuleGap);
   const int textTop = top + (rowHeight - lineHeight) / 2;
-  drawSelectionBar(renderer, kBarX, textTop, lineHeight);
-  renderer.drawText(kText12Font, kRowTextX, textTop, tr(STR_CHESS_NEW_GAME), true, kSemiBold);
+  const GameAction focused = focusedAction();
+  const bool primary = focused == GameAction::None || focused == GameAction::NewGame;
+  if (primary) drawSelectionBar(renderer, kBarX, textTop, lineHeight);
+  renderer.drawText(kText12Font, kRowTextX, textTop, tr(STR_CHESS_NEW_GAME), true,
+                    primary ? kSemiBold : EpdFontFamily::REGULAR);
   screen.frame().hit(fui::makeRect(0, top, renderer.getScreenWidth(), rowHeight), ACTION_NEW_GAME, 0, fui::InputTouch);
 }
 
@@ -1150,13 +1331,20 @@ void ChessActivity::drawActions(UiScreen& screen) const {
   drawRule(renderer, 0, kActionsTop, width);
   const int bandTop = kActionsTop + kRuleWidth;
   const int bandHeight = renderer.getScreenHeight() - bandTop;
-  const int textTop = bandTop + (bandHeight - renderer.getLineHeight(kText12Font)) / 2;
+  const int lineHeight = renderer.getLineHeight(kText12Font);
+  const int textTop = bandTop + (bandHeight - lineHeight) / 2;
+  const GameAction focused = focusedAction();
   if (match->canUndo()) {
-    renderer.drawText(kText12Font, kSidePadding, textTop, tr(STR_CHESS_UNDO));
+    const bool on = focused == GameAction::Undo;
+    if (on) drawSelectionBar(renderer, kBarX, textTop, lineHeight);
+    renderer.drawText(kText12Font, kRowTextX, textTop, tr(STR_CHESS_UNDO), true,
+                      on ? kSemiBold : EpdFontFamily::REGULAR);
     screen.frame().hit(fui::makeRect(0, bandTop, width / 2, bandHeight), ACTION_UNDO, 0, fui::InputTouch);
   }
-  drawRightAligned(renderer, kText12Font, width - kSidePadding, textTop, tr(STR_CHESS_MENU));
+  const bool on = focused == GameAction::Menu;
+  const auto style = on ? kSemiBold : EpdFontFamily::REGULAR;
+  const int menuX = width - kSidePadding - renderer.getTextWidth(kText12Font, tr(STR_CHESS_MENU), style);
+  if (on) drawSelectionBar(renderer, menuX - kRowTextX + kBarX, textTop, lineHeight);
+  renderer.drawText(kText12Font, menuX, textTop, tr(STR_CHESS_MENU), true, style);
   screen.frame().hit(fui::makeRect(width / 2, bandTop, width / 2, bandHeight), ACTION_MENU, 0, fui::InputTouch);
 }
-
-#endif  // FREEINK_DEVICE_X4PRO

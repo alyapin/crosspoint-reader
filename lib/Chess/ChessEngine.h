@@ -116,7 +116,12 @@ class Engine {
     uint8_t generation;
   };
 
+  // Boards without PSRAM (ESP32-C3) get an 8x smaller table: ~65 KB per Match instead of ~150 KB.
+#if defined(ARDUINO_ARCH_ESP32) && !defined(BOARD_HAS_PSRAM)
+  static constexpr int TT_BITS = 10;
+#else
   static constexpr int TT_BITS = 13;
+#endif
   static constexpr int TT_SIZE = 1 << TT_BITS;
   static constexpr int ARENA = 2048;
   static constexpr int HISTORY_KEYS = 128;

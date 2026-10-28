@@ -667,7 +667,6 @@ STR_SET_SLEEP_COVER_CONFIRM: "Set Sleep Cover?"
 
 STR_CHESS: "Chess"
 STR_CHESS_IN_PROGRESS: "game in progress"
-STR_CHESS_NAV_BACK: "‹ Back"
 STR_CHESS_NAV_EXIT: "‹ Exit"
 STR_CHESS_NEW_GAME: "New game"
 STR_CHESS_OPPONENT: "Opponent"

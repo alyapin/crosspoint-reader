@@ -206,8 +206,6 @@ def generate():
         "// Licence files: src/games/chess/ui/pieces/.",
         f"// Art {ART[0]} / {ART[1]} px plus a {HALO} px halo. Plane format: PieceBitmap in PieceSets.h.",
         "",
-        "#if FREEINK_DEVICE_X4PRO",
-        "",
         "#include <cstdint>",
         "",
         '#include "PieceSets.h"',
@@ -218,8 +216,6 @@ def generate():
         "static const chess::ui::PieceBitmap piece_bitmaps[chess::ui::PIECE_SET_COUNT][2][6][2] = {"
         + ", ".join(table)
         + "};",
-        "",
-        "#endif  // FREEINK_DEVICE_X4PRO",
         "",
     ]
     OUT.write_text("\n".join(header))

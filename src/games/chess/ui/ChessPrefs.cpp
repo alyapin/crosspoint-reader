@@ -1,5 +1,3 @@
-#if FREEINK_DEVICE_X4PRO
-
 #include "ChessPrefs.h"
 
 #include <HalStorage.h>
@@ -52,5 +50,3 @@ void savePrefs(const Prefs& prefs) {
 }
 
 }  // namespace chess::ui
-
-#endif  // FREEINK_DEVICE_X4PRO

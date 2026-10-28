@@ -527,7 +527,6 @@ STR_SPACING_200_PERCENT: "200%"
 
 STR_CHESS: "Шахматы"
 STR_CHESS_IN_PROGRESS: "партия идёт"
-STR_CHESS_NAV_BACK: "‹ Назад"
 STR_CHESS_NAV_EXIT: "‹ Выйти"
 STR_CHESS_NEW_GAME: "Новая партия"
 STR_CHESS_OPPONENT: "Соперник"

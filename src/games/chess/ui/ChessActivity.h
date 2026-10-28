@@ -1,8 +1,7 @@
 #pragma once
 
-#if FREEINK_DEVICE_X4PRO
-
 #include <ChessMatch.h>
+#include <Icon.h>
 
 #include <atomic>
 #include <memory>
@@ -43,19 +42,23 @@ class ChessActivity final : public Activity, private UiAppHost {
   // Pending repaint, strongest wins: Entry = HALF, Update = cadence FAST,
   // Clock = plain FAST that does not count toward the cadence.
   enum Repaint : uint8_t { RepaintNone, RepaintClock, RepaintUpdate, RepaintEntry };
+  enum class GameAction : uint8_t { None, NewGame, Undo, Menu };
+  static constexpr int kMaxActions = 3;
   static constexpr int kMaxRows = 8;
   static constexpr chess::Square kNoSquare = 0xFF;
 
   struct RowText {
     const char* label = "";
+    const freeink::Icon* icon = nullptr;
     char value[24] = {};
-    int8_t preview = -1;     // piece set drawn as a sample on the right
-    bool ruleAbove = false;  // the action row under the settings
+    int8_t preview = -1;  // piece set drawn as a sample on the right
   };
 
   static void screenFn(UiScreen& screen, void* user);
   void build(UiScreen& screen);
-  int drawHeader(UiScreen& screen, const char* back, const char* title) const;
+  const char* listTitle() const;
+  int listTop() const;
+  void drawRow(UiScreen& screen, int top, int index, const freeink::Icon* icon, const char* label) const;
   void buildList(UiScreen& screen);
   void buildCustomTime(UiScreen& screen);
   void buildGame(UiScreen& screen);
@@ -73,12 +76,17 @@ class ChessActivity final : public Activity, private UiAppHost {
   int rowCount() const;
   RowText rowText(int index) const;
   const char* rowLabel(Row row) const;
+  const freeink::Icon* rowIcon(Row row) const;
   void rowValue(Row row, char* out, size_t cap) const;
   int optionCount(Row row) const;
   const char* optionLabel(Row row, int option) const;
   int currentOption(Row row) const;
 
   void handleAction(const freeink::ui::ActionEvent& event, int x, int y);
+  void handleGameKeys();
+  int gameActions(GameAction* out) const;
+  GameAction focusedAction() const;
+  void runAction(GameAction action);
   void activateRow(int index);
   void applyOption(int option);
   void stepCustom(int field, int delta);
@@ -98,6 +106,8 @@ class ChessActivity final : public Activity, private UiAppHost {
 
   bool boardFlipped() const;
   chess::Color heroSide() const;
+  int boardLeft() const;
+  chess::Square squareAtCell(int cell) const;
   chess::Square squareAt(int x, int y) const;
   void squareOrigin(chess::Square square, bool flip, int& x, int& y) const;
   const char* turnLabel() const;
@@ -106,8 +116,7 @@ class ChessActivity final : public Activity, private UiAppHost {
   std::unique_ptr<chess::Match> match;
   chess::ui::Prefs prefs;  // the setup screen edits prefs.match
   View view = View::Setup;
-  bool inGame = false;      // a game was started or resumed: Setup's back returns to it
-  bool rotateGame = false;  // prefs.rotateBoard as of the game's start
+  bool inGame = false;  // a game was started or resumed: Setup's back returns to it
   bool manualFlip = false;
   int focus = 0;
   Row pickerRow = Row::Opponent;
@@ -118,6 +127,8 @@ class ChessActivity final : public Activity, private UiAppHost {
   uint64_t targets = 0;
   chess::Square promoFrom = kNoSquare;
   chess::Square promoTo = kNoSquare;
+  int promoFocus = 0;
+  int cursor = -1;            // key focus in the game view: board cell (visual), then actions; -1 hidden
   bool drawDeclined = false;  // until the next move
   uint32_t shownSeconds[2] = {0, 0};
   bool savePending = false;
@@ -126,5 +137,3 @@ class ChessActivity final : public Activity, private UiAppHost {
   setka::RefreshCadence cadence;  // render task only
   std::atomic<uint8_t> repaint{RepaintEntry};
 };
-
-#endif  // FREEINK_DEVICE_X4PRO

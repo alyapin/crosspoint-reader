@@ -1,7 +1,5 @@
 #pragma once
 
-#if FREEINK_DEVICE_X4PRO
-
 // Chess choices that outlive a game: the last "Новая партия" setup and the
 // piece set. A missing or unreadable file gives the defaults.
 
@@ -21,5 +19,3 @@ Prefs loadPrefs();
 void savePrefs(const Prefs& prefs);
 
 }  // namespace chess::ui
-
-#endif  // FREEINK_DEVICE_X4PRO

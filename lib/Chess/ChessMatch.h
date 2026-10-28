@@ -12,7 +12,8 @@
 // legalTargets()/needsPromotion() share a scratch move list: call them from the
 // input side, not the render task.
 //
-// ~150 KB, so allocate it once (it lands in PSRAM on boards that have it).
+// ~150 KB (~65 KB on boards without PSRAM, see Engine::TT_BITS), so allocate it
+// once (it lands in PSRAM on boards that have it).
 
 #include <cstddef>
 #include <cstdint>

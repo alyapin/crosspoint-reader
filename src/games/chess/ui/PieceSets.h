@@ -1,7 +1,5 @@
 #pragma once
 
-#if FREEINK_DEVICE_X4PRO
-
 #include <cstdint>
 
 class GfxRenderer;
@@ -37,5 +35,3 @@ const PieceBitmap& pieceBitmap(PieceSet set, PieceColor color, PieceKind kind, P
 void drawPiece(const GfxRenderer& renderer, const PieceBitmap& piece, int x, int y);
 
 }  // namespace chess::ui
-
-#endif  // FREEINK_DEVICE_X4PRO
