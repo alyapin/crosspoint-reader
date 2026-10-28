@@ -33,6 +33,9 @@ bool wordsFit(const GfxRenderer& renderer, const int fontId, const char* text, c
 }  // namespace
 
 void StatisticsActivity::onEnter() {
+  // The render task may run as soon as ActivityManager drops its lock; keep it
+  // out until the state below is in place (same as LibraryListActivity).
+  RenderLock lock(*this);
   Activity::onEnter();
   entryRefresh = true;
   summary = stats::StatsSummary{};

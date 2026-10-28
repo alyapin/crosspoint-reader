@@ -65,6 +65,9 @@ LocalSendActivity::LocalSendActivity(GfxRenderer& renderer, MappedInputManager& 
     : Activity("LocalSend", renderer, mappedInput), UiAppHost(renderer) {}
 
 void LocalSendActivity::onEnter() {
+  // The render task may run as soon as ActivityManager drops its lock; keep it
+  // out until the state below is in place (same as LibraryListActivity).
+  RenderLock renderLock(*this);
   Activity::onEnter();
   resetUi();
   app.on(ACTION_DECLINE, &LocalSendActivity::onAction, this);

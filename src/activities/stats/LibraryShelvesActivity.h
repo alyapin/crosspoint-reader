@@ -57,6 +57,8 @@ class LibraryShelvesActivity final : public Activity, private UiAppHost {
   static void onDismiss(const freeink::ui::ActionEvent& event, void* user);
 
   void reload();
+  // reload() for a caller that holds the render lock.
+  void reloadLocked();
   void draw(UiScreen& screen);
   int drawTabs(UiScreen& screen, int stripTop, int width);
   void drawBookRow(UiScreen& screen, int index, int top, int width);

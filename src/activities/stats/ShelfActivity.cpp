@@ -38,13 +38,16 @@ constexpr size_t kMaxBooks = FREEINK_MCU_C3 ? 80 : 200;
 }  // namespace
 
 void ShelfActivity::onEnter() {
+  // The render task may run as soon as ActivityManager drops its lock; keep it
+  // out until the state below is in place (same as LibraryListActivity).
+  RenderLock lock(*this);
   Activity::onEnter();
   picking = false;
   focus = 0;
   top = 0;
   menuOpen = false;
   entryRefresh = true;
-  reload();
+  reloadLocked();
   resetUi();
   app.on(ACTION_CELL, &ShelfActivity::onCell, this);
   app.on(ACTION_PICK, &ShelfActivity::onPick, this);
@@ -55,8 +58,12 @@ void ShelfActivity::onEnter() {
 }
 
 void ShelfActivity::reload() {
-  auto names = makeUniqueNoThrow<stats::ShelfNames>();
   RenderLock lock(*this);
+  reloadLocked();
+}
+
+void ShelfActivity::reloadLocked() {
+  auto names = makeUniqueNoThrow<stats::ShelfNames>();
   books.clear();
   candidates.clear();
   thumbsChecked = false;

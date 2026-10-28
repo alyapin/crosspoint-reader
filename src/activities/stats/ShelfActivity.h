@@ -39,6 +39,8 @@ class ShelfActivity final : public Activity, private UiAppHost {
   static void describeMenu(int index, const freeink::Icon*& icon, const char*& label, void* ctx);
 
   void reload();
+  // reload() for a caller that holds the render lock.
+  void reloadLocked();
   void draw(UiScreen& screen);
   void drawGrid(UiScreen& screen, int areaTop, int bottom, int width);
   void drawPicker(UiScreen& screen, int areaTop, int bottom, int width);

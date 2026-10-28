@@ -56,12 +56,15 @@ stats::BookStatus tabStatus(const int tab) {
 }  // namespace
 
 void LibraryShelvesActivity::onEnter() {
+  // The render task may run as soon as ActivityManager drops its lock; keep it
+  // out until the state below is in place (same as LibraryListActivity).
+  RenderLock lock(*this);
   Activity::onEnter();
   focus = -1;
   top = 0;
   menu = Menu::None;
   entryRefresh = true;
-  reload();
+  reloadLocked();
   resetUi();
   app.on(ACTION_TAB, &LibraryShelvesActivity::onTab, this);
   app.on(ACTION_ROW, &LibraryShelvesActivity::onRow, this);
@@ -73,6 +76,10 @@ void LibraryShelvesActivity::onEnter() {
 
 void LibraryShelvesActivity::reload() {
   RenderLock lock(*this);
+  reloadLocked();
+}
+
+void LibraryShelvesActivity::reloadLocked() {
   books.clear();
   shelfRows.clear();
   thumbsChecked = false;
