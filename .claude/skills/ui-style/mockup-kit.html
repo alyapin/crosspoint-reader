@@ -1,0 +1,31 @@
+<!-- Setka mockup kit: device frame at 0.425 scale (204x340 = 480x800), 1-bit dither patterns,
+     reference home screen "3в". Copy the <style>, <defs> and helpers into new mockups. -->
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600&family=Golos+Text:wght@400;600&display=swap" rel="stylesheet">
+<style>
+.d{background:#fff;color:#000;border:2px solid #555;border-radius:14px;width:204px;height:340px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;font-family:'Golos Text',sans-serif;font-size:11px}
+.u{font-family:Unbounded,sans-serif;font-weight:600}
+.sb{display:flex;justify-content:space-between;padding:4px 10px;font-size:10px}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #000;margin-top:auto}
+.tabs div{height:30px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9px;gap:1px}
+.sel{border-left:5px solid #000;font-weight:600}
+</style>
+<svg width="0" height="0" style="position:absolute"><defs>
+<pattern id="dither50" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="1" height="1" fill="#000"/><rect x="1" y="1" width="1" height="1" fill="#000"/></pattern>
+<pattern id="dither25" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="1" height="1" fill="#000"/></pattern>
+</defs></svg>
+<div id="home"></div>
+<script>
+const cover=(w,h,pat)=>`<svg width="${w}" height="${h}" style="display:block"><rect width="${w}" height="${h}" fill="url(#${pat})" stroke="#000"/></svg>`;
+const tabs=['Библиотека','Статистика','Ещё','Настройки'].map(t=>`<div>${t}</div>`).join('');
+document.getElementById('home').innerHTML=`<div class="d">
+<div class="sb"><span>21:40</span><span>82%</span></div>
+<div style="padding:4px 10px 6px;display:flex;justify-content:space-between;align-items:baseline"><span style="font-weight:600;font-size:12px">Читаю сейчас</span><span>3 книги</span></div>
+<div style="display:flex;gap:6px;padding:0 10px">
+ <div style="flex:1">${cover(62,92,'dither50')}<div class="u" style="font-size:17px;padding-top:3px">64%</div></div>
+ <div style="flex:1;padding-top:14px">${cover(56,80,'dither25')}<div class="u" style="font-size:12px;padding-top:3px">12%</div></div>
+ <div style="flex:1;padding-top:14px">${cover(56,80,'dither25')}<div class="u" style="font-size:12px;padding-top:3px">3%</div></div>
+</div>
+<div style="border-top:1px solid #000;margin-top:8px"></div>
+<div class="sel" style="padding:6px 10px 0;margin-top:6px"><div style="font-size:12px">Мастер и Маргарита</div><div style="font-weight:400">глава 14, ещё 1 ч 20 мин</div></div>
+<div class="tabs">${tabs}</div></div>`;
+</script>
