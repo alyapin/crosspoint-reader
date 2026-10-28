@@ -13,6 +13,7 @@
 #include <iterator>
 #include <new>
 
+#include "ClockText.h"
 #include "PieceSets.h"
 #include "chessIcons.h"
 #include "components/HeaderBackTapTarget.h"
@@ -53,6 +54,7 @@ constexpr int kPieceInset = (kSquare - 56) / 2;
 constexpr int kDotSize = 16;
 constexpr int kRingWidth = 3;
 constexpr int kTurnLineGap = 16;
+constexpr int kUnitGap = 12;    // hero minutes and their "мин"
 constexpr int kCursorArm = 14;  // key cursor: corner brackets on the focused square
 // Key focus ring in the game view: the 64 board cells (visual order), then the actions.
 constexpr int kCells = 64;
@@ -93,13 +95,6 @@ chess::ui::PieceKind pieceKind(const chess::PieceType type) { return static_cast
 
 chess::ui::PieceColor pieceColor(const chess::Color color) {
   return color == chess::WHITE ? chess::ui::PieceColor::White : chess::ui::PieceColor::Black;
-}
-
-uint32_t clockSeconds(const uint32_t ms) { return (ms + 999) / 1000; }
-
-void formatClock(const uint32_t ms, char* out, const size_t cap) {
-  const uint32_t seconds = clockSeconds(ms);
-  snprintf(out, cap, "%u:%02u", static_cast<unsigned>(seconds / 60), static_cast<unsigned>(seconds % 60));
 }
 
 void formatTime(const chess::TimeControl& time, char* out, const size_t cap) {
@@ -406,11 +401,12 @@ void ChessActivity::handleGameKeys() {
 void ChessActivity::tickClocks() {
   // The computer's reply is a few seconds at most: its clock catches up when it moves.
   if (!match->timed() || match->paused() || match->game().isOver() || match->engineThinking()) return;
+  // Clocks show whole minutes, then 10 s steps (ClockText): repaint only when that changes.
   bool changed = false;
   for (const chess::Color side : {chess::WHITE, chess::BLACK}) {
-    const uint32_t seconds = clockSeconds(match->remainingMs(side));
-    if (seconds != shownSeconds[side]) {
-      shownSeconds[side] = seconds;
+    const uint32_t shown = chess::ui::clockText(match->remainingMs(side)).shownSeconds;
+    if (shown != shownSeconds[side]) {
+      shownSeconds[side] = shown;
       changed = true;
     }
   }
@@ -678,7 +674,7 @@ void ChessActivity::afterPly() {
 
 void ChessActivity::syncShownClocks() {
   for (const chess::Color side : {chess::WHITE, chess::BLACK}) {
-    shownSeconds[side] = clockSeconds(match->remainingMs(side));
+    shownSeconds[side] = chess::ui::clockText(match->remainingMs(side)).shownSeconds;
   }
 }
 
@@ -1118,8 +1114,13 @@ void ChessActivity::drawTopLine(UiScreen& screen) const {
   }
   int right = width - kSidePadding;
   if (match->timed()) {
-    char clock[12];
-    formatClock(match->remainingMs(far), clock, sizeof(clock));
+    const chess::ui::ClockText time = chess::ui::clockText(match->remainingMs(far));
+    char clock[24];
+    if (time.minutes) {
+      snprintf(clock, sizeof(clock), "%s %s", time.text, tr(STR_CHESS_MIN));
+    } else {
+      snprintf(clock, sizeof(clock), "%s", time.text);
+    }
     drawRightAligned(renderer, kText12Font, right, kHeaderTop, clock, kSemiBold);
     right -= renderer.getTextWidth(kText12Font, clock, kSemiBold) + kTurnLineGap;
   }
@@ -1193,11 +1194,14 @@ void ChessActivity::drawTurnLine(const int top, const bool bar) const {
 
 void ChessActivity::drawClockPanel() const {
   const chess::Color hero = heroSide();
-  char clock[12];
-  formatClock(match->remainingMs(hero), clock, sizeof(clock));
-  // Unbounded is wide: "45:00" does not fit at 96 px. Scale the face down just
-  // enough, measured with the widest digit in every place so the size holds
-  // while the time ticks.
+  const chess::ui::ClockText time = chess::ui::clockText(match->remainingMs(hero));
+  const char* clock = time.text;
+  // Above a minute the number is minutes with a small "мин" after it.
+  const char* unit = time.minutes ? tr(STR_CHESS_MIN) : nullptr;
+  const int unitWidth = unit != nullptr ? kUnitGap + renderer.getTextWidth(kText12Font, unit) : 0;
+  // Unbounded is wide: a long number may not fit at 96 px. Scale the face down
+  // just enough, measured with the widest digit in every place so the size
+  // holds while the time runs down.
   int32_t digitAdvance = 0;
   int32_t advance = 0;
   int glyphTop = 0;
@@ -1210,7 +1214,7 @@ void ChessActivity::drawClockPanel() const {
   renderer.getCodepointMetrics(kHeroFont, ':', EpdFontFamily::REGULAR, colonAdvance, glyphTop);
   int32_t naturalWidth = 0;  // 12.4 fixed point
   for (const char* c = clock; *c != '\0'; ++c) naturalWidth += *c == ':' ? colonAdvance : digitAdvance;
-  const int maxWidth = renderer.getScreenWidth() - kRowTextX - kSidePadding;
+  const int maxWidth = renderer.getScreenWidth() - kRowTextX - kSidePadding - unitWidth;
   int scale256 = kHeroCapTarget > 0 ? kHeroCapTarget * 256 / std::max(1, heroCapHeight(renderer, kHeroFont)) : 256;
   if (naturalWidth * scale256 > maxWidth * 16 * 256) scale256 = maxWidth * 16 * 256 / naturalWidth;
 
@@ -1218,14 +1222,18 @@ void ChessActivity::drawClockPanel() const {
   const int capHeight = heroCapHeight(renderer, kHeroFont) * scale256 / 256;
   const bool heroToMove = match->isHumanTurn() && match->game().sideToMove() == hero;
   if (heroToMove) drawSelectionBar(renderer, kBarX, capTop, capHeight);
+  int x = kRowTextX;
   if (scale256 == 256) {
-    drawHeroNumber(renderer, kHeroFont, kRowTextX, capTop, clock);
+    x += drawHeroNumber(renderer, kHeroFont, x, capTop, clock);
   } else {
-    int x = kRowTextX;
     for (const char* c = clock; *c != '\0'; ++c) {
       x += renderer.drawScaledCodepoint(kHeroFont, static_cast<uint8_t>(*c), EpdFontFamily::REGULAR, x,
                                         capTop + capHeight, scale256);
     }
+  }
+  if (unit != nullptr) {
+    // On the digits' baseline.
+    renderer.drawText(kText12Font, x + kUnitGap, capTop + capHeight - renderer.getFontAscenderSize(kText12Font), unit);
   }
   drawTurnLine(capTop + capHeight + 14, false);
 }
