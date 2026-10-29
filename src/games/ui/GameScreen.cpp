@@ -102,6 +102,7 @@ void GameScreen::openGameMenu(const bool rowsAfterNewGame) {
 }
 
 void GameScreen::openPauseMenu() {
+  static_assert(GamePickerActivity::MAX_ROWS >= 4 + BAR_SLOTS + MENU_ROWS, "every pause menu row fits");
   GamePickerActivity::Row rows[GamePickerActivity::MAX_ROWS];
   int count = 0;
   addMenuRow(rows, count, kRowContinue, {tr(STR_GAMES_CONTINUE), &icon_start_24});

@@ -13,7 +13,7 @@ class GamePickerActivity final : public SetkaListActivity {
     const freeink::Icon* icon;
     const char* status = nullptr;  // right-aligned, e.g. the difficulty
   };
-  static constexpr int MAX_ROWS = 8;
+  static constexpr int MAX_ROWS = 10;
 
   GamePickerActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const char* title, const Row* rows,
                      int count, int selected, int toggleRow = -1, bool toggleOn = false);

@@ -47,7 +47,7 @@ std::unique_ptr<Activity> openSpider(GfxRenderer& renderer, MappedInputManager& 
 }
 
 SpiderActivity::SpiderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : GameScreen("Spider", renderer, mappedInput) {}
+    : GameScreen("Spider", StrId::STR_SPIDER, renderer, mappedInput) {}
 
 bool SpiderActivity::restore() {
   gamesave::loadBest(gamesave::Kind::Spider, best);
@@ -108,7 +108,7 @@ void SpiderActivity::afterMove() {
   if (game.isWon()) {
     newBest = best.record(modeOf(game.suits()), game.moveCount());
     bestPending = bestPending || newBest;
-    if (focus != kNone) focus = kBarFocus + BAR_SLOTS - 1;
+    if (focus != kNone && hasBar()) focus = kBarFocus + BAR_SLOTS - 1;
     requestRepaint(RepaintEntry);
   }
   markChanged();
@@ -214,7 +214,7 @@ int SpiderActivity::nextBarSlot(const int from, const int step) const {
   return from;
 }
 
-// Left/Right walk the stock and the ten columns, Up/Down reach the stock and the bar.
+// Left/Right walk the stock and the ten columns, Up/Down reach the stock and the bar where it is shown.
 void SpiderActivity::onKey(const int dx, const int dy, const bool confirm) {
   const int before = focus;
   if (focus == kNone) {
@@ -240,8 +240,10 @@ void SpiderActivity::onKey(const int dx, const int dy, const bool confirm) {
     const int position = (focus == STOCK ? 0 : focus + 1) + dx;
     const int next = (position + places) % places;
     focus = next == 0 ? STOCK : next - 1;
-  } else if (dy > 0) {
-    focus = focus == STOCK ? 0 : kBarFocus + nextBarSlot(BAR_SLOTS - 1, 1);
+  } else if (dy > 0 && focus == STOCK) {
+    focus = 0;
+  } else if (dy > 0 && hasBar()) {
+    focus = kBarFocus + nextBarSlot(BAR_SLOTS - 1, 1);
   } else if (dy < 0 && focus != STOCK) {
     focus = STOCK;
   }
@@ -340,8 +342,9 @@ void SpiderActivity::build(UiScreen& screen) {
                                    won ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU)};
   const freeink::Icon* icons[BAR_SLOTS] = {&icon_bar_undo_24, &icon_bar_hint_24,
                                            won ? &icon_bar_new_game_24 : &icon_menu_24};
+  const BarItem::Kind kinds[BAR_SLOTS] = {BarItem::Action, BarItem::Action, won ? BarItem::NewGame : BarItem::Menu};
   for (int i = 0; i < BAR_SLOTS; ++i) {
-    if (barShown(i)) items[i] = {icons[i], labels[i], false};
+    if (barShown(i)) items[i] = {icons[i], labels[i], false, kinds[i]};
   }
   drawBar(screen, items, focus >= kBarFocus ? focus - kBarFocus : -1);
 }

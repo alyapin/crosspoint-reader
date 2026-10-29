@@ -45,7 +45,7 @@ std::unique_ptr<Activity> openReversi(GfxRenderer& renderer, MappedInputManager&
 }
 
 ReversiActivity::ReversiActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : GameScreen("Reversi", renderer, mappedInput) {}
+    : GameScreen("Reversi", StrId::STR_REVERSI, renderer, mappedInput) {}
 
 // A finished game still loads for its score; the screen then opens the picker.
 bool ReversiActivity::restore() {
@@ -101,11 +101,7 @@ bool ReversiActivity::playerToMove() const {
 }
 
 void ReversiActivity::syncFocus() {
-  if (mappedInput.hasTouch()) return;
-  if (game.isOver()) {
-    barFocus = kMenuSlot;
-    return;
-  }
+  if (mappedInput.hasTouch() || game.isOver()) return;
   const uint64_t moves = playerToMove() ? game.moves() : 0;
   if (moves != 0 && (cursor < 0 || !(moves >> cursor & 1))) cursor = __builtin_ctzll(moves);
 }
@@ -138,7 +134,7 @@ bool ReversiActivity::barShown(const int slot) const {
   return slot == kMenuSlot;
 }
 
-// Keys walk the legal moves, then the bar, and wrap.
+// Keys walk the legal moves, then the bar where it is shown, and wrap.
 void ReversiActivity::stepFocus(const int step) {
   const uint64_t moves = playerToMove() ? game.moves() : 0;
   int ring[CELLS + BAR_SLOTS];  // a square, or -1 - bar slot
@@ -149,7 +145,7 @@ void ReversiActivity::stepFocus(const int step) {
     if (barFocus < 0 && s == cursor) at = count;
     ring[count++] = s;
   }
-  for (int slot = 0; slot < BAR_SLOTS; ++slot) {
+  for (int slot = 0; hasBar() && slot < BAR_SLOTS; ++slot) {
     if (!barShown(slot)) continue;
     if (slot == barFocus) at = count;
     ring[count++] = -1 - slot;
@@ -241,7 +237,8 @@ void ReversiActivity::build(UiScreen& screen) {
   BarItem items[BAR_SLOTS];
   if (barShown(0)) items[0] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO)};
   const bool over = game.isOver();
-  items[kMenuSlot] = {over ? &icon_bar_new_game_24 : &icon_menu_24, over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU)};
+  items[kMenuSlot] = {over ? &icon_bar_new_game_24 : &icon_menu_24, over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU),
+                      false, over ? BarItem::NewGame : BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 

@@ -46,7 +46,7 @@ std::unique_ptr<Activity> openFreeCell(GfxRenderer& renderer, MappedInputManager
 }
 
 FreeCellActivity::FreeCellActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : GameScreen("FreeCell", renderer, mappedInput) {}
+    : GameScreen("FreeCell", StrId::STR_FREECELL, renderer, mappedInput) {}
 
 // Without a save a new deal starts right away.
 bool FreeCellActivity::restore() {
@@ -105,7 +105,7 @@ void FreeCellActivity::afterMove() {
   if (game.isWon()) {
     newBest = best.record(0, game.moveCount());
     bestPending = bestPending || newBest;
-    if (focus != kNone) focus = kBarFocus + BAR_SLOTS - 1;
+    if (focus != kNone && hasBar()) focus = kBarFocus + BAR_SLOTS - 1;
     requestRepaint(RepaintEntry);
   }
   markChanged();
@@ -196,7 +196,7 @@ int FreeCellActivity::nextBarSlot(const int from, const int step) const {
   return from;
 }
 
-// Left/Right walk all sixteen places, Up/Down switch rows and reach the bar.
+// Left/Right walk all sixteen places, Up/Down switch rows and reach the bar where it is shown.
 void FreeCellActivity::onKey(const int dx, const int dy, const bool confirm) {
   const int before = focus;
   if (focus == kNone) {
@@ -215,8 +215,10 @@ void FreeCellActivity::onKey(const int dx, const int dy, const bool confirm) {
     activate(focus, kNone);
   } else if (dx != 0) {
     focus = (focus + dx + PLACES) % PLACES;
-  } else if (dy > 0) {
-    focus = isColumn(focus) ? kBarFocus + nextBarSlot(BAR_SLOTS - 1, 1) : focus + COLUMN;
+  } else if (dy > 0 && !isColumn(focus)) {
+    focus += COLUMN;
+  } else if (dy > 0 && hasBar()) {
+    focus = kBarFocus + nextBarSlot(BAR_SLOTS - 1, 1);
   } else if (dy < 0 && isColumn(focus)) {
     focus -= COLUMN;
   }
@@ -307,8 +309,9 @@ void FreeCellActivity::build(UiScreen& screen) {
                                    won ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU)};
   const freeink::Icon* icons[BAR_SLOTS] = {&icon_bar_undo_24, &icon_bar_hint_24,
                                            won ? &icon_bar_new_game_24 : &icon_menu_24};
+  const BarItem::Kind kinds[BAR_SLOTS] = {BarItem::Action, BarItem::Action, won ? BarItem::NewGame : BarItem::Menu};
   for (int i = 0; i < BAR_SLOTS; ++i) {
-    if (barShown(i)) items[i] = {icons[i], labels[i], false};
+    if (barShown(i)) items[i] = {icons[i], labels[i], false, kinds[i]};
   }
   drawBar(screen, items, focus >= kBarFocus ? focus - kBarFocus : -1);
 }

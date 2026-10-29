@@ -96,7 +96,7 @@ std::unique_ptr<Activity> openDraughts(GfxRenderer& renderer, MappedInputManager
 }
 
 DraughtsActivity::DraughtsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : GameScreen("Draughts", renderer, mappedInput) {}
+    : GameScreen("Draughts", StrId::STR_DRAUGHTS, renderer, mappedInput) {}
 
 bool DraughtsActivity::restore() {
   if (!gamesave::load(game) || !game.inProgress()) return false;
@@ -130,6 +130,7 @@ void DraughtsActivity::pickerChosen(const int row, bool) {
 }
 
 int DraughtsActivity::menuRows(GamePickerActivity::Row (&rows)[MENU_ROWS]) const {
+  if (game.isOver()) return 0;
   rows[0] = {tr(STR_CHESS_OFFER_DRAW), &icon_draw_24};
   rows[1] = {tr(STR_CHESS_RESIGN), &icon_surrender_24};
   return 2;
@@ -176,7 +177,6 @@ void DraughtsActivity::refresh() {
 
 void DraughtsActivity::afterChange() {
   refresh();
-  if (game.isOver() && !mappedInput.hasTouch()) barFocus = kNewGameSlot;
   markChanged();
 }
 
@@ -352,7 +352,7 @@ void DraughtsActivity::onKey(const int dx, const int dy, const bool confirm) {
       if (at == count) cursor = items[0];
     }
   } else if (count == 0) {
-    barFocus = firstSlot;
+    if (hasBar()) barFocus = firstSlot;
   } else if (at == count) {
     cursor = items[0];
   } else if (confirm) {
@@ -363,12 +363,14 @@ void DraughtsActivity::onKey(const int dx, const int dy, const bool confirm) {
     }
   } else if (dx != 0) {
     const int next = at + dx;
-    if (next < 0 || next >= count) {
+    if (next >= 0 && next < count) {
+      cursor = items[next];
+    } else if (hasBar()) {
       barFocus = dx > 0 ? firstSlot : lastSlot;
     } else {
-      cursor = items[next];
+      cursor = items[(next + count) % count];
     }
-  } else if (dy > 0) {
+  } else if (dy > 0 && hasBar()) {
     barFocus = firstSlot;
   }
   const int after[] = {cursor, barFocus, selected, chainLen, flipped};
@@ -439,7 +441,8 @@ void DraughtsActivity::build(UiScreen& screen) {
   if (barShown(0)) items[0] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO)};
   if (barShown(kFlipSlot)) items[kFlipSlot] = {&icon_flip_24, tr(STR_CHESS_FLIP_SHORT)};
   items[kNewGameSlot] = {over ? &icon_bar_new_game_24 : &icon_menu_24,
-                         over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU)};
+                         over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU), false,
+                         over ? BarItem::NewGame : BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 

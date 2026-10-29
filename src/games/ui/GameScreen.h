@@ -24,7 +24,8 @@
 // Keys (the X4 has no touch): the subclass walks its own cursor with
 // Left/Right and the side buttons, Confirm acts; Back first drops what the
 // subclass holds (a pick, a pad focus), then leaves, or on button boards opens
-// the pause menu: Продолжить, the bar's actions, Новая игра, Завершить, Выйти.
+// the pause menu: Продолжить, the bar's actions, the game's own menu rows,
+// Новая игра, Завершить, Выйти.
 // Once a game is over there, Confirm runs the bar's Новая игра.
 //
 // The loop task alone mutates the game and the view state, under the
@@ -90,7 +91,7 @@ class GameScreen : public Activity, protected UiAppHost {
   // The game's own menu rows (at most MENU_ROWS) and the choice of one, by its
   // index there: in the touch Меню and in the pause menu, before Новая игра.
   static constexpr int MENU_ROWS = 3;
-  virtual int menuRows(GamePickerActivity::Row (&/*rows*/)[MENU_ROWS]) const { return 0; }
+  virtual int menuRows(GamePickerActivity::Row (& /*rows*/)[MENU_ROWS]) const { return 0; }
   virtual void menuChosen(int /*row*/) {}
 
   void openPicker(const char* title, const GamePickerActivity::Row* rows, int count, int selected, int toggleRow = -1,
@@ -135,9 +136,9 @@ class GameScreen : public Activity, protected UiAppHost {
   int newGameSlot() const;
 
   StrId title;
-  mutable BarItem shownBar[BAR_SLOTS];  // the last drawBar(), for the pause menu
+  mutable BarItem shownBar[BAR_SLOTS];                // the last drawBar(), for the pause menu
   int8_t menuIds[GamePickerActivity::MAX_ROWS] = {};  // the open menu's rows (GameScreen.cpp MenuRow)
-  setka::RefreshCadence cadence;  // render task only
+  setka::RefreshCadence cadence;                      // render task only
   std::atomic<uint8_t> repaint{RepaintEntry};
   int32_t clockShown = -1;
   bool savePending = false;

@@ -58,7 +58,7 @@ std::unique_ptr<Activity> openCodeword(GfxRenderer& renderer, MappedInputManager
 }
 
 CodewordActivity::CodewordActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : GameScreen("Codeword", renderer, mappedInput), game(&GameScreen::nowMs) {}
+    : GameScreen("Codeword", StrId::STR_CODEWORD, renderer, mappedInput), game(&GameScreen::nowMs) {}
 
 bool CodewordActivity::restore() {
   gamesave::load(solved);
@@ -134,7 +134,7 @@ void CodewordActivity::resetView() {
   }
   select(cursor);
   stripOpen = false;
-  barFocus = game.solved() && !mappedInput.hasTouch() ? static_cast<int>(Action::Menu) : -1;
+  barFocus = -1;
   mistakes = -1;
   solvedPending = false;
 }
@@ -161,7 +161,7 @@ void CodewordActivity::afterChange() {
   stripOpen = false;
   if (game.solved()) {
     solvedPending = true;
-    barFocus = mappedInput.hasTouch() ? -1 : static_cast<int>(Action::Menu);
+    barFocus = -1;
   }
   if (!stripFree(pick)) pick = stripStep(pick, 1);
   markChanged();
@@ -284,7 +284,7 @@ void CodewordActivity::moveCursor(const int dx, const int dy) {
       return;
     }
   }
-  if (dy > 0) barFocus = nextBarSlot(BAR_SLOTS - 1, 1);
+  if (dy > 0 && hasBar()) barFocus = nextBarSlot(BAR_SLOTS - 1, 1);
 }
 
 // --- input -------------------------------------------------------------------
@@ -433,8 +433,8 @@ void CodewordActivity::build(UiScreen& screen) {
   BarItem items[BAR_SLOTS];
   if (barShown(0)) items[0] = {&icon_bar_hint_24, tr(STR_CODEWORD_HINT)};
   if (barShown(1)) items[1] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO)};
-  items[2] = game.solved() ? BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME)}
-                           : BarItem{&icon_menu_24, tr(STR_GAMES_MENU)};
+  items[2] = game.solved() ? BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame}
+                           : BarItem{&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 
