@@ -811,11 +811,11 @@ const freeink::Icon* ChessActivity::rowIcon(const Row row) const {
     case Row::Start:
       return &icon_start_24;
     case Row::Resign:
-      return &icon_resign_24;
+      return &icon_finish_24;
     case Row::Draw:
       return &icon_draw_24;
     case Row::NewGame:
-      return &icon_new_game_24;
+      return &icon_bar_new_game_24;
     case Row::Flip:
       return &icon_flip_24;
     case Row::Undo:

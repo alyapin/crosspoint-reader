@@ -143,7 +143,7 @@ void DraughtsActivity::pickerChosen(const int row, bool) {
 int DraughtsActivity::menuRows(GamePickerActivity::Row (&rows)[MENU_ROWS]) const {
   if (game.isOver()) return 0;
   rows[0] = {tr(STR_CHESS_OFFER_DRAW), &icon_draw_24};
-  rows[1] = {tr(STR_CHESS_RESIGN), &icon_surrender_24};
+  rows[1] = {tr(STR_CHESS_RESIGN), &icon_finish_24};
   return 2;
 }
 

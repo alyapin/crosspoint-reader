@@ -97,7 +97,7 @@ void GameScreen::openGameMenu(const bool rowsAfterNewGame) {
   if (!rowsAfterNewGame) addOwnRows(rows, count);
   addMenuRow(rows, count, kRowNewGame, {tr(STR_GAMES_NEW_GAME), &icon_bar_new_game_24});
   if (rowsAfterNewGame) addOwnRows(rows, count);
-  addMenuRow(rows, count, kRowFinish, {tr(STR_GAMES_FINISH), &icon_resign_24});
+  addMenuRow(rows, count, kRowFinish, {tr(STR_GAMES_FINISH), &icon_finish_24});
   showMenu(tr(STR_GAMES_MENU), rows, count);
 }
 
@@ -114,7 +114,7 @@ void GameScreen::openPauseMenu() {
   }
   addOwnRows(rows, count);
   addMenuRow(rows, count, kRowNewGame, {tr(STR_GAMES_NEW_GAME), &icon_bar_new_game_24});
-  if (newGameSlot() < 0) addMenuRow(rows, count, kRowFinish, {tr(STR_GAMES_FINISH), &icon_resign_24});
+  if (newGameSlot() < 0) addMenuRow(rows, count, kRowFinish, {tr(STR_GAMES_FINISH), &icon_finish_24});
   addMenuRow(rows, count, kRowLeave, {tr(STR_GAMES_LEAVE), &icon_exit_24});
   showMenu(I18N.get(title), rows, count);
 }
