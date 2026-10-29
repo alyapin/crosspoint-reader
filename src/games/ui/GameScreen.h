@@ -131,7 +131,10 @@ class GameScreen : public Activity, protected UiAppHost {
   void drawCentered(int font, int x, int width, int y, const char* text,
                     EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
   // Key cursor where the board already frames a pick or marks a move: corner brackets inside the box.
+  // Board cells take the 4 px inset frame (drawCellFrame) instead.
   void drawCursor(int x, int y, int width, int height) const;
+  // Key cursor on a keyboard key, whatever the key shows: corner brackets just outside it.
+  void drawKeyCursor(int x, int y, int width, int height) const;
   // "4 мин" / "<1 мин".
   static void formatElapsed(uint32_t ms, char* out, size_t cap);
   // The games' clock source.

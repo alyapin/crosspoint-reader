@@ -30,7 +30,6 @@ constexpr int kKeyHeight = 44;
 constexpr int kKeyGap = 6;
 constexpr int kKeySide = 8;
 constexpr int kKeyUnits = 12;     // the widest row; keys sit on half units
-constexpr int kKeyCursorOut = 3;  // key focus: corner brackets just outside the key
 constexpr int kCaptionBand = 32;  // under the keyboard: the totals once over
 constexpr int kIconSize = 24;
 
@@ -335,7 +334,7 @@ void FiveLettersActivity::drawKey(UiScreen& screen, const int row, const int ind
     }
   }
   if (row == keyRow && index == keyIndex && barFocus < 0 && !game.isOver()) {
-    drawCursor(x - kKeyCursorOut, y - kKeyCursorOut, width + 2 * kKeyCursorOut, kKeyHeight + 2 * kKeyCursorOut);
+    drawKeyCursor(x, y, width, kKeyHeight);
   }
 }
 

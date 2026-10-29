@@ -364,7 +364,7 @@ void SudokuActivity::drawPad(UiScreen& screen) const {
     renderer.drawRect(x, kPadTop, kKeyWidth, kKeyHeight, kKeyRule, true);
     const char digit[2] = {static_cast<char>('1' + k), '\0'};
     drawCentered(kText12Font, x, kKeyWidth, kPadTop + (kKeyHeight - lineHeight) / 2, digit, kSemiBold);
-    if (area == Area::Pad && k == padFocus) drawCellFrame(renderer, x, kPadTop, kKeyWidth, kKeyHeight);
+    if (area == Area::Pad && k == padFocus) drawKeyCursor(x, kPadTop, kKeyWidth, kKeyHeight);
     screen.frame().hit(fui::makeRect(x, kPadTop, kKeyWidth, kKeyHeight), ACTION_PAD, static_cast<int16_t>(k + 1),
                        fui::InputTouch);
   }

@@ -227,8 +227,8 @@ void ReversiActivity::build(UiScreen& screen) {
     }
   }
   if (cursor >= 0 && barFocus < 0 && (moves >> cursor & 1)) {
-    drawCursor(left + cursor % SIZE * cell + kCursorInset, BOARD_TOP + cursor / SIZE * cell + kCursorInset,
-               cell - 2 * kCursorInset, cell - 2 * kCursorInset);
+    drawCellFrame(renderer, left + cursor % SIZE * cell + kCursorInset, BOARD_TOP + cursor / SIZE * cell + kCursorInset,
+                  cell - 2 * kCursorInset, cell - 2 * kCursorInset);
   }
   screen.frame().hit(fui::makeRect(left, BOARD_TOP, side, side), ACTION_BOARD, 0, shellInput());
 

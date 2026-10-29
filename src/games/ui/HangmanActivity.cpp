@@ -360,10 +360,5 @@ void HangmanActivity::drawKey(const int key, const int top) const {
     renderer.drawText(kText10Font, x + (kKeyWidth - renderer.getTextWidth(kText10Font, text, kSemiBold)) / 2, textY,
                       text, black, kSemiBold);
   }
-  if (key != cursor || barFocus >= 0 || game.isOver()) return;
-  if (state == hangman::Key::Right) {
-    renderer.drawRect(x + 3, y + 3, kKeyWidth - 6, kKeyHeight - 6, 3, false);
-  } else {
-    drawCellFrame(renderer, x, y, kKeyWidth, kKeyHeight);
-  }
+  if (key == cursor && barFocus < 0 && !game.isOver()) drawKeyCursor(x, y, kKeyWidth, kKeyHeight);
 }

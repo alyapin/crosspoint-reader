@@ -59,22 +59,6 @@ struct PackScan {
   }
 };
 
-// Corner brackets or a full frame, in black or (on a filled cell) white.
-void frameCell(const GfxRenderer& renderer, const int x, const int y, const int size, const bool black,
-               const bool brackets) {
-  if (!brackets) {
-    renderer.drawRect(x, y, size, size, kCellFrameWidth, black);
-    return;
-  }
-  const int arm = size * 2 / 5;
-  const int w = kCellFrameWidth - 1;
-  for (const int cx : {x, x + size - arm}) {
-    for (const int cy : {y, y + size - w}) renderer.fillRect(cx, cy, arm, w, black);
-  }
-  for (const int cx : {x, x + size - w}) {
-    for (const int cy : {y, y + size - arm}) renderer.fillRect(cx, cy, w, arm, black);
-  }
-}
 }  // namespace
 
 const char* nonogramListStatus() {
@@ -472,10 +456,11 @@ void NonogramActivity::drawGrid(const Layout& l) const {
     renderer.fillRect(l.gridLeft + i * size - offset, l.gridTop - offset, width, span + 2 * offset + 1, true);
     renderer.fillRect(l.gridLeft - offset, l.gridTop + i * size - offset, span + 2 * offset + 1, width, true);
   }
-  // A tapped cell is framed only while white; the key cursor shows on any cell.
+  // A tapped cell is framed only while white; the key cursor shows on any cell, in white on a filled one.
   const bool filled = cursor >= 0 && game.mark(cursor) == nonogram::Filled;
   if (cursor >= 0 && barFocus < 0 && !solved && (keyCursor || !filled)) {
-    frameCell(renderer, l.gridLeft + cursor % n * size, l.gridTop + cursor / n * size, size + 1, !filled, keyCursor);
+    renderer.drawRect(l.gridLeft + cursor % n * size, l.gridTop + cursor / n * size, size + 1, size + 1,
+                      kCellFrameWidth, !filled);
   }
 }
 

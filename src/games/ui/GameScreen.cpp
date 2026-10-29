@@ -24,6 +24,7 @@ using namespace setka;
 
 namespace {
 constexpr int kCursorArm = 14;
+constexpr int kKeyCursorOut = 3;
 constexpr int kModeIcon = 24;
 constexpr int kModeIconGap = 8;
 // Menu rows other than a bar slot (0..BAR_SLOTS-1); a game's own row is kRowOwn + its index.
@@ -369,6 +370,10 @@ void GameScreen::drawCursor(const int x, const int y, const int width, const int
   for (const int cx : {x, x + width - kCellFrameWidth}) {
     for (const int cy : {y, y + height - arm}) renderer.fillRect(cx, cy, kCellFrameWidth, arm, true);
   }
+}
+
+void GameScreen::drawKeyCursor(const int x, const int y, const int width, const int height) const {
+  drawCursor(x - kKeyCursorOut, y - kKeyCursorOut, width + 2 * kKeyCursorOut, height + 2 * kKeyCursorOut);
 }
 
 void GameScreen::formatElapsed(const uint32_t ms, char* out, const size_t cap) {
