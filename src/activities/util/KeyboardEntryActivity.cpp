@@ -188,6 +188,7 @@ void KeyboardEntryActivity::onEnter() {
   delPressCount = 0;
   hintVisible = false;
   hintShowTime = 0;
+  altOpen = false;
   rightHeld = false;
   rightLongHandled = false;
   savedCursorPos = 0;
@@ -393,13 +394,126 @@ bool KeyboardEntryActivity::clearAllOrAltOnSelected() {
     cursorPos = 0;
     return true;
   }
-  // Explicit alts and the letter case-flip, same as touch long-press.
-  const char* alt = fui::keyboardAltOutputFor(currentLayout(), key->value);
-  if (alt) {
-    insertUtf8(alt);
-    return true;
+  // Explicit alts and the letter case-flip, same strip as a touch long-press.
+  if (!openAltStrip(key->value)) return false;
+  altSwallowConfirm = true;
+  return true;
+}
+
+bool KeyboardEntryActivity::openAltStrip(const int16_t value) {
+  const fui::KeyboardLayout& layer = currentLayout();
+  const char* own = fui::keyboardOutputFor(layer, value);
+  const char* alt = fui::keyboardAltOutputFor(layer, value);
+  if (!own || !alt || std::strcmp(own, alt) == 0) return false;
+  const fui::Interaction* hits = interactions.publishedData();
+  const size_t count = interactions.publishedCount();
+  const auto* key = std::find_if(hits, hits + count, [value](const fui::Interaction& hit) {
+    return hit.action == ACTION_KEY && hit.value == value;
+  });
+  if (key == hits + count) return false;
+  altAnchor = key->rect;
+  altChoices[0] = own;
+  altChoices[1] = alt;
+  altCount = 2;
+  altFocus = 1;
+  altArmed = false;
+  altSwallowConfirm = false;
+  altOpen = true;
+  delPressCount = 0;
+  hintVisible = false;
+  return true;
+}
+
+void KeyboardEntryActivity::closeAltStrip() {
+  altOpen = false;
+  confirmHeld = false;
+  confirmLongHandled = false;
+  touchRouter.reset();
+  requestUpdate();
+}
+
+void KeyboardEntryActivity::handleAltStrip() {
+  const auto pick = [this](const int index) {
+    insertUtf8(altChoices[index]);
+    if (shifted && !symbols) {
+      shifted = false;  // shift auto-releases after one character
+      clampSelection();
+    }
+    closeAltStrip();
+  };
+  int tx = 0;
+  int ty = 0;
+  if (mappedInput.wasScreenTapped(tx, ty) && altArmed) {
+    haptic_feedback::touchAction();
+    for (int i = 0; i < altCount; ++i) {
+      if (altCellRect(i).contains(static_cast<int16_t>(tx), static_cast<int16_t>(ty))) {
+        pick(i);
+        return;
+      }
+    }
+    closeAltStrip();  // a tap elsewhere dismisses the strip
+    return;
   }
-  return false;
+  int hx = 0;
+  int hy = 0;
+  if (!mappedInput.isScreenTouchHeld(hx, hy)) altArmed = true;
+
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+    if (altSwallowConfirm) {
+      altSwallowConfirm = false;
+    } else {
+      pick(altFocus);
+    }
+    return;
+  }
+  if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
+    closeAltStrip();
+    return;
+  }
+  const bool left = mappedInput.wasPressed(MappedInputManager::Button::Left);
+  const bool right = mappedInput.wasPressed(MappedInputManager::Button::Right);
+  if (left || right) {
+    altFocus = (altFocus + (right ? 1 : altCount - 1)) % altCount;
+    requestUpdate();
+  }
+}
+
+// One square cell per character, at least a list row tall, just above the
+// keyboard's top rule (no key is covered) and centered over the long-pressed
+// key inside the side padding.
+fui::Rect KeyboardEntryActivity::altCellRect(const int index) const {
+  using namespace setka;
+  constexpr int kGap = 12;  // air between the strip and the keyboard's rule
+  const int cell = std::max<int>(altAnchor.width, kListRowHeight);
+  const fui::Rect kb = keyboardRect();
+  const int keysHeight =
+      keyboardKeysHeight(UITheme::getInstance().getMetrics(), currentLayout().rowCount, mappedInput.hasTouch());
+  const int keysTop = kb.y + (kb.height - keysHeight) / 2;
+  const int width = renderer.getScreenWidth();
+  const int stripW = cell * altCount;
+  const int x = std::clamp(altAnchor.x + altAnchor.width / 2 - stripW / 2, kSidePadding, width - kSidePadding - stripW);
+  return fui::Rect{static_cast<int16_t>(x + index * cell), static_cast<int16_t>(keysTop - kRuleWidth - kGap - cell),
+                   static_cast<int16_t>(cell), static_cast<int16_t>(cell)};
+}
+
+// White under the strip, a 2 px frame, 1 px lines between the cells, and the
+// focused cell in the 4 px grid frame.
+void KeyboardEntryActivity::drawAltStrip(const int fontId) const {
+  using namespace setka;
+  const fui::Rect first = altCellRect(0);
+  const int stripW = first.width * altCount;
+  constexpr int kClear = 6;
+  renderer.fillRect(first.x - kClear, first.y - kClear, stripW + 2 * kClear, first.height + 2 * kClear, false);
+  renderer.drawRect(first.x, first.y, stripW, first.height, kRuleWidth, true);
+  const int lineHeight = renderer.getLineHeight(fontId);
+  for (int i = 0; i < altCount; ++i) {
+    const fui::Rect cell = altCellRect(i);
+    if (i > 0) renderer.drawLine(cell.x, cell.y, cell.x, cell.y + cell.height - 1);
+    if (i == altFocus) drawCellFrame(renderer, cell.x, cell.y, cell.width, cell.height);
+    const int labelWidth = renderer.getTextWidth(fontId, altChoices[i]);
+    renderer.drawText(fontId, cell.x + (cell.width - labelWidth) / 2, cell.y + (cell.height - lineHeight) / 2,
+                      altChoices[i]);
+  }
 }
 
 std::string KeyboardEntryActivity::displayTextForCurrentState() const {
@@ -577,6 +691,10 @@ fui::Rect KeyboardEntryActivity::keyboardRect() const {
 }
 
 void KeyboardEntryActivity::loop() {
+  if (altOpen) {
+    handleAltStrip();
+    return;
+  }
   int tx = 0;
   int ty = 0;
 
@@ -611,6 +729,11 @@ void KeyboardEntryActivity::loop() {
                            static_cast<int16_t>(tapX), static_cast<int16_t>(tapY), inContact, millis());
     if (result.event) {
       syncSelectionToValue(result.event.value);
+      if (result.event.longPress && openAltStrip(result.event.value)) {
+        haptic_feedback::touchAction(true);
+        requestUpdate();
+        return;
+      }
       if (activateValue(result.event.value, result.event.longPress)) {
         haptic_feedback::touchAction(result.event.longPress);
         requestUpdate();
@@ -1032,7 +1155,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   // The 12-column Arabic rows need the smaller font for wide isolated letters.
   props.labelText.font = layoutId == fui::KeyboardLayoutId::ArabicAr && !symbols ? fui::GfxRendererTarget::FONT_SMALL
                                                                                  : fui::GfxRendererTarget::FONT_BODY;
-  props.altText.font = fui::GfxRendererTarget::FONT_SMALL;
+  props.altHints = false;                       // alternates show only in the long-press strip
   if (urlPanel) props.uniformKeyWidth = false;  // Shortcut rows stretch independently.
   // Setka keyboard, like the scanword one: flat keys on one grid of 1 px
   // lines under a 2 px rule, the focused key a 4 px inset frame.
@@ -1055,6 +1178,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   drawKeyGrid(keysRect, layout.rowCount);
   interactions.publish();
   interactionsReady = true;
+  if (altOpen) drawAltStrip(keyLabelFont(keysRect.width));
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
