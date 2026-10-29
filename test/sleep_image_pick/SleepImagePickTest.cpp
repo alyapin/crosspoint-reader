@@ -80,15 +80,42 @@ TEST(SleepImagePick, ExplicitRandomGoesBeforeRootBmp) {
 }
 
 TEST(SleepImagePick, ThumbKeyChangesWithEveryInput) {
-  const uint32_t base = thumbKey("/sleep/a.bmp", 1000, 42, 136, 226, false);
-  EXPECT_EQ(base, thumbKey("/sleep/a.bmp", 1000, 42, 136, 226, false));
-  EXPECT_NE(base, thumbKey("/sleep/b.bmp", 1000, 42, 136, 226, false));
-  EXPECT_NE(base, thumbKey("/.sleep/a.bmp", 1000, 42, 136, 226, false));
-  EXPECT_NE(base, thumbKey("/sleep/a.bmp", 1001, 42, 136, 226, false));
-  EXPECT_NE(base, thumbKey("/sleep/a.bmp", 1000, 43, 136, 226, false));
-  EXPECT_NE(base, thumbKey("/sleep/a.bmp", 1000, 42, 137, 226, false));
-  EXPECT_NE(base, thumbKey("/sleep/a.bmp", 1000, 42, 136, 225, false));
-  EXPECT_NE(base, thumbKey("/sleep/a.bmp", 1000, 42, 136, 226, true));
+  const uint32_t base = thumbKey("/sleep/a.bmp", 1000, 42, 136, 226, false, 0);
+  EXPECT_EQ(base, thumbKey("/sleep/a.bmp", 1000, 42, 136, 226, false, 0));
+  EXPECT_NE(base, thumbKey("/sleep/b.bmp", 1000, 42, 136, 226, false, 0));
+  EXPECT_NE(base, thumbKey("/.sleep/a.bmp", 1000, 42, 136, 226, false, 0));
+  EXPECT_NE(base, thumbKey("/sleep/a.bmp", 1001, 42, 136, 226, false, 0));
+  EXPECT_NE(base, thumbKey("/sleep/a.bmp", 1000, 43, 136, 226, false, 0));
+  EXPECT_NE(base, thumbKey("/sleep/a.bmp", 1000, 42, 137, 226, false, 0));
+  EXPECT_NE(base, thumbKey("/sleep/a.bmp", 1000, 42, 136, 225, false, 0));
+  EXPECT_NE(base, thumbKey("/sleep/a.bmp", 1000, 42, 136, 226, true, 0));
+  EXPECT_NE(base, thumbKey("/sleep/a.bmp", 1000, 42, 136, 226, false, 1));
+  EXPECT_NE(base, thumbKey("/sleep/a.bmp", 1000, 42, 136, 226, false, 2));
+  EXPECT_NE(thumbKey("/sleep/a.bmp", 1000, 42, 136, 226, false, 1),
+            thumbKey("/sleep/a.bmp", 1000, 42, 136, 226, false, 2));
+}
+
+// Keys from before the filter was hashed (format 1: the crop byte, then the
+// format byte) must not name a current thumbnail, so old cache files are
+// regenerated and pruned instead of shown under the wrong filter.
+TEST(SleepImagePick, ThumbKeyDiffersFromFormatOne) {
+  const auto formatOne = [](const std::string& path, const bool crop) {
+    uint32_t hash = 2166136261u;
+    const auto mix = [&hash](const uint8_t byte) { hash = (hash ^ byte) * 16777619u; };
+    for (const char c : path) mix(static_cast<uint8_t>(c));
+    mix(0);
+    for (const uint32_t value : {1000u, 42u, 136u, 226u}) {
+      for (int shift = 0; shift < 32; shift += 8) mix(static_cast<uint8_t>(value >> shift));
+    }
+    mix(crop ? 1 : 0);
+    mix(1);
+    return hash;
+  };
+  for (const bool crop : {false, true}) {
+    for (const uint8_t filter : {0, 1, 2}) {
+      EXPECT_NE(formatOne("/sleep/a.bmp", crop), thumbKey("/sleep/a.bmp", 1000, 42, 136, 226, crop, filter));
+    }
+  }
 }
 
 TEST(SleepImagePick, ScreenSizedImageFillsTheThumb) {

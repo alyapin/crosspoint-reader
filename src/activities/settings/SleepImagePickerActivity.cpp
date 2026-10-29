@@ -35,6 +35,7 @@ constexpr size_t kNameBytes = 256;
 const char* baseName(const std::string& path) { return path.c_str() + path.rfind('/') + 1; }
 
 bool cropMode() { return SETTINGS.sleepScreenCoverMode == CrossPointSettings::SLEEP_SCREEN_COVER_MODE::CROP; }
+uint8_t sleepFilter() { return SETTINGS.sleepScreenCoverFilter; }
 }  // namespace
 
 SleepImagePickerActivity::SleepImagePickerActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
@@ -99,7 +100,7 @@ void SleepImagePickerActivity::scan() {
       if (bitmap.parseHeaders() != BmpReaderError::Ok) continue;
       Entry entry;
       entry.key = sleep_pick::thumbKey(path, static_cast<uint32_t>(file.fileSize()), file.modificationTime(), geo.tileW,
-                                       geo.tileH, crop);
+                                       geo.tileH, crop, sleepFilter());
       entry.path = std::move(path);
       entries.push_back(std::move(entry));
     }
@@ -232,7 +233,7 @@ bool SleepImagePickerActivity::generateNextThumb() {
     auto& entry = entries[tile - 1];
     if (entry.thumb != Thumb::Missing) continue;
     const bool ok = sleep_thumbs::generate(entry.path, entry.key, geo.tileW, geo.tileH, renderer.getScreenWidth(),
-                                           renderer.getScreenHeight(), cropMode());
+                                           renderer.getScreenHeight(), cropMode(), sleepFilter());
     entry.thumb = ok ? Thumb::Ready : Thumb::Failed;
     return true;
   }

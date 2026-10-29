@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "CrossPointSettings.h"
 #include "SleepImagePick.h"
 
 namespace sleep_thumbs {
@@ -26,11 +27,20 @@ constexpr size_t kNameChars = 8;  // hex key
 // time, which is Atkinson-dithered and written as soon as it is complete.
 // Thumbnail rows go out in the source's file order (bottom-up BMPs stay
 // bottom-up), so a destination row is final when the source moves past it.
+// The B/W filters keep only white pixels white, as the sleep screen's B/W
+// frame does, and the inverted one flips the whole screen, margins included.
 class ThumbStreamer {
  public:
   ThumbStreamer(const Bitmap& bitmap, const sleep_pick::ThumbLayout& layout, const int thumbW, const int thumbH,
-                HalFile& out)
-      : bitmap(bitmap), layout(layout), thumbW(thumbW), thumbH(thumbH), out(out), ditherer(thumbW) {}
+                const uint8_t filter, HalFile& out)
+      : bitmap(bitmap),
+        layout(layout),
+        thumbW(thumbW),
+        thumbH(thumbH),
+        blackWhite(filter != CrossPointSettings::SLEEP_SCREEN_COVER_FILTER::NO_FILTER),
+        inverted(filter == CrossPointSettings::SLEEP_SCREEN_COVER_FILTER::INVERTED_BLACK_AND_WHITE),
+        out(out),
+        ditherer(thumbW) {}
 
   bool run() {
     const int levelBytes = (bitmap.getWidth() + 3) / 4;
@@ -66,22 +76,23 @@ class ThumbStreamer {
       }
       for (int x = layout.srcX; x < layout.srcX + layout.srcW; ++x) {
         const int col = (x - layout.srcX) * layout.dstW / layout.srcW;
-        sums[col] += (levels[x >> 2] >> (6 - (x & 3) * 2)) & 0x03;
+        const int level = (levels[x >> 2] >> (6 - (x & 3) * 2)) & 0x03;
+        sums[col] += !blackWhite ? level : (level == 3) != inverted ? 3 : 0;
         ++counts[col];
       }
     }
     if (pending >= 0 && !writeImageRow(pending)) return false;
-    return writeWhiteUntil(thumbH);
+    return writeBlankUntil(thumbH);
   }
 
  private:
   int fileIndexOf(const int thumbRow) const { return bitmap.isTopDown() ? thumbRow : thumbH - 1 - thumbRow; }
 
-  // Margins (and any row the downscale skipped) are plain white, with no
+  // Margins (and any row the downscale skipped) are plain background, with no
   // dither error carried across them.
-  bool writeWhiteUntil(const int fileIndex) {
+  bool writeBlankUntil(const int fileIndex) {
     for (; written < fileIndex; ++written) {
-      std::fill_n(row, outRowBytes, 0xFF);  // palette index 1 is white
+      std::fill_n(row, outRowBytes, inverted ? 0x00 : 0xFF);  // palette index 1 is white
       ditherer.reset();
       if (out.write(row, outRowBytes) != outRowBytes) return false;
     }
@@ -90,11 +101,11 @@ class ThumbStreamer {
 
   bool writeImageRow(const int thumbRow) {
     // Destination rows complete in file order, so this never moves backwards.
-    if (!writeWhiteUntil(fileIndexOf(thumbRow))) return false;
+    if (!writeBlankUntil(fileIndexOf(thumbRow))) return false;
     std::fill_n(row, outRowBytes, 0);
     for (int x = 0; x < thumbW; ++x) {
       const int col = x - layout.dstX;
-      int gray = 255;
+      int gray = inverted ? 0 : 255;
       if (col >= 0 && col < layout.dstW && counts[col] > 0) {
         gray = static_cast<int>(sums[col] * 85 / counts[col]);
         sums[col] = 0;
@@ -111,6 +122,8 @@ class ThumbStreamer {
   const sleep_pick::ThumbLayout& layout;
   const int thumbW;
   const int thumbH;
+  const bool blackWhite;
+  const bool inverted;
   HalFile& out;
   Atkinson1BitDitherer ditherer;
   std::unique_ptr<uint8_t[]> scratch;
@@ -141,12 +154,13 @@ std::string pathFor(const uint32_t key) {
 }
 
 bool generate(const std::string& source, const uint32_t key, const int thumbW, const int thumbH, const int screenW,
-              const int screenH, const bool crop) {
+              const int screenH, const bool crop, const uint8_t filter) {
   if (thumbW <= 0 || thumbH <= 0) return false;
   HalFile in;
   if (!Storage.openFileForRead("STH", source, in)) return false;
-  // Even thresholds: the 4 levels average back to gray as level * 85.
-  Bitmap bitmap(in, true, true);
+  // Even thresholds: the 4 levels average back to gray as level * 85. The B/W
+  // filters use the legacy ones, like the sleep screen (originalSleepThresholds).
+  Bitmap bitmap(in, true, filter == CrossPointSettings::SLEEP_SCREEN_COVER_FILTER::NO_FILTER);
   if (bitmap.parseHeaders() != BmpReaderError::Ok) return false;
   const auto layout =
       sleep_pick::thumbLayout(bitmap.getWidth(), bitmap.getHeight(), screenW, screenH, thumbW, thumbH, crop);
@@ -155,7 +169,7 @@ bool generate(const std::string& source, const uint32_t key, const int thumbW, c
   const std::string tmp = path.substr(0, path.size() - strlen(kExt)) + ".tmp";
   HalFile out;
   if (!Storage.ensureDirectoryExists(kDir) || !Storage.openFileForWrite("STH", tmp, out)) return false;
-  const bool written = ThumbStreamer(bitmap, layout, thumbW, thumbH, out).run();
+  const bool written = ThumbStreamer(bitmap, layout, thumbW, thumbH, filter, out).run();
   out.close();
   if (!written || !Storage.replaceFile(tmp.c_str(), path.c_str())) {
     LOG_ERR("STH", "Failed to build %s from %s", path.c_str(), source.c_str());

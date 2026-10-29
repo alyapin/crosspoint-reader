@@ -33,7 +33,9 @@ struct SourceOrder {
 SourceOrder sourceOrder(bool hasChoice, bool randomPicked);
 
 // Thumbnail cache key: FNV-1a over everything that changes a thumbnail.
-uint32_t thumbKey(std::string_view path, uint32_t fileSize, uint32_t mtime, int thumbW, int thumbH, bool crop);
+// `filter` is CrossPointSettings::SLEEP_SCREEN_COVER_FILTER.
+uint32_t thumbKey(std::string_view path, uint32_t fileSize, uint32_t mtime, int thumbW, int thumbH, bool crop,
+                  uint8_t filter);
 
 // Where a sleep image lands in a thumbnail of the whole sleep screen, mirroring
 // SleepActivity's fit/crop placement and GfxRenderer::drawBitmap's scaling:
