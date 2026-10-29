@@ -6,10 +6,12 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <utility>
 
 #include "components/UITheme.h"
 #include "components/UiSliderDialog.h"
+#include "components/setka/SetkaStyle.h"
 #include "fontIds.h"
 
 namespace fui = freeink::ui;
@@ -158,26 +160,22 @@ void IntervalSelectionActivity::intervalScreen(UiScreen& screen, void* user) {
   static_cast<IntervalSelectionActivity*>(user)->buildIntervalScreen(screen);
 }
 
+void IntervalSelectionActivity::formatStepHint(char* buffer, const size_t size, const StrId labelId,
+                                               const int step) const {
+  // Built from separate label + value strings (rather than splitting one localized sentence) so the layout
+  // doesn't depend on translators preserving a hidden separator.
+  char stepText[24];
+  if (valueFormatId != StrId::STR_NONE_OPT) {
+    snprintf(stepText, sizeof(stepText), I18N.get(valueFormatId), static_cast<unsigned int>(step));
+  } else {
+    snprintf(stepText, sizeof(stepText), "%d", step);
+  }
+  snprintf(buffer, size, "%s %s", I18N.get(labelId), stepText);
+}
+
 void IntervalSelectionActivity::buildIntervalScreen(UiScreen& screen) {
   char readout[64];
   formatValue(readout, sizeof(readout), value);
-
-  // Step hints: front buttons do the small step, side buttons the large step. Built from
-  // separate label + value strings (rather than splitting one localized sentence) so the layout
-  // doesn't depend on translators preserving a hidden separator.
-  char hints[2][64];
-  char stepText[24];
-  int hintIndex = 0;
-  for (const auto& [labelId, step] :
-       {std::pair{StrId::STR_STEP_HINT_FRONT, smallStep}, std::pair{StrId::STR_STEP_HINT_SIDE, largeStep}}) {
-    if (valueFormatId != StrId::STR_NONE_OPT) {
-      snprintf(stepText, sizeof(stepText), I18N.get(valueFormatId), static_cast<unsigned int>(step));
-    } else {
-      snprintf(stepText, sizeof(stepText), "%d", step);
-    }
-    snprintf(hints[hintIndex], sizeof(hints[hintIndex]), "%s %s", I18N.get(labelId), stepText);
-    hintIndex++;
-  }
 
   char minText[32];
   formatValue(minText, sizeof(minText), minValue);
@@ -195,19 +193,96 @@ void IntervalSelectionActivity::buildIntervalScreen(UiScreen& screen) {
   spec.stepAction = ACTION_STEP;
   spec.okAction = ACTION_OK;
   spec.chromeAction = ACTION_CHROME;
-  spec.hintLine1 = hints[0];
-  spec.hintLine2 = hints[1];
   buildSliderDialogScreen(screen, uiTarget, mappedInput, spec);
 }
 
+// The value as the shared dialog form draws it: its number in the Unbounded
+// digits, any words of the format (or the boundary label) in the UI face.
+void IntervalSelectionActivity::drawValue(const int x, const int capTop) const {
+  using namespace setka;
+  const int baseline = capTop + heroCapHeight(renderer, kDigitsFont);
+  const int textTop = baseline - renderer.getFontAscenderSize(kText12Font);
+  const char* format = valueFormatId != StrId::STR_NONE_OPT ? I18N.get(valueFormatId) : "%u";
+  const char* number = strstr(format, "%u");
+  if ((maxBoundaryLabelId != StrId::STR_NONE_OPT && value == maxValue) || number == nullptr) {
+    char text[64];
+    formatValue(text, sizeof(text), value);
+    renderer.drawText(kText12Font, x, textTop, text, true, kSemiBold);
+    return;
+  }
+  char part[32];
+  snprintf(part, sizeof(part), "%.*s", static_cast<int>(number - format), format);
+  int left = x;
+  if (*part) {
+    renderer.drawText(kText12Font, left, textTop, part, true, kSemiBold);
+    left += renderer.getTextWidth(kText12Font, part, kSemiBold);
+  }
+  snprintf(part, sizeof(part), "%d", value);
+  left += drawHeroNumber(renderer, kDigitsFont, left, capTop, part);
+  renderer.drawText(kText12Font, left, textTop, number + 2, true, kSemiBold);
+}
+
+// Button boards: the shared dialog form (as «Сбросить текст?»): the screen
+// cleared to the status line, a full-width ruled band, a square card on it.
+void IntervalSelectionActivity::drawKeyDialog() const {
+  using namespace setka;
+  constexpr int kPadding = 24;     // OptionPopup kDialogPadding
+  constexpr int kTextInset = 32;   // OptionPopup kDialogSidePadding
+  constexpr int kBandMargin = 20;  // OptionPopup kBandMargin
+  constexpr int kGap = 12;
+  const int width = renderer.getScreenWidth();
+  const int cardX = kSidePadding;
+  const int cardWidth = width - 2 * kSidePadding;
+  const int textX = cardX + kTextInset;
+  const int textWidth = cardWidth - 2 * kTextInset;
+  const int titleLine = renderer.getLineHeight(kText12Font);
+  const int captionLine = renderer.getLineHeight(kCaptionFont);
+  const int valueHeight = heroCapHeight(renderer, kDigitsFont);
+  const int cardHeight = kPadding + titleLine + kGap + valueHeight + 2 * kGap + captionLine + 4 + kProgressHeight +
+                         kGap + 2 * captionLine + kPadding;
+  const int cardY = (renderer.getScreenHeight() - cardHeight) / 2;
+
+  drawRule(renderer, 0, cardY - kBandMargin - kRuleWidth, width);
+  drawRule(renderer, 0, cardY + cardHeight + kBandMargin, width);
+  renderer.drawRect(cardX, cardY, cardWidth, cardHeight, kRuleWidth, true);
+
+  int y = cardY + kPadding;
+  renderer.drawText(kText12Font, textX, y,
+                    renderer.truncatedText(kText12Font, I18N.get(titleId), textWidth, kSemiBold).c_str(), true,
+                    kSemiBold);
+  y += titleLine + kGap;
+  drawValue(textX, y);
+  y += valueHeight + 2 * kGap;
+
+  char text[64];
+  formatValue(text, sizeof(text), minValue);
+  renderer.drawText(kCaptionFont, textX, y, text);
+  formatValue(text, sizeof(text), maxValue);
+  renderer.drawText(kCaptionFont, textX + textWidth - renderer.getTextWidth(kCaptionFont, text), y, text);
+  y += captionLine + 4;
+  const int range = std::max(1, maxValue - minValue);
+  drawProgressBar(renderer, textX, y, textWidth, (value - minValue) * 100 / range);
+  y += kProgressHeight + kGap;
+
+  // Front buttons do the small step, side buttons the large step.
+  formatStepHint(text, sizeof(text), StrId::STR_STEP_HINT_FRONT, smallStep);
+  renderer.drawText(kCaptionFont, textX, y, text);
+  formatStepHint(text, sizeof(text), StrId::STR_STEP_HINT_SIDE, largeStep);
+  renderer.drawText(kCaptionFont, textX, y + captionLine, text);
+}
+
 void IntervalSelectionActivity::render(RenderLock&&) {
-  // No clearScreen: the dialog is a popup — it dims the frame it opened over
-  // and draws the card on top. Everything renders through the app so the
-  // interactive elements register touch hit rects.
-  renderUi();
-
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), "-", "+");
-  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-
+  if (mappedInput.hasTouch()) {
+    // No clearScreen: the dialog is a popup — it dims the frame it opened over
+    // and draws the card on top. Everything renders through the app so the
+    // interactive elements register touch hit rects.
+    renderUi();
+  } else {
+    renderer.clearScreen();
+    setka::drawStatusLine(renderer);
+    drawKeyDialog();
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), "\xE2\x88\x92", "+");
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+  }
   renderer.displayBuffer();
 }

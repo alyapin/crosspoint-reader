@@ -9,6 +9,7 @@
 #include "KOReaderCredentialStore.h"
 #include "MappedInputManager.h"
 #include "ReaderUtils.h"
+#include "activities/stats/StatsUi.h"
 #include "activities/util/ValuePickerActivity.h"
 #include "components/UITheme.h"
 #include "util/PluginEvents.h"
@@ -181,6 +182,16 @@ void EpubReaderMenuActivity::activateIndex(const int index) {
   finish();
 }
 
+std::string EpubReaderMenuActivity::pageTurnLabel(const int pagesPerMinute) {
+  if (pagesPerMinute <= 0) return tr(STR_AUTO_TURN_OFF);
+  char text[48];
+  snprintf(text, sizeof(text),
+           I18N.get(statsui::plural(pagesPerMinute, StrId::STR_AUTO_TURN_RATE_ONE, StrId::STR_AUTO_TURN_RATE_FEW,
+                                    StrId::STR_AUTO_TURN_RATE_MANY)),
+           pagesPerMinute);
+  return text;
+}
+
 bool EpubReaderMenuActivity::handleButtons() {
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     closeCancelled();
@@ -205,15 +216,16 @@ void EpubReaderMenuActivity::buildScreen(UiScreen& screen) {
       static_cast<int16_t>(renderer.getScreenHeight() - (safe.y + safe.height)), static_cast<int16_t>(safe.x)});
 
   // Progress summary where the old sub-header band sat.
-  std::string progressLine;
+  char progressLine[96];
   if (totalPages > 0) {
-    progressLine = std::string(tr(STR_CHAPTER_PREFIX)) + std::to_string(currentPage) + "/" +
-                   std::to_string(totalPages) + std::string(tr(STR_PAGES_SEPARATOR));
+    snprintf(progressLine, sizeof(progressLine), tr(STR_MENU_PROGRESS_CHAPTER), currentPage, totalPages,
+             bookProgressPercent);
+  } else {
+    snprintf(progressLine, sizeof(progressLine), tr(STR_MENU_PROGRESS_BOOK), bookProgressPercent);
   }
-  progressLine += std::string(tr(STR_BOOK_PREFIX)) + std::to_string(bookProgressPercent) + "%";
   const fui::Rect band = screen.takeTop(static_cast<int16_t>(metrics.tabBarHeight));
   const int16_t pad = screen.theme().headerSidePadding;
-  screen.target().text(band.inset(fui::Insets{0, pad, 0, pad}), progressLine.c_str(), screen.theme().smallText);
+  screen.target().text(band.inset(fui::Insets{0, pad, 0, pad}), progressLine, screen.theme().smallText);
   screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
 
   // menuRowItems's labels/actionValue were set once in the constructor (see
@@ -223,7 +235,7 @@ void EpubReaderMenuActivity::buildScreen(UiScreen& screen) {
     if (action == MenuAction::ROTATE_SCREEN) {
       menuRowItems[i].value = I18N.get(orientationLabels[pendingOrientation]);
     } else if (action == MenuAction::AUTO_PAGE_TURN) {
-      menuRowItems[i].value = pageTurnLabels[selectedPageTurnOption];
+      menuRowItems[i].value = pageTurnLabels[selectedPageTurnOption].c_str();
     } else if (action == MenuAction::NIGHT_MODE) {
       GUI.setCheckboxRow(menuRowItems[i], SETTINGS.screenInverted);
     } else if (action == MenuAction::BLUETOOTH) {

@@ -30,7 +30,8 @@
 namespace fui = freeink::ui;
 
 namespace {
-constexpr int SIDE_PADDING = 12;
+constexpr int SIDE_PADDING = 20;  // footer texts on the Setka side padding
+constexpr int HELP_GAP = 12;      // between the hold help and the position readout
 
 // Side clearance for the footer text in the panel's bottom corners.
 int bottomCornerClearance() {
@@ -990,7 +991,11 @@ void LibraryListActivity::buildScreen(UiScreen& screen) {
   // The position readout owns the line above the hints; rows must not overlap
   // it.
   constexpr int READOUT_GAP = 4;  // the list's fold sits just above the readout's line box
-  const int16_t readoutReserved = static_cast<int16_t>(renderer.getLineHeight(SMALL_FONT_ID) + READOUT_GAP);
+  // The hold help beside the readout takes a second line when it is too long.
+  const char* help = holdHelp();
+  const int footerLines = help && renderer.getTextWidth(SMALL_FONT_ID, help) > holdHelpWidth() ? 2 : 1;
+  const int16_t readoutReserved =
+      static_cast<int16_t>(footerLines * renderer.getLineHeight(SMALL_FONT_ID) + READOUT_GAP);
   const Rect area = UITheme::getContentArea(renderer);
   const auto bottomInset = static_cast<int16_t>(renderer.getScreenHeight() - area.y - area.height);
   buildHeader(screen);
@@ -1018,13 +1023,17 @@ void LibraryListActivity::buildScreen(UiScreen& screen) {
 // consume band height), so a page total grows and shrinks as you scroll. The
 // book position is stable by construction, and it answers the question the
 // reader actually has: how far in am I, and how much is left.
-void LibraryListActivity::drawPositionReadout() const {
+bool LibraryListActivity::formatPosition(char* buf, const size_t size) const {
   const int count = listCount();
-  if (count <= 0) return;
-
-  char buf[32];
+  if (count <= 0) return false;
   const char* positionFormat = groupsCollapsed ? tr(STR_LIBRARY_GROUP_POSITION) : tr(STR_LIBRARY_POSITION);
-  snprintf(buf, sizeof(buf), positionFormat, selectedEntry() + 1, count);
+  snprintf(buf, size, positionFormat, selectedEntry() + 1, count);
+  return true;
+}
+
+void LibraryListActivity::drawPositionReadout() const {
+  char buf[32];
+  if (!formatPosition(buf, sizeof(buf))) return;
   const auto& metrics = UITheme::getInstance().getMetrics();
   const int width = renderer.getTextWidth(SMALL_FONT_ID, buf);
   // Bottom-right of the viewable area, clear of the bezel and rounded corner.
@@ -1037,29 +1046,44 @@ void LibraryListActivity::drawPositionReadout() const {
 
 const char* LibraryListActivity::headerTitle() const {
   if (!headerSearchTitle.empty()) return headerSearchTitle.c_str();
-  return degraded ? tr(STR_LIBRARY_TITLE_UNSORTED) : tr(STR_LIBRARY);
+  return degraded ? tr(STR_LIBRARY_TITLE_UNSORTED) : tr(STR_LIBRARY_ALL_BOOKS);
+}
+
+const char* LibraryListActivity::holdHelp() const {
+  if (mappedInput.hasTouch() || groupsCollapsed) return nullptr;
+  if (tabsFocused() && !degraded) return tr(STR_LIBRARY_HOLD_SORT);
+  if (!tabsFocused() && isRecentSort(sortOrder) && listCount() > 0) {
+    return tr(STR_LIBRARY_HOLD_OPTIONS);  // recent rows: hold opens the row menu
+  }
+  if (!tabsFocused() && deleteEligible() && listCount() > 0) return tr(STR_HOLD_OPEN_TO_DELETE);
+  if (!tabsFocused() && groupable()) return tr(STR_LIBRARY_HOLD_GROUPS);
+  return nullptr;
+}
+
+// From the left side padding up to the position readout.
+int LibraryListActivity::holdHelpWidth() const {
+  const Rect area = UITheme::getContentArea(renderer);
+  const int left = std::max(area.x, bottomCornerClearance()) + SIDE_PADDING;
+  const int right = std::max(renderer.getScreenWidth() - area.x - area.width, bottomCornerClearance()) + SIDE_PADDING;
+  char buf[32];
+  const int readout = formatPosition(buf, sizeof(buf)) ? renderer.getTextWidth(SMALL_FONT_ID, buf) + HELP_GAP : 0;
+  return renderer.getScreenWidth() - left - right - readout;
 }
 
 void LibraryListActivity::drawHoldHelp() const {
-  if (mappedInput.hasTouch() || groupsCollapsed) return;
-  const char* help = nullptr;
-  if (tabsFocused() && !degraded)
-    help = tr(STR_LIBRARY_HOLD_SORT);
-  else if (!tabsFocused() && isRecentSort(sortOrder) && listCount() > 0)
-    help = tr(STR_LIBRARY_HOLD_OPTIONS);  // recent rows: hold opens the row menu
-  else if (!tabsFocused() && deleteEligible() && listCount() > 0)
-    help = tr(STR_HOLD_OPEN_TO_DELETE);
-  else if (!tabsFocused() && groupable())
-    help = tr(STR_LIBRARY_HOLD_GROUPS);
+  const char* help = holdHelp();
   if (!help) return;
-
   const auto& metrics = UITheme::getInstance().getMetrics();
   const int lineHeight = renderer.getLineHeight(SMALL_FONT_ID);
   const Rect area = UITheme::getContentArea(renderer);
-  const int left = std::max(area.x, bottomCornerClearance());
-  const int y = area.y + area.height - metrics.buttonHintsHeight - lineHeight;
-  GUI.drawHelpText(renderer,
-                   Rect{left + SIDE_PADDING, y, renderer.getScreenWidth() / 2 - left - SIDE_PADDING, lineHeight}, help);
+  const int left = std::max(area.x, bottomCornerClearance()) + SIDE_PADDING;
+  // Whole words on up to two lines, the last one level with the readout.
+  const auto lines = renderer.wrappedText(SMALL_FONT_ID, help, holdHelpWidth(), 2);
+  int y = area.y + area.height - metrics.buttonHintsHeight - static_cast<int>(lines.size()) * lineHeight;
+  for (const auto& line : lines) {
+    renderer.drawText(SMALL_FONT_ID, left, y, line.c_str());
+    y += lineHeight;
+  }
 }
 
 // OptionPopup is a self-contained modal: it owns the whole frame (hints
@@ -1073,8 +1097,7 @@ void LibraryListActivity::drawFooter() {
   drawPositionReadout();
   drawHoldHelp();
 
-  const bool backGoesHome = tabsFocused() && !groupsCollapsed && query.empty();
-  const char* backLabel = backGoesHome ? tr(STR_HOME) : tr(STR_BACK);
+  const char* backLabel = tr(STR_BACK);
   const char* confirmLabel = groupsCollapsed ? tr(STR_SELECT) : tr(STR_OPEN);
   const bool canSearch = tabsFocused() && !degraded;
   const auto labels = mappedInput.mapLabels(backLabel, tabsFocused() ? tr(STR_SHELF_TAB_NEXT) : confirmLabel,

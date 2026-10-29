@@ -121,7 +121,12 @@ class LibraryListActivity final : public UiTabListActivity {
   void buildRows(UiScreen& screen);
   static void formatInitialHeading(uint32_t initial, std::string& out);
   void formatAuthorHeading(const std::string& author, std::string& out) const;
+  // "Книги: 12/69"; false when the list is empty.
+  bool formatPosition(char* buf, size_t size) const;
   void drawPositionReadout() const;
+  // The hold action of the focused strip or row, or nullptr.
+  const char* holdHelp() const;
+  int holdHelpWidth() const;
   void drawHoldHelp() const;
   const char* headerTitle() const override;
 

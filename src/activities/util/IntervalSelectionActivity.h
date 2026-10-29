@@ -24,8 +24,8 @@ class IntervalSelectionActivity final : public Activity, private UiAppHost {
   bool isReaderActivity() const override { return readerActivity; }
 
  private:
-  // The UiAppHost app hosts the shared slider dialog popup (capsule slider,
-  // [-] [+] [Confirm] buttons) drawn over the screen underneath.
+  // On touch boards the UiAppHost app hosts the shared slider dialog popup
+  // (capsule slider, [-] [+] [Confirm] buttons) drawn over the screen underneath.
   static void intervalScreen(UiScreen& screen, void* user);
   static void onSliderEvent(const freeink::ui::ActionEvent& event, void* user);
   static void onStepEvent(const freeink::ui::ActionEvent& event, void* user);
@@ -52,6 +52,9 @@ class IntervalSelectionActivity final : public Activity, private UiAppHost {
   void setValue(int candidate);
   int clampedValue(int candidate) const;
   void formatValue(char* buffer, size_t size, int forValue) const;
+  void formatStepHint(char* buffer, size_t size, StrId labelId, int step) const;
+  void drawValue(int x, int capTop) const;
+  void drawKeyDialog() const;
   void cancel();
   void confirm();
 };
