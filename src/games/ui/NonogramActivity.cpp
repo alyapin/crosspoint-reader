@@ -33,6 +33,7 @@ constexpr int kNoticeGap = 10;
 constexpr int kBoardGap = 8;  // above the bar rule
 constexpr int kClueFrame = 2;
 constexpr int kStroke = 2;
+constexpr int kCursorGap = 3;    // white between the key cursor and a filled cell's fill
 constexpr int kNewGameSlot = 1;  // once solved, or without a board
 
 // Ids run 1..255, so a valid pack of 15x15 pictures stays under 75 KB.
@@ -539,11 +540,17 @@ void NonogramActivity::drawGrid(const Layout& l) const {
     renderer.fillRect(l.gridLeft + i * size - offset, l.gridTop - offset, width, span + 2 * offset + 1, true);
     renderer.fillRect(l.gridLeft - offset, l.gridTop + i * size - offset, span + 2 * offset + 1, width, true);
   }
-  // A tapped cell is framed only while white; the key cursor shows on any cell, in white on a filled one.
+  // A tapped cell is framed only while white; the key cursor shows on any cell, the same frame on the cell's
+  // rules, and on a filled one a white gap inside it.
   const bool filled = cursor >= 0 && game.mark(cursor) == nonogram::Filled;
   if (cursor >= 0 && barFocus < 0 && !solved && (keyCursor || !filled)) {
-    renderer.drawRect(l.gridLeft + cursor % n * size, l.gridTop + cursor / n * size, size + 1, size + 1,
-                      kCellFrameWidth, !filled);
+    const int x = l.gridLeft + cursor % n * size;
+    const int y = l.gridTop + cursor / n * size;
+    renderer.drawRect(x, y, size + 1, size + 1, kCellFrameWidth, true);
+    if (filled) {
+      renderer.drawRect(x + kCellFrameWidth, y + kCellFrameWidth, size + 1 - 2 * kCellFrameWidth,
+                        size + 1 - 2 * kCellFrameWidth, kCursorGap, false);
+    }
   }
 }
 

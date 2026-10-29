@@ -30,7 +30,6 @@ constexpr int kMenuSlot = 2;
 constexpr int kSliceMs = 20;
 constexpr int kDiscInset = 7;
 constexpr int kDot = 10;
-constexpr int kCursorInset = 4;
 constexpr int kLineGap = 10;
 constexpr int kCountDisc = 14;  // as Шашки's count discs
 constexpr int kCountGap = 8;
@@ -227,10 +226,10 @@ void ReversiActivity::build(UiScreen& screen) {
   const int cell = width / SIZE;
   const int side = cell * SIZE;
   const int left = (width - side) / 2;
+  const auto rule = [cell, side](const int i) { return std::clamp(i * cell - kRuleWidth / 2, 0, side - kRuleWidth); };
   for (int i = 0; i <= SIZE; ++i) {
-    const int offset = std::clamp(i * cell - kRuleWidth / 2, 0, side - kRuleWidth);
-    renderer.fillRect(left + offset, BOARD_TOP, kRuleWidth, side, true);
-    renderer.fillRect(left, BOARD_TOP + offset, side, kRuleWidth, true);
+    renderer.fillRect(left + rule(i), BOARD_TOP, kRuleWidth, side, true);
+    renderer.fillRect(left, BOARD_TOP + rule(i), side, kRuleWidth, true);
   }
   const uint64_t moves = playerToMove() ? game.moves() : 0;
   const int last = !vs || game.lastMover() == Disc::White ? game.lastMove() : -1;
@@ -247,8 +246,11 @@ void ReversiActivity::build(UiScreen& screen) {
     }
   }
   if (cursor >= 0 && barFocus < 0 && (moves >> cursor & 1)) {
-    drawCellFrame(renderer, left + cursor % SIZE * cell + kCursorInset, BOARD_TOP + cursor / SIZE * cell + kCursorInset,
-                  cell - 2 * kCursorInset, cell - 2 * kCursorInset);
+    // On the cell's rules, as the other boards' cursors.
+    const int column = cursor % SIZE;
+    const int row = cursor / SIZE;
+    drawCellFrame(renderer, left + rule(column), BOARD_TOP + rule(row), rule(column + 1) - rule(column) + kRuleWidth,
+                  rule(row + 1) - rule(row) + kRuleWidth);
   }
   screen.frame().hit(fui::makeRect(left, BOARD_TOP, side, side), ACTION_BOARD, 0, shellInput());
 
