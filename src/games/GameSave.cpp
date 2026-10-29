@@ -1,5 +1,6 @@
 #include "GameSave.h"
 
+#include <Fifteen.h>
 #include <HalStorage.h>
 #include <Klondike.h>
 #include <Logging.h>
@@ -28,30 +29,26 @@ Paths pathsOf(const Kind kind) {
       return {"/.crosspoint/games/minesweeper.json", "/.crosspoint/games/minesweeper.json.tmp"};
     case Kind::TicTacToe:
       return {"/.crosspoint/games/tictactoe.json", "/.crosspoint/games/tictactoe.json.tmp"};
+    case Kind::Fifteen:
+      return {"/.crosspoint/games/fifteen.json", "/.crosspoint/games/fifteen.json.tmp"};
     case Kind::Klondike:
       break;
   }
   return {"/.crosspoint/games/klondike.json", "/.crosspoint/games/klondike.json.tmp"};
 }
 
-constexpr Paths kTicTacToeDone{"/.crosspoint/games/tictactoe-done.json", "/.crosspoint/games/tictactoe-done.json.tmp"};
+constexpr Paths TICTACTOE_DONE{"/.crosspoint/games/tictactoe-done.json", "/.crosspoint/games/tictactoe-done.json.tmp"};
+constexpr Paths FIFTEEN_BEST{"/.crosspoint/games/fifteen-best.json", "/.crosspoint/games/fifteen-best.json.tmp"};
 
-// Cold path (exit, sleep, after a move): one bounded buffer, freed on return.
-template <typename GameT>
-bool writeTo(const Paths& p, const GameT& game, const size_t cap) {
-  auto text = makeUniqueNoThrow<char[]>(cap);
-  if (!text) {
-    LOG_ERR("GAMES", "OOM: %u bytes for save", static_cast<unsigned>(cap));
-    return false;
-  }
-  const size_t len = game.serialize(text.get(), cap);
+// Crash-safe: tmp file + rename.
+bool writeText(const Paths& p, const char* text, const size_t len) {
   if (len == 0 || !Storage.ensureDirectoryExists(SAVE_DIR)) {
     LOG_ERR("GAMES", "Cannot prepare save %s", p.path);
     return false;
   }
   HalFile file;
   if (!Storage.openFileForWrite("GAMES", p.tmp, file)) return false;
-  const size_t written = file.write(text.get(), len);
+  const size_t written = file.write(text, len);
   file.close();
   if (written != len || !Storage.replaceFile(p.tmp, p.path)) {
     LOG_ERR("GAMES", "Save failed (%u of %u bytes)", static_cast<unsigned>(written), static_cast<unsigned>(len));
@@ -59,6 +56,17 @@ bool writeTo(const Paths& p, const GameT& game, const size_t cap) {
     return false;
   }
   return true;
+}
+
+// Cold path (exit, sleep, after a move): one bounded buffer, freed on return.
+template <typename T>
+bool writeTo(const Paths& p, const T& value, const size_t cap) {
+  auto text = makeUniqueNoThrow<char[]>(cap);
+  if (!text) {
+    LOG_ERR("GAMES", "OOM: %u bytes for save", static_cast<unsigned>(cap));
+    return false;
+  }
+  return writeText(p, text.get(), value.serialize(text.get(), cap));
 }
 
 template <typename GameT>
@@ -70,8 +78,8 @@ bool write(const Kind kind, const GameT& game, const size_t cap) {
   return writeTo(pathsOf(kind), game, cap);
 }
 
-template <typename GameT>
-bool readFrom(const Paths& p, GameT& game, const size_t cap) {
+template <typename T>
+bool readFrom(const Paths& p, T& value, const size_t cap) {
   if (!Storage.exists(p.path)) return false;
   std::string text;
   // A read error may be transient: keep the file. Only content that fails to parse is dropped.
@@ -79,7 +87,7 @@ bool readFrom(const Paths& p, GameT& game, const size_t cap) {
     LOG_ERR("GAMES", "Cannot read %s", p.path);
     return false;
   }
-  if (!game.deserialize(text.data(), text.size())) {
+  if (!value.deserialize(text.data(), text.size())) {
     LOG_ERR("GAMES", "Discarding corrupt %s", p.path);
     Storage.remove(p.path);
     return false;
@@ -106,16 +114,24 @@ bool save(const minesweeper::Game& game) { return write(Kind::Minesweeper, game,
 bool save(const klondike::Game& game) { return write(Kind::Klondike, game, klondike::SAVE_MAX); }
 bool save(const tictactoe::Game& game) {
   if (game.inProgress()) return writeTo(pathsOf(Kind::TicTacToe), game, tictactoe::SAVE_MAX);
-  const bool ok = writeTo(kTicTacToeDone, game, tictactoe::SAVE_MAX);
+  const bool ok = writeTo(TICTACTOE_DONE, game, tictactoe::SAVE_MAX);
   if (ok) clear(Kind::TicTacToe);
   return ok;
 }
+bool save(const fifteen::Game& game) { return write(Kind::Fifteen, game, fifteen::SAVE_MAX); }
 
 bool load(sudoku::Game& game) { return read(Kind::Sudoku, game, sudoku::SAVE_MAX); }
 bool load(minesweeper::Game& game) { return read(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
 bool load(klondike::Game& game) { return read(Kind::Klondike, game, klondike::SAVE_MAX); }
 bool load(tictactoe::Game& game) {
-  return read(Kind::TicTacToe, game, tictactoe::SAVE_MAX) || readFrom(kTicTacToeDone, game, tictactoe::SAVE_MAX);
+  return read(Kind::TicTacToe, game, tictactoe::SAVE_MAX) || readFrom(TICTACTOE_DONE, game, tictactoe::SAVE_MAX);
 }
+bool load(fifteen::Game& game) { return read(Kind::Fifteen, game, fifteen::SAVE_MAX); }
+
+bool save(const fifteen::Best& best) {
+  char text[48];
+  return writeText(FIFTEEN_BEST, text, best.serialize(text, sizeof(text)));
+}
+bool load(fifteen::Best& best) { return readFrom(FIFTEEN_BEST, best, 48); }
 
 }  // namespace gamesave
