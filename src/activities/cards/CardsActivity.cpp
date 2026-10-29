@@ -1050,7 +1050,8 @@ void CardsActivity::buildCard(UiScreen& screen) {
   if (!back) {
     if (touch) {
       const char* hint = tr(STR_CARDS_TAP_TO_SHOW);
-      renderer.drawText(kCaptionFont, (width - renderer.getTextWidth(kCaptionFont, hint)) / 2,
+      // The text role of the games' captions.
+      renderer.drawText(kText10Font, (width - renderer.getTextWidth(kText10Font, hint)) / 2,
                         (frontBottom + zoneBottom) / 2 + 20, hint);
       screen.frame().hit(fui::makeRect(exitWidth, kGameBoardTop, width - exitWidth, panelTop - kGameBoardTop),
                          ACTION_CARD, 0, fui::InputTouch);
