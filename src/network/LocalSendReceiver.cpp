@@ -8,6 +8,8 @@
 
 #include <cstdio>
 #include <cstring>
+#include <string>
+#include <vector>
 
 #include "CrossPointSettings.h"
 #include "util/BookCacheUtils.h"
@@ -22,6 +24,8 @@ constexpr size_t POLL_BUDGET = 32 * 1024;
 constexpr uint32_t ANNOUNCE_AT_MS[] = {0, 1000, 3000};
 constexpr uint32_t REPLY_INTERVAL_MS = 500;
 constexpr int DATAGRAMS_PER_LOOP = 4;
+// Not a book extension, so no received file ends with it; .part belongs to web uploads.
+constexpr char PART_SUFFIX[] = ".localsend";
 
 uint32_t hardwareRandom() { return esp_random(); }
 }  // namespace
@@ -65,6 +69,7 @@ bool LocalSendReceiver::start(const Config& config) {
     LOG_ERR("LSND", "mkdir %s failed, using SD root", store.dir);
     store.dir[0] = 0;
   }
+  store.reclaimPartials();
   store.forgetFreeSpace();
   // The first query scans the FAT (seconds on a large card): do it now, while
   // no sender waits on a prepare-upload.
@@ -166,11 +171,11 @@ bool LocalSendReceiver::Store::open(const localsend::FileEntry& entry) {
   for (int i = 0; i < MAX_COLLISIONS && !found; i++) {
     if (!localsend::makeCollisionName(entry.name, i, name, sizeof(name))) return false;
     const int n = snprintf(finalPath, sizeof(finalPath), "%s/%s", dir, name);
-    const int m = snprintf(tmpPath, sizeof(tmpPath), "%s.part", finalPath);
+    const int m = snprintf(tmpPath, sizeof(tmpPath), "%s%s", finalPath, PART_SUFFIX);
     if (n <= 0 || static_cast<size_t>(n) >= sizeof(finalPath) || m <= 0 || static_cast<size_t>(m) >= sizeof(tmpPath)) {
       return false;
     }
-    // A .part without its book is left over from an interrupted transfer.
+    // A partial without its book is left over from an interrupted transfer.
     found = !Storage.exists(finalPath) && (!Storage.exists(tmpPath) || Storage.remove(tmpPath));
   }
   if (!found || !Storage.openFileForWrite("LSND", tmpPath, file)) {
@@ -232,6 +237,28 @@ void LocalSendReceiver::Store::abort() {
   stopHashing();
   if (tmpPath[0]) Storage.remove(tmpPath);
   tmpPath[0] = 0;
+}
+
+// A transfer cut by a reset leaves its partial, which would count against the free space.
+void LocalSendReceiver::Store::reclaimPartials() {
+  std::vector<std::string> stale;
+  {
+    HalFile root = Storage.open(dir[0] ? dir : "/");
+    if (!root || !root.isDirectory()) return;
+    constexpr size_t suffixLen = sizeof(PART_SUFFIX) - 1;
+    char name[256];
+    for (HalFile entry = root.openNextFile(); entry; entry = root.openNextFile()) {
+      resetTaskWatchdogIfSubscribed();
+      if (entry.isDirectory()) continue;
+      entry.getName(name, sizeof(name));
+      const size_t len = strlen(name);
+      if (len > suffixLen && strcmp(name + len - suffixLen, PART_SUFFIX) == 0) stale.emplace_back(name);
+    }
+  }
+  for (const std::string& name : stale) {
+    const std::string path = std::string(dir) + "/" + name;
+    if (Storage.remove(path.c_str())) LOG_INF("LSND", "removed partial %s", path.c_str());
+  }
 }
 
 void LocalSendReceiver::Store::stopHashing() {

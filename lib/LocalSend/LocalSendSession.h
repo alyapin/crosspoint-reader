@@ -45,7 +45,8 @@ bool datagramWantsReply(const char* data, size_t len, const char* ownFingerprint
 // Turns a sender-supplied name into a single safe path component: takes the
 // base name, drops control, FAT-reserved and invalid UTF-8 bytes, trims leading
 // and trailing dots and spaces, and truncates to FILE_NAME_MAX bytes keeping the
-// extension. Returns false when nothing usable remains.
+// extension. Returns false when nothing usable remains or the name is a DOS
+// device such as CON.epub.
 bool sanitizeFileName(const char* in, char* out, size_t cap);
 // index 0 copies the name; index N inserts " (N)" before the extension.
 bool makeCollisionName(const char* name, int index, char* out, size_t cap);
@@ -146,6 +147,8 @@ class Session {
   bool keyValid = false;
   bool sawFiles = false;
   bool sawRoot = false;
+  bool rootClosed = false;
+  bool trailing = false;  // bytes other than whitespace after the root object
   bool fileHasName = false;
   bool fileHasSize = false;
   bool fileBad = false;

@@ -61,6 +61,7 @@ class LocalSendReceiver {
     int commit(const localsend::FileEntry& entry) override;
     void abort() override;
     void forgetFreeSpace() { freeKnown = false; }
+    void reclaimPartials();
 
    private:
     HalFile file;
