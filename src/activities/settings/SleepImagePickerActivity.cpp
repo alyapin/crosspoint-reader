@@ -321,9 +321,14 @@ void SleepImagePickerActivity::loop() {
     buttonNavigator.onPreviousPress([this] { showPage(page - 1); });
     return;
   }
-  // Button boards: a press steps the frame (side buttons and Left/Right), a hold jumps a page.
-  buttonNavigator.onNextPress([this] { moveFocus(ButtonNavigator::nextIndex(focus, tileCount())); });
-  buttonNavigator.onPreviousPress([this] { moveFocus(ButtonNavigator::previousIndex(focus, tileCount())); });
+  // Button boards: Left/Right step the frame, the side buttons a row; a hold jumps a page.
+  using Button = MappedInputManager::Button;
+  ButtonNavigator::onPress({Button::Right}, [this] { moveFocus(ButtonNavigator::nextIndex(focus, tileCount())); });
+  ButtonNavigator::onPress({Button::Left}, [this] { moveFocus(ButtonNavigator::previousIndex(focus, tileCount())); });
+  ButtonNavigator::onPress({Button::Down},
+                           [this] { moveFocus(ButtonNavigator::nextRowIndex(focus, tileCount(), kColumns)); });
+  ButtonNavigator::onPress({Button::Up},
+                           [this] { moveFocus(ButtonNavigator::previousRowIndex(focus, tileCount(), kColumns)); });
   buttonNavigator.onNextContinuous(
       [this] { moveFocus(ButtonNavigator::nextPageIndex(focus, tileCount(), geo.perPage)); });
   buttonNavigator.onPreviousContinuous(

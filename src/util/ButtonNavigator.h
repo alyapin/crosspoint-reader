@@ -44,6 +44,11 @@ class ButtonNavigator final {
   [[nodiscard]] static int nextPageIndex(int currentIndex, int totalItems, int itemsPerPage);
   [[nodiscard]] static int previousPageIndex(int currentIndex, int totalItems, int itemsPerPage);
 
+  // Grids: one row down or up in the same column. A short last row takes the
+  // last item; past the edge rows wrap to the other end of the column.
+  [[nodiscard]] static int nextRowIndex(int currentIndex, int totalItems, int columns);
+  [[nodiscard]] static int previousRowIndex(int currentIndex, int totalItems, int columns);
+
   // Navigation uses the logical NavNext / NavPrevious buttons; MappedInputManager::mapButton resolves
   // them to physical buttons and applies any orientation-based direction swap, so this stays settings-free.
   [[nodiscard]] static Buttons getNextButtons() {
