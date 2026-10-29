@@ -32,7 +32,9 @@ class KlondikeActivity final : public GameScreen {
   void onTouch(const freeink::ui::ActionEvent& event, int x, int y) override;
   void onKey(int dx, int dy, bool confirm) override;
   bool onBack() override;
-  const char* backHint() const override { return pickPile != kNone ? tr(STR_CANCEL) : nullptr; }
+  const char* backHint() const override {
+    return pickPile != kNone || hintPile != kNone || noMoves ? tr(STR_CANCEL) : nullptr;
+  }
 
   // Acts on `pile` at card `index` (kNone: the pile's natural card).
   void activate(int pile, int index);
