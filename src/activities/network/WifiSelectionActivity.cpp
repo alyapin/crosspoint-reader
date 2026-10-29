@@ -193,17 +193,23 @@ void WifiSelectionActivity::processWifiScanResults() {
   }
 
   if (scanResult == WIFI_SCAN_FAILED) {
-    networks.clear();
-    realNetworkCount = 0;
-    appendHiddenNetworkEntry();
-    rebuildNetworkRowItems();
-    autoConnecting = false;
-    state = WifiSelectionState::NETWORK_LIST;
-    selectedNetworkIndex = 0;
+    {
+      // The render task reads the list and its row items.
+      RenderLock lock(*this);
+      networks.clear();
+      realNetworkCount = 0;
+      appendHiddenNetworkEntry();
+      rebuildNetworkRowItems();
+      autoConnecting = false;
+      state = WifiSelectionState::NETWORK_LIST;
+      selectedNetworkIndex = 0;
+    }
     requestUpdate();
     return;
   }
 
+  // The render task reads the list and its row items while they are rebuilt.
+  RenderLock lock(*this);
   // Scan complete, process results — deduplicate in-place, keeping strongest signal
   networks.clear();
   networks.reserve(scanResult);
@@ -244,6 +250,9 @@ void WifiSelectionActivity::processWifiScanResults() {
   realNetworkCount = networks.size();
   appendHiddenNetworkEntry();
   rebuildNetworkRowItems();
+  // The shorter list may no longer hold the old selection.
+  if (selectedNetworkIndex >= networks.size()) selectedNetworkIndex = 0;
+  lock.unlock();
 
   WiFi.scanDelete();
 
