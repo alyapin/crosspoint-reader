@@ -4,6 +4,7 @@
 #include <FiveLetters.h>
 #include <Game2048.h>
 #include <HalStorage.h>
+#include <Hangman.h>
 #include <Klondike.h>
 #include <Logging.h>
 #include <Memory.h>
@@ -38,6 +39,8 @@ Paths pathsOf(const Kind kind) {
       return {"/.crosspoint/games/fiveletters.json", "/.crosspoint/games/fiveletters.json.tmp"};
     case Kind::Game2048:
       return {"/.crosspoint/games/2048.json", "/.crosspoint/games/2048.json.tmp"};
+    case Kind::Hangman:
+      return {"/.crosspoint/games/hangman.json", "/.crosspoint/games/hangman.json.tmp"};
     case Kind::Klondike:
       break;
   }
@@ -137,6 +140,7 @@ bool save(const tictactoe::Game& game) {
 bool save(const fifteen::Game& game) { return write(Kind::Fifteen, game, fifteen::SAVE_MAX); }
 bool save(const fiveletters::Game& game) { return write(Kind::FiveLetters, game, fiveletters::SAVE_MAX); }
 bool save(const g2048::Game& game) { return write(Kind::Game2048, game, g2048::SAVE_MAX); }
+bool save(const hangman::Game& game) { return write(Kind::Hangman, game, hangman::SAVE_MAX); }
 
 bool load(sudoku::Game& game) { return read(Kind::Sudoku, game, sudoku::SAVE_MAX); }
 bool load(minesweeper::Game& game) { return read(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
@@ -147,6 +151,7 @@ bool load(tictactoe::Game& game) {
 bool load(fifteen::Game& game) { return read(Kind::Fifteen, game, fifteen::SAVE_MAX); }
 bool load(fiveletters::Game& game) { return read(Kind::FiveLetters, game, fiveletters::SAVE_MAX); }
 bool load(g2048::Game& game) { return read(Kind::Game2048, game, g2048::SAVE_MAX); }
+bool load(hangman::Game& game) { return read(Kind::Hangman, game, hangman::SAVE_MAX); }
 
 bool save(const fifteen::Best& best) {
   char text[48];

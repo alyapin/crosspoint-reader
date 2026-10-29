@@ -934,3 +934,12 @@ STR_2048_BEST: "best"
 STR_2048_SWIPE_HINT: "swipe any way"
 STR_2048_WON: "You made 2048"
 STR_2048_NO_MOVES: "No moves left"
+
+# Hangman
+STR_HANGMAN: "Hangman"
+STR_HANGMAN_MISTAKES: "mistakes"
+STR_HANGMAN_OF: "%d of %d"
+STR_HANGMAN_LETTERS: "%d letters"
+STR_HANGMAN_HINT: "Hint"
+STR_HANGMAN_WON: "Guessed"
+STR_HANGMAN_LOST: "Not guessed"

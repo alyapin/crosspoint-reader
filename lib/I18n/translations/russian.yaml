@@ -934,3 +934,12 @@ STR_2048_BEST: "рекорд"
 STR_2048_SWIPE_HINT: "свайп в любую сторону"
 STR_2048_WON: "Вы собрали 2048"
 STR_2048_NO_MOVES: "Ходов нет"
+
+# Hangman
+STR_HANGMAN: "Виселица"
+STR_HANGMAN_MISTAKES: "ошибок"
+STR_HANGMAN_OF: "%d из %d"
+STR_HANGMAN_LETTERS: "%d букв"
+STR_HANGMAN_HINT: "Подсказка"
+STR_HANGMAN_WON: "Отгадано"
+STR_HANGMAN_LOST: "Не отгадано"

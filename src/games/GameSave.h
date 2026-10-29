@@ -31,10 +31,13 @@ struct Stats;
 namespace g2048 {
 class Game;
 }
+namespace hangman {
+class Game;
+}
 
 namespace gamesave {
 
-enum class Kind { Sudoku, Minesweeper, Klondike, TicTacToe, Fifteen, FiveLetters, Game2048 };
+enum class Kind { Sudoku, Minesweeper, Klondike, TicTacToe, Fifteen, FiveLetters, Game2048, Hangman };
 
 bool hasGameInProgress(Kind kind);
 void clear(Kind kind);
@@ -48,6 +51,7 @@ bool save(const tictactoe::Game& game);
 bool save(const fifteen::Game& game);
 bool save(const fiveletters::Game& game);
 bool save(const g2048::Game& game);
+bool save(const hangman::Game& game);
 
 // Restore the saved game, paused. False on failure; a file that reads but does
 // not parse is removed.
@@ -59,6 +63,7 @@ bool load(tictactoe::Game& game);
 bool load(fifteen::Game& game);
 bool load(fiveletters::Game& game);
 bool load(g2048::Game& game);
+bool load(hangman::Game& game);
 
 // The best finished 15 puzzle, kept apart from the save.
 bool save(const fifteen::Best& best);
