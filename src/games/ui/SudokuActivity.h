@@ -13,7 +13,7 @@ const char* sudokuListStatus();
 std::unique_ptr<Activity> openSudoku(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
 // Full-width 9x9 grid, a row of nine digit keys, and Заметки / Стереть / Отменить.
-// The level and the timer on the top line open the picker for a new puzzle.
+// The level and the timer on the top line open the menu (Новая игра, Завершить).
 class SudokuActivity final : public GameScreen {
  public:
   SudokuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
@@ -22,7 +22,7 @@ class SudokuActivity final : public GameScreen {
 
  private:
   // Key focus: the grid cursor is the selected cell; the pad and bar have their own.
-  // Status is the level and timer on the top line, where Confirm starts a new puzzle.
+  // Status is the level and timer on the top line, where Confirm opens the menu.
   enum class Area : uint8_t { Status, Grid, Pad, Bar };
   enum class Action : uint8_t { None, Notes, Erase, Undo, NewGame };
   static constexpr freeink::ui::ActionId ACTION_PAD = ACTION_USER;  // value = digit

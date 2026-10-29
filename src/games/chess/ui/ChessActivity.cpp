@@ -597,9 +597,13 @@ void ChessActivity::confirmResign() {
     LOG_ERR("CHESS", "OOM: resign confirmation");
     return;
   }
+  app.clearTapFlash();
   startActivityForResult(std::move(confirm), [this](const ActivityResult& result) {
     RenderLock lock(*this);
-    if (result.isCancelled || match->game().isOver()) return;
+    if (result.isCancelled || match->game().isOver()) {
+      requestRepaint(RepaintEntry);
+      return;
+    }
     match->resign();
     afterPly();
     setView(View::Game);

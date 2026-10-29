@@ -12,7 +12,7 @@ std::unique_ptr<Activity> openKlondike(GfxRenderer& renderer, MappedInputManager
 
 // Stock, waste and four foundations on top, seven columns below. A tap picks a
 // card (and the run on it); a tap on another pile moves it there, a second tap
-// on the picked card sends it where it fits. Отменить / Подсказка / Новая игра.
+// on the picked card sends it where it fits. Отменить / Подсказка / Меню.
 class KlondikeActivity final : public GameScreen {
  public:
   KlondikeActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);

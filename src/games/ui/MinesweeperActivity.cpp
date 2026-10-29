@@ -136,7 +136,7 @@ void MinesweeperActivity::onTouch(const fui::ActionEvent& event, const int x, co
 }
 
 bool MinesweeperActivity::barShown(const int slot) const {
-  // Флажок while playing, Заново once there is something to deal again, Новая игра always.
+  // Флажок while playing, Заново once there is something to deal again, Меню (Новая игра once over) always.
   if (slot == 0) return !game.isOver();
   if (slot == 1) return game.status() != minesweeper::Status::Ready;
   return slot == 2;
