@@ -1216,14 +1216,16 @@ void ChessActivity::drawTopLine(UiScreen& screen) const {
   }
   games::ui::StatusItem status[2];
   int count = 0;
-  if (match->settings().mode == chess::Mode::VsComputer) {
+  const bool vs = match->settings().mode == chess::Mode::VsComputer;
+  if (vs) {
     status[count++] = {tr(STR_GAMES_VS_LEVEL), level};
   } else if (timed) {
     status[count++] = {far == chess::WHITE ? tr(STR_CHESS_WHITE) : tr(STR_CHESS_BLACK), nullptr};
   }
   if (timed) status[count++] = {nullptr, clock};
-  // Too long beside "‹ Выйти": the clock alone.
+  // With a clock, too long beside "‹ Выйти": the level without "Компьютер", then the clock alone.
   const int room = width - kSidePadding - exitWidth;
+  if (timed && vs && games::ui::statusWidth(renderer, status, count) > room) status[0].label = tr(STR_GAMES_LEVEL);
   if (timed && games::ui::statusWidth(renderer, status, count) > room) {
     status[0] = status[count - 1];
     count = 1;
