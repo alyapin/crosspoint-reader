@@ -825,17 +825,7 @@ void WifiSelectionActivity::render(RenderLock&&) {
   auto& theme = UITheme::getInstance();
   auto metrics = theme.getMetrics();
   Rect screen = theme.getScreenSafeArea(renderer, true, false);
-
-  // Draw header
-  // STR_NETWORKS_FOUND is ~37 bytes once the Arabic translation is substituted,
-  // so 32 truncated it. See ClockSyncActivity for the same class of bug.
-  char countStr[64];
-  snprintf(countStr, sizeof(countStr), tr(STR_NETWORKS_FOUND), realNetworkCount);
-  // drawHeader self-insets by the board's viewable margins, so it takes the
-  // full-width rect at metrics.topPadding that every other caller uses; the
-  // safe-area `screen` would inset it twice.
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.headerHeight},
-                 tr(STR_WIFI_NETWORKS), countStr);
+  drawListHeader();
 
   switch (state) {
     case WifiSelectionState::AUTO_CONNECTING:
@@ -990,8 +980,28 @@ void WifiSelectionActivity::buildPromptDialog(UiScreen& screen) {
   fui::optionDialog(screen.frame(), fui::centeredRect(body, fui::Size{width, height}), props);
 }
 
+void WifiSelectionActivity::drawListHeader() {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  // STR_NETWORKS_FOUND is ~37 bytes once the Arabic translation is substituted,
+  // so 32 truncated it. See ClockSyncActivity for the same class of bug.
+  char countStr[64];
+  snprintf(countStr, sizeof(countStr), tr(STR_NETWORKS_FOUND), realNetworkCount);
+  // drawHeader self-insets by the board's viewable margins, so it takes the
+  // full-width rect at metrics.topPadding that every other caller uses; the
+  // safe-area `screen` would inset it twice.
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.headerHeight},
+                 tr(STR_WIFI_NETWORKS), countStr);
+}
+
 void WifiSelectionActivity::renderNetworkList(const Rect* screen, const ThemeMetrics* metrics) {
   renderUi();
+  // Rows taller than the fixed-height estimate: the follow asks for another
+  // build until the selection is drawn (as UiListActivity::render does).
+  for (int pass = 0; listNav.consumeRebuildNeeded() && pass < 8; ++pass) {
+    renderer.clearScreen();
+    drawListHeader();
+    renderUi();
+  }
   if (networks.empty() && !mappedInput.hasTouch()) {
     // Below the centered "no networks" line the app drew. Touch boards get an
     // on-screen Retry button from the screen builder instead of this hint.

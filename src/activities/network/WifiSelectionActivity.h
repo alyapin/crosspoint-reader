@@ -112,6 +112,7 @@ class WifiSelectionActivity final : public Activity, private UiAppHost {
   void buildPromptDialog(UiScreen& screen);
 
   void renderNetworkList(const Rect* screen, const ThemeMetrics* metrics);
+  void drawListHeader();
   void renderPasswordEntry(const Rect* screen, const ThemeMetrics* metrics) const;
   void renderConnecting(const Rect* screen, const ThemeMetrics* metrics) const;
   void renderConnected(const Rect* screen, const ThemeMetrics* metrics) const;

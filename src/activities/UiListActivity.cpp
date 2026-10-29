@@ -252,16 +252,7 @@ void UiListActivity::render(RenderLock&&) {
   renderer.clearScreen();
   drawChrome();
   renderUi();
-  // Wrapped labels grow rows, so fewer rows can fit than the fixed-height
-  // estimate ListNav plans with. list() reports the real layout back
-  // (ListNav::onListRendered); when the selection landed past the drawn rows
-  // the nav advanced the viewport and asked for another build. Bounded: top
-  // strictly advances toward the selection each pass.
-  for (int pass = 0; activeNav().consumeRebuildNeeded() && pass < 8; ++pass) {
-    renderer.clearScreen();
-    drawChrome();
-    renderUi();
-  }
+  rebuildWhileFollowing([this] { drawChrome(); });
   drawFooter();
   renderer.displayBuffer();
 }
