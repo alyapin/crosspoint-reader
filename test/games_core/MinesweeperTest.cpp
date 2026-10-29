@@ -161,7 +161,8 @@ TEST(Minesweeper, FirstDigIsSafeAndOpensAnArea) {
       ASSERT_TRUE(g.newGame(config, seed));
       const int x = static_cast<int>(seed * 7 % config.columns);
       const int y = static_cast<int>(seed * 13 % config.rows);
-      EXPECT_FALSE(g.toggleFlag(x, y));  // nothing to flag before the mines exist
+      ASSERT_TRUE(g.toggleFlag(x, y));  // a flag before the first dig, taken back
+      ASSERT_TRUE(g.toggleFlag(x, y));
       ASSERT_TRUE(g.reveal(x, y));
       EXPECT_NE(g.status(), Status::Lost);
       EXPECT_EQ(g.adjacent(x, y), 0);
@@ -469,6 +470,23 @@ TEST(MinesweeperSave, RoundTripsEveryState) {
   fresh.reveal(2, 2);
   r.reveal(2, 2);
   EXPECT_EQ(save(r), save(fresh));
+}
+
+TEST(Minesweeper, FlagsBeforeTheFirstDigStay) {
+  Game g(fakeMillis);
+  ASSERT_TRUE(g.newGame(BEGINNER, 3));
+  ASSERT_TRUE(g.toggleFlag(0, 0));
+  EXPECT_EQ(g.status(), Status::Ready);
+  EXPECT_EQ(g.view(0, 0), View::Flagged);
+  EXPECT_FALSE(g.reveal(0, 0));  // a flag is not dug
+  // The flag survives a save of the undug board and the first dig.
+  const std::string text = save(g);
+  Game r(fakeMillis);
+  ASSERT_TRUE(r.deserialize(text.data(), text.size()));
+  EXPECT_EQ(r.view(0, 0), View::Flagged);
+  ASSERT_TRUE(r.reveal(4, 4));
+  EXPECT_EQ(r.status(), Status::Playing);
+  EXPECT_EQ(r.view(0, 0), View::Flagged);
 }
 
 TEST(MinesweeperSave, CorruptSavesAreRejected) {

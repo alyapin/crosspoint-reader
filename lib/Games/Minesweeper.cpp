@@ -51,7 +51,7 @@ void Game::layMines(games::Rng& rng, const int safe) {
   const int sy = safe / cfg.columns;
   int pool = 0;
   for (int i = 0; i < cellCount(); ++i) {
-    cells[i] = 0;
+    cells[i] &= FLAG;  // flags set before the first dig stay
     const int dx = i % cfg.columns - sx;
     const int dy = i / cfg.columns - sy;
     if (dx < -1 || dx > 1 || dy < -1 || dy > 1) scratch[pool++] = static_cast<uint16_t>(i);
@@ -62,7 +62,7 @@ void Game::layMines(games::Rng& rng, const int safe) {
     const uint16_t t = scratch[i];
     scratch[i] = scratch[j];
     scratch[j] = t;
-    cells[scratch[i]] = MINE;
+    cells[scratch[i]] |= MINE;
   }
   countAdjacent();
 }
@@ -331,8 +331,8 @@ bool Game::chord(const int x, const int y) {
 bool Game::dig(const int x, const int y) { return reveal(x, y) || chord(x, y); }
 
 bool Game::toggleFlag(const int x, const int y) {
-  // Nothing to flag before the mines exist.
-  if (!inside(x, y) || state != Status::Playing) return false;
+  // A flag may go down before the first dig lays the mines.
+  if (!inside(x, y) || isOver()) return false;
   uint8_t& c = cells[index(x, y)];
   if (c & OPEN) return false;
   c ^= FLAG;
@@ -387,7 +387,6 @@ bool Game::deserialize(const char* text, const size_t len) {
   int mines = 0;
   int opened = 0;
   int exploded = 0;
-  int flagged = 0;
   for (size_t i = 0; i < boardLen; ++i) {
     if (board[i] < '0' || board[i] > '7') return false;
     const uint8_t c = static_cast<uint8_t>(board[i] - '0');
@@ -395,10 +394,9 @@ bool Game::deserialize(const char* text, const size_t len) {
     mines += (c & MINE) != 0;
     opened += (c & OPEN) != 0;
     exploded += (c & (MINE | OPEN)) == (MINE | OPEN);
-    flagged += (c & FLAG) != 0;
   }
-  // Either an untouched board, or every mine laid by a first dig and at most one gone off.
-  if (mines == 0 ? opened != 0 || flagged != 0 : mines != static_cast<int>(mineCount) || opened == 0 || exploded > 1) {
+  // Either a board not dug yet (flags only), or every mine laid by a first dig and at most one gone off.
+  if (mines == 0 ? opened != 0 : mines != static_cast<int>(mineCount) || opened == 0 || exploded > 1) {
     return false;
   }
 
