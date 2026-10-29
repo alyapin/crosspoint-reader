@@ -539,5 +539,9 @@ void NonogramActivity::drawCaption(const int top) const {
   const char* hint = mappedInput.hasTouch()
                          ? (crossMode ? tr(STR_NONOGRAM_CROSS_HINT) : tr(STR_NONOGRAM_TAP_HINT))
                          : (stroking ? tr(STR_NONOGRAM_KEYS_STROKE_HINT) : tr(STR_NONOGRAM_KEYS_HINT));
-  renderer.drawText(kCaptionFont, kSidePadding, top, hint);
+  int y = top;
+  for (const auto& text : renderer.wrappedText(kCaptionFont, hint, renderer.getScreenWidth() - 2 * kSidePadding, 2)) {
+    renderer.drawText(kCaptionFont, kSidePadding, y, text.c_str());
+    y += renderer.getLineHeight(kCaptionFont);
+  }
 }
