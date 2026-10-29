@@ -1,5 +1,6 @@
 #include "GameSave.h"
 
+#include <Fifteen.h>
 #include <HalStorage.h>
 #include <Klondike.h>
 #include <Logging.h>
@@ -25,10 +26,31 @@ Paths pathsOf(const Kind kind) {
       return {"/.crosspoint/games/sudoku.json", "/.crosspoint/games/sudoku.json.tmp"};
     case Kind::Minesweeper:
       return {"/.crosspoint/games/minesweeper.json", "/.crosspoint/games/minesweeper.json.tmp"};
+    case Kind::Fifteen:
+      return {"/.crosspoint/games/fifteen.json", "/.crosspoint/games/fifteen.json.tmp"};
     case Kind::Klondike:
       break;
   }
   return {"/.crosspoint/games/klondike.json", "/.crosspoint/games/klondike.json.tmp"};
+}
+
+constexpr Paths FIFTEEN_BEST = {"/.crosspoint/games/fifteen-best.json", "/.crosspoint/games/fifteen-best.json.tmp"};
+
+bool writeText(const Paths& p, const char* text, const size_t len) {
+  if (len == 0 || !Storage.ensureDirectoryExists(SAVE_DIR)) {
+    LOG_ERR("GAMES", "Cannot prepare save %s", p.path);
+    return false;
+  }
+  HalFile file;
+  if (!Storage.openFileForWrite("GAMES", p.tmp, file)) return false;
+  const size_t written = file.write(text, len);
+  file.close();
+  if (written != len || !Storage.replaceFile(p.tmp, p.path)) {
+    LOG_ERR("GAMES", "Save failed (%u of %u bytes)", static_cast<unsigned>(written), static_cast<unsigned>(len));
+    Storage.remove(p.tmp);
+    return false;
+  }
+  return true;
 }
 
 // Cold path (exit, sleep, after a move): one bounded buffer, freed on return.
@@ -44,26 +66,11 @@ bool write(const Kind kind, const GameT& game, const size_t cap) {
     LOG_ERR("GAMES", "OOM: %u bytes for save", static_cast<unsigned>(cap));
     return false;
   }
-  const size_t len = game.serialize(text.get(), cap);
-  if (len == 0 || !Storage.ensureDirectoryExists(SAVE_DIR)) {
-    LOG_ERR("GAMES", "Cannot prepare save %s", p.path);
-    return false;
-  }
-  HalFile file;
-  if (!Storage.openFileForWrite("GAMES", p.tmp, file)) return false;
-  const size_t written = file.write(text.get(), len);
-  file.close();
-  if (written != len || !Storage.replaceFile(p.tmp, p.path)) {
-    LOG_ERR("GAMES", "Save failed (%u of %u bytes)", static_cast<unsigned>(written), static_cast<unsigned>(len));
-    Storage.remove(p.tmp);
-    return false;
-  }
-  return true;
+  return writeText(p, text.get(), game.serialize(text.get(), cap));
 }
 
 template <typename GameT>
-bool read(const Kind kind, GameT& game, const size_t cap) {
-  const Paths p = pathsOf(kind);
+bool read(const Paths& p, GameT& game, const size_t cap) {
   if (!Storage.exists(p.path)) return false;
   std::string text;
   // A read error may be transient: keep the file. Only content that fails to parse is dropped.
@@ -91,9 +98,17 @@ void clear(const Kind kind) {
 bool save(const sudoku::Game& game) { return write(Kind::Sudoku, game, sudoku::SAVE_MAX); }
 bool save(const minesweeper::Game& game) { return write(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
 bool save(const klondike::Game& game) { return write(Kind::Klondike, game, klondike::SAVE_MAX); }
+bool save(const fifteen::Game& game) { return write(Kind::Fifteen, game, fifteen::SAVE_MAX); }
 
-bool load(sudoku::Game& game) { return read(Kind::Sudoku, game, sudoku::SAVE_MAX); }
-bool load(minesweeper::Game& game) { return read(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
-bool load(klondike::Game& game) { return read(Kind::Klondike, game, klondike::SAVE_MAX); }
+bool load(sudoku::Game& game) { return read(pathsOf(Kind::Sudoku), game, sudoku::SAVE_MAX); }
+bool load(minesweeper::Game& game) { return read(pathsOf(Kind::Minesweeper), game, minesweeper::SAVE_MAX); }
+bool load(klondike::Game& game) { return read(pathsOf(Kind::Klondike), game, klondike::SAVE_MAX); }
+bool load(fifteen::Game& game) { return read(pathsOf(Kind::Fifteen), game, fifteen::SAVE_MAX); }
+
+bool save(const fifteen::Best& best) {
+  char text[48];
+  return writeText(FIFTEEN_BEST, text, best.serialize(text, sizeof(text)));
+}
+bool load(fifteen::Best& best) { return read(FIFTEEN_BEST, best, 48); }
 
 }  // namespace gamesave

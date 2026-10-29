@@ -1,6 +1,6 @@
 #pragma once
 
-// SD persistence for the unfinished Sudoku, Minesweeper and Klondike games, one
+// SD persistence for the unfinished Sudoku, Minesweeper, Klondike and 15 puzzle games, one
 // file each under /.crosspoint/games. A file exists only while its game is in
 // progress, so its presence is the "game in progress" flag.
 
@@ -13,10 +13,14 @@ class Game;
 namespace klondike {
 class Game;
 }
+namespace fifteen {
+class Game;
+struct Best;
+}  // namespace fifteen
 
 namespace gamesave {
 
-enum class Kind { Sudoku, Minesweeper, Klondike };
+enum class Kind { Sudoku, Minesweeper, Klondike, Fifteen };
 
 bool hasGameInProgress(Kind kind);
 void clear(Kind kind);
@@ -26,11 +30,17 @@ void clear(Kind kind);
 bool save(const sudoku::Game& game);
 bool save(const minesweeper::Game& game);
 bool save(const klondike::Game& game);
+bool save(const fifteen::Game& game);
 
 // Restore the saved game, paused. False on failure; a file that reads but does
 // not parse is removed.
 bool load(sudoku::Game& game);
 bool load(minesweeper::Game& game);
 bool load(klondike::Game& game);
+bool load(fifteen::Game& game);
+
+// The best finished 15 puzzle, kept apart from the save.
+bool save(const fifteen::Best& best);
+bool load(fifteen::Best& best);
 
 }  // namespace gamesave
