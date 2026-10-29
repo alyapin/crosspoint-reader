@@ -24,7 +24,6 @@ void ConfirmationActivity::onEnter() {
       cancelLabel.empty() ? I18N.get(StrId::STR_CANCEL) : cancelLabel.c_str(),
       confirmLabel.c_str(),
   };
-  confirmPopup.setStandalone(true);
   confirmPopup.show(heading.c_str(), body.c_str(), options, 2, OptionPopup::kDialog, [this](int idx) {
     ActivityResult res;
     res.isCancelled = (idx != 1);
@@ -37,6 +36,8 @@ void ConfirmationActivity::onEnter() {
 
 void ConfirmationActivity::render(RenderLock&& lock) {
   renderer.clearScreen();
+  // The shared dialog layout (as Clear cache): the status line on top, the dialog on its band.
+  setka::drawStatusLine(renderer);
 
   if (confirmPopup.processRender(renderer, mappedInput)) return;
 
