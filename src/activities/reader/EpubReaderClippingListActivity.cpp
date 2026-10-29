@@ -74,7 +74,7 @@ void EpubReaderClippingListActivity::openSelected() {
   if (!clipping) return;
   static constexpr StrId OPTIONS[] = {StrId::STR_OPEN, StrId::STR_GO_TO_PASSAGE};
   const bool anchored = clipping->startOffset != UINT32_MAX && clipping->endOffset != UINT32_MAX;
-  confirmPopup.show(StrId::STR_CLIPPINGS, OPTIONS, anchored ? 2 : 1, 0, [this](const int index) {
+  confirmPopup.show(StrId::STR_CLIPPINGS, OPTIONS, anchored ? 2 : 1, OptionPopup::kMenu, [this](const int index) {
     if (index == 0) {
       readSelected();
       return;
@@ -124,7 +124,7 @@ void EpubReaderClippingListActivity::showDeleteConfirmation() {
   if (listCount() == 0 || confirmPopup.isActive()) return;
   confirmingDelete = true;
   const char* options[] = {tr(STR_CANCEL), tr(STR_DELETE)};
-  confirmPopup.show(tr(STR_DELETE_CLIPPING_CONFIRM), options, 2, 0, [this](const int index) {
+  confirmPopup.show(tr(STR_DELETE_CLIPPING_CONFIRM), options, 2, OptionPopup::kDialog, [this](const int index) {
     confirmingDelete = false;
     if (index == 1) deleteSelected();
     requestUpdate();

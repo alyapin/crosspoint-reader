@@ -15,11 +15,12 @@ void ClearCacheActivity::onEnter() {
 
   state = WARNING;
   const char* options[] = {tr(STR_CANCEL), tr(STR_CLEAR_BUTTON)};
-  confirmPopup.showMessage(tr(STR_CLEAR_READING_CACHE), tr(STR_CLEAR_CACHE_WARNING_2), options, 2, 0, [this](int idx) {
-    if (idx == 1) {
-      beginClear();
-    }
-  });
+  confirmPopup.showMessage(tr(STR_CLEAR_READING_CACHE), tr(STR_CLEAR_CACHE_WARNING_2), options, 2, OptionPopup::kDialog,
+                           [this](int idx) {
+                             if (idx == 1) {
+                               beginClear();
+                             }
+                           });
   requestUpdate();
 }
 

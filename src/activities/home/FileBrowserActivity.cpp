@@ -386,7 +386,7 @@ void FileBrowserActivity::showEntryActions() {
   const bool isDirectory = entry.back() == '/';
   const std::string name = utf8ComposeNfc(isDirectory ? entry.substr(0, entry.size() - 1) : entry);
   const char* options[] = {tr(STR_OPEN), tr(STR_DELETE), tr(STR_RENAME)};
-  optionPopup.show(name.c_str(), options, isDirectory ? 2 : 3, 0, [this](const int index) {
+  optionPopup.show(name.c_str(), options, isDirectory ? 2 : 3, OptionPopup::kMenu, [this](const int index) {
     if (index == 0) {
       activateSelected();
     } else if (index == 1) {

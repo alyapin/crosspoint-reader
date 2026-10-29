@@ -182,7 +182,7 @@ void EpubReaderBookmarksActivity::showBookmarkActions() {
     return;
   }
   const StrId options[] = {StrId::STR_OPEN, StrId::STR_RENAME, StrId::STR_DELETE};
-  confirmPopup.show(StrId::STR_BOOKMARKS, options, 3, 0, [this](const int idx) {
+  confirmPopup.show(StrId::STR_BOOKMARKS, options, 3, OptionPopup::kMenu, [this](const int idx) {
     if (idx == 0) {
       openSelectedBookmark();
     } else if (idx == 1) {
@@ -200,7 +200,7 @@ void EpubReaderBookmarksActivity::showDeleteConfirmation() {
   }
   confirmingDelete = true;
   const char* options[] = {tr(STR_CANCEL), tr(STR_DELETE)};
-  confirmPopup.show(tr(STR_CONFIRM_DELETE_BOOKMARK), options, 2, 0, [this](int idx) {
+  confirmPopup.show(tr(STR_CONFIRM_DELETE_BOOKMARK), options, 2, OptionPopup::kDialog, [this](int idx) {
     confirmingDelete = false;
     if (idx == 1) {
       deleteSelectedBookmark();

@@ -1,4 +1,5 @@
 #pragma once
+#include <HalGPIO.h>
 #include <I18n.h>
 
 #include <algorithm>
@@ -27,6 +28,14 @@
 // publication so a release cannot be dropped during a highlight repaint.
 class OptionPopup {
  public:
+  // currentIndex for show()/showMessage(): the option holding the current
+  // value (a value picker keeps the bar on it), or one of these. The bar
+  // follows the key focus on button boards; on touch it marks only what a tap
+  // would confirm.
+  static constexpr int kMenu = -1;    // a list of actions: no bar on touch; keys start on the first
+  static constexpr int kDialog = -2;  // Cancel first, the action last: the bar on the action on touch;
+                                      // keys start on Cancel
+
   void show(StrId titleId, const StrId* optionIds, int optionCount, int currentIndex,
             std::function<void(int)> onSelect) {
     title = I18N.get(titleId);
@@ -130,14 +139,14 @@ class OptionPopup {
     if (!active) return false;
     const int count = std::min<int>(ownedStrings.size(), MAX_OPTIONS);
     if (previous) {
-      selectedIndex = (selectedIndex - 1 + count) % count;
+      selectedIndex = selectedIndex < 0 ? count - 1 : (selectedIndex - 1 + count) % count;
       requestUpdate();
       return true;
     } else if (next) {
       selectedIndex = (selectedIndex + 1) % count;
       requestUpdate();
       return true;
-    } else if (confirm) {
+    } else if (confirm && selectedIndex >= 0) {
       active = false;
       if (onSelectCallback) onSelectCallback(selectedIndex);
       requestUpdate();
@@ -333,7 +342,13 @@ class OptionPopup {
 
   void activate(int currentIndex, std::function<void(int)> onSelect) {
     const int count = std::min<int>(ownedStrings.size(), MAX_OPTIONS);
-    selectedIndex = currentIndex >= 0 && currentIndex < count ? currentIndex : 0;
+    if (currentIndex >= 0 && currentIndex < count) {
+      selectedIndex = currentIndex;
+    } else if (gpio.hasTouch()) {
+      selectedIndex = currentIndex == kDialog ? count - 1 : -1;
+    } else {
+      selectedIndex = 0;
+    }
     onSelectCallback = std::move(onSelect);
     message.clear();
     uiReady = false;
