@@ -289,9 +289,9 @@ void NonogramActivity::onKey(const int dx, const int dy, const bool confirm) {
       stroking = false;
       requestRepaint(RepaintUpdate);
     } else if (dx != 0 || dy != 0) {
-      const int x = (cursor % n + dx + n) % n;
-      const int y = (cursor / n + dy + n) % n;
-      cursor = y * n + x;
+      const int y = cursor / n + dy;
+      if (dx != 0) cursor = (cursor + dx + n * n) % (n * n);
+      if (dy != 0 && y >= 0 && y < n) cursor += dy * n;
       if (game.mark(cursor) == nonogram::Empty) apply(cursor, strokeMark);
       stroking = game.inProgress();
     }
@@ -558,8 +558,12 @@ void NonogramActivity::drawCaption(const int top) const {
   const char* hint = mappedInput.hasTouch()
                          ? (crossMode ? tr(STR_NONOGRAM_CROSS_HINT) : tr(STR_NONOGRAM_TAP_HINT))
                          : (stroking ? tr(STR_NONOGRAM_KEYS_STROKE_HINT) : tr(STR_NONOGRAM_KEYS_HINT));
+  if (hint != captionFor) {
+    captionFor = hint;
+    captionLines = renderer.wrappedText(kCaptionFont, hint, renderer.getScreenWidth() - 2 * kSidePadding, 2);
+  }
   int y = top;
-  for (const auto& text : renderer.wrappedText(kCaptionFont, hint, renderer.getScreenWidth() - 2 * kSidePadding, 2)) {
+  for (const auto& text : captionLines) {
     renderer.drawText(kCaptionFont, kSidePadding, y, text.c_str());
     y += renderer.getLineHeight(kCaptionFont);
   }

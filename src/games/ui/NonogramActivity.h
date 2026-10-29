@@ -3,6 +3,8 @@
 #include <Nonogram.h>
 
 #include <memory>
+#include <string>
+#include <vector>
 
 #include "GameScreen.h"
 
@@ -76,6 +78,8 @@ class NonogramActivity final : public GameScreen {
   bool crossMode = false;
   bool stroking = false;  // button boards: the arrows paint strokeMark on the empty cells they reach
   nonogram::Mark strokeMark = nonogram::Crossed;
+  mutable const char* captionFor = nullptr;  // render task only: the key caption, wrapped once
+  mutable std::vector<std::string> captionLines;
   bool checkShown = false;
   Notice notice = Notice::None;
   int noticeSide = 0;
