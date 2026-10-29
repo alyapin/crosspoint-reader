@@ -519,13 +519,17 @@ void ChessActivity::setView(const View next) {
     focus = currentOption(pickerRow);
   } else if (next == View::CustomTime) {
     focus = kCustomDoneRow;
+  } else if (next == View::Menu) {
+    // As the other games: touch and a finished game start on Новая игра (no stray tap resigns); keys reopen on
+    // the game action chosen here last, else Продолжить.
+    Row rows[kMaxRows];
+    const int count = listRows(rows);
+    const Row start = mappedInput.hasTouch() || match->game().isOver() ? Row::NewGame : lastMenuRow;
+    const Row* found = std::find(rows, rows + count, start);
+    if (found == rows + count) found = std::find(rows, rows + count, Row::NewGame);
+    focus = found < rows + count ? static_cast<int>(found - rows) : 0;
   } else {
-    focus = mappedInput.hasTouch() ? -1 : 0;  // a touch menu shows no bar until a key moves it
-    if (next == View::Menu && focus == 0) {
-      Row rows[kMaxRows];
-      const int count = listRows(rows);
-      focus = std::max(0, static_cast<int>(std::find(rows, rows + count, lastMenuRow) - rows) % count);
-    }
+    focus = mappedInput.hasTouch() ? -1 : 0;
   }
   requestRepaint(RepaintEntry);
 }
