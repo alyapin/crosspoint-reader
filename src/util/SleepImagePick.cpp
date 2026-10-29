@@ -46,8 +46,9 @@ bool isChoicePath(const std::string_view path) {
   return false;
 }
 
-SourceOrder sourceOrder(const bool hasChoice) {
+SourceOrder sourceOrder(const bool hasChoice, const bool randomPicked) {
   if (hasChoice) return {{Source::Chosen, Source::Random, Source::RootBmp}, 3};
+  if (randomPicked) return {{Source::Random, Source::RootBmp}, 2};
   return {{Source::RootBmp, Source::Random}, 2};
 }
 

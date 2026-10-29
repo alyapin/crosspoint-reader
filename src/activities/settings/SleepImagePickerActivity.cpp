@@ -276,6 +276,7 @@ void SleepImagePickerActivity::choose(const int tile) {
   const char* path = tile > 0 ? entries[tile - 1].path.c_str() : "";
   strncpy(SETTINGS.sleepImagePath, path, sizeof(SETTINGS.sleepImagePath) - 1);
   SETTINGS.sleepImagePath[sizeof(SETTINGS.sleepImagePath) - 1] = '\0';
+  SETTINGS.sleepImageRandom = tile > 0 ? 0 : 1;
   // Any pick here is a sleep picture: modes that show no folder picture switch to Custom.
   using Mode = CrossPointSettings::SLEEP_SCREEN_MODE;
   if (SETTINGS.sleepScreen != Mode::CUSTOM && SETTINGS.sleepScreen != Mode::COVER_CUSTOM) {

@@ -20,9 +20,9 @@ inline constexpr size_t kMaxPathBytes = 192;
 bool isChoicePath(std::string_view path);
 
 // The sources the Custom sleep screen tries, in order. A chosen picture comes
-// first and falls back to a random one; /sleep.bmp keeps its old first place
-// only while nothing is chosen, and is the last resort when a chosen picture
-// has gone missing and the folders are empty.
+// first and falls back to a random one. /sleep.bmp keeps its old first place
+// only while nothing is picked, not even the Random tile (randomPicked), and
+// is otherwise the last resort when the folders are empty.
 enum class Source : uint8_t { Chosen, RootBmp, Random };
 struct SourceOrder {
   std::array<Source, 3> items{};
@@ -30,7 +30,7 @@ struct SourceOrder {
   const Source* begin() const { return items.data(); }
   const Source* end() const { return items.data() + count; }
 };
-SourceOrder sourceOrder(bool hasChoice);
+SourceOrder sourceOrder(bool hasChoice, bool randomPicked);
 
 // Thumbnail cache key: FNV-1a over everything that changes a thumbnail.
 uint32_t thumbKey(std::string_view path, uint32_t fileSize, uint32_t mtime, int thumbW, int thumbH, bool crop);
