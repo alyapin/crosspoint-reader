@@ -36,8 +36,8 @@ struct Bands {
 // Draws the stock header (back arrow on touch boards when `back`, title, rule)
 // and returns the free band under it.
 Bands drawHeader(const GfxRenderer& renderer, const char* title, bool back);
-// Back/Select/Up/Down hints on button boards; nothing on touch boards.
-void drawHints(GfxRenderer& renderer, const MappedInputManager& input, const char* confirmLabel);
+// Back/Select/Up/Down hints on button boards (Up/Down only when `navigates`); nothing on touch boards.
+void drawHints(GfxRenderer& renderer, const MappedInputManager& input, const char* confirmLabel, bool navigates = true);
 
 // Russian-style plural choice for the active language (one/few/many); other
 // languages use one for 1 and many otherwise.
