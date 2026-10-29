@@ -348,18 +348,19 @@ void ChessActivity::runAction(const GameAction action) {
 // then the bar's actions, if shown; Confirm acts like a tap. Left/Right step along the ring,
 // Up/Down change rank (on edge-button boards the side buttons step instead).
 void ChessActivity::handleGameKeys() {
-  using Button = MappedInputManager::Button;
-  const bool sideStep = gpio.hasEdgeSideButtons();
-  int dx = 0;
-  int dy = 0;
-  keyRepeat.onPressAndContinuous({Button::Left}, [&dx] { dx = -1; });
-  keyRepeat.onPressAndContinuous({Button::Right}, [&dx] { dx = 1; });
-  keyRepeat.onPressAndContinuous({Button::Up}, [&] { (sideStep ? dx : dy) = -1; });
-  keyRepeat.onPressAndContinuous({Button::Down}, [&] { (sideStep ? dx : dy) = 1; });
-  const bool confirm = mappedInput.wasReleased(Button::Confirm);
-  if (dx == 0 && dy == 0 && !confirm) return;
+  keys.read(mappedInput, gpio.hasEdgeSideButtons());
+  if (!keys.pending()) return;
+  // A panel refresh holds the lock: the keys wait in the queue and none is lost.
+  RenderLock lock(RenderLock::Mode::Try);
+  if (!lock.ownsLock()) return;
+  games::ui::BoardKeys::Key key{};
+  while (view == View::Game && keys.pop(key)) {
+    gameKey(key.dx, key.dy, key.confirm);
+    if (key.confirm) return;
+  }
+}
 
-  RenderLock lock(*this);
+void ChessActivity::gameKey(const int dx, const int dy, const bool confirm) {
   if (promoFrom != kNoSquare) {
     if (confirm) {
       playMove(promoFrom, promoTo, kPromotions[promoFocus]);
@@ -496,6 +497,7 @@ void ChessActivity::setView(const View next) {
   if (view == View::Game && next != View::Game) match->pause();
   view = next;
   if (next == View::Game) {
+    keys.reset();
     match->resume();
     syncShownClocks();
     if (!mappedInput.hasTouch() && cursor < 0) cursor = kStartCursor;
@@ -1015,7 +1017,7 @@ void ChessActivity::lastMoveText(char* out, const size_t cap) const {
 
 // --- render task -------------------------------------------------------------
 
-void ChessActivity::render(RenderLock&& lock) {
+void ChessActivity::render(RenderLock&&) {
   renderer.clearScreen();
   if (view == View::Game) {
     HeaderBackTapTarget::clear();  // the board screen has its own "‹ Выйти"
@@ -1033,12 +1035,9 @@ void ChessActivity::render(RenderLock&& lock) {
                                             board ? tr(STR_DIR_RIGHT) : tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   const uint8_t kind = repaint.exchange(RepaintNone);
-  const HalDisplay::RefreshMode mode = kind == RepaintEntry   ? cadence.entry()
-                                       : kind == RepaintClock ? HalDisplay::FAST_REFRESH
-                                                              : cadence.update();
-  // Keys pressed during the panel refresh still move the cursor; the next render shows where it ended.
-  lock.unlock();
-  renderer.displayBuffer(mode);
+  renderer.displayBuffer(kind == RepaintEntry   ? cadence.entry()
+                         : kind == RepaintClock ? HalDisplay::FAST_REFRESH
+                                                : cadence.update());
 }
 
 bool ChessActivity::hasBar() const { return UITheme::getInstance().getMetrics().buttonHintsHeight == 0; }

@@ -7,11 +7,11 @@
 #include <cstdint>
 
 #include "ActionBar.h"
+#include "BoardKeys.h"
 #include "GamePickerActivity.h"
 #include "activities/Activity.h"
 #include "components/UiAppHost.h"
 #include "components/setka/SetkaStyle.h"
-#include "util/ButtonNavigator.h"
 
 // The shell of the Sudoku, Minesweeper and Klondike boards (ui-style Setka):
 // the shared clock/battery line (setka::drawStatusLine), a top line with "‹ Выйти" and a status on the right,
@@ -150,6 +150,7 @@ class GameScreen : public Activity, protected UiAppHost {
  private:
   static void screenFn(UiScreen& screen, void* user);
   void confirmFinish();
+  void applyKeys();
   void drawMode(UiScreen& screen, const BarItem* items, int count) const;
   void addMenuRow(GamePickerActivity::Row* rows, int& count, int8_t id, const GamePickerActivity::Row& row);
   void addOwnRows(GamePickerActivity::Row* rows, int& count);
@@ -164,7 +165,7 @@ class GameScreen : public Activity, protected UiAppHost {
   int8_t lastMenuRow = -1;                            // the last bar action or own row chosen there
   setka::RefreshCadence cadence;                      // render task only
   std::atomic<uint8_t> repaint{RepaintEntry};
-  ButtonNavigator keyRepeat{games::ui::kKeyRepeatMs, games::ui::kKeyRepeatStartMs};
+  games::ui::BoardKeys keys;  // loop task only
   int32_t clockShown = -1;
   bool savePending = false;
 };

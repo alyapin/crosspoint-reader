@@ -81,6 +81,7 @@ void GameScreen::openPicker(const char* title, const GamePickerActivity::Row* ro
   if (hasGame) pauseGame();
   startActivityForResult(std::move(picker), [this](const ActivityResult& result) {
     RenderLock lock(*this);
+    keys.reset();
     const auto* choice = std::get_if<MenuResult>(&result.data);
     if (!result.isCancelled && choice != nullptr) {
       pickerChosen(choice->action, choice->pageTurnOption != 0);
@@ -145,6 +146,7 @@ void GameScreen::showMenu(const char* title, const GamePickerActivity::Row* rows
   pauseGame();
   startActivityForResult(std::move(menu), [this, count](const ActivityResult& result) {
     RenderLock lock(*this);
+    keys.reset();
     const auto* choice = std::get_if<MenuResult>(&result.data);
     const bool chosen = !result.isCancelled && choice != nullptr && choice->action >= 0 && choice->action < count;
     const int row = chosen ? menuIds[choice->action] : kRowContinue;
@@ -168,6 +170,20 @@ void GameScreen::showMenu(const char* title, const GamePickerActivity::Row* rows
       runBarSlot(row);
     }
   });
+}
+
+// In order; a Confirm ends the pass, as it may open another screen (which drops the rest on return).
+void GameScreen::applyKeys() {
+  games::ui::BoardKeys::Key key{};
+  while (keys.pop(key)) {
+    const int over = key.confirm && !hasBar() ? newGameSlot() : -1;
+    if (over >= 0) {
+      runBarSlot(over);
+    } else {
+      onKey(key.dx, key.dy, key.confirm);
+    }
+    if (key.confirm) return;
+  }
 }
 
 void GameScreen::runBarSlot(const int slot) {
@@ -198,6 +214,7 @@ void GameScreen::confirmFinish() {
   }
   startActivityForResult(std::move(confirm), [this, concede](const ActivityResult& result) {
     RenderLock lock(*this);
+    keys.reset();
     if (result.isCancelled || concede) {
       resumeGame();
       if (!result.isCancelled) resign();
@@ -245,22 +262,12 @@ void GameScreen::loop() {
     RenderLock lock(*this);
     onConfirmHold();
   } else {
-    int dx = 0;
-    int dy = 0;
-    keyRepeat.onPressAndContinuous({Button::Left}, [&dx] { dx = -1; });
-    keyRepeat.onPressAndContinuous({Button::Right}, [&dx] { dx = 1; });
-    keyRepeat.onPressAndContinuous({Button::Up}, [&dy] { dy = -1; });
-    keyRepeat.onPressAndContinuous({Button::Down}, [&dy] { dy = 1; });
-    const bool confirm = mappedInput.wasReleased(Button::Confirm);
-    if (dx != 0 || dy != 0 || confirm) {
-      RenderLock lock(*this);
-      const int over = confirm && !hasBar() ? newGameSlot() : -1;
-      if (over >= 0) {
-        runBarSlot(over);
-      } else {
-        onKey(dx, dy, confirm);
-      }
-    }
+    keys.read(mappedInput);
+  }
+  if (keys.pending()) {
+    // A panel refresh holds the lock: the keys wait in the queue and none is lost.
+    RenderLock lock(RenderLock::Mode::Try);
+    if (lock.ownsLock()) applyKeys();
   }
 
   // The timer repaints when its minute turns; a change in the same pass merges into one refresh.
@@ -277,7 +284,7 @@ void GameScreen::loop() {
 
 // --- render task -------------------------------------------------------------
 
-void GameScreen::render(RenderLock&& lock) {
+void GameScreen::render(RenderLock&&) {
   renderer.clearScreen();
   renderUi();
   const bool over = newGameSlot() >= 0;
@@ -288,12 +295,9 @@ void GameScreen::render(RenderLock&& lock) {
                             tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   const uint8_t kind = repaint.exchange(RepaintNone);
-  const HalDisplay::RefreshMode mode = kind == RepaintEntry   ? cadence.entry()
-                                       : kind == RepaintClock ? HalDisplay::FAST_REFRESH
-                                                              : cadence.update();
-  // Keys pressed during the panel refresh still move the game; the next render shows where they ended.
-  lock.unlock();
-  renderer.displayBuffer(mode);
+  renderer.displayBuffer(kind == RepaintEntry   ? cadence.entry()
+                         : kind == RepaintClock ? HalDisplay::FAST_REFRESH
+                                                : cadence.update());
 }
 
 void GameScreen::screenFn(UiScreen& screen, void* user) {

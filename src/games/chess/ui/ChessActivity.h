@@ -10,7 +10,7 @@
 #include "activities/Activity.h"
 #include "components/UiAppHost.h"
 #include "components/setka/SetkaStyle.h"
-#include "games/ui/ActionBar.h"
+#include "games/ui/BoardKeys.h"
 #include "util/ButtonNavigator.h"
 
 // Games list hook for the "Шахматы" row: chessListStatus() is the row's second
@@ -102,6 +102,7 @@ class ChessActivity final : public Activity, private UiAppHost {
 
   void handleAction(const freeink::ui::ActionEvent& event, int x, int y);
   void handleGameKeys();
+  void gameKey(int dx, int dy, bool confirm);
   int gameActions(GameAction* out) const;
   GameAction focusedAction() const;
   void runAction(GameAction action);
@@ -159,7 +160,7 @@ class ChessActivity final : public Activity, private UiAppHost {
   bool savePending = false;
 
   ButtonNavigator buttonNavigator;
-  ButtonNavigator keyRepeat{games::ui::kKeyRepeatMs, games::ui::kKeyRepeatStartMs};  // the board cursor
-  setka::RefreshCadence cadence;                                                     // render task only
+  games::ui::BoardKeys keys;      // the board cursor, loop task only
+  setka::RefreshCadence cadence;  // render task only
   std::atomic<uint8_t> repaint{RepaintEntry};
 };
