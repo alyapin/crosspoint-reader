@@ -239,7 +239,7 @@ void ScanwordActivity::sortList() {
 int ScanwordActivity::rowsPerPage() const {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const int top = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  return std::max(1, (renderer.getScreenHeight() - kFooterHeight - top) / (kRowHeight + kRowGap));
+  return std::max(1, (bottom() - kFooterHeight - top) / (kRowHeight + kRowGap));
 }
 
 void ScanwordActivity::openPuzzle(const uint16_t item) {
@@ -693,8 +693,12 @@ void ScanwordActivity::handleBoardKeys() {
 // --- geometry -------------------------------------------------------------------
 
 int ScanwordActivity::cellSize() const {
-  const int areaHeight = renderer.getScreenHeight() - (touchBoard() ? kBandTouch : kBandMin) - kGridTop;
+  const int areaHeight = bottom() - (touchBoard() ? kBandTouch : kBandMin) - kGridTop;
   return std::min(renderer.getScreenWidth() / puzzle->width(), areaHeight / puzzle->height());
+}
+
+int ScanwordActivity::bottom() const {
+  return renderer.getScreenHeight() - UITheme::getInstance().getMetrics().buttonHintsHeight;
 }
 
 int ScanwordActivity::gridLeft() const { return (renderer.getScreenWidth() - puzzle->width() * cellSize()) / 2; }
@@ -735,6 +739,10 @@ void ScanwordActivity::render(RenderLock&&) {
                    view == View::List ? tr(STR_SCANWORDS) : tr(STR_SCANWORD_MENU), page[0] ? page : nullptr);
   }
   renderUi();
+  const bool board = view == View::Board;
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), board ? tr(STR_DIR_LEFT) : tr(STR_DIR_UP),
+                                            board ? tr(STR_DIR_RIGHT) : tr(STR_DIR_DOWN));
+  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   const uint8_t kind = repaint.exchange(RepaintNone);
   renderer.displayBuffer(kind == RepaintEntry ? cadence.entry() : cadence.update());
 }
@@ -780,7 +788,7 @@ void ScanwordActivity::drawRow(UiScreen& screen, const int top, const int index,
 void ScanwordActivity::buildList(UiScreen& screen) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const int width = renderer.getScreenWidth();
-  const int height = renderer.getScreenHeight();
+  const int height = bottom();
   const int listTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
   if (itemCount == 0) {
     int y = listTop + kRowGap;
@@ -1170,7 +1178,7 @@ void ScanwordActivity::drawLetterStrip(const int top) const {
 
 void ScanwordActivity::drawBand(UiScreen& screen) const {
   const int width = renderer.getScreenWidth();
-  const int height = renderer.getScreenHeight();
+  const int height = bottom();
   const int top = gridBottom();
   drawRule(renderer, 0, top, width);
   const int bandTop = top + kRuleWidth;

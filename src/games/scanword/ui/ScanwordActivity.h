@@ -101,6 +101,8 @@ class ScanwordActivity final : public Activity, private UiAppHost {
 
   bool touchBoard() const;
   int cellSize() const;
+  // Bottom of the content, above the button hints on button boards.
+  int bottom() const;
   int gridLeft() const;
   int gridBottom() const;
   int keyboardTop() const;

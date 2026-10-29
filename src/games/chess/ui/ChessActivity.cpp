@@ -53,7 +53,6 @@ constexpr int kSquare = 60;
 constexpr int kBoardTop = kGameBoardTop;
 constexpr int kBoardSize = 8 * kSquare;
 constexpr int kPanelTop = kBoardTop + kBoardSize;
-constexpr int kActionsTop = 800 - games::ui::kActionBarHeight;
 constexpr int kPieceInset = (kSquare - 56) / 2;
 constexpr int kDotSize = 16;
 constexpr int kRingWidth = 3;
@@ -520,7 +519,7 @@ void ChessActivity::setView(const View next) {
   } else if (next == View::CustomTime) {
     focus = kCustomDoneRow;
   } else {
-    focus = -1;  // the menu shows no bar until a key moves it
+    focus = mappedInput.hasTouch() ? -1 : 0;  // a touch menu shows no bar until a key moves it
   }
   requestRepaint(RepaintEntry);
 }
@@ -1001,15 +1000,20 @@ void ChessActivity::render(RenderLock&&) {
     GUI.drawHeader(renderer, Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.headerHeight}, listTitle());
   }
   renderUi();
-  if (view != View::Game) {
-    // Button boards only; the lists end well above the hints.
-    const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
-    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-  }
+  // Button boards only; the lists and the action bar end above the hints.
+  const bool board = view == View::Game;
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), board ? tr(STR_DIR_LEFT) : tr(STR_DIR_UP),
+                                            board ? tr(STR_DIR_RIGHT) : tr(STR_DIR_DOWN));
+  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   const uint8_t kind = repaint.exchange(RepaintNone);
   renderer.displayBuffer(kind == RepaintEntry   ? cadence.entry()
                          : kind == RepaintClock ? HalDisplay::FAST_REFRESH
                                                 : cadence.update());
+}
+
+int ChessActivity::actionsTop() const {
+  return renderer.getScreenHeight() - games::ui::kActionBarHeight -
+         UITheme::getInstance().getMetrics().buttonHintsHeight;
 }
 
 void ChessActivity::screenFn(UiScreen& screen, void* user) { static_cast<ChessActivity*>(user)->build(screen); }
@@ -1268,6 +1272,10 @@ void ChessActivity::drawClockPanel() const {
   const int maxWidth = renderer.getScreenWidth() - kRowTextX - kSidePadding - unitWidth;
   int scale256 = kHeroCapTarget > 0 ? kHeroCapTarget * 256 / std::max(1, heroCapHeight(renderer, kHeroFont)) : 256;
   if (naturalWidth * scale256 > maxWidth * 16 * 256) scale256 = maxWidth * 16 * 256 / naturalWidth;
+  // The digits shrink to the room above the turn line, which button boards cut by the hint row.
+  const int room = actionsTop() - 6 - renderer.getLineHeight(kText12Font) - 14 - (kPanelTop + 22);
+  const int naturalCap = std::max(1, heroCapHeight(renderer, kHeroFont));
+  if (naturalCap * scale256 / 256 > room) scale256 = room * 256 / naturalCap;
 
   const int capTop = kPanelTop + 22;
   const int capHeight = heroCapHeight(renderer, kHeroFont) * scale256 / 256;
@@ -1292,7 +1300,7 @@ void ChessActivity::drawClockPanel() const {
 void ChessActivity::drawStatusPanel() const {
   const int top = kPanelTop + 18;
   drawTurnLine(top);
-  drawMoveList(top + renderer.getLineHeight(kText12Font) + 12, kActionsTop - 6);
+  drawMoveList(top + renderer.getLineHeight(kText12Font) + 12, actionsTop() - 6);
 }
 
 // Move list in Russian notation, newest last; only the lines that fit are shown.
@@ -1362,15 +1370,19 @@ void ChessActivity::drawPromotion(UiScreen& screen) const {
   renderer.drawText(kText12Font, kRowTextX, top, tr(STR_CHESS_PROMOTE), true, kSemiBold);
   const int cellTop = top + renderer.getLineHeight(kText12Font) + 8;
   const int cellWidth = width / static_cast<int>(std::size(kPromotions));
-  const int cellHeight = kActionsTop - cellTop;
+  const int cellHeight = actionsTop() - cellTop;
   const char* names[] = {tr(STR_CHESS_QUEEN), tr(STR_CHESS_ROOK), tr(STR_CHESS_BISHOP), tr(STR_CHESS_KNIGHT)};
   const auto color = pieceColor(match->game().sideToMove());
   for (int i = 0; i < static_cast<int>(std::size(kPromotions)); ++i) {
     const int x = i * cellWidth;
     const auto& bitmap =
         chess::ui::pieceBitmap(prefs.pieceSet, color, pieceKind(kPromotions[i]), chess::ui::PieceSize::Small);
-    chess::ui::drawPiece(renderer, bitmap, x + (cellWidth - bitmap.size) / 2, cellTop + 8);
-    drawCentered(renderer, kText10Font, x, cellWidth, cellTop + 16 + bitmap.size, names[i]);
+    // A short cell (button boards) lifts the name above the focus frame, and the piece above the name.
+    const int nameTop = std::min(cellTop + 16 + bitmap.size,
+                                 cellTop + cellHeight - kCellFrameWidth - 2 - renderer.getLineHeight(kText10Font));
+    chess::ui::drawPiece(renderer, bitmap, x + (cellWidth - bitmap.size) / 2,
+                         std::max(cellTop + kCellFrameWidth, std::min(cellTop + 8, nameTop - 4 - bitmap.size)));
+    drawCentered(renderer, kText10Font, x, cellWidth, nameTop, names[i]);
     if (i == promoFocus) drawCellFrame(renderer, x, cellTop, cellWidth, cellHeight);
     screen.frame().hit(fui::makeRect(x, cellTop, cellWidth, cellHeight), ACTION_PROMOTE, static_cast<int16_t>(i),
                        fui::InputTouch);
@@ -1384,7 +1396,7 @@ void ChessActivity::drawGameOver(UiScreen& screen) const {
   top += lineHeight + 4;
   renderer.drawText(kText12Font, kRowTextX, top, overSubtitle(*match));
   top += lineHeight + 8;
-  const int rowHeight = std::max(kListRowHeight, lineHeight + 2 * kRuleGap);
+  const int rowHeight = std::min(std::max(kListRowHeight, lineHeight + 2 * kRuleGap), actionsTop() - top);
   const int textTop = top + (rowHeight - lineHeight) / 2;
   const GameAction focused = focusedAction();
   const bool primary = focused == GameAction::None || focused == GameAction::NewGame;
@@ -1406,6 +1418,6 @@ void ChessActivity::drawActions(UiScreen& screen) const {
                           : focused == GameAction::Flip ? 1
                           : focused == GameAction::Menu ? 2
                                                         : -1;
-  games::ui::drawActionBar(renderer, screen, kActionsTop, slots, static_cast<int>(std::size(slots)), focusedSlot,
+  games::ui::drawActionBar(renderer, screen, actionsTop(), slots, static_cast<int>(std::size(slots)), focusedSlot,
                            fui::InputTouch);
 }

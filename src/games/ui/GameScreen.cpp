@@ -14,6 +14,7 @@
 
 #include "ElapsedText.h"
 #include "activities/util/ConfirmationActivity.h"
+#include "components/UITheme.h"
 #include "gameIcons.h"
 #include "games/chess/ui/chessIcons.h"
 
@@ -196,6 +197,8 @@ void GameScreen::loop() {
 void GameScreen::render(RenderLock&&) {
   renderer.clearScreen();
   renderUi();
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
+  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   const uint8_t kind = repaint.exchange(RepaintNone);
   renderer.displayBuffer(kind == RepaintEntry   ? cadence.entry()
                          : kind == RepaintClock ? HalDisplay::FAST_REFRESH
@@ -267,7 +270,10 @@ void GameScreen::formatElapsed(const uint32_t ms, char* out, const size_t cap) {
 
 uint32_t GameScreen::nowMs() { return static_cast<uint32_t>(millis()); }
 
-int GameScreen::barTop() const { return renderer.getScreenHeight() - BAR_HEIGHT; }
+// Button boards keep the button hints below the bar.
+int GameScreen::barTop() const {
+  return renderer.getScreenHeight() - BAR_HEIGHT - UITheme::getInstance().getMetrics().buttonHintsHeight;
+}
 
 uint16_t GameScreen::shellInput() const {
   // A held tap on a board that takes long presses must still work on the shell controls.
