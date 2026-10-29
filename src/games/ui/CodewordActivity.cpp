@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <initializer_list>
 #include <iterator>
 #include <string>
 
@@ -545,12 +546,14 @@ void CodewordActivity::drawNotice() const {
                     kSemiBold);
   y += 2 * renderer.getLineHeight(kText12Font);
   const char* body = kept ? tr(STR_CODEWORD_SAVE_KEPT_BODY) : tr(STR_CODEWORD_NO_PACK_BODY);
-  for (const auto& line : renderer.wrappedText(kText12Font, body, width, 4)) {
-    renderer.drawText(kText12Font, kSidePadding, y, line.c_str());
+  const char* key = kept && !hasBar() ? tr(STR_CODEWORD_NEXT_KEY) : nullptr;
+  for (const char* text : {body, key}) {
+    if (text == nullptr) continue;
+    for (const auto& line : renderer.wrappedText(kText12Font, text, width, 4)) {
+      renderer.drawText(kText12Font, kSidePadding, y, line.c_str());
+      y += renderer.getLineHeight(kText12Font);
+    }
     y += renderer.getLineHeight(kText12Font);
-  }
-  if (kept && !hasBar()) {
-    renderer.drawText(kText12Font, kSidePadding, y + renderer.getLineHeight(kText12Font), tr(STR_CODEWORD_NEXT_KEY));
   }
 }
 
