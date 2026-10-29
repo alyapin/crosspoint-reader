@@ -18,6 +18,10 @@ class AboutActivity final : public UiListActivity {
   int listCount() const override { return ITEM_COUNT; }
   void buildScreen(UiScreen& screen) override;
   void activateIndex(int) override {}
+  // Read-only rows: no selection to move or set, so no keys to hint but Back.
+  void onRowAction(const freeink::ui::ActionEvent&) override {}
+  void navigateButtons() override {}
+  void drawFooter() override;
   const char* headerTitle() const override;
 
   std::string rowValues_[ITEM_COUNT];

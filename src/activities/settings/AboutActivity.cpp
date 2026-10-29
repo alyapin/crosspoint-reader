@@ -85,7 +85,9 @@ AboutActivity::AboutActivity(GfxRenderer& renderer, MappedInputManager& mappedIn
 const char* AboutActivity::headerTitle() const { return tr(STR_ABOUT); }
 
 void AboutActivity::onEnter() {
+  RenderLock lock(*this);  // the base requests the first render before the rows are filled
   UiListActivity::onEnter();
+  nav.reset(-1);
   for (int i = 0; i < ITEM_COUNT; i++) {
     rowItems_[i].label = I18N.get(menuNames[i]);
     rowItems_[i].actionValue = static_cast<int16_t>(i);
@@ -139,6 +141,10 @@ void AboutActivity::buildScreen(UiScreen& screen) {
   props.labelText = screen.theme().smallText;
   props.labelText.maxLines = 2;
   syncListViewport(screen, props);
-  props.selectedIndex = -1;  // read-only rows: nothing to select
   screen.list(props);
+}
+
+void AboutActivity::drawFooter() {
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
+  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 }
