@@ -145,7 +145,6 @@ class ChessActivity final : public Activity, private UiAppHost {
   bool manualFlip = false;
   int focus = 0;
   Row pickerRow = Row::Opponent;
-  Row lastMenuRow = Row::Continue;
   View pickerReturn = View::Setup;
   uint8_t customBase = 0;  // indices into the custom time steps
   uint8_t customIncrement = 0;

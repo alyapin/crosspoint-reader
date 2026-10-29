@@ -520,11 +520,11 @@ void ChessActivity::setView(const View next) {
   } else if (next == View::CustomTime) {
     focus = kCustomDoneRow;
   } else if (next == View::Menu) {
-    // As the other games: touch and a finished game start on Новая игра (no stray tap resigns); keys reopen on
-    // the game action chosen here last, else Продолжить.
+    // As the other games: touch and a finished game start on Новая игра (no stray tap resigns); keys start on
+    // Продолжить.
     Row rows[kMaxRows];
     const int count = listRows(rows);
-    const Row start = mappedInput.hasTouch() || match->game().isOver() ? Row::NewGame : lastMenuRow;
+    const Row start = mappedInput.hasTouch() || match->game().isOver() ? Row::NewGame : Row::Continue;
     const Row* found = std::find(rows, rows + count, start);
     if (found == rows + count) found = std::find(rows, rows + count, Row::NewGame);
     focus = found < rows + count ? static_cast<int>(found - rows) : 0;
@@ -574,11 +574,6 @@ void ChessActivity::activateRow(const int index) {
   }
   Row rows[kMaxRows];
   if (index < 0 || index >= listRows(rows)) return;
-  if (view == View::Menu) {
-    // Keys reopen the menu on a game action chosen here last.
-    const Row row = rows[index];
-    lastMenuRow = row == Row::Undo || row == Row::Flip || row == Row::Pieces ? row : Row::Continue;
-  }
   switch (rows[index]) {
     case Row::Start:
       startGame();

@@ -318,7 +318,7 @@ void SudokuActivity::build(UiScreen& screen) {
         items[i] = {&icon_bar_erase_24, tr(STR_SUDOKU_ERASE), false};
         break;
       case Action::Undo:
-        items[i] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false, BarItem::Repeat};
+        items[i] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false, BarItem::Action};
         break;
       case Action::Menu:
         items[i] = {&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};

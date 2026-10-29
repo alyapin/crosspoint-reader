@@ -258,7 +258,7 @@ void FiveLettersActivity::build(UiScreen& screen) {
 
   BarItem items[BAR_SLOTS];
   if (!over) {
-    items[ERASE_SLOT] = {&icon_key_delete_24, tr(STR_SCANWORD_ERASE), false, BarItem::Repeat};
+    items[ERASE_SLOT] = {&icon_key_delete_24, tr(STR_SCANWORD_ERASE), false, BarItem::Action};
     items[DONE_SLOT] = {&icon_done_24, tr(STR_SCANWORD_DONE), false, BarItem::Action};
   }
   items[MENU_SLOT] = over ? BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame}

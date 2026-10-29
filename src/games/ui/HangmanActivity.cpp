@@ -249,7 +249,7 @@ void HangmanActivity::build(UiScreen& screen) {
   }
 
   BarItem items[BAR_SLOTS];
-  if (barShown(0)) items[0] = {&icon_bar_hint_24, tr(STR_HANGMAN_HINT), false, BarItem::Repeat};
+  if (barShown(0)) items[0] = {&icon_bar_hint_24, tr(STR_HANGMAN_HINT), false, BarItem::Action};
   items[2] = {over ? &icon_bar_new_game_24 : &icon_menu_24, over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU), false,
               over ? BarItem::NewGame : BarItem::Menu};
   drawBar(screen, items, barFocus);

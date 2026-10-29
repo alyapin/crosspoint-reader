@@ -457,7 +457,7 @@ void NonogramActivity::build(UiScreen& screen) {
 
   BarItem items[BAR_SLOTS];
   if (barShown(0)) items[0] = {&icon_bar_cross_24, tr(STR_NONOGRAM_CROSS), crossMode, BarItem::Mode};
-  if (barShown(1)) items[1] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false, BarItem::Repeat};
+  if (barShown(1)) items[1] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false, BarItem::Action};
   items[2] = boardShown() && game.inProgress()
                  ? BarItem{&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu}
                  : BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame};
