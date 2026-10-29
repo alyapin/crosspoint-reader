@@ -208,6 +208,10 @@ void FifteenActivity::build(UiScreen& screen) {
       snprintf(record, sizeof(record), tr(STR_FIFTEEN_BEST), moves, clock);
     }
     drawResult(games::ui::captionTop(renderer, BOARD_TOP + kBoard, kText12Font), line, record);
+  } else if (!hasBar()) {
+    // The side buttons slide up and down, as in 2048.
+    renderer.drawText(kText10Font, kSidePadding, games::ui::captionTop(renderer, BOARD_TOP + kBoard, kText10Font),
+                      tr(STR_2048_SIDE_HINT));
   }
 
   BarItem items[BAR_SLOTS];
