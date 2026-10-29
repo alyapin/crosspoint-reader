@@ -47,11 +47,12 @@ size_t skipBom(const uint8_t* p, const size_t len) {
   return len >= 3 && p[0] == 0xEF && p[1] == 0xBB && p[2] == 0xBF ? 3 : 0;
 }
 
-// CP1251 when some byte is not UTF-8 and no UTF-8 letter was seen. A sequence
-// cut by the end of a full probe buffer is not a broken one.
+// CP1251 when bytes that are not UTF-8 outnumber the UTF-8 sequences: CP1251
+// text forms stray valid pairs too («Её», «ВСЁ»). A sequence cut by the end of
+// a full probe buffer is not a broken one.
 bool looksCp1251(const uint8_t* p, const size_t len, const bool cutOk) {
-  bool multibyte = false;
-  bool broken = false;
+  size_t multibyte = 0;
+  size_t broken = 0;
   size_t i = 0;
   while (i < len) {
     const uint8_t c = p[i];
@@ -68,19 +69,29 @@ bool looksCp1251(const uint8_t* p, const size_t len, const bool cutOk) {
     }
     bool ok = extra > 0;
     if (ok && i + extra >= len) {
-      broken = broken || !cutOk;
+      if (!cutOk) broken++;
       break;
     }
     for (size_t k = 1; ok && k <= extra; k++) ok = (p[i + k] & 0xC0) == 0x80;
     if (ok) {
-      multibyte = true;
+      multibyte++;
       i += extra + 1;
     } else {
-      broken = true;
+      broken++;
       i++;
     }
   }
-  return broken && !multibyte;
+  return broken > multibyte;
+}
+
+// "{{c<digits>::" opens a cloze deletion; "{{count}}" does not.
+bool hasCloze(const char* text) {
+  for (const char* at = strstr(text, "{{c"); at != nullptr; at = strstr(at + 3, "{{c")) {
+    const char* p = at + 3;
+    while (*p >= '0' && *p <= '9') p++;
+    if (p > at + 3 && p[0] == ':' && p[1] == ':') return true;
+  }
+  return false;
 }
 
 bool sameLower(std::string_view a, const char* b) {
@@ -386,7 +397,7 @@ bool RecordReader::next(Fields& out, uint32_t& offset, uint32_t& guidHash) {
     bool blank = true;
     for (int i = 0; i < FIELDS && blank; i++) blank = out.text[i][0] == '\0' && out.media[i] == NoMedia;
     if (blank) continue;
-    if (strstr(out.text[0], "{{c") != nullptr) {
+    if (hasCloze(out.text[0])) {
       memcpy(out.text[2], out.text[1], FIELD_CAP);
       out.media[2] = out.media[1];
       memcpy(out.text[1], out.text[0], FIELD_CAP);

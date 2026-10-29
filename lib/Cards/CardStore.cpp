@@ -183,7 +183,9 @@ class FileSource final : public ByteSource {
   HalFile& file;
 };
 
-void deckPathOf(const char* name, char* out, const size_t cap) { snprintf(out, cap, "%s/%s", deckDir(), name); }
+void deckPathOf(const char* folder, const char* name, char* out, const size_t cap) {
+  snprintf(out, cap, "%s/%s", folder, name);
+}
 
 }  // namespace
 
@@ -314,7 +316,8 @@ Status DeckStore::open(const char* fileName, const uint16_t realDay, const Reind
   if (!head) return Status::NoMemory;
 
   char deckPath[DECK_NAME_MAX + 32];
-  deckPathOf(fileName, deckPath, sizeof(deckPath));
+  folder = deckDir();
+  deckPathOf(folder, fileName, deckPath, sizeof(deckPath));
   HalFile deck;
   if (!Storage.openFileForRead("CARD", deckPath, deck)) return Status::Missing;
   const uint32_t size = static_cast<uint32_t>(deck.fileSize());
@@ -384,7 +387,10 @@ Status DeckStore::open(const char* fileName, const uint16_t realDay, const Reind
   openDay = realDay;
   clockKnown = realDay != NO_DAY;
   head->virtualDays = days.virtualDays;
-  if ((logCount > 0 || shift != 0) && !merge(shift)) return Status::Failed;
+  if (logCount > 0 || shift != 0) {
+    const Status merged = merge(shift);
+    if (merged != Status::Ok) return merged;
+  }
   if (head->counterDay != today) {
     head->counterDay = today;
     head->newDone = 0;
@@ -413,7 +419,7 @@ Status DeckStore::rebuild(const bool keepOld, const uint32_t size, const uint32_
   }
 
   char deckPath[DECK_NAME_MAX + 32];
-  deckPathOf(head->name, deckPath, sizeof(deckPath));
+  deckPathOf(folder, head->name, deckPath, sizeof(deckPath));
   HalFile deck;
   if (!Storage.openFileForRead("CARD", deckPath, deck)) return Status::Missing;
   {
@@ -467,7 +473,8 @@ Status DeckStore::rebuild(const bool keepOld, const uint32_t size, const uint32_
       if (head->skipped < UINT16_MAX) head->skipped++;
       continue;
     }
-    uint32_t key = cardKey(*fields, guidHash);
+    const uint32_t frontKey = cardKey(*fields, guidHash);
+    uint32_t key = frontKey;
     if (head->count < MAX_CARDS) {
       const uint32_t alt = cardAltKey(*fields);
       if (has(alt) || (has(key) && guidHash != 0)) {
@@ -480,9 +487,16 @@ Status DeckStore::rebuild(const bool keepOld, const uint32_t size, const uint32_
       Record r;
       r.offset = offset;
       r.key = key;
-      const OldState* found = std::lower_bound(old.get(), old.get() + oldCount, key,
-                                               [](const OldState& s, const uint32_t k) { return s.key < k; });
-      if (found != old.get() + oldCount && found->key == key) r.state = found->state;
+      // A card once told apart by its answer keeps that progress, even when the
+      // other card with its front is gone.
+      const auto find = [&](const uint32_t k) -> const OldState* {
+        const OldState* at = std::lower_bound(old.get(), old.get() + oldCount, k,
+                                              [](const OldState& s, const uint32_t v) { return s.key < v; });
+        return at != old.get() + oldCount && at->key == k ? at : nullptr;
+      };
+      const OldState* found = guidHash != 0 ? nullptr : find(alt);
+      if (found == nullptr && key == frontKey) found = find(frontKey);
+      if (found != nullptr) r.state = found->state;
       encodeRecord(buf + buffered, r);
       buffered += RECORD;
       head->count++;
@@ -509,12 +523,12 @@ Status DeckStore::rebuild(const bool keepOld, const uint32_t size, const uint32_
   return Status::Ok;
 }
 
-bool DeckStore::merge(const int32_t shift, bool force) {
+Status DeckStore::merge(const int32_t shift, bool force) {
   auto entries = makeUniqueNoThrow<LogEntry[]>(LOG_CHUNK);
   // The header as on disk: a chunk that does not commit leaves it, and its
   // answers stay in the log for the next merge.
   auto saved = makeUniqueNoThrow<Header>();
-  if (!entries || !saved) return false;
+  if (!entries || !saved) return Status::NoMemory;
   HalFile log;
   const bool haveLog = Storage.exists(logPath) && Storage.openFileForRead("CARD", logPath, log);
   int32_t pendingShift = shift;
@@ -531,7 +545,7 @@ bool DeckStore::merge(const int32_t shift, bool force) {
     *saved = *head;
     if (!mergeChunk(entries.get(), n, pendingShift)) {
       *head = *saved;
-      return false;
+      return Status::Failed;
     }
     pendingShift = 0;
     force = false;
@@ -539,7 +553,7 @@ bool DeckStore::merge(const int32_t shift, bool force) {
   if (haveLog) log.close();
   if (Storage.exists(logPath) && !Storage.remove(logPath)) LOG_ERR("CARD", "Cannot clear %s", logPath);
   logCount = 0;
-  return true;
+  return Status::Ok;
 }
 
 bool DeckStore::mergeChunk(LogEntry* entries, const uint16_t n, const int32_t shift) {
@@ -604,7 +618,7 @@ bool DeckStore::summarize(Summary& out) {
   out = Summary{};
   if (!opened) return false;
   // Answers a failed merge left in the log are not in the .dat yet.
-  if (logCount > 0 && !inSession()) merge(0);
+  if (logCount > 0 && !inSession()) static_cast<void>(merge(0));
   out.newPerDay = head->newPerDay;
   out.skipped = head->skipped;
   out.dropped = head->dropped;
@@ -649,14 +663,17 @@ uint8_t DeckStore::newPerDay() const { return head ? head->newPerDay : DEFAULT_N
 bool DeckStore::setNewPerDay(const uint8_t count) {
   if (!opened) return false;
   head->newPerDay = count;
-  return merge(0, true);
+  return merge(0, true) == Status::Ok;
 }
 
 Status DeckStore::startSession(const uint16_t extraNew) {
   if (!opened) return Status::Failed;
   if (inSession()) endSession();
   // The queue is read from the .dat: it must hold every answer given.
-  if (logCount > 0 && !merge(0)) return Status::Failed;
+  if (logCount > 0) {
+    const Status merged = merge(0);
+    if (merged != Status::Ok) return merged;
+  }
   queue = makeUniqueNoThrow<Item[]>(QUEUE_CAP);
   if (!queue) return Status::NoMemory;
   queueLen = 0;
@@ -731,7 +748,7 @@ Status DeckStore::loadCard(Fields& out) {
   const uint16_t index = queue[pos].index;
   if (!readRecord(index, currentOffset, currentKey)) return Status::Failed;
   char deckPath[DECK_NAME_MAX + 32];
-  deckPathOf(head->name, deckPath, sizeof(deckPath));
+  deckPathOf(folder, head->name, deckPath, sizeof(deckPath));
   HalFile deck;
   if (!Storage.openFileForRead("CARD", deckPath, deck) || !deck.seekSet(currentOffset)) return Status::Failed;
   FileSource source(deck);
@@ -741,7 +758,8 @@ Status DeckStore::loadCard(Fields& out) {
   uint32_t guid = 0;
   const bool ok = reader->next(out, offset, guid);
   deck.close();
-  if (!ok) return Status::Changed;
+  // A line that is no longer there is an edit; a read error is not.
+  if (!ok) return reader->failed() ? Status::Failed : Status::Changed;
   if (cardKey(out, guid) != currentKey && cardAltKey(out) != currentKey) {
     LOG_INF("CARD", "%s changed in place", head->name);
     return Status::Changed;
@@ -814,7 +832,7 @@ bool DeckStore::grade(const Grade g) {
   }
   pos++;
   loadedIndex = -1;
-  if (logCount >= LOG_MERGE_AT && !merge(0)) LOG_ERR("CARD", "Merge failed; the log keeps the answers");
+  if (logCount >= LOG_MERGE_AT && merge(0) != Status::Ok) LOG_ERR("CARD", "Merge failed; the log keeps the answers");
   return true;
 }
 
@@ -835,14 +853,14 @@ bool DeckStore::undo() {
   return true;
 }
 
-bool DeckStore::flush() { return logCount == 0 || merge(0); }
+bool DeckStore::flush() { return logCount == 0 || merge(0) == Status::Ok; }
 
 void DeckStore::endSession() {
   queue.reset();
   queueLen = 0;
   pos = 0;
   undoValid = false;
-  if (opened && logCount > 0 && !merge(0)) LOG_ERR("CARD", "Merge failed; the log keeps the answers");
+  if (opened && logCount > 0 && merge(0) != Status::Ok) LOG_ERR("CARD", "Merge failed; the log keeps the answers");
 }
 
 }  // namespace cards

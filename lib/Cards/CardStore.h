@@ -115,13 +115,14 @@ class DeckStore {
   bool readRecord(uint16_t index, uint32_t& offset, uint32_t& key);
   bool appendLog(uint32_t key, const CardState& state, uint8_t flags);
   static uint8_t answerKind(const CardState& before);
-  bool merge(int32_t shift, bool force = false);
+  Status merge(int32_t shift, bool force = false);
   bool mergeChunk(LogEntry* entries, uint16_t n, int32_t shift);
   Status rebuild(bool keepOld, uint32_t size, uint32_t time);
   void countAnswer(uint8_t kind, int delta);
 
   std::unique_ptr<Header> head;
   bool opened = false;
+  const char* folder = DECK_DIR;  // deckDir() as found on open
   char datPath[48] = {};
   char logPath[48] = {};
   uint16_t today = NO_DAY;

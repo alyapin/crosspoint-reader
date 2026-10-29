@@ -127,6 +127,13 @@ TEST(CardDeck, Cp1251Fallback) {
   // One stray byte in a UTF-8 file is not CP1251.
   const std::string stray = "Привет;мир\xFF\n";
   EXPECT_FALSE(probe(reinterpret_cast<const uint8_t*>(stray.data()), stray.size(), true).cp1251);
+  // CP1251 text with pairs that happen to be valid UTF-8 (Е+ё, В+С+Ё).
+  const std::string russian = "\xC5\xB8 \xE7\xEE\xE2\xF3\xF2;\xC2\xD1\xA8 \xEE\xEA\n";
+  EXPECT_TRUE(probe(reinterpret_cast<const uint8_t*>(russian.data()), russian.size(), true).cp1251);
+  const auto ee = parse(russian, true);
+  ASSERT_EQ(ee.size(), 1u);
+  EXPECT_EQ(ee[0].front, "Её зовут");
+  EXPECT_EQ(ee[0].back, "ВСЁ ок");
   const std::string utf16(
       "\xFF\xFE"
       "a\0;\0",
@@ -178,6 +185,10 @@ TEST(CardDeck, Cloze) {
   EXPECT_EQ(cards[0].front, "[…] — столица […]");
   EXPECT_EQ(cards[0].back, "Москва — столица России");
   EXPECT_EQ(cards[0].extra, "город");
+  const auto plain = parse("#html:true\n{{count}} words\tx\n");
+  ASSERT_EQ(plain.size(), 1u);
+  EXPECT_EQ(plain[0].front, "{{count}} words");
+  EXPECT_EQ(plain[0].back, "x");
 }
 
 TEST(CardDeck, OpenQuoteDoesNotSwallowTheFile) {

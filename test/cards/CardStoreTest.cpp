@@ -393,3 +393,49 @@ TEST(CardStore, LowerCaseFolderAndUtf16) {
   EXPECT_STREQ(deckDir(), DECK_DIR);
   EXPECT_EQ(store.open("u.csv", DAY), Status::Unsupported);
 }
+
+TEST(CardStore, DeletingTheFirstOfTwoFrontsKeepsTheOthersProgress) {
+  fake::reset();
+  addDeck("bank\tбанк\nbank\tберег\n", 1);
+  {
+    DeckStore store;
+    ASSERT_EQ(store.open("es.txt", DAY), Status::Ok);
+    ASSERT_EQ(store.startSession(0), Status::Ok);
+    ASSERT_TRUE(store.grade(Grade::Easy));  // банк: 3 days
+    ASSERT_TRUE(store.grade(Grade::Good));  // берег: 1 day
+  }
+  addDeck("bank\tберег\nbank\tновое\n", 2);
+  DeckStore store;
+  ASSERT_EQ(store.open("es.txt", DAY + 1), Status::Ok);
+  const Summary s = summary(store);
+  EXPECT_EQ(s.cards, 2);
+  EXPECT_EQ(s.reviews, 1);  // берег, due on day + 1
+  EXPECT_EQ(s.fresh, 1);    // новое does not take банк's progress
+}
+
+TEST(CardStore, ReadErrorIsNotAnEdit) {
+  fake::reset();
+  addDeck(deckText(2));
+  DeckStore store;
+  ASSERT_EQ(store.open("es.txt", DAY), Status::Ok);
+  ASSERT_EQ(store.startSession(0), Status::Ok);
+  auto fields = std::make_unique<Fields>();
+  fake::failRead = 1;  // the .dat record reads, the deck does not
+  EXPECT_EQ(store.loadCard(*fields), Status::Failed);
+  EXPECT_EQ(store.loadCard(*fields), Status::Ok);
+}
+
+TEST(CardStore, MergeOutOfMemoryIsReported) {
+  fake::reset();
+  addDeck(deckText(3));
+  DeckStore store;
+  ASSERT_EQ(store.open("es.txt", DAY), Status::Ok);
+  ASSERT_EQ(store.startSession(0), Status::Ok);
+  ASSERT_TRUE(store.grade(Grade::Good));
+  fake::failClosePath = pathOf("dat") + ".tmp";
+  store.endSession();
+  fake::failAlloc = 0;
+  EXPECT_EQ(store.startSession(0), Status::NoMemory);
+  EXPECT_EQ(store.startSession(0), Status::Ok);
+  EXPECT_EQ(store.length(), 2);
+}
