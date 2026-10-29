@@ -36,7 +36,17 @@ void SetkaListActivity::openChild(std::unique_ptr<Activity> child) {
 int SetkaListActivity::rowsPerPage() const {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const int listTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  return std::max(1, (renderer.getScreenHeight() - metrics.buttonHintsHeight - listTop) / (kRowHeight + kRowGap));
+  return std::max(1, (renderer.getScreenHeight() - metrics.buttonHintsHeight - listTop) / (rowHeight() + kRowGap));
+}
+
+int SetkaListActivity::rowHeight() const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int room = renderer.getScreenHeight() - metrics.buttonHintsHeight -
+                   (metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing);
+  const int compact = compactRowHeight();
+  const int count = listCount();
+  const bool closeUp = compact > 0 && count * (kRowHeight + kRowGap) > room && count * (compact + kRowGap) <= room;
+  return closeUp ? compact : kRowHeight;
 }
 
 bool SetkaListActivity::handleCustomInput() {
@@ -64,20 +74,21 @@ void SetkaListActivity::buildScreen(UiScreen& screen) {
   }
   const int selected = nav.selected;
   const int perPage = rowsPerPage();
+  const int pitch = rowHeight();
   const int first = selected / perPage * perPage;
   // Held Up/Down page by this (UiListActivity::navigateButtons).
   nav.onListRendered(static_cast<uint16_t>(first), perPage, true);
   for (int i = first; i < std::min(count, first + perPage); ++i) {
-    const int top = listTop + (i - first) * (kRowHeight + kRowGap);
+    const int top = listTop + (i - first) * (pitch + kRowGap);
     const bool focused = i == selected;
-    if (focused) drawSelectionBar(renderer, kSelectionBarX, top, kRowHeight);
+    if (focused) drawSelectionBar(renderer, kSelectionBarX, top, pitch);
     int x = kRowTextX;
     if (const freeink::Icon* icon = rowIcon(i)) {
-      screen.target().bitmap(fui::makeRect(x, top + (kRowHeight - kIconSize) / 2, kIconSize, kIconSize),
+      screen.target().bitmap(fui::makeRect(x, top + (pitch - kIconSize) / 2, kIconSize, kIconSize),
                              fui::bitmapFromIcon(*icon), fui::BitmapMode::Center);
       x += kIconSize + kIconGap;
     }
-    const int textTop = top + (kRowHeight - lineHeight) / 2;
+    const int textTop = top + (pitch - lineHeight) / 2;
     renderer.drawText(kText12Font, x, textTop, rowLabel(i), true, focused ? kSemiBold : EpdFontFamily::REGULAR);
     if (const char* status = rowStatus(i); status && *status) {
       // Shares the label's baseline.
@@ -86,7 +97,7 @@ void SetkaListActivity::buildScreen(UiScreen& screen) {
       renderer.drawText(kText10Font, width - kSidePadding - renderer.getTextWidth(kText10Font, status), statusTop,
                         status);
     }
-    screen.frame().hit(fui::makeRect(0, top, width, kRowHeight), ACTION_ROW, static_cast<int16_t>(i), fui::InputTouch);
+    screen.frame().hit(fui::makeRect(0, top, width, pitch), ACTION_ROW, static_cast<int16_t>(i), fui::InputTouch);
   }
 }
 

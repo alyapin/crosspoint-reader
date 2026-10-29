@@ -18,5 +18,6 @@ class GamesActivity final : public SetkaListActivity {
   const freeink::Icon* rowIcon(int index) const override;
   const char* rowStatus(int index) const override;
   const char* emptyText() const override;
+  int compactRowHeight() const override;
   void activateIndex(int index) override;
 };
