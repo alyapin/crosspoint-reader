@@ -1,4 +1,5 @@
 #pragma once
+#include <FreeInkUIIcon.h>
 #include <HalGPIO.h>
 #include <I18n.h>
 
@@ -41,6 +42,7 @@ class OptionPopup {
             std::function<void(int)> onSelect) {
     title = I18N.get(titleId);
     headline.clear();
+    icons.clear();
     ownedStrings.resize(optionCount);
     for (int i = 0; i < optionCount; i++) {
       ownedStrings[i] = I18N.get(optionIds[i]);
@@ -52,6 +54,7 @@ class OptionPopup {
             std::function<void(int)> onSelect) {
     title = titleStr;
     headline.clear();
+    icons.clear();
     ownedStrings.resize(optionCount);
     for (int i = 0; i < optionCount; i++) {
       ownedStrings[i] = options[i];
@@ -67,6 +70,14 @@ class OptionPopup {
     headline = headlineStr ? headlineStr : "";
   }
 
+  // Action menu with a 24 px icon before each option, shaped like the Library
+  // book menu: always rows, title and rows on its side padding.
+  void show(const char* titleStr, const char* const* options, const freeink::Icon* const* optionIcons, int optionCount,
+            int currentIndex, std::function<void(int)> onSelect) {
+    show(titleStr, options, optionCount, currentIndex, std::move(onSelect));
+    icons.assign(optionIcons, optionIcons + optionCount);
+  }
+
   // Message dialog: a wrapped body under the (optional) title, like the
   // Wi-Fi forget-network prompt. Pass an empty title for a message-only look.
   void showMessage(const char* titleStr, const char* messageStr, const char* const* options, int optionCount,
@@ -79,6 +90,7 @@ class OptionPopup {
             std::function<void(int)> onSelect) {
     title = I18N.get(titleId);
     headline.clear();
+    icons.clear();
     ownedStrings = options;
     activate(currentIndex, std::move(onSelect));
   }
@@ -204,8 +216,9 @@ class OptionPopup {
     const int count = std::min<int>(ownedStrings.size(), MAX_OPTIONS);
     const int cardX = kSidePadding;
     const int cardWidth = screenWidth - 2 * kSidePadding;
-    const int textX = cardX + kDialogSidePadding;
-    const int textWidth = cardWidth - 2 * kDialogSidePadding;
+    const int sidePadding = icons.empty() ? kDialogSidePadding : kMenuSidePadding;
+    const int textX = cardX + sidePadding;
+    const int textWidth = cardWidth - 2 * sidePadding;
     const int titleLine = renderer.getLineHeight(kText12Font);
     const int bodyLine = renderer.getLineHeight(kText10Font);
 
@@ -298,9 +311,16 @@ class OptionPopup {
         const bool focused = i == selectedIndex;
         const auto style = focused ? kSemiBold : EpdFontFamily::REGULAR;
         if (focused) drawSelectionBar(renderer, textX, top, rowHeight);
-        renderer.drawText(kText12Font, labelX, top + (rowHeight - titleLine) / 2,
-                          renderer.truncatedText(kText12Font, ownedStrings[i].c_str(), labelWidth, style).c_str(), true,
-                          style);
+        int x = labelX;
+        if (i < static_cast<int>(icons.size()) && icons[i]) {
+          target.bitmap(fui::makeRect(x, top + (rowHeight - kIconSize) / 2, kIconSize, kIconSize),
+                        fui::bitmapFromIcon(*icons[i]), fui::BitmapMode::Center);
+          x += kIconSize + kIconGap;
+        }
+        renderer.drawText(
+            kText12Font, x, top + (rowHeight - titleLine) / 2,
+            renderer.truncatedText(kText12Font, ownedStrings[i].c_str(), labelX + labelWidth - x, style).c_str(), true,
+            style);
         frame.hit(fui::makeRect(cardX, top, cardWidth, rowHeight), ACTION_OPTION, static_cast<int16_t>(i),
                   fui::InputTouch);
       }
@@ -315,7 +335,7 @@ class OptionPopup {
   bool buttonRow(const GfxRenderer& renderer) const {
     using namespace setka;
     const int count = std::min<int>(ownedStrings.size(), MAX_OPTIONS);
-    if (count > 2) return false;
+    if (count > 2 || !icons.empty()) return false;
     int labelsWidth = kButtonGap;
     for (int i = 0; i < count; ++i) {
       labelsWidth += renderer.getTextWidth(kText12Font, ownedStrings[i].c_str(), kSemiBold) + kButtonBarSpan;
@@ -340,8 +360,11 @@ class OptionPopup {
   static constexpr size_t INTERACTION_CAPACITY = MAX_OPTIONS + 1;
   static constexpr freeink::ui::ActionId ACTION_OPTION = 1;
   static constexpr freeink::ui::ActionId ACTION_CHROME = 2;
-  static constexpr int kDialogPadding = 24;                             // above the title
-  static constexpr int kDialogSidePadding = 32;                         // clears the bar of a left option
+  static constexpr int kDialogPadding = 24;      // above the title
+  static constexpr int kDialogSidePadding = 32;  // clears the bar of a left option
+  static constexpr int kMenuSidePadding = 16;    // icon menus, as the Library book menu
+  static constexpr int kIconSize = 24;
+  static constexpr int kIconGap = 16;
   static constexpr int kBodyGap = 4;                                    // title to body
   static constexpr int kOptionsGap = 8;                                 // text to the options
   static constexpr int kButtonRowHeight = 56;                           // one row of 1-2 options
@@ -376,6 +399,7 @@ class OptionPopup {
   std::string headline;
   std::string message;
   std::vector<std::string> ownedStrings;
+  std::vector<const freeink::Icon*> icons;  // per option, empty for a plain list
   int selectedIndex = 0;
   std::function<void(int)> onSelectCallback;
   // Written by the render task (frame registration), routed by the loop task;
