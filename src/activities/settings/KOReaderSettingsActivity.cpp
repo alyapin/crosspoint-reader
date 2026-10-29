@@ -228,7 +228,7 @@ void KOReaderSettingsActivity::buildScreen(UiScreen& screen) {
       rowValues_[i] =
           KOREADER_STORE.getSyncBehavior() == KOReaderSyncBehavior::SMART ? tr(STR_SMART_SYNC) : tr(STR_ASK_EVERY_TIME);
     } else {
-      rowValues_[i] = KOREADER_STORE.hasCredentials() ? "" : tr(STR_NOT_SET);
+      rowValues_[i].clear();  // action rows carry no value
     }
     rowItems_[i].value = rowValues_[i].empty() ? nullptr : rowValues_[i].c_str();
   }
