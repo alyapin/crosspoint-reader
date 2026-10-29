@@ -1231,10 +1231,14 @@ void KeyboardEntryActivity::drawKeyGrid(const fui::Rect& keysRect, const int row
     if (keysRect.right() - right >= KEY_EDGE_SNAP) renderer.drawLine(right, key.y, right, bottom);
     if (hits[i].value != fui::QWERTY_KEY_ENTER) continue;
     const int fontId = keyLabelFont(keysRect.width);
+    const int keyWidth = std::min<int>(right, keysRect.right()) - key.x;
+    // The bar and the label keep 4 px clear of the key edges; a narrower key says OK.
     const char* label = tr(STR_KEYBOARD_DONE);
+    if (renderer.getTextWidth(fontId, label, kSemiBold) + kSelectionBarWidth + 6 > keyWidth - 8) {
+      label = tr(STR_OK_BUTTON);
+    }
     const int lineHeight = renderer.getLineHeight(fontId);
     const int labelWidth = renderer.getTextWidth(fontId, label, kSemiBold);
-    const int keyWidth = std::min<int>(right, keysRect.right()) - key.x;
     const int labelX = key.x + (keyWidth - labelWidth + kSelectionBarWidth + 6) / 2;
     const int labelY = key.y + (rowHeight - lineHeight) / 2;
     drawSelectionBar(renderer, labelX - kSelectionBarWidth - 6, labelY, lineHeight);
