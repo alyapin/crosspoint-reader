@@ -1,5 +1,6 @@
 #include "GameSave.h"
 
+#include <FiveLetters.h>
 #include <HalStorage.h>
 #include <Klondike.h>
 #include <Logging.h>
@@ -25,10 +26,32 @@ Paths pathsOf(const Kind kind) {
       return {"/.crosspoint/games/sudoku.json", "/.crosspoint/games/sudoku.json.tmp"};
     case Kind::Minesweeper:
       return {"/.crosspoint/games/minesweeper.json", "/.crosspoint/games/minesweeper.json.tmp"};
+    case Kind::FiveLetters:
+      return {"/.crosspoint/games/fiveletters.json", "/.crosspoint/games/fiveletters.json.tmp"};
     case Kind::Klondike:
       break;
   }
   return {"/.crosspoint/games/klondike.json", "/.crosspoint/games/klondike.json.tmp"};
+}
+
+constexpr Paths FIVE_LETTERS_STATS{"/.crosspoint/games/fiveletters-stats.json",
+                                   "/.crosspoint/games/fiveletters-stats.json.tmp"};
+
+bool commit(const Paths& p, const char* text, const size_t len) {
+  if (len == 0 || !Storage.ensureDirectoryExists(SAVE_DIR)) {
+    LOG_ERR("GAMES", "Cannot prepare save %s", p.path);
+    return false;
+  }
+  HalFile file;
+  if (!Storage.openFileForWrite("GAMES", p.tmp, file)) return false;
+  const size_t written = file.write(text, len);
+  file.close();
+  if (written != len || !Storage.replaceFile(p.tmp, p.path)) {
+    LOG_ERR("GAMES", "Save failed (%u of %u bytes)", static_cast<unsigned>(written), static_cast<unsigned>(len));
+    Storage.remove(p.tmp);
+    return false;
+  }
+  return true;
 }
 
 // Cold path (exit, sleep, after a move): one bounded buffer, freed on return.
@@ -44,26 +67,11 @@ bool write(const Kind kind, const GameT& game, const size_t cap) {
     LOG_ERR("GAMES", "OOM: %u bytes for save", static_cast<unsigned>(cap));
     return false;
   }
-  const size_t len = game.serialize(text.get(), cap);
-  if (len == 0 || !Storage.ensureDirectoryExists(SAVE_DIR)) {
-    LOG_ERR("GAMES", "Cannot prepare save %s", p.path);
-    return false;
-  }
-  HalFile file;
-  if (!Storage.openFileForWrite("GAMES", p.tmp, file)) return false;
-  const size_t written = file.write(text.get(), len);
-  file.close();
-  if (written != len || !Storage.replaceFile(p.tmp, p.path)) {
-    LOG_ERR("GAMES", "Save failed (%u of %u bytes)", static_cast<unsigned>(written), static_cast<unsigned>(len));
-    Storage.remove(p.tmp);
-    return false;
-  }
-  return true;
+  return commit(p, text.get(), game.serialize(text.get(), cap));
 }
 
 template <typename GameT>
-bool read(const Kind kind, GameT& game, const size_t cap) {
-  const Paths p = pathsOf(kind);
+bool readFrom(const Paths& p, GameT& game, const size_t cap) {
   if (!Storage.exists(p.path)) return false;
   std::string text;
   // A read error may be transient: keep the file. Only content that fails to parse is dropped.
@@ -79,6 +87,11 @@ bool read(const Kind kind, GameT& game, const size_t cap) {
   return true;
 }
 
+template <typename GameT>
+bool read(const Kind kind, GameT& game, const size_t cap) {
+  return readFrom(pathsOf(kind), game, cap);
+}
+
 }  // namespace
 
 bool hasGameInProgress(const Kind kind) { return Storage.exists(pathsOf(kind).path); }
@@ -92,8 +105,21 @@ bool save(const sudoku::Game& game) { return write(Kind::Sudoku, game, sudoku::S
 bool save(const minesweeper::Game& game) { return write(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
 bool save(const klondike::Game& game) { return write(Kind::Klondike, game, klondike::SAVE_MAX); }
 
+bool save(const fiveletters::Game& game) { return write(Kind::FiveLetters, game, fiveletters::SAVE_MAX); }
+
 bool load(sudoku::Game& game) { return read(Kind::Sudoku, game, sudoku::SAVE_MAX); }
 bool load(minesweeper::Game& game) { return read(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
 bool load(klondike::Game& game) { return read(Kind::Klondike, game, klondike::SAVE_MAX); }
+bool load(fiveletters::Game& game) { return read(Kind::FiveLetters, game, fiveletters::SAVE_MAX); }
+
+bool saveStats(const fiveletters::Stats& stats) {
+  char text[fiveletters::STATS_MAX];
+  return commit(FIVE_LETTERS_STATS, text, stats.serialize(text, sizeof(text)));
+}
+
+bool loadStats(fiveletters::Stats& stats) {
+  stats = fiveletters::Stats{};
+  return !Storage.exists(FIVE_LETTERS_STATS.path) || readFrom(FIVE_LETTERS_STATS, stats, fiveletters::STATS_MAX);
+}
 
 }  // namespace gamesave

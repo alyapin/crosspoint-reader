@@ -1,0 +1,5 @@
+The words of the «5 букв» game (lib/Games/FiveLettersWords.h) are derived
+from the Russian Wiktionary (https://ru.wiktionary.org), licensed under
+CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/). Words were
+ranked with wordfreq (CC BY-SA 4.0) and pymorphy3 / OpenCorpora data. The
+list is shared under the same licence, CC BY-SA 4.0.
