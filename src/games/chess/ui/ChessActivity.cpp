@@ -934,7 +934,7 @@ int ChessActivity::optionCount(const Row row) const {
 const char* ChessActivity::optionLabel(const Row row, const int option) const {
   switch (row) {
     case Row::Opponent:
-      return option == 1 ? tr(STR_CHESS_FRIEND) : tr(STR_CHESS_COMPUTER);
+      return option == 1 ? tr(STR_GAMES_TWO_PLAYERS) : tr(STR_CHESS_COMPUTER);
     case Row::Level:
       return kLevelLabels[std::clamp(option, 0, static_cast<int>(std::size(kLevelLabels)) - 1)];
     case Row::Color:
@@ -1224,18 +1224,22 @@ void ChessActivity::drawTopLine(UiScreen& screen) const {
       snprintf(clock, sizeof(clock), "%s", time.text);
     }
   }
-  games::ui::StatusItem status[2];
+  games::ui::StatusItem status[3];
   int count = 0;
   const bool vs = match->settings().mode == chess::Mode::VsComputer;
   if (vs) {
-    status[count++] = {tr(STR_GAMES_VS_LEVEL), level};
+    status[count++] = {tr(STR_CHESS_COMPUTER), nullptr};
+    status[count++] = {tr(STR_GAMES_LEVEL), level};
   } else if (timed) {
     status[count++] = {far == chess::WHITE ? tr(STR_CHESS_WHITE) : tr(STR_CHESS_BLACK), nullptr};
   }
   if (timed) status[count++] = {nullptr, clock};
   // With a clock, too long beside "‹ Выйти": the level without "Компьютер", then the clock alone.
   const int room = width - kSidePadding - exitWidth;
-  if (timed && vs && games::ui::statusWidth(renderer, status, count) > room) status[0].label = tr(STR_GAMES_LEVEL);
+  if (timed && vs && games::ui::statusWidth(renderer, status, count) > room) {
+    std::copy(status + 1, status + count, status);
+    --count;
+  }
   if (timed && games::ui::statusWidth(renderer, status, count) > room) {
     status[0] = status[count - 1];
     count = 1;
