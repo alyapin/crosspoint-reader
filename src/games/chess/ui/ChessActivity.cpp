@@ -6,6 +6,7 @@
 #include <HalGPIO.h>
 #include <I18n.h>
 #include <Logging.h>
+#include <Memory.h>
 #include <esp_random.h>
 
 #include <algorithm>
@@ -15,6 +16,7 @@
 
 #include "ClockText.h"
 #include "PieceSets.h"
+#include "activities/util/ConfirmationActivity.h"
 #include "chessIcons.h"
 #include "components/HeaderBackTapTarget.h"
 #include "components/UITheme.h"
@@ -568,9 +570,7 @@ void ChessActivity::activateRow(const int index) {
       startGame();
       break;
     case Row::Resign:
-      match->resign();
-      afterPly();
-      setView(View::Game);
+      confirmResign();
       break;
     case Row::Draw:
       offerDraw();
@@ -587,6 +587,23 @@ void ChessActivity::activateRow(const int index) {
       openPicker(rows[index]);
       break;
   }
+}
+
+void ChessActivity::confirmResign() {
+  auto confirm =
+      makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_CHESS_RESIGN_CONFIRM),
+                                              tr(STR_CHESS_RESIGN_BODY), tr(STR_CANCEL), tr(STR_CHESS_RESIGN));
+  if (!confirm) {
+    LOG_ERR("CHESS", "OOM: resign confirmation");
+    return;
+  }
+  startActivityForResult(std::move(confirm), [this](const ActivityResult& result) {
+    RenderLock lock(*this);
+    if (result.isCancelled || match->game().isOver()) return;
+    match->resign();
+    afterPly();
+    setView(View::Game);
+  });
 }
 
 void ChessActivity::applyOption(const int option) {

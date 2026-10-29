@@ -27,6 +27,7 @@ class KlondikeActivity final : public GameScreen {
   void resumeGame() override { game.resume(); }
   void openNewGame() override;
   void pickerChosen(int row, bool toggle) override;
+  void clearSave() override;
   void build(UiScreen& screen) override;
   void onTouch(const freeink::ui::ActionEvent& event, int x, int y) override;
   void onKey(int dx, int dy, bool confirm) override;

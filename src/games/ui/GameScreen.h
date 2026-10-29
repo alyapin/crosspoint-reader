@@ -66,6 +66,8 @@ class GameScreen : public Activity, protected UiAppHost {
   virtual void resumeGame() = 0;
   // Opens the picker for a new game (see openPicker).
   virtual void openNewGame() = 0;
+  // Removes the saved game.
+  virtual void clearSave() = 0;
   virtual void pickerChosen(int row, bool toggle) = 0;
   virtual void build(UiScreen& screen) = 0;
   virtual void onTouch(const freeink::ui::ActionEvent& event, int x, int y) = 0;
@@ -79,6 +81,9 @@ class GameScreen : public Activity, protected UiAppHost {
 
   void openPicker(const char* title, const GamePickerActivity::Row* rows, int count, int selected, int toggleRow = -1,
                   bool toggleOn = false);
+  // The menu of a game in progress: Новая игра, or Завершить, which after a
+  // confirmation drops the save and leaves.
+  void openGameMenu();
   void requestRepaint(Repaint kind);
   int barTop() const;
   uint16_t shellInput() const;
@@ -104,6 +109,7 @@ class GameScreen : public Activity, protected UiAppHost {
 
  private:
   static void screenFn(UiScreen& screen, void* user);
+  void confirmFinish();
 
   setka::RefreshCadence cadence;  // render task only
   std::atomic<uint8_t> repaint{RepaintEntry};
