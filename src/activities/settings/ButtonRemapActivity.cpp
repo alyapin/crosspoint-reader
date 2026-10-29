@@ -135,10 +135,12 @@ void ButtonRemapActivity::render(RenderLock&&) {
                     tr(STR_REMAP_PROMPT));
   renderUi();
 
-  // Side-button notes above the hints, bottom up: the reset question replaces both.
+  // Side-button notes above the hints, bottom up: the reset question and its keys replace both.
   const int line = renderer.getLineHeight(setka::kCaptionFont);
   int y = pageHeight - metrics.buttonHintsHeight - kPromptGap - line;
   if (resetAsked) {
+    renderer.drawText(setka::kCaptionFont, setka::kSidePadding, y, tr(STR_REMAP_RESET_CONFIRM_KEYS));
+    y -= line;
     renderer.drawText(setka::kCaptionFont, setka::kSidePadding, y, tr(STR_REMAP_RESET_CONFIRM_HINT));
   } else {
     renderer.drawText(setka::kCaptionFont, setka::kSidePadding, y, tr(STR_REMAP_CANCEL_HINT));
@@ -168,11 +170,12 @@ void ButtonRemapActivity::buildScreen(UiScreen& screen) {
   const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   const int topOffset = metrics.topPadding + metrics.headerHeight + kPromptGap +
                         renderer.getLineHeight(setka::kCaptionFont) + metrics.verticalSpacing;
+  // The safe area's sides, as every settings list.
   screen.setContentMarginFromScreen(
       fui::Insets{static_cast<int16_t>(safe.y + topOffset),
-                  static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width) + metrics.verticalSpacing),
+                  static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width)),
                   static_cast<int16_t>(renderer.getScreenHeight() - (safe.y + safe.height) + metrics.verticalSpacing),
-                  static_cast<int16_t>(safe.x + metrics.verticalSpacing)});
+                  static_cast<int16_t>(safe.x)});
 
   for (uint8_t i = 0; i < kRoleCount; ++i) {
     const uint8_t assignedButton = tempMapping[i];
