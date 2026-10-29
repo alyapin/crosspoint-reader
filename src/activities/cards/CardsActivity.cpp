@@ -1031,8 +1031,10 @@ void CardsActivity::buildCard(UiScreen& screen) {
   // The bar runs to the screen bottom; the key line keys to the hint band.
   const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   const int panelTop = touch ? height - games::ui::kActionBarHeight : safe.y + safe.height;
-  const int noteLine = renderer.getLineHeight(kDenseFont);
-  const int noteTop = hintCaptionTop(renderer, kDenseFont, panelTop);
+  // The games' caption role over the bar, the hint face over the keys.
+  const int noteFont = touch ? kText10Font : kDenseFont;
+  const int noteLine = renderer.getLineHeight(noteFont);
+  const int noteTop = hintCaptionTop(renderer, noteFont, panelTop);
   const int zoneBottom = noteTop - noteLine - kNoteGap;
   const int frontBottom = touch ? kFrontBottomTouch : kFrontBottomButtons;
 
@@ -1061,28 +1063,6 @@ void CardsActivity::buildCard(UiScreen& screen) {
     }
     slots[1] = {&icon_show_24, tr(STR_CARDS_SHOW)};
   } else {
-    drawRule(renderer, 60, frontBottom + 12, width - 120);
-    const int zoneTop = frontBottom + 12 + kRuleWidth + 12;
-    const int zone = zoneBottom - 10 - zoneTop;
-    Block answer;
-    Block extra;
-    answer.text = sideText(*fields, 1);
-    extra.text = sideText(*fields, 2);
-    extra.style = EpdFontFamily::ITALIC;
-    int total = 0;
-    // The example only where a line of it still fits.
-    for (const auto& fonts : kBackFonts) {
-      layoutBlock(renderer, answer, fonts[0], zone, scratch);
-      layoutBlock(renderer, extra, fonts[1], zone - answer.height() - kAnswerGap, scratch, false);
-      total = answer.height() + (extra.lines.count > 0 ? kAnswerGap + extra.height() : 0);
-      if (!answer.lines.overflow && !extra.lines.overflow && total <= zone) break;
-    }
-    // An example with no room left is cut too: the answer says so.
-    if (extra.lines.count == 0 && *extra.text) answer.lines.overflow = true;
-    int y = zoneTop + std::max(0, (zone - total) / 2);
-    drawBlock(renderer, answer, y, scratch);
-    if (extra.lines.count > 0) drawBlock(renderer, extra, y + answer.height() + kAnswerGap, scratch);
-
     const cards::CardState state = store->currentState();
     const StrId labels[3] = {StrId::STR_CARDS_AGAIN, StrId::STR_CARDS_GOOD, StrId::STR_CARDS_EASY};
     const freeink::Icon* icons[3] = {&icon_bar_restart_24, &icon_good_24, &icon_easy_24};
@@ -1106,12 +1086,12 @@ void CardsActivity::buildCard(UiScreen& screen) {
     }
     // Breaks only between pairs; the last line sits on noteTop.
     const int maxWidth = width - 2 * kSidePadding;
-    const int separator = renderer.getTextWidth(kDenseFont, " · ");
+    const int separator = renderer.getTextWidth(noteFont, " · ");
     bool breakBefore[4] = {};
     int lineWidth = 0;
     int breaks = 0;
     for (int i = 0; i < count; i++) {
-      const int partWidth = renderer.getTextWidth(kDenseFont, order[i]);
+      const int partWidth = renderer.getTextWidth(noteFont, order[i]);
       if (i > 0 && lineWidth + separator + partWidth > maxWidth) {
         breakBefore[i] = true;
         breaks++;
@@ -1120,18 +1100,41 @@ void CardsActivity::buildCard(UiScreen& screen) {
         lineWidth += (i > 0 ? separator : 0) + partWidth;
       }
     }
+    drawRule(renderer, 60, frontBottom + 12, width - 120);
+    const int zoneTop = frontBottom + 12 + kRuleWidth + 12;
+    // A third line of intervals takes its room from the answer.
+    const int zone = zoneBottom - std::max(0, breaks - 1) * noteLine - 10 - zoneTop;
+    Block answer;
+    Block extra;
+    answer.text = sideText(*fields, 1);
+    extra.text = sideText(*fields, 2);
+    extra.style = EpdFontFamily::ITALIC;
+    int total = 0;
+    // The example only where a line of it still fits.
+    for (const auto& fonts : kBackFonts) {
+      layoutBlock(renderer, answer, fonts[0], zone, scratch);
+      layoutBlock(renderer, extra, fonts[1], zone - answer.height() - kAnswerGap, scratch, false);
+      total = answer.height() + (extra.lines.count > 0 ? kAnswerGap + extra.height() : 0);
+      if (!answer.lines.overflow && !extra.lines.overflow && total <= zone) break;
+    }
+    // An example with no room left is cut too: the answer says so.
+    if (extra.lines.count == 0 && *extra.text) answer.lines.overflow = true;
+    int y = zoneTop + std::max(0, (zone - total) / 2);
+    drawBlock(renderer, answer, y, scratch);
+    if (extra.lines.count > 0) drawBlock(renderer, extra, y + answer.height() + kAnswerGap, scratch);
+
     y = noteTop - breaks * noteLine;
     scratch[0] = '\0';
     for (int i = 0; i < count; i++) {
       if (breakBefore[i]) {
-        renderer.drawText(kDenseFont, kSidePadding, y, scratch);
+        renderer.drawText(noteFont, kSidePadding, y, scratch);
         y += noteLine;
         scratch[0] = '\0';
       }
       const size_t used = strlen(scratch);
       snprintf(scratch + used, kNameBytes - used, "%s%s", used > 0 ? " · " : "", order[i]);
     }
-    renderer.drawText(kDenseFont, kSidePadding, y, scratch);
+    renderer.drawText(noteFont, kSidePadding, y, scratch);
   }
   if (!touch) return;
 
