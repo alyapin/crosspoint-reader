@@ -571,3 +571,13 @@ TEST(CardStore, RetryAfterPartialKeptSettlesFirst) {
   EXPECT_EQ(placeReceivedDeck(partial, sizeof(partial), "es.txt", final, sizeof(final)), Placed::Done);
   EXPECT_EQ(bytesOf("/Карточки/es.txt"), "retried deck");
 }
+
+TEST(CardStore, IndexReaderOutOfMemoryIsReported) {
+  fake::reset();
+  addDeck(deckText(3));
+  DeckStore store;
+  fake::failAlloc = 6;  // head, probe, keys, fields, two bitmaps, then the reader
+  EXPECT_EQ(store.open("es.txt", DAY), Status::NoMemory);
+  EXPECT_FALSE(Storage.exists((pathOf("dat") + ".tmp").c_str()));
+  EXPECT_EQ(store.open("es.txt", DAY), Status::Ok);
+}

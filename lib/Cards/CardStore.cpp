@@ -648,7 +648,7 @@ Status DeckStore::rebuild(const bool keepOld, const uint32_t size, const uint32_
   ok = ok && writeAll(out, crcBytes, sizeof(crcBytes));
   head->encode(headBuf);
   ok = ok && out.seekSet(0) && writeAll(out, headBuf, headSize);
-  if (!commit(out, datPath, ok)) return Status::Failed;
+  if (!commit(out, datPath, ok)) return reader ? Status::Failed : Status::NoMemory;
   LOG_INF("CARD", "Indexed %s: %u cards, %u skipped", head->name, static_cast<unsigned>(head->count),
           static_cast<unsigned>(head->skipped));
   return Status::Ok;
