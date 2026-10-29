@@ -91,6 +91,8 @@ class ChessActivity final : public Activity, private UiAppHost {
   void runAction(GameAction action);
   void activateRow(int index);
   void confirmResign();
+  // Top of the action bar, above the button hints on button boards.
+  int actionsTop() const;
   void applyOption(int option);
   void stepCustom(int field, int delta);
   void goBack();

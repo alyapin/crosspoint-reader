@@ -5,6 +5,7 @@
 
 #include <algorithm>
 
+#include "components/UITheme.h"
 #include "components/setka/SetkaStyle.h"
 
 namespace fui = freeink::ui;
@@ -20,7 +21,8 @@ constexpr int kIconGap = 4;
 void drawActionBar(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, const int top, const ActionSlot* slots,
                    const int count, const int focused, const uint16_t input) {
   const int width = renderer.getScreenWidth();
-  const int bottom = renderer.getScreenHeight();
+  // Ends above the button hints on button boards.
+  const int bottom = renderer.getScreenHeight() - UITheme::getInstance().getMetrics().buttonHintsHeight;
   drawRule(renderer, 0, top, width);
   const int cellTop = top + kRuleWidth;
   const int cellHeight = bottom - cellTop;
