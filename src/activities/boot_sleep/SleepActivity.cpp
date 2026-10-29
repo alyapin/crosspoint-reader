@@ -839,8 +839,9 @@ bool SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap, const bool pre
     if (ready)
       renderer.displayGrayBuffer();
     else
-      LOG_ERR("SLP", "Incomplete grayscale image; keeping the current display");
+      LOG_ERR("SLP", "Incomplete grayscale image");
     renderer.setRenderMode(GfxRenderer::BW);
+    return ready;
   }
   return true;
 }
