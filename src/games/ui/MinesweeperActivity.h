@@ -41,6 +41,7 @@ class MinesweeperActivity final : public GameScreen {
   const char* confirmHint() const override { return barFocus < 0 && cursor >= 0 ? tr(STR_GAMES_DIG) : nullptr; }
 
   void runAction(Action action);
+  void confirmRestart();
   bool barShown(int slot) const;
   int nextBarSlot(int from, int step) const;
   void act(int x, int y, bool flag);

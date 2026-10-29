@@ -176,7 +176,7 @@ void NonogramActivity::menuChosen(const int row) {
 
 void NonogramActivity::confirmRestart() {
   auto confirm =
-      makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_NONOGRAM_RESTART_CONFIRM),
+      makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_GAMES_RESTART_CONFIRM),
                                               tr(STR_NONOGRAM_RESTART_BODY), tr(STR_CANCEL), tr(STR_GAMES_RESTART));
   if (!confirm) {
     LOG_ERR("NONOGRAM", "OOM: restart confirmation, the board stays");

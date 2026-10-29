@@ -2,6 +2,7 @@
 
 #include <GfxRenderer.h>
 #include <I18n.h>
+#include <Logging.h>
 #include <Memory.h>
 #include <esp_random.h>
 
@@ -10,6 +11,7 @@
 #include <iterator>
 
 #include "ElapsedText.h"
+#include "activities/util/ConfirmationActivity.h"
 #include "gameIcons.h"
 #include "games/GameSave.h"
 #include "games/chess/ui/chessIcons.h"
@@ -99,9 +101,7 @@ void MinesweeperActivity::runAction(const Action action) {
       requestRepaint(RepaintUpdate);
       break;
     case Action::New:
-      game.newGame(game.config(), esp_random());
-      flagMode = false;
-      markChanged();
+      confirmRestart();
       break;
     case Action::Menu:
       if (game.isOver()) {
@@ -111,6 +111,29 @@ void MinesweeperActivity::runAction(const Action action) {
       }
       break;
   }
+}
+
+// As Японские: Начать заново asks first.
+void MinesweeperActivity::confirmRestart() {
+  auto confirm =
+      makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_GAMES_RESTART_CONFIRM),
+                                              tr(STR_MINES_RESTART_BODY), tr(STR_CANCEL), tr(STR_GAMES_RESTART));
+  if (!confirm) {
+    LOG_ERR("MINES", "OOM: restart confirmation, the board stays");
+    return;
+  }
+  app.clearTapFlash();
+  pauseGame();
+  startActivityForResult(std::move(confirm), [this](const ActivityResult& result) {
+    RenderLock lock(*this);
+    if (!result.isCancelled) {
+      game.newGame(game.config(), esp_random());
+      flagMode = false;
+      markChanged();
+    }
+    resumeGame();
+    requestRepaint(RepaintEntry);
+  });
 }
 
 void MinesweeperActivity::act(const int x, const int y, const bool flag) {
