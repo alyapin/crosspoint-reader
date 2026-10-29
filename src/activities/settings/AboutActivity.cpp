@@ -137,5 +137,6 @@ void AboutActivity::buildScreen(UiScreen& screen) {
   props.labelText = screen.theme().smallText;
   props.labelText.maxLines = 2;
   syncListViewport(screen, props);
+  props.selectedIndex = -1;  // read-only rows: nothing to select
   screen.list(props);
 }
