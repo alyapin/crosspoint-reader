@@ -94,7 +94,6 @@ struct ThemeMetrics {
   int keyboardKeyHeight;
   bool keyboardCenteredText;
   int keyboardVerticalOffset;
-  int keyboardTextFieldWidthPercent;
   int keyboardWidthPercent;
 
   float popupTopOffsetRatio;
@@ -199,7 +198,6 @@ constexpr ThemeMetrics values = {.batteryWidth = 15,
                                  .keyboardKeyHeight = 56,
                                  .keyboardCenteredText = false,
                                  .keyboardVerticalOffset = -13,
-                                 .keyboardTextFieldWidthPercent = 85,
                                  .keyboardWidthPercent = 94,
                                  .popupTopOffsetRatio = 0.075f,
                                  .popupMarginX = 15,

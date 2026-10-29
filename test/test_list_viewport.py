@@ -17,6 +17,11 @@ harness = r"""
 namespace fui = freeink::ui;
 struct UiScreen {
   int16_t height = 80;
+  fui::DeviceContext device() const {
+    fui::DeviceContext touch;
+    touch.hasTouch = true;  // button-board paging is ListPager's, tested in test/list_pager
+    return touch;
+  }
   void syncListViewport(fui::ListNav& nav, fui::ListProps& props, int count, int offset) {
     nav.syncToProps({0, 0, 200, height}, 20, 0, count, props, offset);
   }
@@ -24,8 +29,15 @@ struct UiScreen {
 struct UiListActivity {
   fui::ListNav nav;
   int count = 16;
+  bool paged_ = false;
+  struct {
+    void prepare(UiScreen&, fui::ListProps&, const fui::ListNav&, int, int) {}
+    void follow(fui::ListNav&, fui::ListProps&) {}
+  } pager_;
   fui::ListNav& activeNav() { return nav; }
   int listCount() const { return count; }
+  bool showsPageLine() const { return false; }
+  int pageLineTop() const { return -1; }
   void syncListViewport(UiScreen&, fui::ListProps&, int = 0);
 };
 """ + method + r"""
@@ -57,12 +69,13 @@ int main() {
     activity.syncListViewport(screen, props, offset);
     assert(nav.top == 2 && props.topIndex == 2);
   }
+
 }
 """
 with tempfile.TemporaryDirectory() as directory:
     cpp = Path(directory) / "viewport.cpp"
     executable = Path(directory) / "viewport"
-    cpp.write_text("#include <initializer_list>\n" + harness)
+    cpp.write_text("#include <algorithm>\n#include <initializer_list>\n#include <utility>\n" + harness)
     subprocess.run([
         "c++", "-std=c++17", "-I",
         str(ROOT / "freeink-sdk/libs/ui/FreeInkUI/include"),

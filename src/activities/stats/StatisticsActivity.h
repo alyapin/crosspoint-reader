@@ -22,9 +22,9 @@ class StatisticsActivity final : public Activity {
   static constexpr uint8_t kFuture = 0xFF;
 
   void drawCalendar(int top, int width) const;
-  // Returns the bottom of what it drew.
-  // `labelFirst`: "рекорд: 5" rather than "5 дней подряд".
-  int drawStat(int x, int capTop, int width, unsigned value, const char* label, bool labelFirst = false) const;
+  // "серия: 3 дня · рекорд: 12 дней", on two lines when one is too narrow;
+  // returns the last baseline.
+  int drawStreaks(int capTop) const;
 
   stats::StatsSummary summary;
   // Shade of each calendar day, Monday-first weeks, oldest week first: 0

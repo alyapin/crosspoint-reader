@@ -39,11 +39,15 @@ constexpr EpdFontFamily::Style kSemiBold = EpdFontFamily::BOLD;
 constexpr int kSelectionBarWidth = 10;  // left bar on the selected list row or tab
 constexpr int kCellFrameWidth = 4;      // inset frame on the selected grid cell
 constexpr int kRuleWidth = 2;           // black rule between sections
+constexpr int kTabUnderline = 2;         // under the active tab while a list row has the focus
 constexpr int kSidePadding = 20;
 // The selection bar sits in the side padding, clear of the X4 Pro bezel; list
 // text starts past it, so a label does not shift when the selection moves.
 constexpr int kSelectionBarX = kSidePadding - kSelectionBarWidth;
 constexpr int kRowTextX = kSidePadding + 12;
+// Captions above the button hints: the last line's baseline sits this far
+// above the hint band, the safe area's bottom (14 px over the X4 hint frames).
+constexpr int kHintCaptionGap = 11;
 constexpr int kProgressHeight = 12;
 constexpr int kMinTouch = 44;
 // Row pitch, no gap between rows: a navigation row (icon + label) and a
@@ -135,6 +139,35 @@ inline void drawProgressBarVertical(const GfxRenderer& renderer, const int x, co
   renderer.drawRect(x, y, width, height, true);
   renderer.fillRect(x + 1, y + 1 + inner - filled, width - 2, filled, true);
   renderer.fillRectDither(x + 1, y + 1, width - 2, inner - filled, Color::LightGray);
+}
+
+// Lines `text` takes at `width`, at most maxLines. A text that fits one line
+// is measured, not wrapped, so the common case allocates nothing.
+inline int textLines(const GfxRenderer& renderer, const int fontId, const char* text, const int width,
+                     const int maxLines) {
+  if (renderer.getTextWidth(fontId, text) <= width) return 1;
+  return static_cast<int>(renderer.wrappedText(fontId, text, width, maxLines).size());
+}
+
+// Draws `text` from (x, y) in whole words on up to maxLines lines, wrapping
+// only when it does not fit one; returns the y under it.
+inline int drawTextLines(const GfxRenderer& renderer, const int fontId, const int x, int y, const char* text,
+                         const int width, const int maxLines) {
+  const int line = renderer.getLineHeight(fontId);
+  if (renderer.getTextWidth(fontId, text) <= width) {
+    renderer.drawText(fontId, x, y, text);
+    return y + line;
+  }
+  for (const auto& part : renderer.wrappedText(fontId, text, width, maxLines)) {
+    renderer.drawText(fontId, x, y, part.c_str());
+    y += line;
+  }
+  return y;
+}
+
+// Top of the last caption line above the hint band that starts at hintsTop.
+inline int hintCaptionTop(const GfxRenderer& renderer, const int fontId, const int hintsTop) {
+  return hintsTop - kHintCaptionGap - renderer.getFontAscenderSize(fontId);
 }
 
 // Height of the hero digits above the baseline. Unbounded's line box carries

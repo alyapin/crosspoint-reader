@@ -3,6 +3,7 @@
 #include <BoardConfig.h>
 #include <GfxRenderer.h>
 #include <I18n.h>
+#include <LibraryText.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -186,7 +187,7 @@ void CoverGridHomeUi::drawCurrent(UiScreen& screen, fui::Rect rect, const int co
   const auto& theme = screen.theme();
   const auto& book = books->front();
   card.title = book.title.c_str();
-  card.author = book.author.empty() ? nullptr : book.author.c_str();
+  card.author = book.author.empty() ? nullptr : book.author.c_str() + library::authorRoleLength(book.author);
   card.meta = nullptr;
   card.progressLabel = progress >= 0 ? progressText : nullptr;
   card.centerTextOnCover = true;

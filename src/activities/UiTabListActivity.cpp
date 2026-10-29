@@ -213,8 +213,8 @@ void UiTabListActivity::buildTabBar(UiScreen& screen) {
 
 // Setka tabs, as in the Library: labels from the left in the UI 9 text role,
 // the active one SemiBold with the 10 px bar before it, the rule below. A
-// sort indicator follows its label as an arrow. Key focus on the band shows
-// as no list row carrying the bar.
+// sort indicator follows its label as an arrow. The bar marks the focus: with
+// a list row focused by keys, the active tab is underlined instead.
 void UiTabListActivity::buildSetkaTabStrip(UiScreen& screen, const int16_t tabBand) {
   constexpr int kBarGap = 6;  // the bar ends this far left of its label
   constexpr int kTabGap = 26;
@@ -249,11 +249,14 @@ void UiTabListActivity::buildSetkaTabStrip(UiScreen& screen, const int16_t tabBa
   const int16_t lineHeight = target.lineHeight(regular.font);
   const auto textTop = static_cast<int16_t>(band.y + (stripBottom - band.y - lineHeight) / 2);
   const fui::Paint ink = fui::Paint::solid(fui::Color::Black);
+  const bool listFocused = !mappedInput.hasTouch() && ringPos() != 0;
   int x = firstX;
   for (int i = 0; i < count; ++i) {
     const char* label = labelFor(i, buf);
     const auto labelWidth = static_cast<int16_t>(target.measureText(regular.font, label, styleFor(i)).width);
-    if (i == activeTab()) {
+    if (i == activeTab() && listFocused) {
+      target.fill(fui::makeRect(x, textTop + lineHeight, labelWidth, setka::kTabUnderline), ink);
+    } else if (i == activeTab()) {
       target.fill(
           fui::makeRect(x - kBarGap - setka::kSelectionBarWidth, textTop, setka::kSelectionBarWidth, lineHeight), ink);
     }

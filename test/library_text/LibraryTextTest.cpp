@@ -246,6 +246,15 @@ TEST(CleanPersonName, InvertedNameIsTurnedRound) {
 
 TEST(CleanPersonName, PlainNameIsUntouched) { EXPECT_EQ(library::cleanPersonName("Emily Bronte"), "Emily Bronte"); }
 
+// Some books put the role before the name; it must neither show nor split the
+// author's books into a second group.
+TEST(CleanPersonName, LeadingRoleIsDropped) {
+  EXPECT_EQ(library::cleanPersonName("автор Николай Васильевич Гоголь"), "Николай Васильевич Гоголь");
+  EXPECT_EQ(library::cleanPersonName("by Lewis Carroll"), "Lewis Carroll");
+  EXPECT_EQ(library::cleanPersonName("Byron"), "Byron");
+  EXPECT_EQ(library::authorKey("автор Николай Гоголь"), library::authorKey("Николай Гоголь"));
+}
+
 // Two commas mean a suffix or a list, not an inversion — leave it alone rather
 // than scramble it.
 TEST(CleanPersonName, MultipleCommasAreLeftAlone) {

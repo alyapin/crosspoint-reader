@@ -24,6 +24,7 @@
 #include "components/icons/headerIcons.h"
 #include "components/icons/listIcons.h"
 #include "components/icons/search32.h"
+#include "components/setka/SetkaStyle.h"
 #include "fontIds.h"
 #include "util/BookCacheUtils.h"
 
@@ -716,6 +717,7 @@ bool LibraryListActivity::rowTextFor(const int entry, std::string& title, std::s
     const auto& book = books[static_cast<size_t>(entry)];
     title = book.title;
     author = book.author;
+    author.erase(0, library::authorRoleLength(author));
     if (fileName) *fileName = book.path;
     return true;
   }
@@ -995,7 +997,8 @@ void LibraryListActivity::buildScreen(UiScreen& screen) {
   const char* help = holdHelp();
   const int footerLines = help && renderer.getTextWidth(SMALL_FONT_ID, help) > holdHelpWidth() ? 2 : 1;
   const int16_t readoutReserved =
-      static_cast<int16_t>(footerLines * renderer.getLineHeight(SMALL_FONT_ID) + READOUT_GAP);
+      static_cast<int16_t>((footerLines - 1) * renderer.getLineHeight(SMALL_FONT_ID) + setka::kHintCaptionGap +
+                           renderer.getFontAscenderSize(SMALL_FONT_ID) + READOUT_GAP);
   const Rect area = UITheme::getContentArea(renderer);
   const auto bottomInset = static_cast<int16_t>(renderer.getScreenHeight() - area.y - area.height);
   buildHeader(screen);
@@ -1040,7 +1043,7 @@ void LibraryListActivity::drawPositionReadout() const {
   const Rect area = UITheme::getContentArea(renderer);
   const int right = std::max(renderer.getScreenWidth() - area.x - area.width, bottomCornerClearance());
   const int x = renderer.getScreenWidth() - right - width - SIDE_PADDING;
-  const int y = area.y + area.height - metrics.buttonHintsHeight - renderer.getLineHeight(SMALL_FONT_ID);
+  const int y = setka::hintCaptionTop(renderer, SMALL_FONT_ID, area.y + area.height - metrics.buttonHintsHeight);
   renderer.drawText(SMALL_FONT_ID, x, y, buf, true);
 }
 
@@ -1078,12 +1081,11 @@ void LibraryListActivity::drawHoldHelp() const {
   const Rect area = UITheme::getContentArea(renderer);
   const int left = std::max(area.x, bottomCornerClearance()) + SIDE_PADDING;
   // Whole words on up to two lines, the last one level with the readout.
-  const auto lines = renderer.wrappedText(SMALL_FONT_ID, help, holdHelpWidth(), 2);
-  int y = area.y + area.height - metrics.buttonHintsHeight - static_cast<int>(lines.size()) * lineHeight;
-  for (const auto& line : lines) {
-    renderer.drawText(SMALL_FONT_ID, left, y, line.c_str());
-    y += lineHeight;
-  }
+  const int width = holdHelpWidth();
+  const int lines = setka::textLines(renderer, SMALL_FONT_ID, help, width, 2);
+  const int y = setka::hintCaptionTop(renderer, SMALL_FONT_ID, area.y + area.height - metrics.buttonHintsHeight) -
+                (lines - 1) * lineHeight;
+  setka::drawTextLines(renderer, SMALL_FONT_ID, left, y, help, width, 2);
 }
 
 // OptionPopup is a self-contained modal: it owns the whole frame (hints

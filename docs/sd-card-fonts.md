@@ -15,7 +15,7 @@ the manual SD card copy method below.
 ### Option 1: Download from device (recommended)
 
 1. Connect your CrossPoint reader to Wi-Fi
-2. Go to **Settings > Reader > Manage Fonts**
+2. Go to **Settings > Reader > Online fonts**
 3. Browse available font families and tap to download
 4. Downloaded fonts appear immediately in **Settings > Reader > Font Family**
 

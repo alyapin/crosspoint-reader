@@ -602,11 +602,7 @@ bool KeyboardEntryActivity::cursorPositionFromPoint(const int x, const int y, si
   const int inputStartY = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing +
                           metrics.verticalSpacing * 4 + metrics.keyboardVerticalOffset;
 
-  int availableWidth = content.width;
-  if (gpio.deviceIsX3()) {
-    availableWidth -= 2 * metrics.sideButtonHintsWidth;
-  }
-  const int effectiveMargin = (content.width - availableWidth * metrics.keyboardTextFieldWidthPercent / 100) / 2;
+  const int effectiveMargin = fieldMargin(metrics, content);
   const int textLeft = content.x + effectiveMargin;
   const int toggleGap = inputType == InputType::Password ? 4 : 0;
   const int toggleReserve = inputType == InputType::Password ? std::max(renderer.getTextWidth(UI_12_FONT_ID, "[abc]"),
@@ -928,11 +924,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   // Field text/cursor share the bezel-safe content box the underline and
   // keyboard use (matches cursorPositionFromPoint); content.x offsets them past
   // the bezel on inset panels (EEGO A4).
-  int availableWidth = content.width;
-  if (gpio.deviceIsX3()) {
-    availableWidth -= 2 * metrics.sideButtonHintsWidth;
-  }
-  const int effectiveMargin = (content.width - availableWidth * metrics.keyboardTextFieldWidthPercent / 100) / 2;
+  const int effectiveMargin = fieldMargin(metrics, content);
   const int textLeft = content.x + effectiveMargin;
   const int toggleGap = isPassword ? 4 : 0;
   const int toggleReserve = isPassword ? std::max(renderer.getTextWidth(UI_12_FONT_ID, "[abc]"),
@@ -1233,12 +1225,10 @@ void KeyboardEntryActivity::drawKeyGrid(const fui::Rect& keysRect, const int row
     const int right = key.x + key.width;
     if (keysRect.right() - right >= KEY_EDGE_SNAP) renderer.drawLine(right, key.y, right, bottom);
     if (hits[i].value != fui::QWERTY_KEY_ENTER) continue;
-    int fontId = keyLabelFont(keysRect.width);
+    const int fontId = keyLabelFont(keysRect.width);
     const int keyWidth = std::min<int>(right, keysRect.right()) - key.x;
-    // The label keeps 4 px clear of the key edges: in the smaller UI face when
-    // the key face is too wide, and only a key too narrow for both says OK.
+    // The label keeps 4 px clear of the key edges; a key too narrow says OK.
     const char* label = tr(STR_KEYBOARD_DONE);
-    if (renderer.getTextWidth(fontId, label, kSemiBold) > keyWidth - 8) fontId = UI_10_FONT_ID;
     if (renderer.getTextWidth(fontId, label, kSemiBold) > keyWidth - 8) label = tr(STR_OK_BUTTON);
     const int lineHeight = renderer.getLineHeight(fontId);
     const int labelWidth = renderer.getTextWidth(fontId, label, kSemiBold);
@@ -1247,9 +1237,16 @@ void KeyboardEntryActivity::drawKeyGrid(const fui::Rect& keysRect, const int row
   }
 }
 
-// Key labels use the body font unless a letter would not fit its key (the wide
-// X4 Pro face on 12-key Cyrillic rows); then the next smaller UI font. Both
-// letter layers decide, so Shift and the symbol pages keep the label size.
+// Margin inside `content` that puts the field and its underline on the
+// screen's side padding, like the tips under them; the X3 also keeps its side
+// hints clear.
+int KeyboardEntryActivity::fieldMargin(const ThemeMetrics& metrics, const Rect& content) {
+  return std::max(0, setka::kSidePadding - content.x) + (gpio.deviceIsX3() ? metrics.sideButtonHintsWidth : 0);
+}
+
+// Key labels use the UI 10 face on every layout, so the keyboards share one
+// size; the small face only where a letter would not fit its key. Both letter
+// layers decide, so Shift and the symbol pages keep the label size.
 int KeyboardEntryActivity::keyLabelFont(const int keysWidth) const {
   // Arabic letter keys draw in the small slot; the body font is unused there.
   if (layoutId == fui::KeyboardLayoutId::ArabicAr && !symbols) return UI_12_FONT_ID;
@@ -1261,14 +1258,10 @@ int KeyboardEntryActivity::keyLabelFont(const int keysWidth) const {
     layers[1] = &URL_LAYOUT;
     layers[2] = &URL_SHIFT_LAYOUT;
   }
-  for (const int fontId : {UI_12_FONT_ID, UI_10_FONT_ID}) {
-    if (std::all_of(std::begin(layers), std::end(layers), [&](const fui::KeyboardLayout* layer) {
-          return layer == nullptr || keyLabelsFit(renderer, *layer, fontId, keysWidth, !urlPanel);
-        })) {
-      return fontId;
-    }
-  }
-  return SMALL_FONT_ID;
+  const bool fits = std::all_of(std::begin(layers), std::end(layers), [&](const fui::KeyboardLayout* layer) {
+    return layer == nullptr || keyLabelsFit(renderer, *layer, UI_10_FONT_ID, keysWidth, !urlPanel);
+  });
+  return fits ? UI_10_FONT_ID : SMALL_FONT_ID;
 }
 
 void KeyboardEntryActivity::onComplete(std::string text) {

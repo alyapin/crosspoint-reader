@@ -5,6 +5,7 @@
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <I18n.h>
+#include <LibraryText.h>
 #include <Logging.h>
 #include <Memory.h>
 #include <Xtc.h>
@@ -134,7 +135,8 @@ void SetkaHomeActivity::loadBooks() {
     snprintf(text, sizeof(text), tr(STR_CHAPTER_OF), current.chapter, current.chapterCount);
     currentSubtitle = text;
   } else {
-    currentSubtitle = slots[0].book.author;
+    const std::string& author = slots[0].book.author;
+    currentSubtitle.assign(author, library::authorRoleLength(author));
   }
 }
 

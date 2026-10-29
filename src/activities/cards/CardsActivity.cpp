@@ -21,6 +21,7 @@
 #include "components/UITheme.h"
 #include "components/icons/listIcons.h"
 #include "components/setka/setkaIcons.h"
+#include "games/ui/ActionBar.h"
 #include "games/ui/gameIcons.h"
 #include "stats/StatsCalendar.h"
 #include "util/ButtonNavigator.h"
@@ -38,7 +39,6 @@ constexpr fui::ActionId ACTION_SLOT = 4;
 constexpr int kRowHeight = kNavRowHeight;
 constexpr int kIconSize = 24;
 constexpr int kIconGap = 16;
-constexpr int kGradeBarHeight = 100;
 constexpr int kNoteGap = 12;
 constexpr int kCardWidth = 440;
 constexpr int kFrontBottomTouch = 400;
@@ -831,9 +831,14 @@ void CardsActivity::drawStats(const int y, const uint16_t (&numbers)[3], const S
 }
 
 void CardsActivity::buildList(UiScreen& screen) {
-  const int height = renderer.getScreenHeight() - UITheme::getInstance().getMetrics().buttonHintsHeight;
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+  const int height = safe.y + safe.height;
   const int captionLine = renderer.getLineHeight(kCaptionFont);
-  const int noteTop = height - 2 * captionLine - 24;
+  // The formats wrap once when a language runs long.
+  const char* formats = tr(STR_CARDS_LIST_FORMATS);
+  const int noteWidth = renderer.getScreenWidth() - 2 * kSidePadding;
+  const int formatLines = textLines(renderer, kCaptionFont, formats, noteWidth, 2);
+  const int noteTop = hintCaptionTop(renderer, kCaptionFont, height) - formatLines * captionLine;
   const int first = headerBottom() + 14;
   const int rows = std::max(1, (noteTop - 8 - first) / kRowHeight);
   if (focus < listTop) listTop = focus;
@@ -843,7 +848,7 @@ void CardsActivity::buildList(UiScreen& screen) {
             decks[i].caption, i);
   }
   renderer.drawText(kCaptionFont, kSidePadding, noteTop, tr(STR_CARDS_LIST_NOTE));
-  renderer.drawText(kCaptionFont, kSidePadding, noteTop + captionLine, tr(STR_CARDS_LIST_FORMATS));
+  drawTextLines(renderer, kCaptionFont, kSidePadding, noteTop + captionLine, formats, noteWidth, 2);
 }
 void CardsActivity::buildEmpty(UiScreen& screen) {
   const int width = renderer.getScreenWidth();
@@ -1020,12 +1025,15 @@ void CardsActivity::buildCard(UiScreen& screen) {
   renderer.drawText(kText12Font, width - kSidePadding - renderer.getTextWidth(kText12Font, text, kSemiBold),
                     kGameTopLineY, text, true, kSemiBold);
 
-  // Touch grades on a bar of three slots; button boards say what the keys do
-  // above the hints, in a line that wraps once when the intervals run long.
-  const int hintsTop = height - UITheme::getInstance().getMetrics().buttonHintsHeight;
+  // Touch grades on the games' action bar with the intervals in a line over
+  // it; button boards say what the keys do above the hints. The line wraps
+  // once when the intervals run long.
+  // The bar runs to the screen bottom; the key line keys to the hint band.
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+  const int panelTop = touch ? height - games::ui::kActionBarHeight : safe.y + safe.height;
   const int noteLine = renderer.getLineHeight(kDenseFont);
-  const int noteTop = hintsTop - kNoteGap - noteLine;
-  const int barTop = touch ? hintsTop - kGradeBarHeight : noteTop - noteLine - kNoteGap;
+  const int noteTop = hintCaptionTop(renderer, kDenseFont, panelTop);
+  const int zoneBottom = noteTop - noteLine - kNoteGap;
   const int frontBottom = touch ? kFrontBottomTouch : kFrontBottomButtons;
 
   // The front stays put when the answer shows, so the flip is a FAST refresh.
@@ -1037,30 +1045,25 @@ void CardsActivity::buildCard(UiScreen& screen) {
   }
   drawBlock(renderer, front, kGameBoardTop + (frontBottom - kGameBoardTop - front.height()) / 2, scratch);
 
-  struct Slot {
-    const freeink::Icon* icon;
-    const char* label;
-    const char* caption;
-  };
-  Slot slots[3] = {};
-  char captions[3][40] = {};
+  games::ui::ActionSlot slots[3] = {};
   if (!back) {
     if (touch) {
       const char* hint = tr(STR_CARDS_TAP_TO_SHOW);
-      renderer.drawText(kCaptionFont, (width - renderer.getTextWidth(kCaptionFont, hint)) / 2,
-                        (frontBottom + barTop) / 2 + 20, hint);
-      screen.frame().hit(fui::makeRect(exitWidth, kGameBoardTop, width - exitWidth, barTop - kGameBoardTop),
+      // The text role of the games' captions.
+      renderer.drawText(kText10Font, (width - renderer.getTextWidth(kText10Font, hint)) / 2,
+                        (frontBottom + zoneBottom) / 2 + 20, hint);
+      screen.frame().hit(fui::makeRect(exitWidth, kGameBoardTop, width - exitWidth, panelTop - kGameBoardTop),
                          ACTION_CARD, 0, fui::InputTouch);
     }
     if (store->canUndo()) {
-      slots[0] = {&icon_bar_undo_24, tr(STR_CARDS_UNDO), tr(STR_CARDS_UNDO_HINT)};
+      slots[0] = {&icon_bar_undo_24, tr(STR_CARDS_UNDO)};
       if (!touch) renderer.drawText(kDenseFont, kSidePadding, noteTop, tr(STR_CARDS_UNDO_HOLD));
     }
-    slots[1] = {&icon_show_24, tr(STR_CARDS_SHOW), nullptr};
+    slots[1] = {&icon_show_24, tr(STR_CARDS_SHOW)};
   } else {
     drawRule(renderer, 60, frontBottom + 12, width - 120);
     const int zoneTop = frontBottom + 12 + kRuleWidth + 12;
-    const int zone = barTop - 10 - zoneTop;
+    const int zone = zoneBottom - 10 - zoneTop;
     Block answer;
     Block extra;
     answer.text = sideText(*fields, 1);
@@ -1083,71 +1086,58 @@ void CardsActivity::buildCard(UiScreen& screen) {
     const cards::CardState state = store->currentState();
     const StrId labels[3] = {StrId::STR_CARDS_AGAIN, StrId::STR_CARDS_GOOD, StrId::STR_CARDS_EASY};
     const freeink::Icon* icons[3] = {&icon_bar_restart_24, &icon_good_24, &icon_easy_24};
+    // "Again: today · Good: tomorrow · …" in the order of the slots, or of the keys under it.
+    char parts[3][64];
     for (int i = 0; i < 3; i++) {
-      intervalText(cards::intervalAfter(state.box, static_cast<cards::Grade>(i)), captions[i], sizeof(captions[i]));
-      slots[i] = {icons[i], I18N.get(labels[i]), captions[i]};
+      slots[i] = {icons[i], I18N.get(labels[i])};
+      char interval[40];
+      intervalText(cards::intervalAfter(state.box, static_cast<cards::Grade>(i)), interval, sizeof(interval));
+      snprintf(parts[i], sizeof(parts[i]), "%s: %s", slots[i].label, interval);
     }
-    if (!touch) {
-      // "Good: tomorrow · Again: today · …" in the order of the keys under it.
-      char parts[3][64];
-      for (int i = 0; i < 3; i++) snprintf(parts[i], sizeof(parts[i]), "%s: %s", slots[i].label, captions[i]);
+    const char* order[4] = {};
+    int count = 0;
+    if (touch) {
+      for (const auto& part : parts) order[count++] = part;
+    } else {
       const auto keys = mappedInput.mapLabels("", parts[1], parts[0], parts[2]);
-      const char* order[4] = {};
-      int count = 0;
       for (const char* part : {keys.btn1, keys.btn2, keys.btn3, keys.btn4}) {
         if (part != nullptr && *part != '\0') order[count++] = part;
       }
-      // Breaks only between pairs; the last line sits on noteTop.
-      const int maxWidth = width - 2 * kSidePadding;
-      const int separator = renderer.getTextWidth(kDenseFont, " · ");
-      bool breakBefore[4] = {};
-      int lineWidth = 0;
-      int breaks = 0;
-      for (int i = 0; i < count; i++) {
-        const int partWidth = renderer.getTextWidth(kDenseFont, order[i]);
-        if (i > 0 && lineWidth + separator + partWidth > maxWidth) {
-          breakBefore[i] = true;
-          breaks++;
-          lineWidth = partWidth;
-        } else {
-          lineWidth += (i > 0 ? separator : 0) + partWidth;
-        }
-      }
-      int y = noteTop - breaks * noteLine;
-      scratch[0] = '\0';
-      for (int i = 0; i < count; i++) {
-        if (breakBefore[i]) {
-          renderer.drawText(kDenseFont, kSidePadding, y, scratch);
-          y += noteLine;
-          scratch[0] = '\0';
-        }
-        const size_t used = strlen(scratch);
-        snprintf(scratch + used, kNameBytes - used, "%s%s", used > 0 ? " · " : "", order[i]);
-      }
-      renderer.drawText(kDenseFont, kSidePadding, y, scratch);
     }
+    // Breaks only between pairs; the last line sits on noteTop.
+    const int maxWidth = width - 2 * kSidePadding;
+    const int separator = renderer.getTextWidth(kDenseFont, " · ");
+    bool breakBefore[4] = {};
+    int lineWidth = 0;
+    int breaks = 0;
+    for (int i = 0; i < count; i++) {
+      const int partWidth = renderer.getTextWidth(kDenseFont, order[i]);
+      if (i > 0 && lineWidth + separator + partWidth > maxWidth) {
+        breakBefore[i] = true;
+        breaks++;
+        lineWidth = partWidth;
+      } else {
+        lineWidth += (i > 0 ? separator : 0) + partWidth;
+      }
+    }
+    y = noteTop - breaks * noteLine;
+    scratch[0] = '\0';
+    for (int i = 0; i < count; i++) {
+      if (breakBefore[i]) {
+        renderer.drawText(kDenseFont, kSidePadding, y, scratch);
+        y += noteLine;
+        scratch[0] = '\0';
+      }
+      const size_t used = strlen(scratch);
+      snprintf(scratch + used, kNameBytes - used, "%s%s", used > 0 ? " · " : "", order[i]);
+    }
+    renderer.drawText(kDenseFont, kSidePadding, y, scratch);
   }
   if (!touch) return;
 
-  drawRule(renderer, 0, barTop, width);
-  const int cellTop = barTop + kRuleWidth;
-  const int line10 = renderer.getLineHeight(kText10Font);
   for (int i = 0; i < 3; i++) {
-    const int x0 = i * width / 3;
-    const int x1 = (i + 1) * width / 3;
-    if (i > 0) renderer.fillRect(x0, cellTop, 1, kGradeBarHeight - kRuleWidth, true);
-    if (slots[i].label == nullptr) continue;
-    const int cx = (x0 + x1) / 2;
-    const int iconTop = cellTop + 12;
-    screen.target().bitmap(fui::makeRect(cx - kIconSize / 2, iconTop, kIconSize, kIconSize),
-                           fui::bitmapFromIcon(*slots[i].icon), fui::BitmapMode::Center);
-    renderer.drawText(kText10Font, cx - renderer.getTextWidth(kText10Font, slots[i].label) / 2, iconTop + kIconSize + 4,
-                      slots[i].label);
-    if (slots[i].caption != nullptr) {
-      renderer.drawText(kCaptionFont, cx - renderer.getTextWidth(kCaptionFont, slots[i].caption) / 2,
-                        iconTop + kIconSize + 4 + line10, slots[i].caption);
-    }
-    screen.frame().hit(fui::makeRect(x0, cellTop, x1 - x0, kGradeBarHeight - kRuleWidth), ACTION_SLOT,
-                       static_cast<int16_t>(i), fui::InputTouch);
+    slots[i].action = ACTION_SLOT;
+    slots[i].value = static_cast<int16_t>(i);
   }
+  games::ui::drawActionBar(renderer, screen, panelTop, slots, 3, -1, fui::InputTouch);
 }

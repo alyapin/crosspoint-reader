@@ -51,6 +51,9 @@ class FileBrowserActivity final : public UiListActivity {
 
   int listCount() const override { return static_cast<int>(files.size()); }
   void buildScreen(UiScreen& screen) override;
+  // The page line shares the path line when there is one.
+  int pageLineTop() const override { return pathLineTop >= 0 ? pathLineTop : UiListActivity::pageLineTop(); }
+  int pathLineTop = -1;  // render task
   void activateIndex(int index) override;
   void onRowLongPress(int index) override;
 #if FREEINK_CAP_TOUCH

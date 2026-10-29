@@ -52,7 +52,8 @@ class IntervalSelectionActivity final : public Activity, private UiAppHost {
   void setValue(int candidate);
   int clampedValue(int candidate) const;
   void formatValue(char* buffer, size_t size, int forValue) const;
-  void formatStepHint(char* buffer, size_t size, StrId labelId, int step) const;
+  // "−/+: step 5 min · side buttons: step 30 min".
+  void formatSteps(char* buffer, size_t size) const;
   void drawValue(int x, int capTop) const;
   void drawKeyDialog() const;
   void cancel();
