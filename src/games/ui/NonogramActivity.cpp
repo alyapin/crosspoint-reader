@@ -327,12 +327,9 @@ void NonogramActivity::onKey(const int dx, const int dy, const bool confirm) {
 }
 
 const char* NonogramActivity::confirmHint() const {
-  if (stroking) return tr(STR_GAMES_DONE);
+  if (stroking) return "";
   if (!boardShown() || !game.inProgress() || barFocus >= 0 || cursor < 0) return nullptr;
-  const Mark m = game.mark(cursor);
-  return m == nonogram::Empty    ? tr(STR_GAMES_FILL)
-         : m == nonogram::Filled ? tr(STR_NONOGRAM_CROSS)
-                                 : tr(STR_GAMES_ERASE);
+  return tr(STR_NONOGRAM_MARK);
 }
 
 bool NonogramActivity::holdsConfirm() const {
@@ -566,7 +563,10 @@ void NonogramActivity::drawCaption(const int top) const {
                          : (stroking ? tr(STR_NONOGRAM_KEYS_STROKE_HINT) : tr(STR_NONOGRAM_KEYS_HINT));
   if (hint != captionFor) {
     captionFor = hint;
-    captionLines = renderer.wrappedText(kCaptionFont, hint, renderer.getScreenWidth() - 2 * kSidePadding, 2);
+    // The keys caption names the Confirm hint.
+    char text[160];
+    snprintf(text, sizeof(text), hint, tr(STR_NONOGRAM_MARK), tr(STR_NONOGRAM_MARK));
+    captionLines = renderer.wrappedText(kCaptionFont, text, renderer.getScreenWidth() - 2 * kSidePadding, 2);
   }
   int y = top;
   for (const auto& text : captionLines) {

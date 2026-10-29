@@ -239,6 +239,11 @@ void MinesweeperActivity::build(UiScreen& screen) {
   if (over) {
     drawResult(BOARD_TOP + height + kResultGap,
                game.status() == minesweeper::Status::Won ? tr(STR_GAMES_WON) : tr(STR_MINES_LOST));
+  } else if (!hasBar()) {
+    // Button boards flag with a held Confirm (the bar's Флажок is touch only).
+    char line[64];
+    snprintf(line, sizeof(line), tr(STR_MINES_FLAG_HOLD), tr(STR_GAMES_DIG));
+    renderer.drawText(kText10Font, kSidePadding, BOARD_TOP + height + kResultGap, line);
   }
 
   BarItem items[BAR_SLOTS];
