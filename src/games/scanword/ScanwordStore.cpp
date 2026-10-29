@@ -230,15 +230,12 @@ bool saveShelf(const scanword::Shelf& shelf) {
     ok = len > 0 && file.write(line, len + 1) == len + 1;
   }
   if (!commit(file, ok, SHELF_TMP, SHELF_PATH)) return false;
+  const bool marked = Storage.exists(IN_PROGRESS_PATH);
   if (shelf.anyInProgress()) {
-    if (!Storage.exists(IN_PROGRESS_PATH)) {
-      HalFile marker;
-      if (Storage.openFileForWrite("SCANW", IN_PROGRESS_PATH, marker)) marker.close();
-    }
-  } else if (Storage.exists(IN_PROGRESS_PATH)) {
-    Storage.remove(IN_PROGRESS_PATH);
+    HalFile marker;
+    return marked || (Storage.openFileForWrite("SCANW", IN_PROGRESS_PATH, marker) && marker.close());
   }
-  return true;
+  return !marked || Storage.remove(IN_PROGRESS_PATH);
 }
 
 bool hasPuzzleInProgress() { return Storage.exists(IN_PROGRESS_PATH); }

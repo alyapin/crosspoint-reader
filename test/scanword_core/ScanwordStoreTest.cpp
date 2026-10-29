@@ -20,6 +20,7 @@ constexpr char STATS[] = "/.crosspoint/games/scanword/stats.json";
 constexpr char STATS_TMP[] = "/.crosspoint/games/scanword/stats.json.tmp";
 constexpr char SHELF[] = "/.crosspoint/games/scanword/shelf.txt";
 constexpr char SHELF_TMP[] = "/.crosspoint/games/scanword/shelf.txt.tmp";
+constexpr char MARKER[] = "/.crosspoint/games/scanword/in-progress";
 
 std::string contents(const char* path) {
   const auto& bytes = fake::files.at(path)->bytes;
@@ -124,4 +125,20 @@ TEST(ScanwordStore, ShelfFailedCloseKeepsThePreviousFile) {
   fake::failClosePath = SHELF_TMP;
   EXPECT_FALSE(scanwordstore::saveShelf(shelf));
   EXPECT_EQ(contents(SHELF), before);
+}
+
+TEST(ScanwordStore, ShelfReportsAFailedMarker) {
+  fake::reset();
+  Shelf shelf;
+  ASSERT_TRUE(shelf.set("0001", 50, false, 7));
+  fake::failClosePath = MARKER;
+  EXPECT_FALSE(scanwordstore::saveShelf(shelf));
+  EXPECT_TRUE(scanwordstore::saveShelf(shelf));
+  EXPECT_TRUE(scanwordstore::hasPuzzleInProgress());
+
+  ASSERT_TRUE(shelf.set("0001", 100, true, 9));
+  fake::failRemovePath = MARKER;
+  EXPECT_FALSE(scanwordstore::saveShelf(shelf));
+  EXPECT_TRUE(scanwordstore::saveShelf(shelf));
+  EXPECT_FALSE(scanwordstore::hasPuzzleInProgress());
 }

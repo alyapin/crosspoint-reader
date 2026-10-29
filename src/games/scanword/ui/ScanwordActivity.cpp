@@ -169,10 +169,8 @@ void ScanwordActivity::onEnter() {
 }
 
 void ScanwordActivity::onExit() {
-  if (openItem >= 0) {
-    tickTime();
-    saveProgress();
-  }
+  tickTime();
+  saveProgress();
   game.reset();
   puzzle.reset();
   shelf.reset();
@@ -182,7 +180,6 @@ void ScanwordActivity::onExit() {
 }
 
 void ScanwordActivity::prepareForSleep() {
-  if (openItem < 0) return;
   tickTime();
   saveProgress();
 }
@@ -260,10 +257,11 @@ void ScanwordActivity::openPuzzle(const uint16_t item) {
   if (!scanwordstore::hasProgress(id) && shelf->find(id) != nullptr) {
     // The summary outlived its save (e.g. a new pack reused the id).
     shelf->remove(id);
-    if (shelfWritable) scanwordstore::saveShelf(*shelf);
+    shelfPending = true;
   }
   openItem = item;
   dirty = false;
+  solveUncounted = false;
   savedSeconds = game->progress().seconds;
   keyboardOpen = false;
   stripOpen = false;
@@ -307,24 +305,27 @@ void ScanwordActivity::tickTime() {
 }
 
 void ScanwordActivity::saveProgress() {
-  if (openItem < 0) return;
-  const char* id = items[openItem].id;
-  const uint32_t seconds = game->progress().seconds;
-  const bool untouched = shelf->find(id) == nullptr && game->filledCount() == 0 && !dirty;
-  if (!untouched && (dirty || seconds != savedSeconds)) {
-    if (scanwordstore::saveProgress(id, *game)) {
+  if (openItem >= 0) {
+    const char* id = items[openItem].id;
+    const uint32_t seconds = game->progress().seconds;
+    const bool untouched = shelf->find(id) == nullptr && game->filledCount() == 0 && !dirty;
+    // The shelf and the totals follow only a save on the card: a lost solve can be solved and counted again.
+    if (!untouched && (dirty || seconds != savedSeconds) && scanwordstore::saveProgress(id, *game)) {
       dirty = false;
       savedSeconds = seconds;
+      const uint16_t letters = puzzle->letterCount();
+      const uint32_t percent = letters ? game->filledCount() * 100u / letters : 0;
+      shelf->set(id, static_cast<uint8_t>(percent), game->solved(), seconds);
+      shelfPending = true;
+      if (solveUncounted) {
+        stats.record(game->progress());
+        solveUncounted = false;
+        statsPending = true;
+      }
     }
-    const uint16_t letters = puzzle->letterCount();
-    const uint32_t percent = letters ? game->filledCount() * 100u / letters : 0;
-    shelf->set(id, static_cast<uint8_t>(percent), game->solved(), seconds);
-    if (shelfWritable) scanwordstore::saveShelf(*shelf);
   }
-  if (statsPending) {
-    if (statsWritable) scanwordstore::saveStats(stats);
-    statsPending = false;
-  }
+  if (shelfPending && shelfWritable) shelfPending = !scanwordstore::saveShelf(*shelf);
+  if (statsPending && statsWritable) statsPending = !scanwordstore::saveStats(stats);
 }
 
 void ScanwordActivity::tapGrid(const int x, const int y) {
@@ -360,8 +361,7 @@ void ScanwordActivity::afterEntry(const EntryResult result, const bool wordWasLa
   if (result == EntryResult::Solved) {
     keyboardOpen = false;
     stripOpen = false;
-    stats.record(game->progress());
-    statsPending = true;
+    solveUncounted = true;
     savePending = true;
   } else if (wordWasLast && game->wordFilled(game->selectedWord())) {
     closeInput();
