@@ -532,9 +532,10 @@ void DraughtsActivity::drawBoard() const {
       drawDashedFrame(renderer, x, y, kSquare);
     }
   }
+  const bool cursorShown = cursor >= 0 && barFocus < 0 && moveCount > 0;
   if (selected >= 0) {
     cellOrigin(at, x, y);
-    drawCellFrame(renderer, x, y, kSquare, kSquare);
+    drawPick(x, y, kSquare, kSquare, cursorShown && cursor == at);
   }
   for (int s = 0; s < draughts::SQUARES; ++s) {
     if (!has(dots, s)) continue;
@@ -542,9 +543,9 @@ void DraughtsActivity::drawBoard() const {
     renderer.fillRoundedRect(x + (kSquare - kDotSize) / 2, y + (kSquare - kDotSize) / 2, kDotSize, kDotSize,
                              kDotSize / 2, Color::Black);
   }
-  if (cursor >= 0 && barFocus < 0 && moveCount > 0) {
+  if (cursorShown) {
     cellOrigin(cursor, x, y);
-    drawCursor(x, y, kSquare, kSquare);
+    drawCellFrame(renderer, x, y, kSquare, kSquare);
   }
 }
 

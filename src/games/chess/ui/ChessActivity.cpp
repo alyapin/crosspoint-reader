@@ -57,8 +57,9 @@ constexpr int kPieceInset = (kSquare - 56) / 2;
 constexpr int kDotSize = 16;
 constexpr int kRingWidth = 3;
 constexpr int kTurnLineGap = 16;
-constexpr int kUnitGap = 12;    // hero minutes and their "мин"
-constexpr int kCursorArm = 14;  // key cursor: corner brackets on the focused square
+constexpr int kUnitGap = 12;  // hero minutes and their "мин"
+constexpr int kPickArm = 14;  // a picked piece: corner brackets on its square
+constexpr int kPickInCursor = kCellFrameWidth + 2;
 // Key focus ring in the game view: the 64 board cells (visual order), then the actions.
 constexpr int kCells = 64;
 constexpr int kStartCursor = 6 * 8 + 4;  // the near side's e-pawn
@@ -150,13 +151,18 @@ const chess::Notation& notation() {
   return I18N.getLanguage() == Language::RU ? chess::NOTATION_RU : chess::NOTATION_EN;
 }
 
-void drawCursor(const GfxRenderer& renderer, const int x, const int y) {
+// The key cursor is the 4 px inset frame; a picked piece takes corner brackets, inside the frame under the cursor.
+void drawPick(const GfxRenderer& renderer, const int x, const int y, const bool underCursor) {
   constexpr int kWidth = kCellFrameWidth;
-  for (const int cx : {x, x + kSquare - kCursorArm}) {
-    for (const int cy : {y, y + kSquare - kWidth}) renderer.fillRect(cx, cy, kCursorArm, kWidth, true);
+  const int inset = underCursor ? kPickInCursor : 0;
+  const int size = kSquare - 2 * inset;
+  const int left = x + inset;
+  const int top = y + inset;
+  for (const int cx : {left, left + size - kPickArm}) {
+    for (const int cy : {top, top + size - kWidth}) renderer.fillRect(cx, cy, kPickArm, kWidth, true);
   }
-  for (const int cx : {x, x + kSquare - kWidth}) {
-    for (const int cy : {y, y + kSquare - kCursorArm}) renderer.fillRect(cx, cy, kWidth, kCursorArm, true);
+  for (const int cx : {left, left + size - kWidth}) {
+    for (const int cy : {top, top + size - kPickArm}) renderer.fillRect(cx, cy, kWidth, kPickArm, true);
   }
 }
 
@@ -1261,12 +1267,13 @@ void ChessActivity::drawBoard() const {
       drawDashedFrame(renderer, x, y, kSquare);
     }
   }
+  const bool cursorShown = cursor >= 0 && cursor < kCells && (hasBar() || !game.isOver());
   if (selected != kNoSquare) {
     squareOrigin(selected, flip, x, y);
-    drawCellFrame(renderer, x, y, kSquare, kSquare);
+    drawPick(renderer, x, y, cursorShown && squareAtCell(cursor) == selected);
   }
-  if (cursor >= 0 && cursor < kCells && (hasBar() || !game.isOver())) {
-    drawCursor(renderer, boardLeft() + cursor % 8 * kSquare, kBoardTop + cursor / 8 * kSquare);
+  if (cursorShown) {
+    drawCellFrame(renderer, boardLeft() + cursor % 8 * kSquare, kBoardTop + cursor / 8 * kSquare, kSquare, kSquare);
   }
   for (int square = 0; square < 64; ++square) {
     if (((targets >> square) & 1) == 0) continue;
