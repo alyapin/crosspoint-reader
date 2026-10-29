@@ -42,14 +42,19 @@ void StatisticsActivity::loop() {
 }
 
 int StatisticsActivity::drawStat(const int x, const int capTop, const int width, const unsigned value,
-                                 const char* label) const {
+                                 const char* label, const bool labelFirst) const {
   char number[8];
   snprintf(number, sizeof(number), "%u", value);
-  // A secondary number in the digits face, so it does not compete with the hero.
-  const int numberWidth = drawHeroNumber(renderer, kDigitsFont, x, capTop, number);
   const int baseline = capTop + heroCapHeight(renderer, kDigitsFont);
   constexpr int kLabelGap = 10;
   const int ascender = renderer.getFontAscenderSize(kText10Font);
+  if (labelFirst) {
+    renderer.drawText(kText10Font, x, baseline - ascender, label);
+    drawHeroNumber(renderer, kDigitsFont, x + renderer.getTextWidth(kText10Font, label) + kLabelGap, capTop, number);
+    return baseline;
+  }
+  // A secondary number in the digits face, so it does not compete with the hero.
+  const int numberWidth = drawHeroNumber(renderer, kDigitsFont, x, capTop, number);
   // One line on the number's baseline; under it when a wide number leaves too little room.
   if (renderer.getTextWidth(kText10Font, label) <= width - numberWidth - kLabelGap) {
     renderer.drawText(kText10Font, x + numberWidth + kLabelGap, baseline - ascender, label);
@@ -111,7 +116,7 @@ void StatisticsActivity::render(RenderLock&&) {
                I18N.get(statsui::plural(summary.currentStreak, StrId::STR_STATS_STREAK_ONE, StrId::STR_STATS_STREAK_FEW,
                                         StrId::STR_STATS_STREAK_MANY)));
   const int recordBottom =
-      drawStat(width / 2 + kSidePadding / 2, y, statWidth, summary.bestStreak, tr(STR_STATS_RECORD));
+      drawStat(width / 2 + kSidePadding / 2, y, statWidth, summary.bestStreak, tr(STR_STATS_RECORD), true);
   y = std::max(streakBottom, recordBottom) + kGap;
 
   drawRule(renderer, 0, y, width);
