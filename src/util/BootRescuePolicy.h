@@ -16,7 +16,9 @@ constexpr uint32_t COMBO_GAP_MS = 50;
 // the first sample, once Reset is released.
 constexpr uint32_t COMBO_START_WINDOW_MS = 1500;
 constexpr uint32_t CRASH_BOOTS_BEFORE_ROLLBACK = 3;
-constexpr uint32_t HEALTHY_UPTIME_MS = 120000;
+// A boot that runs this long ends the crash streak, so only crashes during start-up count
+// toward the switch, not ones a reader can repeat by reopening a book.
+constexpr uint32_t HEALTHY_UPTIME_MS = 15000;
 constexpr uint32_t CRASH_COUNT_MAGIC = 0x52534355;
 
 enum class ComboState : uint8_t { Holding, Fired, Released };

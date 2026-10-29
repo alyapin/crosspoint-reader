@@ -2,7 +2,7 @@
 
 #include <BoardConfig.h>
 
-#if (FREEINK_DEVICE_X4PRO || FREEINK_DEVICE_X4) && !defined(SIMULATOR)
+#if (FREEINK_DEVICE_X4PRO || FREEINK_DEVICE_X4 || FREEINK_DEVICE_X3) && !defined(SIMULATOR)
 #include <Arduino.h>
 #include <Logging.h>
 #include <esp_ota_ops.h>
@@ -43,13 +43,13 @@ void prepareCombo() {
 bool comboHeld() {
   return digitalRead(BoardConfig::ACTIVE.input.up) == LOW && digitalRead(BoardConfig::ACTIVE.input.down) == LOW;
 }
+
+uint32_t startWindowMs(const esp_reset_reason_t reason, const bool silentRestart) {
+  return comboStartWindowMs(reason, silentRestart);
+}
 #else
 // X4 and X3 read their keys from two resistor ladders. Back is on the GPIO1 one and Down
 // on the GPIO2 one, so the pair reads at once; Up and Down share a ladder and cannot.
-InputManager& ladders() {
-  static InputManager probe;
-  return probe;
-}
 
 void prepareCombo() {
   pinMode(InputManager::BUTTON_ADC_PIN_1, INPUT);
@@ -58,11 +58,16 @@ void prepareCombo() {
 }
 
 bool comboHeld() {
+  InputManager probe;
   InputManager::ButtonAdcSample front{};
   InputManager::ButtonAdcSample side{};
-  ladders().readButtonAdc(front, side);
+  probe.readButtonAdc(front, side);
   return front.button == InputManager::BTN_BACK && side.button == InputManager::BTN_DOWN;
 }
+
+// Neither key is a boot strap, so the combo is held before Power or Reset. On battery a
+// wake is a cold power-on, and a start window would hold every wake back.
+uint32_t startWindowMs(esp_reset_reason_t, bool) { return 0; }
 #endif
 
 // The bootloader already rolls a PENDING_VERIFY image back if it crashes or resets, and a
@@ -140,7 +145,7 @@ void runAtBoot(const bool silentRestart) {
     if (const esp_partition_t* other = usableOtherSlot()) restartInto(other, "Crash loop");
   }
 
-  if (!comboFired(comboStartWindowMs(reason, silentRestart))) return;
+  if (!comboFired(startWindowMs(reason, silentRestart))) return;
   LOG_INF("RESCUE", "Rescue combo held");
   const esp_partition_t* other = usableOtherSlot();
   if (!other) return;

@@ -105,7 +105,16 @@ An SD card firmware update keeps the previous firmware in a second slot. If a ne
 
 The device restarts into the previous firmware once you release the buttons. The screen does not change while you hold them. Releasing them in under 3 seconds, or holding them for more than 30 seconds, continues with the current firmware. After **Reset**, or **Power** from a full power-off, start holding them within about 1.5 seconds. Never hold **Left** while pressing **Reset**, or while turning the device on from a full power-off (for example after the battery ran flat): **Left** is also the chip's boot-mode pin, and the device then does not start. If the screen stays frozen, release all buttons, unplug USB, and turn the device on again.
 
-The combo only works once the current firmware has run for about 10 seconds after it was installed; before that, a crash already returns the device to the previous firmware on its own. The device also switches back by itself after three crashes in a row. In both cases it stays on the current firmware when the other slot is empty or holds a firmware that already failed to start. Afterwards, install a fixed firmware from the SD card as usual.
+The combo only works once the current firmware has run for about 10 seconds after it was installed; before that, a crash already returns the device to the previous firmware on its own. The device also switches back by itself after three crashes in a row during start-up. In both cases it stays on the current firmware when the other slot is empty or holds a firmware that already failed to start. Afterwards, install a fixed firmware from the SD card as usual.
+
+### Going Back to the Previous Firmware (X4)
+
+On the X4 the combo is **Back** (the first front button) and **Down** (the lower side button):
+
+- **From sleep or from a full power-off:** hold **Back** and **Down** together, then press **Power**. Keep them held for 3 to 5 seconds, then release them.
+- **When the device is frozen:** hold **Back** and **Down**, press and release **Reset**, and keep them held for 3 to 5 seconds.
+
+Start holding the buttons before pressing **Power** or **Reset**: on the X4 the device does not wait for them. The rest works as on the X4 Pro: the device restarts into the previous firmware once you release them, releasing them in under 3 seconds or holding them for more than 30 seconds continues with the current firmware, and three crashes in a row during start-up switch back on their own. A device that still has the bootloader it shipped with or got from the web flasher may not return to the previous firmware by itself when a new one crashes right after installing; the combo still works there.
 
 ### First Launch
 
