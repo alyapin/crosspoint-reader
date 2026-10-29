@@ -8,6 +8,7 @@
 #include <I18n.h>
 #include <esp_mac.h>
 
+#include <algorithm>
 #include <cstdio>
 
 #include "MappedInputManager.h"
@@ -99,11 +100,12 @@ void AboutActivity::onEnter() {
   rowValues_[ITEM_FIRMWARE] = CROSSPOINT_VERSION;
   snprintf(buf, sizeof(buf), "%s rev %u", ESP.getChipModel(), static_cast<unsigned>(ESP.getChipRevision()));
   rowValues_[ITEM_CHIP] = buf;
-  snprintf(buf, sizeof(buf), "%u MB", static_cast<unsigned>(ESP.getFlashChipSize() / (1024u * 1024u)));
+  snprintf(buf, sizeof(buf), tr(STR_SIZE_MB), static_cast<unsigned>(ESP.getFlashChipSize() / (1024u * 1024u)));
   rowValues_[ITEM_FLASH] = buf;
   rowValues_[ITEM_DISPLAY] = displayControllerName(BoardConfig::ACTIVE.displayController);
-  snprintf(buf, sizeof(buf), "%ux%u", static_cast<unsigned>(BoardConfig::ACTIVE.displayWidth),
-           static_cast<unsigned>(BoardConfig::ACTIVE.displayHeight));
+  snprintf(buf, sizeof(buf), "%u × %u",
+           static_cast<unsigned>(std::min(BoardConfig::ACTIVE.displayWidth, BoardConfig::ACTIVE.displayHeight)),
+           static_cast<unsigned>(std::max(BoardConfig::ACTIVE.displayWidth, BoardConfig::ACTIVE.displayHeight)));
   rowValues_[ITEM_RESOLUTION] = buf;
   const char* touch = touchControllerName(BoardConfig::ACTIVE.touch.controller);
   rowValues_[ITEM_TOUCH] = touch ? touch : tr(STR_NO);

@@ -1144,7 +1144,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   const fui::KeyboardLayout& layout = currentLayout();
   props.layout = &layout;
   props.keyAction = ACTION_KEY;  // one action id; loop() dispatches on key value
-  props.okLabel = tr(STR_OK_BUTTON);
+  props.okLabel = tr(STR_KEYBOARD_DONE);
   // Match the label to the layer the mode key leads back from: the symbols
   // layer and the URL snippet panel both label it "abc" in the static tables.
   props.modeLabel =
@@ -1219,7 +1219,7 @@ void KeyboardEntryActivity::drawKeyGrid(const fui::Rect& keysRect, const int row
     if (keysRect.right() - right >= KEY_EDGE_SNAP) renderer.drawLine(right, key.y, right, bottom);
     if (hits[i].value != fui::QWERTY_KEY_ENTER) continue;
     const int fontId = keyLabelFont(keysRect.width);
-    const char* label = tr(STR_OK_BUTTON);
+    const char* label = tr(STR_KEYBOARD_DONE);
     const int lineHeight = renderer.getLineHeight(fontId);
     const int labelWidth = renderer.getTextWidth(fontId, label, kSemiBold);
     const int keyWidth = std::min<int>(right, keysRect.right()) - key.x;
