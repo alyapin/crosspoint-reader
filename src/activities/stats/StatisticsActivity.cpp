@@ -43,31 +43,56 @@ void StatisticsActivity::loop() {
 
 int StatisticsActivity::drawStreaks(const int capTop) const {
   constexpr int kNumberGap = 10;  // between a number and its words
-  const int baseline = capTop + heroCapHeight(renderer, kDigitsFont);
-  const int textTop = baseline - renderer.getFontAscenderSize(kText10Font);
+  constexpr int kLineGap = 12;    // between the parts when they take two lines
+  const int right = renderer.getScreenWidth() - kSidePadding;
   const int space = renderer.getSpaceWidth(kText10Font);
-  int x = kSidePadding;
-  const auto text = [&](const char* s) {
-    renderer.drawText(kText10Font, x, textTop, s);
-    x += renderer.getTextWidth(kText10Font, s);
-  };
+  const int capHeight = heroCapHeight(renderer, kDigitsFont);
+  const char* dot = "\xC2\xB7";
   const unsigned values[2] = {summary.currentStreak, summary.bestStreak};
   const StrId labels[2] = {StrId::STR_STATS_STREAK, StrId::STR_STATS_RECORD};
+  char numbers[2][8];
+  const char* units[2];
+  int width = 2 * space + renderer.getTextWidth(kText10Font, dot);
   for (int i = 0; i < 2; ++i) {
-    if (i > 0) {
+    snprintf(numbers[i], sizeof(numbers[i]), "%u", values[i]);
+    units[i] = I18N.get(statsui::plural(values[i], StrId::STR_STATS_DAYS_ONE, StrId::STR_STATS_DAYS_FEW,
+                                        StrId::STR_STATS_DAYS_MANY));
+    width += renderer.getTextWidth(kText10Font, I18N.get(labels[i])) + 2 * kNumberGap +
+             renderer.getTextWidth(kDigitsFont, numbers[i]) + renderer.getTextWidth(kText10Font, units[i]);
+  }
+  // One line where both parts fit; otherwise the record goes under the streak.
+  const bool oneLine = width <= right - kSidePadding;
+  int x = kSidePadding;
+  int top = capTop;
+  for (int i = 0; i < 2; ++i) {
+    if (i > 0 && !oneLine) {
+      x = kSidePadding;
+      top += capHeight + kLineGap;
+    }
+    const int textTop = top + capHeight - renderer.getFontAscenderSize(kText10Font);
+    // Words a long translation pushes past the screen edge are cut.
+    const auto text = [&](const char* s) {
+      const int textWidth = renderer.getTextWidth(kText10Font, s);
+      if (x + textWidth <= right) {
+        renderer.drawText(kText10Font, x, textTop, s);
+        x += textWidth;
+        return;
+      }
+      const std::string fitted = renderer.truncatedText(kText10Font, s, std::max(0, right - x));
+      renderer.drawText(kText10Font, x, textTop, fitted.c_str());
+      x += renderer.getTextWidth(kText10Font, fitted.c_str());
+    };
+    if (i > 0 && oneLine) {
       x += space;
-      text("\xC2\xB7");
+      text(dot);
       x += space;
     }
     text(I18N.get(labels[i]));
     // Numbers in the digits face, so they do not compete with the hero.
-    char number[8];
-    snprintf(number, sizeof(number), "%u", values[i]);
-    x += kNumberGap + drawHeroNumber(renderer, kDigitsFont, x + kNumberGap, capTop, number) + kNumberGap;
-    text(I18N.get(statsui::plural(values[i], StrId::STR_STATS_DAYS_ONE, StrId::STR_STATS_DAYS_FEW,
-                                  StrId::STR_STATS_DAYS_MANY)));
+    x += kNumberGap + drawHeroNumber(renderer, kDigitsFont, x + kNumberGap, top, numbers[i]) + kNumberGap;
+    text(units[i]);
   }
-  return baseline;
+  return top + capHeight;
 }
 
 void StatisticsActivity::drawCalendar(const int top, const int width) const {

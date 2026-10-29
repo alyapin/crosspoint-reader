@@ -22,7 +22,8 @@ class StatisticsActivity final : public Activity {
   static constexpr uint8_t kFuture = 0xFF;
 
   void drawCalendar(int top, int width) const;
-  // "серия: 3 дня · рекорд: 12 дней" on one line; returns its baseline.
+  // "серия: 3 дня · рекорд: 12 дней", on two lines when one is too narrow;
+  // returns the last baseline.
   int drawStreaks(int capTop) const;
 
   stats::StatsSummary summary;
