@@ -108,8 +108,9 @@ void GameScreen::openGameMenu() {
   for (int i = 0; keys && i < shownCount; ++i) {
     const BarItem& item = shownBar[i];
     if (item.label == nullptr || item.kind == BarItem::Menu || item.kind == BarItem::NewGame) continue;
-    const char* status = item.kind != BarItem::Mode ? nullptr : item.active ? tr(STR_GAMES_ON) : tr(STR_GAMES_OFF);
-    addMenuRow(rows, count, static_cast<int8_t>(i), {item.label, item.icon, status});
+    // A mode shows its state as a checkbox, like Косынка's Только решаемые.
+    const int8_t check = item.kind == BarItem::Mode ? static_cast<int8_t>(item.active) : -1;
+    addMenuRow(rows, count, static_cast<int8_t>(i), {item.label, item.icon, nullptr, check});
   }
   addOwnRows(rows, count);
   addMenuRow(rows, count, kRowNewGame, {tr(STR_GAMES_NEW_GAME), &icon_bar_new_game_24});
