@@ -432,7 +432,7 @@ void NonogramActivity::build(UiScreen& screen) {
     }
   } else {
     char size[16];
-    snprintf(size, sizeof(size), "%d\xC3\x97%d", game.side(), game.side());
+    snprintf(size, sizeof(size), "%d \xC3\x97 %d", game.side(), game.side());
     char clock[24];
     formatElapsed(game.elapsedMs(), clock, sizeof(clock));
     drawTopLine(screen, {{size, nullptr}, {nullptr, clock}}, false);
