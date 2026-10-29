@@ -179,10 +179,13 @@ void LocalSendActivity::loop() {
     decide(acceptFocused);
     return;
   }
+  // Decline sits on the left, Accept on the right.
   using Button = MappedInputManager::Button;
-  if (mappedInput.wasPressed(Button::Left) || mappedInput.wasPressed(Button::Right) ||
-      mappedInput.wasPressed(Button::Up) || mappedInput.wasPressed(Button::Down)) {
-    acceptFocused = !acceptFocused;
+  if (mappedInput.wasPressed(Button::Left) || mappedInput.wasPressed(Button::Up)) {
+    acceptFocused = false;
+    viewStale = true;
+  } else if (mappedInput.wasPressed(Button::Right) || mappedInput.wasPressed(Button::Down)) {
+    acceptFocused = true;
     viewStale = true;
   }
 }
@@ -257,8 +260,10 @@ void LocalSendActivity::render(RenderLock&&) {
                    tr(STR_LOCALSEND_TITLE));
     renderUi();
     const bool deciding = view.stage == Stage::Ready && view.phase == Phase::AwaitingDecision;
-    const auto labels = mappedInput.mapLabels(tr(STR_BACK), deciding ? tr(STR_SELECT) : "",
-                                              deciding ? tr(STR_DIR_LEFT) : "", deciding ? tr(STR_DIR_RIGHT) : "");
+    // Back declines a pending offer, so it says so.
+    const auto labels =
+        mappedInput.mapLabels(deciding ? tr(STR_LOCALSEND_DECLINE) : tr(STR_BACK), deciding ? tr(STR_SELECT) : "",
+                              deciding ? tr(STR_DIR_LEFT) : "", deciding ? tr(STR_DIR_RIGHT) : "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   }
   renderer.displayBuffer(entryRefresh.exchange(false) ? cadence.entry() : cadence.update());
