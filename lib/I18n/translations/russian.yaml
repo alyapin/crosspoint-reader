@@ -913,7 +913,6 @@ STR_TTT_O_WON: "Нолики выиграли"
 STR_TTT_DRAW: "Ничья"
 
 STR_FIFTEEN: "Пятнашки"
-STR_FIFTEEN_MOVES: "ходов"
 STR_FIFTEEN_MOVES_ONE: "%d ход"
 STR_FIFTEEN_MOVES_FEW: "%d хода"
 STR_FIFTEEN_MOVES_MANY: "%d ходов"

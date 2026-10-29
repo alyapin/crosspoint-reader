@@ -64,7 +64,13 @@ bool FifteenActivity::restore() {
   return true;
 }
 
-void FifteenActivity::saveGame() { gamesave::save(game); }
+void FifteenActivity::saveGame() {
+  gamesave::save(game);
+  if (bestPending) {
+    bestPending = false;
+    gamesave::save(best);
+  }
+}
 
 void FifteenActivity::clearSave() { gamesave::clear(gamesave::Kind::Fifteen); }
 
@@ -87,7 +93,7 @@ void FifteenActivity::slideAt(const int cell) {
   if (!game.slide(cell)) return;
   if (game.isSolved()) {
     newBest = best.record(game.moveCount(), game.elapsedMs());
-    if (newBest) gamesave::save(best);
+    if (newBest) bestPending = true;
     if (cursor >= 0) barFocus = kLastSlot;
   }
   markChanged();
@@ -174,18 +180,18 @@ void FifteenActivity::build(UiScreen& screen) {
   const int width = renderer.getScreenWidth();
   char clock[24];
   formatElapsed(game.elapsedMs(), clock, sizeof(clock));
-  char value[40];
-  snprintf(value, sizeof(value), "%d \xC2\xB7 %s", game.moveCount(), clock);
-  drawTopLine(screen, tr(STR_FIFTEEN_MOVES), value, false);
+  char moves[24];
+  movesText(game.moveCount(), moves, sizeof(moves));
+  char value[56];
+  snprintf(value, sizeof(value), "%s \xC2\xB7 %s", moves, clock);
+  drawTopLine(screen, nullptr, value, false);
 
   const int left = boardLeft();
   for (int cell = 0; cell < fifteen::CELLS; ++cell) drawTile(cell, left);
   screen.frame().hit(fui::makeRect(left, BOARD_TOP, kBoard, kBoard), ACTION_BOARD, 0, fui::InputTouch);
 
   if (game.isSolved()) {
-    char moves[24];
     char line[80];
-    movesText(game.moveCount(), moves, sizeof(moves));
     snprintf(line, sizeof(line), tr(STR_FIFTEEN_SOLVED), moves, clock);
     drawCentered(kText12Font, 0, width, kResultTop, line, kSemiBold);
     if (newBest) {
