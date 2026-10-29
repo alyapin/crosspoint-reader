@@ -101,13 +101,13 @@ void CoverPainter::draw(const GfxRenderer& renderer, const std::string& thumb, c
     constexpr int kMinLabelWidth = 100;
     const int maxLines = std::max(0, (height - 4 * kPad) / lineHeight);
     if (title && *title && maxLines > 0 && width >= kMinLabelWidth) {
-      const auto lines = renderer.wrappedText(setka::kCaptionFont, title, width - 4 * kPad, std::min(maxLines, 4));
-      if (!lines.empty()) {
-        renderer.fillRect(x + kPad, y + kPad, width - 2 * kPad, static_cast<int>(lines.size()) * lineHeight + 2 * kPad,
-                          false);
+      scanword::ClueLines lines;
+      setka::captionLines(renderer, title, width - 4 * kPad, static_cast<uint8_t>(std::min(maxLines, 4)), lines);
+      if (lines.count > 0) {
+        renderer.fillRect(x + kPad, y + kPad, width - 2 * kPad, lines.count * lineHeight + 2 * kPad, false);
         int textTop = y + 2 * kPad;
-        for (const auto& line : lines) {
-          renderer.drawText(setka::kCaptionFont, x + 2 * kPad, textTop, line.c_str());
+        for (int i = 0; i < lines.count; ++i) {
+          renderer.drawText(setka::kCaptionFont, x + 2 * kPad, textTop, lines.line[i]);
           textTop += lineHeight;
         }
       }

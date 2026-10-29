@@ -198,7 +198,7 @@ void layoutClue(const char* text, const int maxWidth, uint8_t maxLines, const Me
                 ClueLines& out) {
   out.count = 0;
   if (maxLines == 0 || text == nullptr) return;
-  if (maxLines > CLUE_MAX_LINES) maxLines = CLUE_MAX_LINES;
+  if (maxLines > LAYOUT_MAX_LINES) maxLines = LAYOUT_MAX_LINES;
   Builder builder(maxWidth, maxLines, measure, ctx, out);
   const char* p = text;
   while (*p != '\0') {

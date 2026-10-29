@@ -673,6 +673,11 @@ TEST(ScanwordClueLayout, WrapsWords) {
   EXPECT_TRUE(layout("", 8).empty());
 }
 
+TEST(ScanwordClueLayout, CoverCaptionsUseMoreLines) {
+  EXPECT_EQ(layout("Исповедь неполноценного человека", 8, 5),
+            (std::vector<std::string>{"Исповедь", "неполно-", "ценного", "человека"}));
+}
+
 TEST(ScanwordClueLayout, HyphenatesLongWords) {
   // Гиппопотам: the longest prefix that fits with "-" and keeps a vowel on both sides.
   EXPECT_EQ(layout("Гиппопотам", 8), (std::vector<std::string>{"Гиппопо-", "там"}));

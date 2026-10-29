@@ -416,12 +416,12 @@ void SetkaHomeActivity::drawCover(Slot& slot, const int x, const int y, const in
     constexpr int kPad = 6;
     const int lineHeight = renderer.getLineHeight(kCaptionFont);
     renderer.fillRectDither(x, y, width, height, Color::LightGray);
-    const auto lines = renderer.wrappedText(kCaptionFont, slot.book.title.c_str(), width - 4 * kPad, 5);
-    renderer.fillRect(x + kPad, y + kPad, width - 2 * kPad, static_cast<int>(lines.size()) * lineHeight + 2 * kPad,
-                      false);
+    scanword::ClueLines lines;
+    captionLines(renderer, slot.book.title.c_str(), width - 4 * kPad, 5, lines);
+    renderer.fillRect(x + kPad, y + kPad, width - 2 * kPad, lines.count * lineHeight + 2 * kPad, false);
     int textTop = y + 2 * kPad;
-    for (const auto& line : lines) {
-      renderer.drawText(kCaptionFont, x + 2 * kPad, textTop, line.c_str());
+    for (int i = 0; i < lines.count; ++i) {
+      renderer.drawText(kCaptionFont, x + 2 * kPad, textTop, lines.line[i]);
       textTop += lineHeight;
     }
   }

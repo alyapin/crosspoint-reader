@@ -11,12 +11,13 @@ namespace scanword {
 // Pixel width of a NUL-terminated UTF-8 string.
 using MeasureFn = int (*)(void* ctx, const char* text);
 
-constexpr uint8_t CLUE_MAX_LINES = 3;
+constexpr uint8_t CLUE_MAX_LINES = 3;    // a clue cell
+constexpr uint8_t LAYOUT_MAX_LINES = 5;  // what ClueLines holds (cover captions use more)
 constexpr size_t CLUE_LINE_BYTES = 48;
 
 struct ClueLines {
   uint8_t count = 0;
-  char line[CLUE_MAX_LINES][CLUE_LINE_BYTES] = {};
+  char line[LAYOUT_MAX_LINES][CLUE_LINE_BYTES] = {};
 };
 
 // A word breaks only where both parts have two letters and a vowel, and the

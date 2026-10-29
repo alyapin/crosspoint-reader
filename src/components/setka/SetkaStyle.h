@@ -2,6 +2,7 @@
 #include <BoardConfig.h>
 #include <GfxRenderer.h>
 #include <HalDisplay.h>
+#include <ScanwordClueLayout.h>
 
 #include <algorithm>
 
@@ -91,6 +92,11 @@ inline void drawRule(const GfxRenderer& renderer, const int x, const int y, cons
 // caption, battery glyph after the percent, same corners), for screens that
 // draw their own top. Returns the y just below it.
 int drawStatusLine(const GfxRenderer& renderer);
+
+// A cover placeholder's title in caption lines: whole words, and a word wider
+// than the line hyphenated by the scanword clue rules; an ellipsis past maxLines.
+void captionLines(const GfxRenderer& renderer, const char* title, int width, uint8_t maxLines,
+                  scanword::ClueLines& out);
 
 // Black fill on a LightGray-dithered track inside a 1 px black outline.
 inline void drawProgressBar(const GfxRenderer& renderer, const int x, const int y, const int width, int percent) {

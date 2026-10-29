@@ -31,4 +31,12 @@ int drawStatusLine(const GfxRenderer& renderer) {
   return band.y + strip;
 }
 
+void captionLines(const GfxRenderer& renderer, const char* title, const int width, const uint8_t maxLines,
+                  scanword::ClueLines& out) {
+  const auto measure = [](void* ctx, const char* text) {
+    return static_cast<const GfxRenderer*>(ctx)->getTextWidth(kCaptionFont, text);
+  };
+  scanword::layoutClue(title, width, maxLines, measure, const_cast<GfxRenderer*>(&renderer), out);
+}
+
 }  // namespace setka
