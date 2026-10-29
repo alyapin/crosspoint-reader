@@ -92,7 +92,7 @@ void TicTacToeActivity::play(const int cell) {
 }
 
 void TicTacToeActivity::runBar(const int slot) {
-  if (slot == 1) {
+  if (slot == 0) {
     if (game.undo()) markChanged();
   } else if (slot == kNewGameSlot) {
     if (game.isOver()) {
@@ -104,7 +104,7 @@ void TicTacToeActivity::runBar(const int slot) {
 }
 
 bool TicTacToeActivity::barShown(const int slot) const {
-  if (slot == 1) return game.canUndo();
+  if (slot == 0) return game.canUndo();
   return slot == kNewGameSlot;
 }
 
@@ -219,7 +219,7 @@ void TicTacToeActivity::build(UiScreen& screen) {
   renderer.drawText(kText10Font, left, y, text);
 
   BarItem items[BAR_SLOTS];
-  if (barShown(1)) items[1] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO)};
+  if (barShown(0)) items[0] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO)};
   items[kNewGameSlot] = {over ? &icon_bar_new_game_24 : &icon_menu_24,
                          over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU)};
   drawBar(screen, items, barFocus);
