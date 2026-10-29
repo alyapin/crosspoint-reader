@@ -61,7 +61,7 @@ constexpr unsigned long kMenuHoldMs = 600;
 constexpr int kWordFrameWidth = 3;  // outline of the selected answer
 constexpr int kClueFrameWidth = 2;  // its clue cell
 // Every hit takes a long press too: routeTouch() consumes it, so a slow tap
-// would otherwise be lost. Only «Буква» gives it a meaning of its own.
+// would otherwise be lost. Only «Подсказка» gives it a meaning of its own.
 const uint16_t kTap = fui::InputTouch | fui::InputLongPress;
 
 // Clue cells set the caption face one pixel tighter, so a 60 px cell takes a seven-letter line; a clue that
