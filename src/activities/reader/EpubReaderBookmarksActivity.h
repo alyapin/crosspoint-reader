@@ -10,9 +10,9 @@
 #include "components/OptionPopup.h"
 
 class EpubReaderBookmarksActivity final : public UiListActivity {
-  // The list rides the UiListActivity scaffold (themed rows, touch routing);
-  // the title keeps its legacy draw, and OptionPopup keeps its legacy overlay
-  // rendering for the delete confirmation.
+  // The list rides the UiListActivity scaffold (themed rows, touch routing,
+  // shared header); OptionPopup keeps its legacy overlay rendering for the
+  // delete confirmation.
   std::shared_ptr<Epub> epub;
   std::string epubPath;
   std::vector<BookmarkEntry> bookmarks;
@@ -34,6 +34,7 @@ class EpubReaderBookmarksActivity final : public UiListActivity {
 
  private:
   int listCount() const override { return static_cast<int>(bookmarks.size()); }
+  const char* headerTitle() const override;
   void buildScreen(UiScreen& screen) override;
   void activateIndex(int index) override;
   void onRowLongPress(int index) override;
