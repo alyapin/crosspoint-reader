@@ -56,7 +56,7 @@ std::unique_ptr<Activity> openFiveLetters(GfxRenderer& renderer, MappedInputMana
 }
 
 FiveLettersActivity::FiveLettersActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : GameScreen("FiveLetters", renderer, mappedInput) {}
+    : GameScreen("FiveLetters", StrId::STR_FIVE_LETTERS, renderer, mappedInput) {}
 
 // No setup to pick: without a save a new game starts here.
 bool FiveLettersActivity::restore() {
@@ -274,8 +274,8 @@ void FiveLettersActivity::build(UiScreen& screen) {
   }
 
   BarItem items[BAR_SLOTS];
-  items[MENU_SLOT] = game.isOver() ? BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME)}
-                                   : BarItem{&icon_menu_24, tr(STR_GAMES_MENU)};
+  items[MENU_SLOT] = game.isOver() ? BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame}
+                                   : BarItem{&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 

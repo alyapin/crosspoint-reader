@@ -79,7 +79,7 @@ std::unique_ptr<Activity> openHangman(GfxRenderer& renderer, MappedInputManager&
 }
 
 HangmanActivity::HangmanActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : GameScreen("Hangman", renderer, mappedInput), game(kLists, kListCount) {}
+    : GameScreen("Hangman", StrId::STR_HANGMAN, renderer, mappedInput), game(kLists, kListCount) {}
 
 bool HangmanActivity::restore() {
   chosenList = loadList();
@@ -252,7 +252,8 @@ void HangmanActivity::build(UiScreen& screen) {
   BarItem items[BAR_SLOTS];
   const bool over = game.isOver();
   if (barShown(0)) items[0] = {&icon_bar_hint_24, tr(STR_HANGMAN_HINT)};
-  items[2] = {over ? &icon_bar_new_game_24 : &icon_menu_24, over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU)};
+  items[2] = {over ? &icon_bar_new_game_24 : &icon_menu_24, over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU), false,
+              over ? BarItem::NewGame : BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 

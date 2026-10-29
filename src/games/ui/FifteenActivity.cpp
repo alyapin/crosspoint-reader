@@ -51,7 +51,7 @@ std::unique_ptr<Activity> openFifteen(GfxRenderer& renderer, MappedInputManager&
 }
 
 FifteenActivity::FifteenActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : GameScreen("Fifteen", renderer, mappedInput), game(&GameScreen::nowMs) {}
+    : GameScreen("Fifteen", StrId::STR_FIFTEEN, renderer, mappedInput), game(&GameScreen::nowMs) {}
 
 // Without a save a new game starts right away.
 bool FifteenActivity::restore() {
@@ -205,8 +205,8 @@ void FifteenActivity::build(UiScreen& screen) {
   }
 
   BarItem items[BAR_SLOTS];
-  items[kLastSlot] = game.isSolved() ? BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false}
-                                     : BarItem{&icon_menu_24, tr(STR_GAMES_MENU), false};
+  items[kLastSlot] = game.isSolved() ? BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame}
+                                     : BarItem{&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 

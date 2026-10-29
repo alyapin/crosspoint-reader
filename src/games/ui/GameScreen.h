@@ -1,5 +1,7 @@
 #pragma once
 
+#include <I18n.h>
+
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -12,7 +14,8 @@
 
 // The shell of the Sudoku, Minesweeper and Klondike boards (ui-style Setka):
 // the shared clock/battery line (setka::drawStatusLine), a top line with "‹ Выйти" and a status on the right,
-// the board, and a bottom bar of up to three actions. HALF on entry, cadence
+// the board, and a bottom bar of up to three actions; button boards keep only the status and the board.
+// HALF on entry, cadence
 // FAST after each change, and a plain FAST when the shown minute of the timer
 // turns; nothing else repaints while the player is idle. The game is saved
 // after each change, on exit and before sleep. A screen without a saved game opens
@@ -20,7 +23,9 @@
 //
 // Keys (the X4 has no touch): the subclass walks its own cursor with
 // Left/Right and the side buttons, Confirm acts; Back first drops what the
-// subclass holds (a pick, a pad focus), then leaves.
+// subclass holds (a pick, a pad focus), then leaves, or on button boards opens
+// the pause menu: Продолжить, the bar's actions, Новая игра, Завершить, Выйти.
+// Once a game is over there, Confirm runs the bar's Новая игра.
 //
 // The loop task alone mutates the game and the view state, under the
 // RenderLock; the render task only reads them.
@@ -52,12 +57,15 @@ class GameScreen : public Activity, protected UiAppHost {
   static constexpr freeink::ui::ActionId ACTION_USER = 5;
 
   struct BarItem {
+    // Mode: a toggle; Menu, NewGame (the game is over): the slot the pause menu leaves out.
+    enum Kind : uint8_t { Action, Mode, Menu, NewGame };
     const freeink::Icon* icon = nullptr;
     const char* label = nullptr;  // nullptr hides the slot
     bool active = false;          // a mode that is on: inset frame
+    Kind kind = Action;
   };
 
-  GameScreen(const char* name, GfxRenderer& renderer, MappedInputManager& mappedInput);
+  GameScreen(const char* name, StrId title, GfxRenderer& renderer, MappedInputManager& mappedInput);
 
   // Restores the saved game; false when there is none.
   virtual bool restore() = 0;
@@ -85,6 +93,8 @@ class GameScreen : public Activity, protected UiAppHost {
   // confirmation drops the save and leaves.
   void openGameMenu();
   void requestRepaint(Repaint kind);
+  // Touch boards: "‹ Выйти" and the action bar; button boards play by keys alone.
+  bool hasBar() const;
   int barTop() const;
   uint16_t shellInput() const;
   void markChanged() {
@@ -110,7 +120,13 @@ class GameScreen : public Activity, protected UiAppHost {
  private:
   static void screenFn(UiScreen& screen, void* user);
   void confirmFinish();
+  void openPauseMenu();
+  void runBarSlot(int slot);
+  int newGameSlot() const;
 
+  StrId title;
+  mutable BarItem shownBar[BAR_SLOTS];  // the last drawBar(), for the pause menu
+  int8_t pauseRows[GamePickerActivity::MAX_ROWS] = {};
   setka::RefreshCadence cadence;  // render task only
   std::atomic<uint8_t> repaint{RepaintEntry};
   int32_t clockShown = -1;

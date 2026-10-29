@@ -56,7 +56,7 @@ std::unique_ptr<Activity> openMinesweeper(GfxRenderer& renderer, MappedInputMana
 }
 
 MinesweeperActivity::MinesweeperActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : GameScreen("Minesweeper", renderer, mappedInput), game(&GameScreen::nowMs) {}
+    : GameScreen("Minesweeper", StrId::STR_MINESWEEPER, renderer, mappedInput), game(&GameScreen::nowMs) {}
 
 bool MinesweeperActivity::restore() {
   if (!gamesave::load(game)) return false;
@@ -246,8 +246,9 @@ void MinesweeperActivity::build(UiScreen& screen) {
                                    over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU)};
   const freeink::Icon* icons[BAR_SLOTS] = {&icon_bar_flag_24, &icon_bar_restart_24,
                                            over ? &icon_bar_new_game_24 : &icon_menu_24};
+  const BarItem::Kind kinds[BAR_SLOTS] = {BarItem::Mode, BarItem::Action, over ? BarItem::NewGame : BarItem::Menu};
   for (int i = 0; i < BAR_SLOTS; ++i) {
-    if (barShown(i)) items[i] = {icons[i], labels[i], i == 0 && flagMode};
+    if (barShown(i)) items[i] = {icons[i], labels[i], i == 0 && flagMode, kinds[i]};
   }
   drawBar(screen, items, barFocus);
 }

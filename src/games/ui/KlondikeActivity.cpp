@@ -111,7 +111,7 @@ std::unique_ptr<Activity> openKlondike(GfxRenderer& renderer, MappedInputManager
 }
 
 KlondikeActivity::KlondikeActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : GameScreen("Klondike", renderer, mappedInput), game(&GameScreen::nowMs) {}
+    : GameScreen("Klondike", StrId::STR_KLONDIKE, renderer, mappedInput), game(&GameScreen::nowMs) {}
 
 bool KlondikeActivity::restore() {
   if (!gamesave::load(game)) return false;
@@ -387,8 +387,9 @@ void KlondikeActivity::build(UiScreen& screen) {
                                    won ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU)};
   const freeink::Icon* icons[BAR_SLOTS] = {&icon_bar_undo_24, &icon_bar_hint_24,
                                            won ? &icon_bar_new_game_24 : &icon_menu_24};
+  const BarItem::Kind kinds[BAR_SLOTS] = {BarItem::Action, BarItem::Action, won ? BarItem::NewGame : BarItem::Menu};
   for (int i = 0; i < BAR_SLOTS; ++i) {
-    if (barShown(i)) items[i] = {icons[i], labels[i], false};
+    if (barShown(i)) items[i] = {icons[i], labels[i], false, kinds[i]};
   }
   drawBar(screen, items, focus >= kBarFocus ? focus - kBarFocus : -1);
 }

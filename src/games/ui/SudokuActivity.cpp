@@ -67,7 +67,7 @@ std::unique_ptr<Activity> openSudoku(GfxRenderer& renderer, MappedInputManager& 
 }
 
 SudokuActivity::SudokuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : GameScreen("Sudoku", renderer, mappedInput), game(&GameScreen::nowMs) {}
+    : GameScreen("Sudoku", StrId::STR_SUDOKU, renderer, mappedInput), game(&GameScreen::nowMs) {}
 
 bool SudokuActivity::restore() {
   if (!gamesave::load(game)) return false;
@@ -318,7 +318,7 @@ void SudokuActivity::build(UiScreen& screen) {
   for (int i = 0; i < BAR_SLOTS; ++i) {
     switch (actions[i]) {
       case Action::Notes:
-        items[i] = {&icon_bar_notes_24, tr(STR_SUDOKU_NOTES), notesMode};
+        items[i] = {&icon_bar_notes_24, tr(STR_SUDOKU_NOTES), notesMode, BarItem::Mode};
         break;
       case Action::Erase:
         items[i] = {&icon_bar_erase_24, tr(STR_SUDOKU_ERASE), false};
@@ -327,7 +327,7 @@ void SudokuActivity::build(UiScreen& screen) {
         items[i] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false};
         break;
       case Action::NewGame:
-        items[i] = {&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false};
+        items[i] = {&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame};
         break;
       case Action::None:
         break;

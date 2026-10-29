@@ -23,10 +23,12 @@ using namespace setka;
 
 namespace {
 constexpr int kCursorArm = 14;
+// Pause menu rows other than a bar slot.
+enum PauseRow : int8_t { kPauseContinue = -1, kPauseNewGame = -2, kPauseFinish = -3, kPauseLeave = -4 };
 }  // namespace
 
-GameScreen::GameScreen(const char* name, GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : Activity(name, renderer, mappedInput), UiAppHost(renderer) {}
+GameScreen::GameScreen(const char* name, const StrId title, GfxRenderer& renderer, MappedInputManager& mappedInput)
+    : Activity(name, renderer, mappedInput), UiAppHost(renderer), title(title) {}
 
 void GameScreen::onEnter() {
   Activity::onEnter();
@@ -116,6 +118,67 @@ void GameScreen::openGameMenu() {
   });
 }
 
+void GameScreen::openPauseMenu() {
+  GamePickerActivity::Row rows[GamePickerActivity::MAX_ROWS];
+  int count = 0;
+  auto add = [&](const int8_t row, const GamePickerActivity::Row& shown) {
+    pauseRows[count] = row;
+    rows[count++] = shown;
+  };
+  add(kPauseContinue, {tr(STR_GAMES_CONTINUE), &icon_start_24});
+  for (int i = 0; i < BAR_SLOTS; ++i) {
+    const BarItem& item = shownBar[i];
+    if (item.label == nullptr || item.kind == BarItem::Menu || item.kind == BarItem::NewGame) continue;
+    const char* status = item.kind != BarItem::Mode ? nullptr : item.active ? tr(STR_GAMES_ON) : tr(STR_GAMES_OFF);
+    add(static_cast<int8_t>(i), {item.label, item.icon, status});
+  }
+  add(kPauseNewGame, {tr(STR_GAMES_NEW_GAME), &icon_bar_new_game_24});
+  if (newGameSlot() < 0) add(kPauseFinish, {tr(STR_GAMES_FINISH), &icon_resign_24});
+  add(kPauseLeave, {tr(STR_GAMES_LEAVE), &icon_exit_24});
+
+  auto menu = makeUniqueNoThrow<GamePickerActivity>(renderer, mappedInput, I18N.get(title), rows, count, 0);
+  if (!menu) {
+    LOG_ERR("GAMES", "OOM: %u bytes for the pause menu", static_cast<unsigned>(sizeof(GamePickerActivity)));
+    return;
+  }
+  pauseGame();
+  startActivityForResult(std::move(menu), [this](const ActivityResult& result) {
+    RenderLock lock(*this);
+    const auto* choice = std::get_if<MenuResult>(&result.data);
+    const int row = !result.isCancelled && choice != nullptr ? pauseRows[choice->action] : kPauseContinue;
+    if (row == kPauseFinish) {
+      confirmFinish();
+      return;
+    }
+    resumeGame();
+    if (row == kPauseLeave) {
+      leave();
+      return;
+    }
+    clockShown = shownMinutes();
+    requestRepaint(RepaintEntry);
+    if (row == kPauseNewGame) {
+      openNewGame();
+    } else if (row >= 0) {
+      runBarSlot(row);
+    }
+  });
+}
+
+void GameScreen::runBarSlot(const int slot) {
+  fui::ActionEvent event;
+  event.action = ACTION_BAR;
+  event.value = static_cast<int16_t>(slot);
+  onTouch(event, 0, 0);
+}
+
+int GameScreen::newGameSlot() const {
+  for (int i = 0; i < BAR_SLOTS; ++i) {
+    if (shownBar[i].label != nullptr && shownBar[i].kind == BarItem::NewGame) return i;
+  }
+  return -1;
+}
+
 void GameScreen::confirmFinish() {
   auto confirm =
       makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_GAMES_FINISH_CONFIRM),
@@ -163,7 +226,11 @@ void GameScreen::loop() {
   } else if (mappedInput.wasReleased(Button::Back)) {
     RenderLock lock(*this);
     if (!onBack()) {
-      leave();
+      if (hasBar()) {
+        leave();
+      } else {
+        openPauseMenu();
+      }
       return;
     }
   } else {
@@ -176,7 +243,12 @@ void GameScreen::loop() {
     const bool confirm = mappedInput.wasReleased(Button::Confirm);
     if (dx != 0 || dy != 0 || confirm) {
       RenderLock lock(*this);
-      onKey(dx, dy, confirm);
+      const int over = confirm && !hasBar() ? newGameSlot() : -1;
+      if (over >= 0) {
+        runBarSlot(over);
+      } else {
+        onKey(dx, dy, confirm);
+      }
     }
   }
 
@@ -197,7 +269,7 @@ void GameScreen::loop() {
 void GameScreen::render(RenderLock&&) {
   renderer.clearScreen();
   renderUi();
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
+  const auto labels = mappedInput.mapLabels(tr(STR_GAMES_MENU), tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   const uint8_t kind = repaint.exchange(RepaintNone);
   renderer.displayBuffer(kind == RepaintEntry   ? cadence.entry()
@@ -215,10 +287,13 @@ void GameScreen::drawTopLine(UiScreen& screen, const char* label, const char* va
   const int width = renderer.getScreenWidth();
   drawStatusLine(renderer);
 
-  const char* exitLabel = tr(STR_GAMES_EXIT);
-  renderer.drawText(kText12Font, kSidePadding, TOP_LINE_Y, exitLabel);
-  const int exitWidth = renderer.getTextWidth(kText12Font, exitLabel) + 2 * kSidePadding;
-  screen.frame().hit(fui::makeRect(0, 0, exitWidth, BOARD_TOP), ACTION_EXIT, 0, shellInput());
+  int exitWidth = 0;
+  if (hasBar()) {
+    const char* exitLabel = tr(STR_GAMES_EXIT);
+    renderer.drawText(kText12Font, kSidePadding, TOP_LINE_Y, exitLabel);
+    exitWidth = renderer.getTextWidth(kText12Font, exitLabel) + 2 * kSidePadding;
+    screen.frame().hit(fui::makeRect(0, 0, exitWidth, BOARD_TOP), ACTION_EXIT, 0, shellInput());
+  }
 
   int left = width - kSidePadding;
   if (value != nullptr && *value != '\0') {
@@ -242,6 +317,8 @@ void GameScreen::drawTopLine(UiScreen& screen, const char* label, const char* va
 }
 
 void GameScreen::drawBar(UiScreen& screen, const BarItem (&items)[BAR_SLOTS], const int focused) const {
+  std::copy(std::begin(items), std::end(items), shownBar);
+  if (!hasBar()) return;
   games::ui::ActionSlot slots[BAR_SLOTS];
   for (int i = 0; i < BAR_SLOTS; ++i) {
     slots[i] = {items[i].icon, items[i].label, items[i].active, ACTION_BAR, static_cast<int16_t>(i)};
@@ -270,9 +347,12 @@ void GameScreen::formatElapsed(const uint32_t ms, char* out, const size_t cap) {
 
 uint32_t GameScreen::nowMs() { return static_cast<uint32_t>(millis()); }
 
-// Button boards keep the button hints below the bar.
+bool GameScreen::hasBar() const { return UITheme::getInstance().getMetrics().buttonHintsHeight == 0; }
+
+// Button boards have no bar: the board runs down to the button hints.
 int GameScreen::barTop() const {
-  return renderer.getScreenHeight() - BAR_HEIGHT - UITheme::getInstance().getMetrics().buttonHintsHeight;
+  return renderer.getScreenHeight() - (hasBar() ? BAR_HEIGHT : 0) -
+         UITheme::getInstance().getMetrics().buttonHintsHeight;
 }
 
 uint16_t GameScreen::shellInput() const {
