@@ -920,14 +920,7 @@ void WifiSelectionActivity::buildListScreen(UiScreen& screen) {
   listNav.selected = static_cast<int>(selectedNetworkIndex);
   // Button boards draw whole rows only.
   props.partialTrailingRow = mappedInput.hasTouch();
-  // While the selected network is on screen every build follows it, as in
-  // UiListActivity::syncListViewport.
-  const int count = static_cast<int>(networks.size());
-  if (listNav.trusts(count) && listNav.drawnRows > 0 && listNav.selected >= listNav.top &&
-      listNav.selected < listNav.top + listNav.drawnRows) {
-    listNav.followOnBuild = true;
-  }
-  screen.syncListViewport(listNav, props, count);
+  screen.syncListViewport(listNav, props, static_cast<int>(networks.size()));
   screen.list(props);
 }
 
