@@ -5,9 +5,8 @@
 // SD persistence for the games, one file each under /.crosspoint/games. A save
 // exists only while its game is in progress, so its presence is the "game in
 // progress" flag. Some games keep a second file that outlives the game: the
-// last finished tic-tac-toe and reversi games (for the score they carry), the
-// 15 puzzle best, the «5 букв» totals, the 2048 record, the nonogram record,
-// the solved codewords and the FreeCell and Spider bests.
+// last finished reversi game (for the score it carries), the 15 puzzle best,
+// the «5 букв» totals, the 2048 record and the nonogram record.
 
 namespace sudoku {
 class Game;
@@ -16,9 +15,6 @@ namespace minesweeper {
 class Game;
 }
 namespace klondike {
-class Game;
-}
-namespace tictactoe {
 class Game;
 }
 namespace fifteen {
@@ -46,19 +42,6 @@ struct Record;
 namespace draughts {
 class Game;
 }
-namespace codeword {
-class Game;
-class Solved;
-}  // namespace codeword
-namespace freecell {
-class Game;
-}
-namespace spider {
-class Game;
-}
-namespace cards {
-struct Best;
-}
 
 namespace gamesave {
 
@@ -66,7 +49,6 @@ enum class Kind {
   Sudoku,
   Minesweeper,
   Klondike,
-  TicTacToe,
   Fifteen,
   FiveLetters,
   Game2048,
@@ -74,9 +56,6 @@ enum class Kind {
   Reversi,
   Nonogram,
   Draughts,
-  Codeword,
-  FreeCell,
-  Spider,
 };
 
 bool hasGameInProgress(Kind kind);
@@ -88,7 +67,6 @@ bool clear(Kind kind);
 bool save(const sudoku::Game& game);
 bool save(const minesweeper::Game& game);
 bool save(const klondike::Game& game);
-bool save(const tictactoe::Game& game);
 bool save(const fifteen::Game& game);
 bool save(const fiveletters::Game& game);
 bool save(const g2048::Game& game);
@@ -96,9 +74,6 @@ bool save(const hangman::Game& game);
 bool save(const reversi::Game& game);
 bool save(const nonogram::Game& game);
 bool save(const draughts::Game& game);
-bool save(const codeword::Game& game);
-bool save(const freecell::Game& game);
-bool save(const spider::Game& game);
 
 // Restore the saved game, paused. False on failure; a file that reads but does
 // not parse is removed. One that cannot be read is kept: until a load reads it,
@@ -106,8 +81,6 @@ bool save(const spider::Game& game);
 bool load(sudoku::Game& game);
 bool load(minesweeper::Game& game);
 bool load(klondike::Game& game);
-// The game in progress, else the last finished one.
-bool load(tictactoe::Game& game);
 bool load(fifteen::Game& game);
 bool load(fiveletters::Game& game);
 bool load(g2048::Game& game);
@@ -116,10 +89,6 @@ bool load(hangman::Game& game);
 bool load(reversi::Game& game);
 bool load(nonogram::Game& game);
 bool load(draughts::Game& game);
-// The puzzle is not attached: see codeword::Game::attach().
-bool load(codeword::Game& game);
-bool load(freecell::Game& game);
-bool load(spider::Game& game);
 
 // Records outlive their games. A missing or corrupt one loads empty; one that
 // cannot be read loads false (2048: 0) and is not written until a load reads it.
@@ -139,12 +108,5 @@ bool load(nonogram::Record& record);
 // The 2048 record; 0 when none.
 uint32_t loadBest2048();
 void saveBest2048(uint32_t score);
-
-// The solved codewords.
-bool save(const codeword::Solved& solved);
-bool load(codeword::Solved& solved);
-// The fewest moves of FreeCell or Spider (one per number of suits).
-bool saveBest(Kind kind, const cards::Best& best);
-bool loadBest(Kind kind, cards::Best& best);
 
 }  // namespace gamesave

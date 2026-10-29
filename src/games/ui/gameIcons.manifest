@@ -8,13 +8,10 @@ grid = grid-3x3
 grid-small = grid-2x2
 bomb = bomb
 spade = spade
-freecell = club
-spider = bug
 fifteen = blocks
 card = rectangle-vertical
 cards = layers
 circle-check = circle-check
-tictactoe = hash
 tiles = layout-grid
 hangman = baseline
 hangman-rude = flame
@@ -41,5 +38,3 @@ random = dices
 bar-cross = x
 # Шашки: games list
 draughts = disc-2
-# Кейворды: games list
-codeword = binary

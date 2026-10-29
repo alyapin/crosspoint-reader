@@ -1,11 +1,8 @@
 #include "GameSave.h"
 
-#include <Cards.h>
-#include <Codeword.h>
 #include <Draughts.h>
 #include <Fifteen.h>
 #include <FiveLetters.h>
-#include <FreeCell.h>
 #include <Game2048.h>
 #include <HalStorage.h>
 #include <Hangman.h>
@@ -15,9 +12,7 @@
 #include <Minesweeper.h>
 #include <Nonogram.h>
 #include <Reversi.h>
-#include <Spider.h>
 #include <Sudoku.h>
-#include <TicTacToe.h>
 
 #include <cstdio>
 #include <string>
@@ -38,8 +33,6 @@ Paths pathsOf(const Kind kind) {
       return {"/.crosspoint/games/sudoku.json", "/.crosspoint/games/sudoku.json.tmp"};
     case Kind::Minesweeper:
       return {"/.crosspoint/games/minesweeper.json", "/.crosspoint/games/minesweeper.json.tmp"};
-    case Kind::TicTacToe:
-      return {"/.crosspoint/games/tictactoe.json", "/.crosspoint/games/tictactoe.json.tmp"};
     case Kind::Fifteen:
       return {"/.crosspoint/games/fifteen.json", "/.crosspoint/games/fifteen.json.tmp"};
     case Kind::FiveLetters:
@@ -54,12 +47,6 @@ Paths pathsOf(const Kind kind) {
       return {"/.crosspoint/games/nonogram.json", "/.crosspoint/games/nonogram.json.tmp"};
     case Kind::Draughts:
       return {"/.crosspoint/games/draughts.json", "/.crosspoint/games/draughts.json.tmp"};
-    case Kind::Codeword:
-      return {"/.crosspoint/games/codeword.json", "/.crosspoint/games/codeword.json.tmp"};
-    case Kind::FreeCell:
-      return {"/.crosspoint/games/freecell.json", "/.crosspoint/games/freecell.json.tmp"};
-    case Kind::Spider:
-      return {"/.crosspoint/games/spider.json", "/.crosspoint/games/spider.json.tmp"};
     case Kind::Klondike:
       break;
   }
@@ -76,17 +63,11 @@ uint16_t unreadGames = 0;  // a bit per Kind
 
 uint16_t bitOf(const Kind kind) { return static_cast<uint16_t>(1u << static_cast<unsigned>(kind)); }
 
-Record tictactoeDone{{"/.crosspoint/games/tictactoe-done.json", "/.crosspoint/games/tictactoe-done.json.tmp"}};
 Record reversiDone{{"/.crosspoint/games/reversi-done.json", "/.crosspoint/games/reversi-done.json.tmp"}};
 Record fifteenBest{{"/.crosspoint/games/fifteen-best.json", "/.crosspoint/games/fifteen-best.json.tmp"}};
 Record fiveLettersStats{{"/.crosspoint/games/fiveletters-stats.json", "/.crosspoint/games/fiveletters-stats.json.tmp"}};
 Record best2048{{"/.crosspoint/games/2048-best.txt", "/.crosspoint/games/2048-best.txt.tmp"}};
 Record nonogramRecord{{"/.crosspoint/games/nonogram-best.json", "/.crosspoint/games/nonogram-best.json.tmp"}};
-Record codewordSolved{{"/.crosspoint/games/codeword-solved.json", "/.crosspoint/games/codeword-solved.json.tmp"}};
-Record freecellBest{{"/.crosspoint/games/freecell-best.json", "/.crosspoint/games/freecell-best.json.tmp"}};
-Record spiderBest{{"/.crosspoint/games/spider-best.json", "/.crosspoint/games/spider-best.json.tmp"}};
-
-Record& bestOf(const Kind kind) { return kind == Kind::Spider ? spiderBest : freecellBest; }
 
 enum class Read : uint8_t { Ok, Missing, Failed };
 
@@ -210,10 +191,6 @@ bool clear(const Kind kind) {
 bool save(const sudoku::Game& game) { return write(Kind::Sudoku, game, sudoku::SAVE_MAX); }
 bool save(const minesweeper::Game& game) { return write(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
 bool save(const klondike::Game& game) { return write(Kind::Klondike, game, klondike::SAVE_MAX); }
-bool save(const tictactoe::Game& game) {
-  if (game.inProgress()) return write(Kind::TicTacToe, game, tictactoe::SAVE_MAX);
-  return !tictactoeDone.unread && writeTo(tictactoeDone.paths, game, tictactoe::SAVE_MAX) && clear(Kind::TicTacToe);
-}
 bool save(const fifteen::Game& game) { return write(Kind::Fifteen, game, fifteen::SAVE_MAX); }
 bool save(const fiveletters::Game& game) { return write(Kind::FiveLetters, game, fiveletters::SAVE_MAX); }
 bool save(const g2048::Game& game) { return write(Kind::Game2048, game, g2048::SAVE_MAX); }
@@ -224,17 +201,10 @@ bool save(const reversi::Game& game) {
 }
 bool save(const nonogram::Game& game) { return write(Kind::Nonogram, game, nonogram::SAVE_MAX); }
 bool save(const draughts::Game& game) { return write(Kind::Draughts, game, draughts::SAVE_MAX); }
-bool save(const codeword::Game& game) { return write(Kind::Codeword, game, codeword::SAVE_MAX); }
-bool save(const freecell::Game& game) { return write(Kind::FreeCell, game, freecell::SAVE_MAX); }
-bool save(const spider::Game& game) { return write(Kind::Spider, game, spider::SAVE_MAX); }
 
 bool load(sudoku::Game& game) { return read(Kind::Sudoku, game, sudoku::SAVE_MAX); }
 bool load(minesweeper::Game& game) { return read(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
 bool load(klondike::Game& game) { return read(Kind::Klondike, game, klondike::SAVE_MAX); }
-bool load(tictactoe::Game& game) {
-  return read(Kind::TicTacToe, game, tictactoe::SAVE_MAX) ||
-         readRecord(tictactoeDone, game, tictactoe::SAVE_MAX) == Read::Ok;
-}
 bool load(fifteen::Game& game) { return read(Kind::Fifteen, game, fifteen::SAVE_MAX); }
 bool load(fiveletters::Game& game) { return read(Kind::FiveLetters, game, fiveletters::SAVE_MAX); }
 bool load(g2048::Game& game) { return read(Kind::Game2048, game, g2048::SAVE_MAX); }
@@ -244,9 +214,6 @@ bool load(reversi::Game& game) {
 }
 bool load(nonogram::Game& game) { return read(Kind::Nonogram, game, nonogram::SAVE_MAX); }
 bool load(draughts::Game& game) { return read(Kind::Draughts, game, draughts::SAVE_MAX); }
-bool load(codeword::Game& game) { return read(Kind::Codeword, game, codeword::SAVE_MAX); }
-bool load(freecell::Game& game) { return read(Kind::FreeCell, game, freecell::SAVE_MAX); }
-bool load(spider::Game& game) { return read(Kind::Spider, game, spider::SAVE_MAX); }
 
 bool save(const fifteen::Best& best) {
   char text[48];
@@ -280,18 +247,5 @@ void saveBest2048(const uint32_t score) {
   char text[16];
   saveRecord(best2048, text, snprintf(text, sizeof(text), "%lu", static_cast<unsigned long>(score)));
 }
-
-bool save(const codeword::Solved& solved) {
-  char text[codeword::SOLVED_MAX];
-  return saveRecord(codewordSolved, text, solved.serialize(text, sizeof(text)));
-}
-
-bool load(codeword::Solved& solved) { return loadRecord(codewordSolved, solved, codeword::SOLVED_MAX); }
-bool saveBest(const Kind kind, const cards::Best& best) {
-  char text[cards::BEST_MAX];
-  return saveRecord(bestOf(kind), text, best.serialize(text, sizeof(text)));
-}
-
-bool loadBest(const Kind kind, cards::Best& best) { return loadRecord(bestOf(kind), best, cards::BEST_MAX); }
 
 }  // namespace gamesave

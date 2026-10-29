@@ -129,7 +129,7 @@ void DraughtsActivity::openNewGame() {
       {tr(STR_SUDOKU_EASY), &icon_level_1_24},
       {tr(STR_SUDOKU_MEDIUM), &icon_level_2_24},
       {tr(STR_SUDOKU_HARD), &icon_level_3_24},
-      {tr(STR_TTT_TWO_PLAYERS), &icon_friend_24},
+      {tr(STR_GAMES_TWO_PLAYERS), &icon_friend_24},
   };
   openPicker(tr(STR_GAMES_NEW_GAME), rows, static_cast<int>(std::size(rows)), static_cast<int>(game.mode()));
 }
@@ -440,7 +440,7 @@ void DraughtsActivity::cellOrigin(const int square, int& x, int& y) const {
 
 void DraughtsActivity::build(UiScreen& screen) {
   char mode[32];
-  const char* value = tr(STR_TTT_TWO_PLAYERS);
+  const char* value = tr(STR_GAMES_TWO_PLAYERS);
   if (game.vsComputer()) {
     snprintf(mode, sizeof(mode), tr(STR_CHESS_COMPUTER_LEVEL), static_cast<int>(game.mode()) + 1);
     value = mode;

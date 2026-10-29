@@ -63,7 +63,7 @@ void ReversiActivity::openNewGame() {
       {tr(STR_SUDOKU_EASY), &icon_level_1_24},
       {tr(STR_SUDOKU_MEDIUM), &icon_level_2_24},
       {tr(STR_SUDOKU_HARD), &icon_level_3_24},
-      {tr(STR_TTT_TWO_PLAYERS), &icon_friend_24},
+      {tr(STR_GAMES_TWO_PLAYERS), &icon_friend_24},
   };
   openPicker(tr(STR_GAMES_NEW_GAME), rows, static_cast<int>(std::size(rows)), static_cast<int>(game.mode()));
 }
@@ -200,7 +200,7 @@ void ReversiActivity::build(UiScreen& screen) {
   char level[40];
   const bool vs = game.vsComputer();
   if (vs) snprintf(level, sizeof(level), tr(STR_REVERSI_VS_LEVEL), static_cast<int>(game.mode()) + 1);
-  drawTopLine(screen, nullptr, vs ? level : tr(STR_TTT_TWO_PLAYERS), false);
+  drawTopLine(screen, nullptr, vs ? level : tr(STR_GAMES_TWO_PLAYERS), false);
 
   const int width = renderer.getScreenWidth();
   const int cell = width / SIZE;
@@ -246,11 +246,11 @@ void ReversiActivity::drawStatus(const int top) const {
   const bool vs = game.vsComputer();
   const char* title;
   if (game.isOver()) {
-    title = game.status() == Status::Draw       ? tr(STR_TTT_DRAW)
-            : game.status() == Status::BlackWon ? (vs ? tr(STR_TTT_YOU_WON) : tr(STR_REVERSI_BLACK_WON))
-                                                : (vs ? tr(STR_TTT_YOU_LOST) : tr(STR_REVERSI_WHITE_WON));
+    title = game.status() == Status::Draw       ? tr(STR_GAMES_DRAW)
+            : game.status() == Status::BlackWon ? (vs ? tr(STR_GAMES_YOU_WON) : tr(STR_REVERSI_BLACK_WON))
+                                                : (vs ? tr(STR_GAMES_YOU_LOST) : tr(STR_REVERSI_WHITE_WON));
   } else if (vs) {
-    title = game.computerToMove() ? tr(STR_REVERSI_THINKING) : tr(STR_TTT_YOUR_TURN);
+    title = game.computerToMove() ? tr(STR_REVERSI_THINKING) : tr(STR_GAMES_YOUR_TURN);
   } else {
     title = game.toMove() == Disc::Black ? tr(STR_REVERSI_BLACK_MOVE) : tr(STR_REVERSI_WHITE_MOVE);
   }
@@ -273,7 +273,7 @@ void ReversiActivity::drawStatus(const int top) const {
   char tally[64];
   if (game.isOver()) {
     const reversi::Score& score = game.score();
-    snprintf(tally, sizeof(tally), vs ? tr(STR_TTT_SCORE_VS) : tr(STR_REVERSI_SCORE_TWO), score.won, score.lost,
+    snprintf(tally, sizeof(tally), vs ? tr(STR_GAMES_SCORE_VS) : tr(STR_REVERSI_SCORE_TWO), score.won, score.lost,
              score.draws);
     lines[0] = tally;
   } else {

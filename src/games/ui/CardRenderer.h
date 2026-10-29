@@ -2,7 +2,7 @@
 
 #include <GfxRenderer.h>
 
-// Playing cards of the solitaire boards (Klondike, FreeCell, Spider): a white
+// Playing cards of the solitaire board (Klondike): a white
 // card in a 1 px rounded outline with the rank and suit in its top-left
 // corner, the back dithered. Red suits are outlines, black ones filled. Suits
 // in Klondike order: spades, hearts, diamonds, clubs.
