@@ -18,6 +18,7 @@
 #include "games/chess/ui/chessIcons.h"
 #include "games/scanword/ScanwordStore.h"
 #include "games/ui/ActionBar.h"
+#include "games/ui/LetterKeyboard.h"
 #include "scanwordIcons.h"
 
 namespace fui = freeink::ui;
@@ -49,10 +50,7 @@ constexpr int kIconSize = 24;
 constexpr int kIconGap = 16;
 constexpr int kFooterHeight = 56;
 constexpr int kStripHeight = 96;
-constexpr int kKeyHeight = 43;
 constexpr int kActionHeight = games::ui::kActionBarHeight;
-constexpr int kKeyRows = 3;
-constexpr int kKeysPerRow = 11;
 constexpr int kBoxSize = 44;
 constexpr int kBoxGap = 4;
 constexpr int kClueBarHeight = 40;
@@ -65,13 +63,6 @@ constexpr int kClueFrameWidth = 2;  // its clue cell
 // Every hit takes a long press too: routeTouch() consumes it, so a slow tap
 // would otherwise be lost. Only «Буква» gives it a meaning of its own.
 const uint16_t kTap = fui::InputTouch | fui::InputLongPress;
-
-// ЙЦУКЕН rows as letter codes (А=1 … Я=33, Ё=7).
-constexpr uint8_t kKeys[kKeyRows][kKeysPerRow] = {
-    {11, 24, 21, 12, 6, 15, 4, 26, 27, 9, 23},
-    {22, 29, 3, 1, 17, 18, 16, 13, 5, 8, 31},
-    {33, 25, 19, 14, 10, 20, 30, 2, 32, 7, 28},
-};
 
 // Clue cells set the caption face one pixel tighter, so a 60 px cell takes a seven-letter line; a clue that
 // does not fit that way is set dense, a pixel tighter again and then at a closer line pitch.
@@ -528,9 +519,8 @@ void ScanwordActivity::handleAction(const fui::ActionEvent& event, const int x, 
       if (board) tapGrid(x, y);
       break;
     case ACTION_KEY: {
-      const int row = (y - (keyboardTop() + kStripHeight)) / kKeyHeight;
-      const int col = x * kKeysPerRow / renderer.getScreenWidth();
-      if (input && row >= 0 && row < kKeyRows && col >= 0 && col < kKeysPerRow) typeLetter(kKeys[row][col]);
+      const int key = games::ui::keyboardKeyAt(renderer, keyboardTop() + kStripHeight, x, y);
+      if (input && key >= 0) typeLetter(games::ui::keyboardLetter(key));
       break;
     }
     case ACTION_BOX:
@@ -733,7 +723,7 @@ int ScanwordActivity::gridLeft() const { return (renderer.getScreenWidth() - puz
 int ScanwordActivity::gridBottom() const { return kGridTop + puzzle->height() * cellHeight(); }
 
 int ScanwordActivity::keyboardTop() const {
-  return renderer.getScreenHeight() - kStripHeight - kKeyRows * kKeyHeight - kActionHeight;
+  return renderer.getScreenHeight() - kStripHeight - games::ui::kKeyboardHeight - kActionHeight;
 }
 
 uint16_t ScanwordActivity::cellAt(const int x, const int y) const {
@@ -1221,27 +1211,16 @@ void ScanwordActivity::drawKeyboard(UiScreen& screen) const {
   drawAnswerStrip(screen, top + kRuleWidth);
 
   const int keysTop = top + kStripHeight;
-  drawRule(renderer, 0, keysTop - kRuleWidth, width);
-  for (int r = 0; r < kKeyRows; ++r) {
-    const int y = keysTop + r * kKeyHeight;
-    for (int k = 0; k < kKeysPerRow; ++k) {
-      const int x0 = k * width / kKeysPerRow;
-      const int x1 = (k + 1) * width / kKeysPerRow;
-      drawLetter(kKeys[r][k], x0, y, x1 - x0, kKeyHeight, 16);
-      if (k > 0) renderer.drawLine(x0, y, x0, y + kKeyHeight - 1);
-    }
-    // The bar's rule closes the last row.
-    if (r < kKeyRows - 1) renderer.drawLine(0, y + kKeyHeight - 1, width - 1, y + kKeyHeight - 1);
-  }
+  games::ui::drawKeyboard(renderer, keysTop, nullptr, nullptr, -1);
   // One hit for all keys (the frame holds few interactions); handleAction finds the key.
-  screen.frame().hit(fui::makeRect(0, keysTop, width, kKeyRows * kKeyHeight), ACTION_KEY, 0, kTap);
+  screen.frame().hit(fui::makeRect(0, keysTop, width, games::ui::kKeyboardHeight), ACTION_KEY, 0, kTap);
 
   const games::ui::ActionSlot acts[] = {{&icon_scanword_erase_24, tr(STR_SCANWORD_ERASE), false, ACTION_ERASE, 0},
                                         {&icon_scanword_check_24, tr(STR_SCANWORD_CHECK), false, ACTION_CHECK, 0},
                                         {&icon_scanword_hint_24, tr(STR_SCANWORD_HINT), false, ACTION_HINT, 0},
                                         {&icon_scanword_done_24, tr(STR_SCANWORD_DONE), false, ACTION_DONE, 0}};
-  games::ui::drawActionBar(renderer, screen, keysTop + kKeyRows * kKeyHeight, acts, static_cast<int>(std::size(acts)),
-                           -1, kTap);
+  games::ui::drawActionBar(renderer, screen, keysTop + games::ui::kKeyboardHeight, acts,
+                           static_cast<int>(std::size(acts)), -1, kTap);
 }
 
 void ScanwordActivity::drawLetterStrip(const int top) const {

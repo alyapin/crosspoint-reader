@@ -11,7 +11,7 @@ const char* hangmanListStatus();
 std::unique_ptr<Activity> openHangman(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
 // The gallows with the word's definition beside it, the word as letter slots,
-// and a 33-key keyboard: a tap (or Confirm on the key cursor) guesses. Подсказка
+// and the word games' keyboard (LetterKeyboard.h): a tap (or Confirm on the key cursor) guesses. Подсказка
 // opens a letter for a mistake; Меню holds Новая игра and Завершить, and once
 // the round is over the slot opens Новая игра: Обычные слова, or С крепкими
 // словами, which mixes the rude words in. The last pick is remembered.
@@ -48,7 +48,6 @@ class HangmanActivity final : public GameScreen {
   void drawGallows(int top, int bottom) const;
   void drawClue(int left, int top) const;
   void drawWord(int baseline) const;
-  void drawKey(int key, int top) const;
 
   hangman::Game game;
   int cursor = -1;  // key focus: keyboard key, -1 hidden

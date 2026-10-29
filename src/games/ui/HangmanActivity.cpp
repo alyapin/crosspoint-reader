@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <iterator>
 
+#include "LetterKeyboard.h"
 #include "gameIcons.h"
 #include "games/GameSave.h"
 #include "games/chess/ui/chessIcons.h"
@@ -21,14 +22,8 @@ namespace fui = freeink::ui;
 using namespace setka;
 
 namespace {
-constexpr int kKeysPerRow = 11;
-constexpr int kKeyRows = 3;
-constexpr int kKeyCount = hangman::LETTER_COUNT;
-constexpr int kKeyPitch = 40;  // 11 keys between the side paddings
-constexpr int kKeyWidth = 36;
-constexpr int kKeyHeight = 46;
-constexpr int kKeyRowPitch = 54;
-constexpr int kKeysHeight = kKeyRows * kKeyRowPitch - (kKeyRowPitch - kKeyHeight);
+using games::ui::kKeyboardColumns;
+using games::ui::kKeyboardRows;
 constexpr int kWordHeight = 48;  // the letters above their underlines
 constexpr int kGallowsMax = 250;
 constexpr int kGapMin = 16;
@@ -39,8 +34,8 @@ constexpr int kStroke = 4;
 constexpr int kFigureStroke = 3;
 constexpr int kClueGap = 28;
 constexpr int kClueLines = 4;
-constexpr int kResultGap = 16;  // the keyboard to the result
-constexpr int kStartKey = 15;   // О
+constexpr int kResultGap = 16;  // the word to the result
+constexpr int kStartKey = games::ui::kKeyboardStartKey;
 
 // Обычные слова, and С крепкими словами: the same words with the rude ones after them.
 const hangman::WordList kLists[] = {
@@ -67,9 +62,17 @@ int measureText(void* ctx, const char* text) {
   return renderer->getTextWidth(kText12Font, text);
 }
 
-void letterText(const uint8_t letter, char (&out)[4]) {
-  const int n = hangman::putUtf8(hangman::letterCodepoint(letter), out);
-  out[n] = '\0';
+// Untried keys plain, right ones black, wrong ones grey without the letter.
+games::ui::KeyLook keyLook(const void* ctx, const int key) {
+  switch (static_cast<const hangman::Game*>(ctx)->key(games::ui::keyboardLetter(key))) {
+    case hangman::Key::Right:
+      return games::ui::KeyLook::Placed;
+    case hangman::Key::Wrong:
+      return games::ui::KeyLook::Spent;
+    case hangman::Key::Untried:
+      break;
+  }
+  return games::ui::KeyLook::Plain;
 }
 }  // namespace
 
@@ -139,20 +142,17 @@ void HangmanActivity::runAction(const Action action) {
 }
 
 void HangmanActivity::guessKey(const int key) {
-  if (key < 0 || key >= kKeyCount) return;
-  const hangman::Guess result = game.guess(static_cast<uint8_t>(key + 1));
+  if (key < 0) return;
+  const hangman::Guess result = game.guess(games::ui::keyboardLetter(key));
   if (result != hangman::Guess::Hit && result != hangman::Guess::Miss) return;
   markChanged();
 }
 
 void HangmanActivity::onTouch(const fui::ActionEvent& event, const int x, const int y) {
   switch (event.action) {
-    case ACTION_BOARD: {
-      const int column = std::clamp((x - kSidePadding) / kKeyPitch, 0, kKeysPerRow - 1);
-      const int row = std::clamp((y - layout().keysTop) / kKeyRowPitch, 0, kKeyRows - 1);
-      guessKey(row * kKeysPerRow + column);
+    case ACTION_BOARD:
+      guessKey(games::ui::keyboardKeyAt(renderer, layout().keysTop, x, y));
       break;
-    }
     case ACTION_BAR:
       if (event.value >= 0 && event.value < BAR_SLOTS && barShown(event.value)) {
         runAction(static_cast<Action>(event.value));
@@ -190,16 +190,16 @@ void HangmanActivity::onKey(const int dx, const int dy, const bool confirm) {
   } else if (cursor < 0) {
     cursor = kStartKey;
   } else {
-    const int column = cursor % kKeysPerRow;
-    const int row = cursor / kKeysPerRow;
+    const int column = cursor % kKeyboardColumns;
+    const int row = cursor / kKeyboardColumns;
     if (confirm) {
       guessKey(cursor);
     } else if (dx != 0) {
-      cursor = row * kKeysPerRow + (column + dx + kKeysPerRow) % kKeysPerRow;
+      cursor = row * kKeyboardColumns + (column + dx + kKeyboardColumns) % kKeyboardColumns;
     } else if (dy < 0 && row > 0) {
-      cursor -= kKeysPerRow;
-    } else if (dy > 0 && row < kKeyRows - 1) {
-      cursor += kKeysPerRow;
+      cursor -= kKeyboardColumns;
+    } else if (dy > 0 && row < kKeyboardRows - 1) {
+      cursor += kKeyboardColumns;
     } else if (dy > 0 && hasBar()) {
       barFocus = nextBarSlot(BAR_SLOTS - 1, 1);
     }
@@ -215,16 +215,18 @@ bool HangmanActivity::onBack() {
   return true;
 }
 
-// Gallows, word and keyboard with even gaps down to the bar; the gallows give way on a short screen.
+// The keyboard on the bar; above it the gallows and the word with even gaps, and room for the result under
+// the word. The gallows give way on a short screen.
 HangmanActivity::Layout HangmanActivity::layout() const {
-  const int room = barTop() - BOARD_TOP - kWordHeight - kKeysHeight;
-  const int gallows = std::min(kGallowsMax, room - 4 * kGapMin);
-  const int gap = (room - gallows) * 2 / 7;
   Layout l;
-  l.keysTop = barTop() - gap - kKeysHeight;
-  l.wordBaseline = l.keysTop - gap;
-  l.gallowsBottom = l.wordBaseline - kWordHeight - gap;
-  l.gallowsTop = l.gallowsBottom - gallows;
+  l.keysTop = barTop() - games::ui::kKeyboardHeight;
+  const int band = kUnderline + kResultGap + resultHeight(false);
+  const int room = l.keysTop - kRuleWidth - BOARD_TOP - kWordHeight - band;
+  const int gallows = std::min(kGallowsMax, room - 3 * kGapMin);
+  const int gap = (room - gallows) / 3;
+  l.gallowsTop = BOARD_TOP + gap;
+  l.gallowsBottom = l.gallowsTop + gallows;
+  l.wordBaseline = l.gallowsBottom + gap + kWordHeight;
   return l;
 }
 
@@ -238,12 +240,12 @@ void HangmanActivity::build(UiScreen& screen) {
   const Layout l = layout();
   drawGallows(l.gallowsTop, l.gallowsBottom);
   drawWord(l.wordBaseline);
-  for (int key = 0; key < kKeyCount; ++key) drawKey(key, l.keysTop);
-  screen.frame().hit(fui::makeRect(kSidePadding, l.keysTop, kKeysPerRow * kKeyPitch, kKeysHeight), ACTION_BOARD, 0,
-                     shellInput());
   const bool over = game.isOver();
+  games::ui::drawKeyboard(renderer, l.keysTop, keyLook, &game, barFocus < 0 && !over ? cursor : -1);
+  screen.frame().hit(fui::makeRect(0, l.keysTop, renderer.getScreenWidth(), games::ui::kKeyboardHeight), ACTION_BOARD,
+                     0, shellInput());
   if (over) {
-    drawResult(l.keysTop + kKeysHeight + kResultGap,
+    drawResult(l.wordBaseline + kUnderline + kResultGap,
                game.status() == hangman::Status::Won ? tr(STR_HANGMAN_WON) : tr(STR_HANGMAN_LOST));
   }
 
@@ -328,38 +330,6 @@ void HangmanActivity::drawWord(const int baseline) const {
     const int glyphWidth = static_cast<int>(advance * scale / (256 * 16));
     renderer.drawScaledCodepoint(kText12Font, cp, kSemiBold, x + (slot - glyphWidth) / 2, baseline - 10, scale);
   }
-}
-
-// Untried keys framed, right ones black, wrong ones dithered without the letter.
-void HangmanActivity::drawKey(const int key, const int top) const {
-  const int x = kSidePadding + key % kKeysPerRow * kKeyPitch + (kKeyPitch - kKeyWidth) / 2;
-  const int y = top + key / kKeysPerRow * kKeyRowPitch;
-  const auto letter = static_cast<uint8_t>(key + 1);
-  const hangman::Key state = game.key(letter);
-  bool black = true;
-  switch (state) {
-    case hangman::Key::Right:
-      renderer.fillRect(x, y, kKeyWidth, kKeyHeight, true);
-      black = false;
-      break;
-    case hangman::Key::Wrong:
-      renderer.fillRectDither(x, y, kKeyWidth, kKeyHeight, Color::LightGray);
-      break;
-    case hangman::Key::Untried:
-      renderer.drawRect(x, y, kKeyWidth, kKeyHeight, true);
-      break;
-  }
-  if (state != hangman::Key::Wrong) {
-    char text[4];
-    letterText(letter, text);
-    int32_t advance = 0;
-    int capTop = 0;
-    if (!renderer.getCodepointMetrics(kText10Font, 0x41D, kSemiBold, advance, capTop)) capTop = 0;
-    const int textY = y + (kKeyHeight + capTop) / 2 - renderer.getFontAscenderSize(kText10Font);
-    renderer.drawText(kText10Font, x + (kKeyWidth - renderer.getTextWidth(kText10Font, text, kSemiBold)) / 2, textY,
-                      text, black, kSemiBold);
-  }
-  if (key == cursor && barFocus < 0 && !game.isOver()) drawKeyCursor(x, y, kKeyWidth, kKeyHeight);
 }
 
 #endif  // SOVA_KEYBOARD_GAMES

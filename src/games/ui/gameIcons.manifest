@@ -27,10 +27,9 @@ bar-hint = lightbulb
 # game menu: Завершить and Сдаться; Выйти (button boards)
 finish = circle-x
 exit = log-out
-# «5 букв»: games list, keyboard
+# «5 букв»: games list, the bar's Стереть
 five-letters = spell-check
 key-delete = delete
-key-enter = corner-down-left
 # Японские кроссворды: games list, picker, bar
 nonogram = grid-2x2-check
 pictures = image

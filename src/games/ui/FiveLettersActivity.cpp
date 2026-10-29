@@ -2,7 +2,6 @@
 
 #include <KeyboardGames.h>
 #if SOVA_KEYBOARD_GAMES
-#include <FreeInkUIIcon.h>
 #include <GfxRenderer.h>
 #include <I18n.h>
 #include <Memory.h>
@@ -12,6 +11,7 @@
 #include <cstdio>
 #include <iterator>
 
+#include "LetterKeyboard.h"
 #include "gameIcons.h"
 #include "games/GameSave.h"
 #include "games/chess/ui/chessIcons.h"
@@ -25,27 +25,24 @@ using fiveletters::Mark;
 namespace {
 constexpr int kCellGap = 6;
 constexpr int kMaxCell = 64;
-constexpr int kGridKeysGap = 16;
-constexpr int kKeyRows = 3;
-constexpr int kKeyHeight = 44;
-constexpr int kKeyGap = 6;
-constexpr int kKeySide = 8;
-constexpr int kKeyUnits = 12;     // the widest row; keys sit on half units
-constexpr int kCaptionBand = 64;  // under the keyboard: the result and the totals once over
+constexpr int kResultBand = 88;  // between the grid and the keyboard: the result and the totals once over
 constexpr int kResultGap = 12;
-constexpr int kIconSize = 24;
 
-constexpr uint8_t kDelete = 0xFE;
-constexpr uint8_t kEnter = 0xFD;
-constexpr int kRowKeys[kKeyRows] = {12, 11, 11};
-// ЙЦУКЕНГШЩЗХЪ / ФЫВАПРОЛДЖЭ / ⌫ЯЧСМИТЬБЮ↵ as letters (А=0 … Я=31).
-constexpr uint8_t kKeys[kKeyRows][kKeyUnits] = {
-    {9, 22, 19, 10, 5, 13, 3, 24, 25, 7, 21, 26},
-    {20, 27, 2, 0, 15, 16, 14, 11, 4, 6, 29},
-    {kDelete, 31, 23, 17, 12, 8, 18, 28, 1, 30, kEnter},
-};
-constexpr int kStartRow = 1;
-constexpr int kStartIndex = 5;
+uint8_t letterOfKey(const int key) { return fiveletters::letterOf(games::ui::keyboardCodepoint(key)); }
+
+games::ui::KeyLook keyLook(const void* ctx, const int key) {
+  switch (static_cast<const fiveletters::Game*>(ctx)->keyMark(letterOfKey(key))) {
+    case Mark::Placed:
+      return games::ui::KeyLook::Placed;
+    case Mark::Present:
+      return games::ui::KeyLook::Present;
+    case Mark::Absent:
+      return games::ui::KeyLook::Spent;
+    case Mark::None:
+      break;
+  }
+  return games::ui::KeyLook::Plain;
+}
 }  // namespace
 
 const char* fiveLettersListStatus() {
@@ -96,33 +93,26 @@ void FiveLettersActivity::openNewGame() {
 
 void FiveLettersActivity::placeCursor() {
   barFocus = -1;
-  keyRow = mappedInput.hasTouch() ? -1 : kStartRow;
-  keyIndex = kStartIndex;
+  keyCursor = mappedInput.hasTouch() ? -1 : games::ui::kKeyboardStartKey;
 }
 
 // --- input -------------------------------------------------------------------
 
-void FiveLettersActivity::press(const uint8_t key) {
-  if (key == kDelete) {
-    if (game.erase()) requestRepaint(RepaintUpdate);
-    return;
-  }
-  if (key != kEnter) {
-    if (game.keyMark(key) == Mark::Absent || !game.type(key)) return;
-    if (keyRow >= 0 && game.typed() == LETTERS) {
-      keyRow = kKeyRows - 1;
-      keyIndex = kRowKeys[keyRow] - 1;
-    }
-    requestRepaint(RepaintUpdate);
-    return;
-  }
+void FiveLettersActivity::type(const int key) {
+  const uint8_t letter = letterOfKey(key);
+  if (game.keyMark(letter) == Mark::Absent || !game.type(letter)) return;
+  if (keyCursor >= 0 && game.typed() == LETTERS && hasBar()) barFocus = DONE_SLOT;
+  requestRepaint(RepaintUpdate);
+}
+
+void FiveLettersActivity::submit() {
   switch (game.submit()) {
     case fiveletters::Submit::Scored:
       if (game.isOver()) {
         stats.record(game.status() == fiveletters::Status::Won);
         statsPending = true;
-        if (keyRow >= 0 && hasBar()) barFocus = MENU_SLOT;
       }
+      if (barFocus >= 0) barFocus = game.isOver() ? MENU_SLOT : -1;
       markChanged();
       break;
     case fiveletters::Submit::Unknown:
@@ -134,58 +124,76 @@ void FiveLettersActivity::press(const uint8_t key) {
   }
 }
 
-void FiveLettersActivity::runMenu() {
-  if (game.isOver()) {
-    openNewGame();
-  } else {
-    openGameMenu();
+void FiveLettersActivity::runSlot(const int slot) {
+  if (!barShown(slot)) return;
+  switch (slot) {
+    case ERASE_SLOT:
+      if (game.erase()) requestRepaint(RepaintUpdate);
+      break;
+    case DONE_SLOT:
+      submit();
+      break;
+    case MENU_SLOT:
+      if (game.isOver()) {
+        openNewGame();
+      } else {
+        openGameMenu();
+      }
+      break;
+    default:
+      break;
   }
+}
+
+bool FiveLettersActivity::barShown(const int slot) const { return slot == MENU_SLOT || !game.isOver(); }
+
+int FiveLettersActivity::nextBarSlot(const int from, const int step) const {
+  for (int i = 1; i <= BAR_SLOTS; ++i) {
+    const int slot = (from + step * i + 2 * BAR_SLOTS) % BAR_SLOTS;
+    if (barShown(slot)) return slot;
+  }
+  return from;
 }
 
 void FiveLettersActivity::onTouch(const fui::ActionEvent& event, const int x, const int y) {
   const bool hadNotice = unknownWord;
   unknownWord = false;
   if (event.action == ACTION_BOARD) {
-    const int row = std::clamp((y - keyboardTop()) / (kKeyHeight + kKeyGap), 0, kKeyRows - 1);
-    press(kKeys[row][keyAt(row, x)]);
-  } else if (event.action == ACTION_BAR && event.value == MENU_SLOT) {
-    runMenu();
+    const int key = games::ui::keyboardKeyAt(renderer, keyboardTop(), x, y);
+    if (key >= 0) type(key);
+  } else if (event.action == ACTION_BAR) {
+    runSlot(event.value);
   }
   if (hadNotice && !unknownWord) requestRepaint(RepaintUpdate);
 }
 
-void FiveLettersActivity::moveRow(const int step) {
-  int x = 0;
-  int width = 0;
-  keyBounds(keyRow, keyIndex, x, width);
-  keyRow += step;
-  keyIndex = keyAt(keyRow, x + width / 2);
-}
-
 void FiveLettersActivity::onKey(const int dx, const int dy, const bool confirm) {
-  const int before[] = {keyRow, keyIndex, barFocus, unknownWord};
+  using games::ui::kKeyboardColumns;
+  const int before[] = {keyCursor, barFocus, unknownWord};
   unknownWord = false;
+  const int row = keyCursor / kKeyboardColumns;
   if (barFocus >= 0) {
     if (confirm) {
-      runMenu();
+      runSlot(barFocus);
+    } else if (dx != 0) {
+      barFocus = nextBarSlot(barFocus, dx);
     } else if (dy < 0 && !game.isOver()) {
       barFocus = -1;
     }
-  } else if (keyRow < 0) {
-    keyRow = kStartRow;
-    keyIndex = kStartIndex;
+  } else if (keyCursor < 0) {
+    keyCursor = games::ui::kKeyboardStartKey;
   } else if (confirm) {
-    press(kKeys[keyRow][keyIndex]);
+    type(keyCursor);
   } else if (dx != 0) {
-    keyIndex = (keyIndex + dx + kRowKeys[keyRow]) % kRowKeys[keyRow];
-  } else if (dy < 0 && keyRow > 0) {
-    moveRow(-1);
-  } else if (dy > 0 && keyRow < kKeyRows - 1) {
-    moveRow(1);
+    keyCursor = row * kKeyboardColumns + (keyCursor % kKeyboardColumns + dx + kKeyboardColumns) % kKeyboardColumns;
+  } else if (dy < 0 && row > 0) {
+    keyCursor -= kKeyboardColumns;
+  } else if (dy > 0 && row < games::ui::kKeyboardRows - 1) {
+    keyCursor += kKeyboardColumns;
   } else if (dy > 0 && hasBar()) {
-    barFocus = MENU_SLOT;
+    barFocus = DONE_SLOT;
   }
-  const int after[] = {keyRow, keyIndex, barFocus, unknownWord};
+  const int after[] = {keyCursor, barFocus, unknownWord};
   if (!std::equal(std::begin(before), std::end(before), std::begin(after))) requestRepaint(RepaintUpdate);
 }
 
@@ -199,39 +207,12 @@ bool FiveLettersActivity::onBack() {
 // --- layout ------------------------------------------------------------------
 
 int FiveLettersActivity::cellSize() const {
-  const int keyboard = kKeyRows * kKeyHeight + (kKeyRows - 1) * kKeyGap;
-  const int room = barTop() - kCaptionBand - keyboard - kGridKeysGap - BOARD_TOP;
+  const int room = keyboardTop() - kRuleWidth - kResultBand - BOARD_TOP;
   return std::min(kMaxCell, (room - (ATTEMPTS - 1) * kCellGap) / ATTEMPTS);
 }
 
-int FiveLettersActivity::keyboardTop() const {
-  return BOARD_TOP + ATTEMPTS * cellSize() + (ATTEMPTS - 1) * kCellGap + kGridKeysGap;
-}
-
-// The top row holds kKeyUnits keys; the others start half a key in, and ⌫ and ↵ are a key and a half wide.
-void FiveLettersActivity::keyBounds(const int row, const int index, int& x, int& width) const {
-  const int unit = (renderer.getScreenWidth() - 2 * kKeySide + kKeyGap) / kKeyUnits;
-  const int left = (renderer.getScreenWidth() - kKeyUnits * unit + kKeyGap) / 2;
-  int at = 2 * index + (row > 0 ? 1 : 0);
-  int span = 2;
-  if (row == kKeyRows - 1 && (index == 0 || index == kRowKeys[row] - 1)) {
-    at = index == 0 ? 0 : at;
-    span = 3;
-  }
-  x = left + at * unit / 2;
-  width = left + (at + span) * unit / 2 - kKeyGap - x;
-}
-
-// The key under x, the gaps split between neighbours and the row ends running to the edges.
-int FiveLettersActivity::keyAt(const int row, const int x) const {
-  for (int i = 0; i < kRowKeys[row] - 1; ++i) {
-    int left = 0;
-    int width = 0;
-    keyBounds(row, i, left, width);
-    if (x < left + width + kKeyGap / 2) return i;
-  }
-  return kRowKeys[row] - 1;
-}
+// The keyboard sits on the bar.
+int FiveLettersActivity::keyboardTop() const { return barTop() - games::ui::kKeyboardHeight; }
 
 // --- render task -------------------------------------------------------------
 
@@ -263,22 +244,25 @@ void FiveLettersActivity::build(UiScreen& screen) {
   }
 
   const int keysTop = keyboardTop();
-  for (int r = 0; r < kKeyRows; ++r) {
-    for (int i = 0; i < kRowKeys[r]; ++i) drawKey(screen, r, i);
-  }
-  const int keysHeight = kKeyRows * kKeyHeight + (kKeyRows - 1) * kKeyGap;
-  if (!game.isOver()) {
-    screen.frame().hit(fui::makeRect(0, keysTop, renderer.getScreenWidth(), keysHeight), ACTION_BOARD, 0, shellInput());
+  const bool over = game.isOver();
+  games::ui::drawKeyboard(renderer, keysTop, keyLook, &game, barFocus < 0 && !over ? keyCursor : -1);
+  if (!over) {
+    screen.frame().hit(fui::makeRect(0, keysTop, renderer.getScreenWidth(), games::ui::kKeyboardHeight), ACTION_BOARD,
+                       0, shellInput());
   } else {
     char totals[64];
     snprintf(totals, sizeof(totals), tr(STR_FIVE_STATS), static_cast<unsigned>(stats.played),
              static_cast<unsigned>(stats.wins), static_cast<unsigned>(stats.streak));
-    drawResult(keysTop + keysHeight + kResultGap, value, totals);
+    drawResult(BOARD_TOP + ATTEMPTS * size + (ATTEMPTS - 1) * kCellGap + kResultGap, value, totals);
   }
 
   BarItem items[BAR_SLOTS];
-  items[MENU_SLOT] = game.isOver() ? BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame}
-                                   : BarItem{&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
+  if (!over) {
+    items[ERASE_SLOT] = {&icon_key_delete_24, tr(STR_SCANWORD_ERASE), false, BarItem::Repeat};
+    items[DONE_SLOT] = {&icon_done_24, tr(STR_SCANWORD_DONE), false, BarItem::Action};
+  }
+  items[MENU_SLOT] = over ? BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame}
+                          : BarItem{&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 
@@ -304,42 +288,6 @@ void FiveLettersActivity::drawCell(const int row, const int column, const int x,
   const bool next = !game.isOver() && row == game.guesses() && column == game.typed();
   renderer.drawRect(x, y, size, size, next ? kCellFrameWidth : 1, true);
   if (letter != fiveletters::NO_LETTER) drawLetter(letter, x, y, size, size, cap, kSemiBold, true);
-}
-
-void FiveLettersActivity::drawKey(UiScreen& screen, const int row, const int index) const {
-  int x = 0;
-  int width = 0;
-  keyBounds(row, index, x, width);
-  const int y = keyboardTop() + row * (kKeyHeight + kKeyGap);
-  const uint8_t key = kKeys[row][index];
-  constexpr int kKeyCap = 14;
-  if (key == kDelete || key == kEnter) {
-    renderer.drawRect(x, y, width, kKeyHeight, true);
-    screen.target().bitmap(
-        fui::makeRect(x + (width - kIconSize) / 2, y + (kKeyHeight - kIconSize) / 2, kIconSize, kIconSize),
-        fui::bitmapFromIcon(key == kDelete ? icon_key_delete_24 : icon_key_enter_24), fui::BitmapMode::Center);
-  } else {
-    switch (game.keyMark(key)) {
-      case Mark::Placed:
-        renderer.fillRect(x, y, width, kKeyHeight, true);
-        drawLetter(key, x, y, width, kKeyHeight, kKeyCap, kSemiBold, false);
-        break;
-      case Mark::Present:
-        renderer.drawRect(x, y, width, kKeyHeight, kCellFrameWidth, true);
-        drawLetter(key, x, y, width, kKeyHeight, kKeyCap, kSemiBold, true);
-        break;
-      case Mark::Absent:
-        renderer.fillRectDither(x, y, width, kKeyHeight, Color::LightGray);
-        break;
-      case Mark::None:
-        renderer.drawRect(x, y, width, kKeyHeight, true);
-        drawLetter(key, x, y, width, kKeyHeight, kKeyCap, kSemiBold, true);
-        break;
-    }
-  }
-  if (row == keyRow && index == keyIndex && barFocus < 0 && !game.isOver()) {
-    drawKeyCursor(x, y, width, kKeyHeight);
-  }
 }
 
 // A letter scaled to capHeight, centred in the box.
