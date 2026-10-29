@@ -2267,7 +2267,7 @@ bool GfxRenderer::getCodepointMetrics(const int fontId, const uint32_t cp, const
 }
 
 int GfxRenderer::drawScaledCodepoint(const int fontId, const uint32_t cp, const EpdFontFamily::Style style, const int x,
-                                     const int baselineY, const int scale256) const {
+                                     const int baselineY, const int scale256, const bool black) const {
   if (scale256 <= 0) return 0;
   if (fontCacheManager_ && fontCacheManager_->isScanning()) {
     char utf8[5] = {};
@@ -2314,7 +2314,7 @@ int GfxRenderer::drawScaledCodepoint(const int fontId, const uint32_t cp, const 
       const int upper = sample(x0, y0) * (256 - fx) + sample(x0 + 1, y0) * fx;
       const int lower = sample(x0, y0 + 1) * (256 - fx) + sample(x0 + 1, y0 + 1) * fx;
       // Ink where interpolated coverage reaches half of full black (3).
-      if ((upper * (256 - fy) + lower * fy) * 2 >= 3 * 256 * 256) drawPixel(left + dx, top + dy, true);
+      if ((upper * (256 - fy) + lower * fy) * 2 >= 3 * 256 * 256) drawPixel(left + dx, top + dy, black);
     }
   }
   return advance;

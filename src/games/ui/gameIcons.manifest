@@ -21,3 +21,7 @@ bar-flag = flag
 bar-restart = rotate-ccw
 bar-new-game = plus
 bar-hint = lightbulb
+# «5 букв»: games list, keyboard
+five-letters = spell-check
+key-delete = delete
+key-enter = corner-down-left

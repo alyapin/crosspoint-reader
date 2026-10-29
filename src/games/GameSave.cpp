@@ -1,6 +1,7 @@
 #include "GameSave.h"
 
 #include <Fifteen.h>
+#include <FiveLetters.h>
 #include <HalStorage.h>
 #include <Klondike.h>
 #include <Logging.h>
@@ -31,6 +32,8 @@ Paths pathsOf(const Kind kind) {
       return {"/.crosspoint/games/tictactoe.json", "/.crosspoint/games/tictactoe.json.tmp"};
     case Kind::Fifteen:
       return {"/.crosspoint/games/fifteen.json", "/.crosspoint/games/fifteen.json.tmp"};
+    case Kind::FiveLetters:
+      return {"/.crosspoint/games/fiveletters.json", "/.crosspoint/games/fiveletters.json.tmp"};
     case Kind::Klondike:
       break;
   }
@@ -39,6 +42,8 @@ Paths pathsOf(const Kind kind) {
 
 constexpr Paths TICTACTOE_DONE{"/.crosspoint/games/tictactoe-done.json", "/.crosspoint/games/tictactoe-done.json.tmp"};
 constexpr Paths FIFTEEN_BEST{"/.crosspoint/games/fifteen-best.json", "/.crosspoint/games/fifteen-best.json.tmp"};
+constexpr Paths FIVE_LETTERS_STATS{"/.crosspoint/games/fiveletters-stats.json",
+                                   "/.crosspoint/games/fiveletters-stats.json.tmp"};
 
 // Crash-safe: tmp file + rename.
 bool writeText(const Paths& p, const char* text, const size_t len) {
@@ -119,6 +124,7 @@ bool save(const tictactoe::Game& game) {
   return ok;
 }
 bool save(const fifteen::Game& game) { return write(Kind::Fifteen, game, fifteen::SAVE_MAX); }
+bool save(const fiveletters::Game& game) { return write(Kind::FiveLetters, game, fiveletters::SAVE_MAX); }
 
 bool load(sudoku::Game& game) { return read(Kind::Sudoku, game, sudoku::SAVE_MAX); }
 bool load(minesweeper::Game& game) { return read(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
@@ -127,11 +133,22 @@ bool load(tictactoe::Game& game) {
   return read(Kind::TicTacToe, game, tictactoe::SAVE_MAX) || readFrom(TICTACTOE_DONE, game, tictactoe::SAVE_MAX);
 }
 bool load(fifteen::Game& game) { return read(Kind::Fifteen, game, fifteen::SAVE_MAX); }
+bool load(fiveletters::Game& game) { return read(Kind::FiveLetters, game, fiveletters::SAVE_MAX); }
 
 bool save(const fifteen::Best& best) {
   char text[48];
   return writeText(FIFTEEN_BEST, text, best.serialize(text, sizeof(text)));
 }
 bool load(fifteen::Best& best) { return readFrom(FIFTEEN_BEST, best, 48); }
+
+bool saveStats(const fiveletters::Stats& stats) {
+  char text[fiveletters::STATS_MAX];
+  return writeText(FIVE_LETTERS_STATS, text, stats.serialize(text, sizeof(text)));
+}
+
+bool loadStats(fiveletters::Stats& stats) {
+  stats = fiveletters::Stats{};
+  return !Storage.exists(FIVE_LETTERS_STATS.path) || readFrom(FIVE_LETTERS_STATS, stats, fiveletters::STATS_MAX);
+}
 
 }  // namespace gamesave
