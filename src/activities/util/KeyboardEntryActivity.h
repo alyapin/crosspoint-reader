@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "activities/Activity.h"
+#include "components/themes/BaseTheme.h"
 #include "util/ButtonNavigator.h"
 
 enum class InputType { Text, Password, Url };
@@ -143,6 +144,7 @@ class KeyboardEntryActivity : public Activity {
 
   const freeink::ui::KeyboardLayout& currentLayout() const;
   int keyLabelFont(int keysWidth) const;
+  static int fieldMargin(const ThemeMetrics& metrics, const Rect& content);
   const freeink::ui::KeyboardKey* selectedKey() const;
   int selectedLogicalIndex() const;
   void clampSelection();
