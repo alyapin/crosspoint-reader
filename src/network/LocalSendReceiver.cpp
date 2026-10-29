@@ -38,26 +38,6 @@ bool endsWith(const char* name, const char* suffix) {
   return len > n && strcmp(name + len - n, suffix) == 0;
 }
 
-enum class Replace : uint8_t { Done, Failed, PartialKept };
-
-// Moves `tmp` over `path` keeping the old deck aside until the new one is in;
-// cards::restoreReplacedDecks() settles a replace cut at any step.
-Replace replaceKeepingOld(const char* tmp, const char* path) {
-  if (!Storage.exists(path)) return Storage.rename(tmp, path) ? Replace::Done : Replace::Failed;
-  char old[224];
-  snprintf(old, sizeof(old), "%s%s", path, cards::DECK_OLD_SUFFIX);
-  if (Storage.exists(old) && !Storage.remove(old)) return Replace::Failed;
-  if (!Storage.rename(path, old)) return Replace::Failed;
-  if (!Storage.rename(tmp, path)) {
-    if (Storage.rename(old, path)) return Replace::Failed;
-    // Neither copy is at `path`: keep the partial, so the next start restores the old deck.
-    LOG_ERR("LSND", "cannot restore %s", path);
-    return Replace::PartialKept;
-  }
-  if (!Storage.remove(old)) LOG_ERR("LSND", "cannot remove %s", old);
-  return Replace::Done;
-}
-
 uint32_t hardwareRandom() { return esp_random(); }
 }  // namespace
 
@@ -205,9 +185,9 @@ int LocalSendReceiver::Store::entryIndex(const localsend::FileEntry& entry) cons
 }
 
 // Picks a free final path in `folder` (or the same name, to replace) and its partial next to it.
-bool LocalSendReceiver::Store::placeIn(const char* folder, const char* entryName, const bool replace) {
+bool LocalSendReceiver::Store::placeIn(const char* folder, const char* entryName) {
   char name[localsend::FILE_NAME_MAX + 16];
-  for (int i = 0; i < (replace ? 1 : MAX_COLLISIONS); i++) {
+  for (int i = 0; i < MAX_COLLISIONS; i++) {
     if (!localsend::makeCollisionName(entryName, i, name, sizeof(name))) return false;
     const int n = snprintf(finalPath, sizeof(finalPath), "%s/%s", folder, name);
     const int m = snprintf(tmpPath, sizeof(tmpPath), "%s%s", finalPath, PART_SUFFIX);
@@ -215,7 +195,7 @@ bool LocalSendReceiver::Store::placeIn(const char* folder, const char* entryName
       return false;
     }
     // A partial without its book is left over from an interrupted transfer.
-    if ((replace || !Storage.exists(finalPath)) && (!Storage.exists(tmpPath) || Storage.remove(tmpPath))) return true;
+    if (!Storage.exists(finalPath) && (!Storage.exists(tmpPath) || Storage.remove(tmpPath))) return true;
   }
   return false;
 }
@@ -224,10 +204,9 @@ bool LocalSendReceiver::Store::open(const localsend::FileEntry& entry) {
   abort();
   const int index = entryIndex(entry);
   if (index >= 0) toCards &= static_cast<uint16_t>(~(1u << index));
-  // Flashcard tables go straight to the deck folder; a .txt is sorted at commit().
-  const char* decks = cards::deckDir();
-  deck = cards::isTableName(entry.name) && (Storage.exists(decks) || Storage.mkdir(decks));
-  if (!placeIn(deck ? decks : dir, entry.name, deck) || !Storage.openFileForWrite("LSND", tmpPath, file)) {
+  // Every file arrives in the books folder; commit() moves a deck to the deck folder.
+  deck = false;
+  if (!placeIn(dir, entry.name) || !Storage.openFileForWrite("LSND", tmpPath, file)) {
     LOG_ERR("LSND", "cannot create a file for %s", entry.name);
     tmpPath[0] = 0;
     return false;
@@ -268,8 +247,9 @@ int LocalSendReceiver::Store::commit(const localsend::FileEntry& entry) {
       return 422;
     }
   }
-  if (FsHelpers::hasTxtExtension(std::string_view(entry.name))) {
-    // An Anki export is a deck, not a book.
+  // Tables are decks; a .txt is one when it opens with an Anki export header.
+  deck = cards::isTableName(entry.name);
+  if (!deck && FsHelpers::hasTxtExtension(std::string_view(entry.name))) {
     uint8_t head[64];
     HalFile f;
     int got = -1;
@@ -277,24 +257,15 @@ int LocalSendReceiver::Store::commit(const localsend::FileEntry& entry) {
       got = f.read(head, sizeof(head));
       f.close();
     }
-    char partial[sizeof(tmpPath)];
-    snprintf(partial, sizeof(partial), "%s", tmpPath);
-    const char* decks = cards::deckDir();
-    deck = got > 0 && cards::hasAnkiHeader(head, static_cast<size_t>(got)) &&
-           (Storage.exists(decks) || Storage.mkdir(decks)) && placeIn(decks, entry.name, true);
-    if (deck) {
-      snprintf(tmpPath, sizeof(tmpPath), "%s", partial);
-    } else {
-      snprintf(tmpPath, sizeof(tmpPath), "%s", partial);
-      snprintf(finalPath, sizeof(finalPath), "%.*s", static_cast<int>(strlen(partial) - strlen(PART_SUFFIX)), partial);
-    }
+    deck = got > 0 && cards::hasAnkiHeader(head, static_cast<size_t>(got));
   }
-  const Replace placed = deck                                 ? replaceKeepingOld(tmpPath, finalPath)
-                         : Storage.rename(tmpPath, finalPath) ? Replace::Done
-                                                              : Replace::Failed;
-  if (placed != Replace::Done) {
+  const cards::Placed placed =
+      deck ? cards::placeReceivedDeck(tmpPath, sizeof(tmpPath), entry.name, finalPath, sizeof(finalPath))
+      : Storage.rename(tmpPath, finalPath) ? cards::Placed::Done
+                                           : cards::Placed::Failed;
+  if (placed != cards::Placed::Done) {
     LOG_ERR("LSND", "rename failed: %s", finalPath);
-    if (placed == Replace::PartialKept) tmpPath[0] = 0;
+    if (placed == cards::Placed::PartialKept) tmpPath[0] = 0;
     abort();
     return 500;
   }

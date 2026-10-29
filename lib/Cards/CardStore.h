@@ -41,10 +41,18 @@ const char* deckDir();
 inline constexpr char DECK_PARTIAL_SUFFIX[] = ".localsend";
 inline constexpr char DECK_OLD_SUFFIX[] = ".localsend-old";
 // Settles a replace cut short, in one pass over deckDir(): the old deck comes
-// back while the new one is still a partial, and is dropped once the deck is in
-// place or when neither is left (the deck was deleted or renamed). Run it
-// before partials are cleared.
+// back (and the partial goes) while the new one is still a partial, and is
+// dropped once the deck is in place or when neither is left (the deck was
+// deleted or renamed). Run it before partials are cleared.
 void restoreReplacedDecks();
+
+enum class Placed : uint8_t { Done, Failed, PartialKept };
+// Moves a received deck from `partial` (any folder; updated in place) to
+// deckDir()/<name>, written to `finalPath`. The partial first moves next to the
+// deck, then the old deck steps aside until the new one is in, so a cut at any
+// step is settled by restoreReplacedDecks(). PartialKept: neither copy is at
+// the deck's path and the partial must stay for that restore.
+Placed placeReceivedDeck(char* partial, size_t partialCap, const char* name, char* finalPath, size_t finalCap);
 
 struct Summary {
   uint16_t cards = 0;

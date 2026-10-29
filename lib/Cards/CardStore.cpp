@@ -284,6 +284,19 @@ struct DeckStore::Header {
 
 uint32_t deckId(const char* fileName) { return fnv1a(fileName, strlen(fileName)); }
 
+namespace {
+void settleReplacedDeck(const char* old, const char* deck, const char* partial) {
+  if (!Storage.exists(old)) return;
+  if (!Storage.exists(deck) && Storage.exists(partial)) {
+    if (!Storage.rename(old, deck)) return;
+    LOG_INF("CARD", "Restored %s", deck);
+    Storage.remove(partial);
+  } else if (Storage.remove(old)) {
+    LOG_INF("CARD", "Removed %s", old);
+  }
+}
+}  // namespace
+
 void restoreReplacedDecks() {
   constexpr int SLOTS = 4;
   constexpr size_t NAME_BYTES = 256;
@@ -317,12 +330,40 @@ void restoreReplacedDecks() {
     snprintf(old, PATH_BYTES, "%s/%s", folder, oldName);
     snprintf(deck, PATH_BYTES, "%s/%.*s", folder, stem, oldName);
     snprintf(partial, PATH_BYTES, "%s%s", deck, DECK_PARTIAL_SUFFIX);
-    if (!Storage.exists(deck) && Storage.exists(partial)) {
-      if (Storage.rename(old, deck)) LOG_INF("CARD", "Restored %s", deck);
-    } else if (Storage.remove(old)) {
-      LOG_INF("CARD", "Removed %s", old);
-    }
+    settleReplacedDeck(old, deck, partial);
   }
+}
+
+Placed placeReceivedDeck(char* partial, const size_t partialCap, const char* name, char* finalPath,
+                         const size_t finalCap) {
+  const char* folder = deckDir();
+  if (!Storage.exists(folder) && !Storage.mkdir(folder)) return Placed::Failed;
+  char old[240];
+  char moved[240];
+  const int n = snprintf(finalPath, finalCap, "%s/%s", folder, name);
+  if (n <= 0 || static_cast<size_t>(n) >= finalCap ||
+      snprintf(old, sizeof(old), "%s%s", finalPath, DECK_OLD_SUFFIX) >= static_cast<int>(sizeof(old)) ||
+      snprintf(moved, sizeof(moved), "%s%s", finalPath, DECK_PARTIAL_SUFFIX) >= static_cast<int>(sizeof(moved)) ||
+      strlen(moved) >= partialCap) {
+    return Placed::Failed;
+  }
+  // An earlier replace of this deck cut short is settled before its partial's place is reused.
+  settleReplacedDeck(old, finalPath, moved);
+  if (strcmp(partial, moved) != 0) {
+    if (Storage.exists(moved)) Storage.remove(moved);
+    if (!Storage.rename(partial, moved)) return Placed::Failed;
+    snprintf(partial, partialCap, "%s", moved);
+  }
+  if (!Storage.exists(finalPath)) return Storage.rename(moved, finalPath) ? Placed::Done : Placed::Failed;
+  if (Storage.exists(old) && !Storage.remove(old)) return Placed::Failed;
+  if (!Storage.rename(finalPath, old)) return Placed::Failed;
+  if (!Storage.rename(moved, finalPath)) {
+    if (Storage.rename(old, finalPath)) return Placed::Failed;
+    LOG_ERR("CARD", "Cannot restore %s", finalPath);
+    return Placed::PartialKept;
+  }
+  if (!Storage.remove(old)) LOG_ERR("CARD", "Cannot remove %s", old);
+  return Placed::Done;
 }
 
 const char* deckDir() {

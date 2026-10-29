@@ -511,3 +511,63 @@ TEST(CardStore, ReplacedDecksAreSettled) {
   EXPECT_FALSE(Storage.exists("/Карточки/c.tsv.localsend-old"));
   EXPECT_TRUE(Storage.exists("/Книги/d.tsv.localsend-old"));
 }
+
+namespace {
+std::string bytesOf(const char* path) {
+  const auto& b = fake::files.at(path)->bytes;
+  return {b.begin(), b.end()};
+}
+}  // namespace
+
+TEST(CardStore, ReceivedAnkiDeckReplacesThroughTheDeckFolder) {
+  fake::reset();
+  fake::add("/Карточки/es.txt", "old deck");
+  fake::add("/Книги/es (1).txt.localsend", "new deck");
+  char partial[216] = "/Книги/es (1).txt.localsend";
+  char final[208];
+  EXPECT_EQ(placeReceivedDeck(partial, sizeof(partial), "es.txt", final, sizeof(final)), Placed::Done);
+  EXPECT_STREQ(final, "/Карточки/es.txt");
+  EXPECT_EQ(bytesOf("/Карточки/es.txt"), "new deck");
+  EXPECT_FALSE(Storage.exists("/Книги/es (1).txt.localsend"));
+  EXPECT_FALSE(Storage.exists("/Карточки/es.txt.localsend"));
+  EXPECT_FALSE(Storage.exists("/Карточки/es.txt.localsend-old"));
+}
+
+TEST(CardStore, ReceivedDeckCutMidReplaceComesBack) {
+  fake::reset();
+  fake::add("/Карточки/es.txt", "old deck");
+  fake::add("/Книги/es.txt.localsend", "new deck");
+  char partial[216] = "/Книги/es.txt.localsend";
+  char final[208];
+  // The new deck cannot move in; the old one goes back.
+  fake::failRename = 2;
+  EXPECT_EQ(placeReceivedDeck(partial, sizeof(partial), "es.txt", final, sizeof(final)), Placed::Failed);
+  EXPECT_EQ(bytesOf("/Карточки/es.txt"), "old deck");
+  EXPECT_STREQ(partial, "/Карточки/es.txt.localsend");
+
+  // A cut between the old deck stepping aside and the new one moving in.
+  fake::reset();
+  fake::add("/Карточки/es.txt.localsend-old", "old deck");
+  fake::add("/Карточки/es.txt.localsend", "new deck");
+  restoreReplacedDecks();
+  EXPECT_EQ(bytesOf("/Карточки/es.txt"), "old deck");
+  EXPECT_FALSE(Storage.exists("/Карточки/es.txt.localsend"));
+  EXPECT_FALSE(Storage.exists("/Карточки/es.txt.localsend-old"));
+}
+
+TEST(CardStore, RetryAfterPartialKeptSettlesFirst) {
+  fake::reset();
+  // What PartialKept leaves: no deck, the old copy aside, the partial next to it.
+  fake::add("/Карточки/es.txt.localsend-old", "old deck");
+  fake::add("/Карточки/es.txt.localsend", "kept partial");
+  fake::add("/Книги/es.txt.localsend", "retried deck");
+  char partial[216] = "/Книги/es.txt.localsend";
+  char final[208];
+  // The retry's own move fails: the old deck must still be there.
+  fake::failRename = 1;
+  EXPECT_EQ(placeReceivedDeck(partial, sizeof(partial), "es.txt", final, sizeof(final)), Placed::Failed);
+  EXPECT_EQ(bytesOf("/Карточки/es.txt"), "old deck");
+  EXPECT_FALSE(Storage.exists("/Карточки/es.txt.localsend-old"));
+  EXPECT_EQ(placeReceivedDeck(partial, sizeof(partial), "es.txt", final, sizeof(final)), Placed::Done);
+  EXPECT_EQ(bytesOf("/Карточки/es.txt"), "retried deck");
+}

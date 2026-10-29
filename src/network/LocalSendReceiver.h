@@ -78,7 +78,7 @@ class LocalSendReceiver {
     uint64_t freeCache = 0;
     bool freeKnown = false;
     void stopHashing();
-    bool placeIn(const char* folder, const char* name, bool replace);
+    bool placeIn(const char* folder, const char* name);
     int entryIndex(const localsend::FileEntry& entry) const;
   };
 
