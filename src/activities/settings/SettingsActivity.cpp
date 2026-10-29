@@ -397,16 +397,14 @@ void SettingsActivity::toggleSelectedSetting() {
                                });
         break;
       case SettingAction::Plugins: {
-        ValuePickerActivity::open(*this, renderer, mappedInput, tr(STR_PLUGINS), {tr(STR_ENABLED), tr(STR_DISABLED)},
-                                  SETTINGS.pluginsEnabled ? 0 : 1, [this](const int idx) {
-                                    SETTINGS.pluginsEnabled = idx == 0 ? 1 : 0;
-                                    // Turning plugins on brings back a dismissed Plugin Hub install row.
-                                    if (SETTINGS.pluginsEnabled) SETTINGS.pluginHubPromptHidden = 0;
-                                    SETTINGS.saveToFile();
-                                    // Applies to event delivery now, not after a reboot.
-                                    pluginevents::refreshSubscriptions();
-                                    rebuildSettings();
-                                  });
+        SETTINGS.pluginsEnabled = SETTINGS.pluginsEnabled ? 0 : 1;
+        // Turning plugins on brings back a dismissed Plugin Hub install row.
+        if (SETTINGS.pluginsEnabled) SETTINGS.pluginHubPromptHidden = 0;
+        SETTINGS.saveToFile();
+        // Applies to event delivery now, not after a reboot.
+        pluginevents::refreshSubscriptions();
+        rebuildSettings();
+        nav.selected = std::min(selectedSetting, static_cast<int>(settings.size()) - 1);
         return;
       }
       case SettingAction::KeyboardLayouts:
@@ -485,7 +483,6 @@ std::string SettingsActivity::settingValueText(const SettingInfo& setting) {
     const char* path = SETTINGS.sleepImagePath;
     return path[0] == '\0' ? tr(STR_SLEEP_IMAGE_RANDOM) : strrchr(path, '/') + 1;
   }
-  if (setting.action == SettingAction::Plugins) return SETTINGS.pluginsEnabled ? tr(STR_ENABLED) : tr(STR_DISABLED);
   if (setting.type == SettingType::ENUM && setting.valuePtr != nullptr) {
     // Guard like the valueGetter branch below: a corrupt/migrated settings
     // byte must not index past the enum table.
@@ -536,7 +533,10 @@ void SettingsActivity::buildScreen(UiScreen& screen) {
     const bool checkbox = setting.type == SettingType::TOGGLE ||
                           (setting.type == SettingType::ENUM && setting.enumStringValues.empty() &&
                            labels.size() == 2 && labels[0] == StrId::STR_STATE_OFF && labels[1] == StrId::STR_STATE_ON);
-    if (checkbox && (setting.valuePtr || setting.valueGetter)) {
+    if (setting.action == SettingAction::Plugins) {
+      rowValues_[i].clear();
+      GUI.setCheckboxRow(rowItems_[i], SETTINGS.pluginsEnabled != 0);
+    } else if (checkbox && (setting.valuePtr || setting.valueGetter)) {
       const bool checked = setting.valuePtr ? SETTINGS.*(setting.valuePtr) != 0 : setting.valueGetter() != 0;
       rowValues_[i].clear();
       GUI.setCheckboxRow(rowItems_[i], checked);

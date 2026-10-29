@@ -425,7 +425,6 @@ STR_RESTARTING_HINT: "Restartování... Pokud se zařízení nerestartuje, podr�
 STR_RESUME: "Pokračovat"
 STR_SD_FIRMWARE_UPDATE: "Aktualizace firmwaru z SD karty"
 STR_SEARCH: "Hledat"
-STR_SELECTED: "Vybráno"
 STR_SELECT_FIRMWARE_FILE: "Vyberte soubor firmwaru (.bin)"
 STR_SERVER_NAME: "Název serveru"
 STR_SET_SLEEP_COVER: "Nastavit obálku"
