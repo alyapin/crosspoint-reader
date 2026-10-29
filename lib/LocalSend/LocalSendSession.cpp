@@ -271,7 +271,8 @@ bool makeCollisionName(const char* name, const int index, char* out, const size_
 bool isAcceptedBookName(const char* name) {
   const std::string_view n(name);
   return FsHelpers::hasEpubExtension(n) || FsHelpers::hasFb2Extension(n) || FsHelpers::hasTxtExtension(n) ||
-         FsHelpers::hasMarkdownExtension(n) || FsHelpers::hasXtcExtension(n);
+         FsHelpers::hasMarkdownExtension(n) || FsHelpers::hasXtcExtension(n) ||
+         FsHelpers::checkFileExtension(n, ".tsv") || FsHelpers::checkFileExtension(n, ".csv");
 }
 
 Session::Session()

@@ -5,6 +5,7 @@
 #include "CrossPointSettings.h"
 #include "OpdsServerStore.h"
 #include "activities/browser/OpdsBookBrowserActivity.h"
+#include "activities/cards/CardsActivity.h"
 #include "activities/games/GamesActivity.h"
 #include "activities/home/FileBrowserActivity.h"
 #include "activities/network/CrossPointWebServerActivity.h"
@@ -13,15 +14,18 @@
 #include "activities/settings/OpdsServerListActivity.h"
 #include "components/icons/listIcons.h"
 #include "components/setka/setkaIcons.h"
+#include "games/ui/gameIcons.h"
 
 void MoreActivity::onEnter() {
   entryCount = 0;
   entries[entryCount++] = Entry::Games;
+  entries[entryCount++] = Entry::Cards;
   entries[entryCount++] = Entry::ReceiveBooks;
   entries[entryCount++] = Entry::FileTransfer;
   entries[entryCount++] = Entry::Catalogs;
   if (SETTINGS.pluginsEnabled) entries[entryCount++] = Entry::Plugins;
   entries[entryCount++] = Entry::SdFiles;
+  CardsActivity::dueTodayText(cardsStatus, sizeof(cardsStatus));
   SetkaListActivity::onEnter();
 }
 
@@ -31,6 +35,8 @@ const char* MoreActivity::rowLabel(const int index) const {
   switch (entries[index]) {
     case Entry::Games:
       return tr(STR_GAMES);
+    case Entry::Cards:
+      return tr(STR_CARDS);
     case Entry::ReceiveBooks:
       return tr(STR_LOCALSEND_TITLE);
     case Entry::FileTransfer:
@@ -49,6 +55,8 @@ const freeink::Icon* MoreActivity::rowIcon(const int index) const {
   switch (entries[index]) {
     case Entry::Games:
       return &icon_gamepad_24;
+    case Entry::Cards:
+      return &icon_cards_24;
     case Entry::ReceiveBooks:
       return &icon_download_24;
     case Entry::FileTransfer:
@@ -63,11 +71,23 @@ const freeink::Icon* MoreActivity::rowIcon(const int index) const {
   return nullptr;
 }
 
+const char* MoreActivity::rowStatus(const int index) const {
+  return entries[index] == Entry::Cards ? cardsStatus : nullptr;
+}
+
+void MoreActivity::onChildClosed() {
+  RenderLock lock(*this);
+  CardsActivity::dueTodayText(cardsStatus, sizeof(cardsStatus));
+}
+
 void MoreActivity::activateIndex(const int index) {
   app.clearTapFlash();
   switch (entries[index]) {
     case Entry::Games:
       openChild(std::make_unique<GamesActivity>(renderer, mappedInput));
+      break;
+    case Entry::Cards:
+      openChild(std::make_unique<CardsActivity>(renderer, mappedInput));
       break;
     case Entry::ReceiveBooks:
       openChild(std::make_unique<LocalSendActivity>(renderer, mappedInput));

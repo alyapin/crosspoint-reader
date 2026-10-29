@@ -1,0 +1,7 @@
+#separator:tab
+#html:true
+#notetype column:1
+Cloze	{{c1::Москва}} — столица {{c2::России::страна}}	Столица с 1918 года
+Basic	Что такое фотосинтез?	Photosynthesis is the process by which green plants, algae and some bacteria turn light into chemical energy. Inside the chloroplasts, chlorophyll absorbs mostly red and blue light and passes the energy to a chain of reactions that split water, release oxygen and store energy in two carrier molecules. In the second stage, often called the Calvin cycle, that stored energy is used to fix carbon dioxide from the air into simple sugars. Those sugars feed the plant itself and, through food chains, almost every other living thing on Earth. The oxygen released over billions of years changed the atmosphere and made animal life possible. The rate of photosynthesis depends on light, temperature, water and the amount of carbon dioxide; when one of them runs short, it limits the whole process no matter how plentiful the others are. Farmers in greenhouses raise the carbon dioxide level for this reason, and gardeners notice that shaded leaves grow larger and thinner to catch more light. A single large tree can release enough oxygen in a season for several people.
+Basic	bank	банк
+Basic	bank	берег реки

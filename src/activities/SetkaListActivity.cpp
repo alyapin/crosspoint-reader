@@ -26,7 +26,10 @@ void SetkaListActivity::onEnter() {
 }
 
 void SetkaListActivity::openChild(std::unique_ptr<Activity> child) {
-  startActivityForResult(std::move(child), [this](const ActivityResult&) { entryRefresh = true; });
+  startActivityForResult(std::move(child), [this](const ActivityResult&) {
+    onChildClosed();
+    entryRefresh = true;
+  });
 }
 
 bool SetkaListActivity::handleCustomInput() {

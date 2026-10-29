@@ -50,7 +50,8 @@ bool datagramWantsReply(const char* data, size_t len, const char* ownFingerprint
 bool sanitizeFileName(const char* in, char* out, size_t cap);
 // index 0 copies the name; index N inserts " (N)" before the extension.
 bool makeCollisionName(const char* name, int index, char* out, size_t cap);
-// The formats the library indexes: epub, fb2, fb2.zip, txt, md, xtc, xtch.
+// The formats the library indexes: epub, fb2, fb2.zip, txt, md, xtc, xtch;
+// and flashcard tables, tsv and csv.
 bool isAcceptedBookName(const char* name);
 
 enum class FileState : uint8_t { Rejected, Accepted, Receiving, Done, Failed };

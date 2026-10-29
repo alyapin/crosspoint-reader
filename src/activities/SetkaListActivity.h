@@ -31,6 +31,8 @@ class SetkaListActivity : public UiListActivity {
   virtual const char* emptyText() const { return nullptr; }
   // Opens a screen on top of this one; coming back repaints with the entry refresh.
   void openChild(std::unique_ptr<Activity> child);
+  // A screen opened with openChild() closed.
+  virtual void onChildClosed() {}
 
  private:
   bool handleCustomInput() override;

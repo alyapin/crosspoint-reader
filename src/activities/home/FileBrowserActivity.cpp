@@ -1,5 +1,6 @@
 #include "FileBrowserActivity.h"
 
+#include <CardDeck.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalStorage.h>
@@ -15,6 +16,7 @@
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
 #include "RecentBooksStore.h"
+#include "activities/cards/CardsActivity.h"
 #include "activities/util/ConfirmationActivity.h"
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
@@ -29,6 +31,12 @@ namespace fui = freeink::ui;
 namespace {
 constexpr unsigned long GO_HOME_MS = 1000;
 constexpr size_t NAME_BUFFER_SIZE = 500;
+
+// A file in the flashcard folder opens as a deck.
+bool inDeckFolder(std::string path) {
+  while (path.size() > 1 && path.back() == '/') path.pop_back();
+  return path == cards::DECK_DIR || path == cards::DECK_DIR_LOWER;
+}
 
 std::string getBookCachePath(const std::string& path) {
   const char* prefix = nullptr;
@@ -133,7 +141,7 @@ void FileBrowserActivity::loadFiles() {
           files.emplace_back(filename);
         }
       } else if (FsHelpers::hasReflowableBookExtension(filename) || FsHelpers::hasXtcExtension(filename) ||
-                 FsHelpers::hasImageExtension(filename)) {
+                 FsHelpers::hasImageExtension(filename) || (inDeckFolder(basepath) && cards::isDeckName(filename))) {
         files.emplace_back(filename);
       }
     }
@@ -371,7 +379,13 @@ void FileBrowserActivity::activateSelected() {
     requestUpdate();
   } else {
     const std::string fullPath = basepath + entry;
+    const bool deck = inDeckFolder(basepath) && cards::isDeckName(entry);
     lock.unlock();  // onSelectBook launches an activity; don't hold the lock across it
+    if (deck) {
+      startActivityForResult(std::make_unique<CardsActivity>(renderer, mappedInput, entry),
+                             [this](const ActivityResult&) { requestUpdate(); });
+      return;
+    }
     onSelectBook(fullPath);
   }
 }

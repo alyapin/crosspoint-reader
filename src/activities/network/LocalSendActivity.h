@@ -36,6 +36,7 @@ class LocalSendActivity final : public Activity, private UiAppHost {
     uint8_t percent;
     localsend::FileState state;
     localsend::Reject reason;
+    bool toCards;
   };
   struct View {
     Stage stage = Stage::Connecting;

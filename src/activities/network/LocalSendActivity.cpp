@@ -220,6 +220,7 @@ void LocalSendActivity::syncView() {
       row.percent = static_cast<uint8_t>(e.size ? e.received * 100 / e.size : 0);
       row.state = e.state;
       row.reason = e.reason;
+      row.toCards = e.state == FileState::Done && receiver->toCards(i);
       key = key * 31u + static_cast<uint32_t>(e.state) * 5u + static_cast<uint32_t>(e.reason);
     }
     if (key != layoutKey) {
@@ -333,7 +334,11 @@ void LocalSendActivity::drawRequest(int y, const int width) {
         break;
       case FileState::Receiving:
       case FileState::Done:
-        snprintf(right, sizeof(right), "%u%%", row.state == FileState::Done ? 100u : row.percent);
+        if (row.toCards) {
+          snprintf(right, sizeof(right), "%s", tr(STR_CARDS_RECEIVED));
+        } else {
+          snprintf(right, sizeof(right), "%u%%", row.state == FileState::Done ? 100u : row.percent);
+        }
         bar = true;
         break;
     }
