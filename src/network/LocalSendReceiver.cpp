@@ -29,6 +29,30 @@ constexpr uint32_t REPLY_INTERVAL_MS = 500;
 constexpr int DATAGRAMS_PER_LOOP = 4;
 // Not a book extension, so no received file ends with it; .part belongs to web uploads.
 constexpr char PART_SUFFIX[] = ".localsend";
+// A deck being replaced waits under this name until the new one is in place.
+constexpr char OLD_SUFFIX[] = ".localsend-old";
+
+bool endsWith(const char* name, const char* suffix) {
+  const size_t len = strlen(name);
+  const size_t n = strlen(suffix);
+  return len > n && strcmp(name + len - n, suffix) == 0;
+}
+
+// Moves `tmp` over `path` keeping the old file until the new one is in: a
+// failure or a cut at any step leaves one complete copy.
+bool replaceKeepingOld(const char* tmp, const char* path) {
+  if (!Storage.exists(path)) return Storage.rename(tmp, path);
+  char old[224];
+  snprintf(old, sizeof(old), "%s%s", path, OLD_SUFFIX);
+  if (Storage.exists(old) && !Storage.remove(old)) return false;
+  if (!Storage.rename(path, old)) return false;
+  if (!Storage.rename(tmp, path)) {
+    if (!Storage.rename(old, path)) LOG_ERR("LSND", "cannot restore %s", path);
+    return false;
+  }
+  if (!Storage.remove(old)) LOG_ERR("LSND", "cannot remove %s", old);
+  return true;
+}
 
 uint32_t hardwareRandom() { return esp_random(); }
 }  // namespace
@@ -260,7 +284,7 @@ int LocalSendReceiver::Store::commit(const localsend::FileEntry& entry) {
       snprintf(finalPath, sizeof(finalPath), "%.*s", static_cast<int>(strlen(partial) - strlen(PART_SUFFIX)), partial);
     }
   }
-  if (!(deck ? Storage.replaceFile(tmpPath, finalPath) : Storage.rename(tmpPath, finalPath))) {
+  if (!(deck ? replaceKeepingOld(tmpPath, finalPath) : Storage.rename(tmpPath, finalPath))) {
     LOG_ERR("LSND", "rename failed: %s", finalPath);
     abort();
     return 500;
@@ -282,25 +306,36 @@ void LocalSendReceiver::Store::abort() {
   tmpPath[0] = 0;
 }
 
-// A transfer cut by a reset leaves its partial, which would count against the free space.
+// A transfer cut by a reset leaves its partial, which would count against the
+// free space; a deck replace cut short leaves the old deck aside, which comes
+// back when the new one did not arrive.
 void LocalSendReceiver::Store::reclaimPartials(const char* folder) {
   std::vector<std::string> stale;
+  std::vector<std::string> old;
   {
     HalFile root = Storage.open(folder[0] ? folder : "/");
     if (!root || !root.isDirectory()) return;
-    constexpr size_t suffixLen = sizeof(PART_SUFFIX) - 1;
     char name[256];
     for (HalFile entry = root.openNextFile(); entry; entry = root.openNextFile()) {
       resetTaskWatchdogIfSubscribed();
       if (entry.isDirectory()) continue;
       entry.getName(name, sizeof(name));
-      const size_t len = strlen(name);
-      if (len > suffixLen && strcmp(name + len - suffixLen, PART_SUFFIX) == 0) stale.emplace_back(name);
+      if (endsWith(name, PART_SUFFIX)) stale.emplace_back(name);
+      if (endsWith(name, OLD_SUFFIX)) old.emplace_back(name);
     }
   }
   for (const std::string& name : stale) {
     const std::string path = std::string(folder) + "/" + name;
     if (Storage.remove(path.c_str())) LOG_INF("LSND", "removed partial %s", path.c_str());
+  }
+  for (const std::string& name : old) {
+    const std::string path = std::string(folder) + "/" + name;
+    const std::string original = path.substr(0, path.size() - (sizeof(OLD_SUFFIX) - 1));
+    if (!Storage.exists(original.c_str())) {
+      if (Storage.rename(path.c_str(), original.c_str())) LOG_INF("LSND", "restored %s", original.c_str());
+    } else if (Storage.remove(path.c_str())) {
+      LOG_INF("LSND", "removed replaced %s", path.c_str());
+    }
   }
 }
 
