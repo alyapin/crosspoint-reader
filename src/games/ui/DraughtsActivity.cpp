@@ -107,7 +107,14 @@ bool DraughtsActivity::restore() {
   return true;
 }
 
-void DraughtsActivity::saveGame() { gamesave::save(game); }
+// A finished game (won, lost, resigned or drawn) leaves no save: its moves alone would replay to a running position.
+void DraughtsActivity::saveGame() {
+  if (game.isOver()) {
+    clearSave();
+  } else {
+    gamesave::save(game);
+  }
+}
 
 void DraughtsActivity::clearSave() { gamesave::clear(gamesave::Kind::Draughts); }
 
