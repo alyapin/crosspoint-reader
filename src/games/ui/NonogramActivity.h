@@ -49,6 +49,9 @@ class NonogramActivity final : public GameScreen {
   bool onBack() override;
   int32_t shownMinutes() const override;
   bool wantsLongPress() const override { return true; }
+  // Button boards: a held Confirm crosses the cell (a filled one stays filled) and starts a stroke.
+  bool holdsConfirm() const override;
+  void onConfirmHold() override;
 
   Notice loadPicture(int side);
   bool boardShown() const { return game.hasPuzzle() && notice == Notice::None; }
@@ -68,6 +71,8 @@ class NonogramActivity final : public GameScreen {
   bool keyCursor = false;
   int barFocus = -1;
   bool crossMode = false;
+  bool stroking = false;  // button boards: the arrows paint strokeMark on the empty cells they reach
+  nonogram::Mark strokeMark = nonogram::Crossed;
   bool checkShown = false;
   Notice notice = Notice::None;
   int noticeSide = 0;

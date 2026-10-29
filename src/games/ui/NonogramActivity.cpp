@@ -117,6 +117,7 @@ void NonogramActivity::pickerChosen(const int row, bool) {
     }
   }
   crossMode = false;
+  stroking = false;
   checkShown = false;
   newBest = false;
   keyCursor = !mappedInput.hasTouch();
@@ -188,8 +189,8 @@ void NonogramActivity::apply(const int cell, const Mark mark) {
 }
 
 bool NonogramActivity::barShown(const int slot) const {
-  // Крестик and Отменить while playing, Меню (Новая игра once solved or without a board) always.
-  if (slot == 0) return boardShown() && game.inProgress();
+  // Крестик (touch) and Отменить while playing, Меню (Новая игра once solved or without a board) always.
+  if (slot == 0) return hasBar() && boardShown() && game.inProgress();
   if (slot == 1) return boardShown() && game.canUndo();
   return slot == 2;
 }
@@ -264,6 +265,17 @@ void NonogramActivity::onKey(const int dx, const int dy, const bool confirm) {
   } else if (cursor < 0 || !keyCursor) {
     if (cursor < 0) cursor = n / 2 * n + n / 2;
     keyCursor = true;
+  } else if (stroking) {
+    if (confirm) {
+      stroking = false;
+      requestRepaint(RepaintUpdate);
+    } else if (dx != 0 || dy != 0) {
+      const int x = (cursor % n + dx + n) % n;
+      const int y = (cursor / n + dy + n) % n;
+      cursor = y * n + x;
+      if (game.mark(cursor) == nonogram::Empty) apply(cursor, strokeMark);
+      stroking = game.inProgress();
+    }
   } else {
     const int y = cursor / n;
     if (confirm) {
@@ -289,7 +301,26 @@ void NonogramActivity::onKey(const int dx, const int dy, const bool confirm) {
   if (!std::equal(std::begin(before), std::end(before), std::begin(after))) requestRepaint(RepaintUpdate);
 }
 
+bool NonogramActivity::holdsConfirm() const {
+  return !hasBar() && boardShown() && game.inProgress() && keyCursor && cursor >= 0 && barFocus < 0 && !stroking;
+}
+
+void NonogramActivity::onConfirmHold() {
+  strokeMark = game.mark(cursor) == nonogram::Filled ? nonogram::Filled : nonogram::Crossed;
+  stroking = true;
+  if (game.mark(cursor) != strokeMark) {
+    apply(cursor, strokeMark);
+  } else {
+    requestRepaint(RepaintUpdate);
+  }
+}
+
 bool NonogramActivity::onBack() {
+  if (stroking) {
+    stroking = false;
+    requestRepaint(RepaintUpdate);
+    return true;
+  }
   if (barFocus < 0 || !boardShown()) return false;
   barFocus = -1;
   requestRepaint(RepaintUpdate);
@@ -498,6 +529,6 @@ void NonogramActivity::drawCaption(const int top) const {
   }
   const char* hint = mappedInput.hasTouch()
                          ? (crossMode ? tr(STR_NONOGRAM_CROSS_HINT) : tr(STR_NONOGRAM_TAP_HINT))
-                         : (crossMode ? tr(STR_NONOGRAM_KEYS_CROSS_HINT) : tr(STR_NONOGRAM_KEYS_HINT));
+                         : (stroking ? tr(STR_NONOGRAM_KEYS_STROKE_HINT) : tr(STR_NONOGRAM_KEYS_HINT));
   renderer.drawText(kCaptionFont, kSidePadding, top, hint);
 }
