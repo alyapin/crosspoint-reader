@@ -16,7 +16,7 @@ bool endsWithBmp(const std::string_view name) {
 }
 
 // Bump when the thumbnail pixels change for the same inputs.
-constexpr uint8_t kThumbFormat = 1;
+constexpr uint8_t kThumbFormat = 2;
 
 uint32_t fnv1a(uint32_t hash, const void* data, const size_t size) {
   const auto* bytes = static_cast<const uint8_t*>(data);
@@ -46,13 +46,14 @@ bool isChoicePath(const std::string_view path) {
   return false;
 }
 
-SourceOrder sourceOrder(const bool hasChoice) {
+SourceOrder sourceOrder(const bool hasChoice, const bool randomPicked) {
   if (hasChoice) return {{Source::Chosen, Source::Random, Source::RootBmp}, 3};
+  if (randomPicked) return {{Source::Random, Source::RootBmp}, 2};
   return {{Source::RootBmp, Source::Random}, 2};
 }
 
 uint32_t thumbKey(const std::string_view path, const uint32_t fileSize, const uint32_t mtime, const int thumbW,
-                  const int thumbH, const bool crop) {
+                  const int thumbH, const bool crop, const uint8_t filter) {
   uint32_t hash = 2166136261u;
   hash = fnv1a(hash, path.data(), path.size());
   const uint8_t separator = 0;
@@ -61,7 +62,7 @@ uint32_t thumbKey(const std::string_view path, const uint32_t fileSize, const ui
   hash = fnv1aLe(hash, mtime);
   hash = fnv1aLe(hash, static_cast<uint32_t>(thumbW));
   hash = fnv1aLe(hash, static_cast<uint32_t>(thumbH));
-  const uint8_t tail[2] = {static_cast<uint8_t>(crop ? 1 : 0), kThumbFormat};
+  const uint8_t tail[3] = {static_cast<uint8_t>(crop ? 1 : 0), filter, kThumbFormat};
   return fnv1a(hash, tail, sizeof(tail));
 }
 

@@ -27,8 +27,9 @@ class SleepActivity final : public Activity {
   void renderCustomSleepScreen() const;
   bool renderSleepBmp(const std::string& path) const;
   void renderCoverSleepScreen() const;
-  // False when the pixels could not be read or the gray base failed (a partial
-  // frame may already be on the panel); the caller can try another picture.
+  // False when the pixels could not be read or the gray base or a gray plane
+  // failed (a partial frame may already be on the panel); the caller can try
+  // another picture.
   bool renderBitmapSleepScreen(const Bitmap& bitmap, bool preserveBackground = false) const;
   bool renderSleepOverlayFile(HalFile& file, const char* pathForLog) const;
   bool renderTransparentOverlayPng(const std::string& path) const;

@@ -430,9 +430,10 @@ void BmpViewerActivity::doSetSleepCover() {
   if (success) {
     if (!transparentMode) {
       SETTINGS.sleepScreen = CrossPointSettings::SLEEP_SCREEN_MODE::CUSTOM;
-      // sleep.bmp shows only while no folder picture is chosen (as in
+      // sleep.bmp shows only while nothing is picked, Random included (as in
       // guloff/folio-firmware, MIT): the newest pick wins.
       SETTINGS.sleepImagePath[0] = '\0';
+      SETTINGS.sleepImageRandom = 0;
     }
     SETTINGS.saveToFile();
     GUI.drawPopup(renderer, tr(STR_DONE));

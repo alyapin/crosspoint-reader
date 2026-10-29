@@ -263,6 +263,10 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // image ("" = random from /.sleep and /sleep). Validated by
   // sleep_pick::isChoicePath on load; saved manually like dictionaryName.
   char sleepImagePath[192] = "";
+  // 1 once the picker's Random tile is chosen: the folders then go before
+  // /sleep.bmp (sleep_pick::sourceOrder). 0 with no path, as in files saved
+  // before this key and after "Set sleep cover", keeps /sleep.bmp first.
+  uint8_t sleepImageRandom = 0;
   // Status bar settings. This build defaults to the book footer: whole-book
   // page on the left, reading time left on the right, nothing else.
   uint8_t statusBarChapterPageCount = 0;

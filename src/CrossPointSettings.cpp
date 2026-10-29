@@ -112,6 +112,7 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
   if (sleepImagePath[0] != '\0') {
     doc["sleepImagePath"] = sleepImagePath;
   }
+  if (sleepImageRandom) doc["sleepImageRandom"] = sleepImageRandom;
   // The displayed option list varies by board, so this setting uses a dynamic
   // display-index mapping and is skipped by the generic persistence loop.
   doc["longPressMenuFunction"] = longPressMenuFunction;
@@ -309,6 +310,7 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   copyToField(dictionaryName, doc["dictionaryName"] | "", sizeof(dictionaryName));
   const char* sleepImage = doc["sleepImagePath"] | "";
   copyToField(sleepImagePath, sleep_pick::isChoicePath(sleepImage) ? sleepImage : "", sizeof(sleepImagePath));
+  sleepImageRandom = clamp(doc["sleepImageRandom"] | (uint8_t)0, 2, 0);
   // Language -- stored as code string for stability across enum reorders.
   if (doc["language"].is<const char*>()) {
     language = static_cast<uint8_t>(I18n::languageFromCode(doc["language"].as<const char*>()));

@@ -670,9 +670,9 @@ void SleepActivity::onEnter() {
 void SleepActivity::renderCustomSleepScreen() const {
   // A picture picked in Settings → Sleep image comes first. /sleep.bmp on the
   // card root keeps its old priority over both sleep folders only while
-  // nothing is picked (sleep_pick::sourceOrder).
+  // nothing is picked, Random included (sleep_pick::sourceOrder).
   const char* chosen = SETTINGS.sleepImagePath;
-  for (const auto source : sleep_pick::sourceOrder(chosen[0] != '\0')) {
+  for (const auto source : sleep_pick::sourceOrder(chosen[0] != '\0', SETTINGS.sleepImageRandom != 0)) {
     switch (source) {
       case sleep_pick::Source::Chosen:
         if (renderSleepBmp(chosen)) return;
@@ -839,8 +839,9 @@ bool SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap, const bool pre
     if (ready)
       renderer.displayGrayBuffer();
     else
-      LOG_ERR("SLP", "Incomplete grayscale image; keeping the current display");
+      LOG_ERR("SLP", "Incomplete grayscale image");
     renderer.setRenderMode(GfxRenderer::BW);
+    return ready;
   }
   return true;
 }
