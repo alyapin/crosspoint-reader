@@ -416,9 +416,8 @@ void LibraryShelvesActivity::loop() {
 
 int LibraryShelvesActivity::drawTabs(UiScreen& screen, const int stripTop, const int width) {
   constexpr int kStripPad = 12;
-  constexpr int kStripRightPad = 12;  // the strip may run past the content padding, clear of the bezel
   const int firstX = kSelectionBarX + kSelectionBarWidth + kTabBarGap;
-  const int room = width - firstX - kStripRightPad;
+  const int room = width - firstX - kSidePadding;
   // Regular labels plus the widest SemiBold gain pick the font, so it does not
   // change with the active tab; the text role never drops to the caption.
   int font = kText10Font;
@@ -551,7 +550,7 @@ void LibraryShelvesActivity::drawMenu(UiScreen& screen, const int areaTop, const
     title = books[menuRow].title.c_str();
   }
   statsui::drawMenuBox(renderer, screen, title, menuCount, menuFocus, buttonsUsed, &describeMenu, this, areaTop, bottom,
-                       width, ACTION_MENU, ACTION_DISMISS);
+                       width, ACTION_MENU, ACTION_DISMISS, tab == TabShelves ? kShelfRowHeight : kBookRowHeight);
 }
 
 void LibraryShelvesActivity::draw(UiScreen& screen) {

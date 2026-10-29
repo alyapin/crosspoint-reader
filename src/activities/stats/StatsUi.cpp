@@ -147,14 +147,16 @@ void drawIconRow(const GfxRenderer& renderer, freeink::ui::DrawTarget& target, c
 void drawMenuBox(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, const char* title, const int count,
                  const int focus, const bool showFocus, const MenuEntryFn entry, void* ctx, const int areaTop,
                  const int bottom, const int width, const freeink::ui::ActionId itemAction,
-                 const freeink::ui::ActionId dismissAction) {
+                 const freeink::ui::ActionId dismissAction, const int rowPitch) {
   namespace fui = freeink::ui;
   using namespace setka;
   constexpr int kPad = 16;
+  constexpr int kBandMargin = 20;  // cleared above the box, as around OptionPopup
   const int line12 = renderer.getLineHeight(kText12Font);
   const int boxX = kSidePadding;
   const int boxWidth = width - 2 * kSidePadding;
-  const int headHeight = kPad + line12 + kPad / 2;
+  const auto titleLines = renderer.wrappedText(kText12Font, title ? title : "", boxWidth - 2 * kPad, 2, kSemiBold);
+  const int headHeight = kPad + static_cast<int>(titleLines.size()) * line12 + kPad / 2;
   const int fit = std::max(1, (bottom - areaTop - 2 * kPad - headHeight) / kMenuRowHeight);
   const int shown = std::min(count, fit);
   const int first = std::clamp(focus - shown + 1, 0, std::max(0, count - shown));
@@ -164,11 +166,18 @@ void drawMenuBox(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, const
   // Registered first: the rows registered after it win inside the box.
   screen.frame().hit(fui::makeRect(0, 0, width, renderer.getScreenHeight()), dismissAction, 0,
                      fui::InputTouch | fui::InputLongPress);
-  renderer.fillRect(boxX, boxY, boxWidth, boxHeight, false);
+  // The screen under the box is cleared full width down to `bottom`, from a
+  // row boundary when the caller lists rows, so no row shows cut by the frame.
+  int bandTop = std::max(areaTop, boxY - kBandMargin);
+  if (rowPitch > 0) bandTop = areaTop + (bandTop - areaTop) / rowPitch * rowPitch;
+  renderer.fillRect(0, bandTop, width, bottom - bandTop, false);
+  if (bandTop > areaTop) drawRule(renderer, 0, bandTop - kRuleWidth, width);
   renderer.drawRect(boxX, boxY, boxWidth, boxHeight, kRuleWidth, true);
-  renderer.drawText(kText12Font, boxX + kPad, boxY + kPad,
-                    renderer.truncatedText(kText12Font, title ? title : "", boxWidth - 2 * kPad, kSemiBold).c_str(),
-                    true, kSemiBold);
+  int titleTop = boxY + kPad;
+  for (const auto& line : titleLines) {
+    renderer.drawText(kText12Font, boxX + kPad, titleTop, line.c_str(), true, kSemiBold);
+    titleTop += line12;
+  }
   const int rowX = boxX + kPad + (kRowTextX - kSelectionBarX);
   const int rowWidth = boxX + boxWidth - kPad - rowX;
   for (int i = first; i < first + shown; ++i) {

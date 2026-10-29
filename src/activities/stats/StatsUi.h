@@ -66,12 +66,14 @@ class CoverPainter {
 void drawIconRow(const GfxRenderer& renderer, freeink::ui::DrawTarget& target, const freeink::Icon* icon,
                  const char* label, const char* status, int x, int y, int width, int height, bool focused);
 
-// Long-press menu: a framed box above `bottom` with a title and icon rows.
-// A tap outside fires dismissAction; a row fires itemAction with its index.
+// Long-press menu: a framed box above `bottom` with a title (up to two lines)
+// and icon rows, on a cleared band. A tap outside fires dismissAction; a row
+// fires itemAction with its index. rowPitch: the height of the list rows that
+// start at areaTop, so the band starts on a row boundary (0: no rows).
 using MenuEntryFn = void (*)(int index, const freeink::Icon*& icon, const char*& label, void* ctx);
 void drawMenuBox(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, const char* title, int count, int focus,
                  bool showFocus, MenuEntryFn entry, void* ctx, int areaTop, int bottom, int width,
-                 freeink::ui::ActionId itemAction, freeink::ui::ActionId dismissAction);
+                 freeink::ui::ActionId itemAction, freeink::ui::ActionId dismissAction, int rowPitch = 0);
 
 // Dashed outline, for the add-a-book tile.
 void drawDashedRect(const GfxRenderer& renderer, int x, int y, int width, int height);
