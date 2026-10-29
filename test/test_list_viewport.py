@@ -17,6 +17,11 @@ harness = r"""
 namespace fui = freeink::ui;
 struct UiScreen {
   int16_t height = 80;
+  fui::DeviceContext device() const {
+    fui::DeviceContext touch;
+    touch.hasTouch = true;  // button-board paging is ListPager's, tested in test/list_pager
+    return touch;
+  }
   void syncListViewport(fui::ListNav& nav, fui::ListProps& props, int count, int offset) {
     nav.syncToProps({0, 0, 200, height}, 20, 0, count, props, offset);
   }
@@ -24,10 +29,15 @@ struct UiScreen {
 struct UiListActivity {
   fui::ListNav nav;
   int count = 16;
-  bool paged = false;
+  bool paged_ = false;
+  struct {
+    void prepare(UiScreen&, fui::ListProps&, const fui::ListNav&, int, int) {}
+    void follow(fui::ListNav&, fui::ListProps&) {}
+  } pager_;
   fui::ListNav& activeNav() { return nav; }
   int listCount() const { return count; }
-  bool reservePageLine(UiScreen&, fui::ListProps&, bool, int, int) { return paged; }
+  bool showsPageLine() const { return false; }
+  int pageLineTop() const { return -1; }
   void syncListViewport(UiScreen&, fui::ListProps&, int = 0);
 };
 """ + method + r"""
@@ -60,21 +70,6 @@ int main() {
     assert(nav.top == 2 && props.topIndex == 2);
   }
 
-  // Button boards page by whole rows: a selection off the page opens its page.
-  UiListActivity activity;
-  activity.paged = true;
-  UiScreen screen;
-  fui::ListProps props;
-  auto& nav = activity.nav;
-  nav.reset(0);
-  activity.syncListViewport(screen, props);
-  nav.onListRendered(0, 4, true);
-  for (const auto& [selection, top] : {std::pair{4, 4}, {3, 0}, {15, 12}, {11, 8}, {9, 8}}) {
-    nav.requestSelection(selection);
-    activity.syncListViewport(screen, props);
-    assert(nav.top == top && props.topIndex == top);
-    nav.onListRendered(static_cast<uint16_t>(top), 4, true);
-  }
 }
 """
 with tempfile.TemporaryDirectory() as directory:

@@ -5,6 +5,7 @@
 #include <atomic>
 
 #include "activities/Activity.h"
+#include "components/ListPager.h"
 #include "components/UiAppHost.h"
 #include "util/ButtonNavigator.h"
 
@@ -29,6 +30,8 @@ class UiListActivity : public Activity, protected UiAppHost {
   static constexpr freeink::ui::ActionId ACTION_ROW = 1;
   static constexpr freeink::ui::ActionId ACTION_SWIPE_DELETE = 2;
   static constexpr freeink::ui::ActionId ACTION_USER = 3;
+  // Enough builds for a walk to the farthest remembered page and back.
+  static constexpr int kMaxListPasses = 2 * ListPager::kMaxPages + 8;
 
   UiListActivity(const char* name, GfxRenderer& renderer, MappedInputManager& mappedInput,
                  bool wantsTouchLongPress = false);
@@ -82,9 +85,22 @@ class UiListActivity : public Activity, protected UiAppHost {
   // right before screen.list(props).
   // SDK resolves fonts, content padding and touch minimum before measuring.
   // selectionOffset reserves leading ring entries such as the tab bar.
-  // Button boards page by whole rows: no preview of the next row, no scroll
-  // track, and the selection opens the page it is on.
+  // Button boards page by whole rows (ListPager): no preview of the next row,
+  // no scroll track, and the selection opens the page it is on.
   void syncListViewport(UiScreen& screen, freeink::ui::ListProps& props, int selectionOffset = 0);
+  // Builds again while the viewport settles: wrapped rows can fit fewer rows
+  // than the fixed-height estimate (ListNav::onListRendered), and the pager
+  // walks to a page it has not laid out yet, one build per page. Each pass
+  // starts from a clear screen with `chrome` drawn again. Renders that do not
+  // use the base render() call it right after renderUi().
+  template <typename Chrome>
+  void settleList(Chrome&& chrome) {
+    for (int pass = 0; pass < kMaxListPasses && activeNav().consumeRebuildNeeded(); ++pass) {
+      renderer.clearScreen();
+      chrome();
+      renderUi();
+    }
+  }
   // Move the selection to index and pull the viewport to it.
   void moveSelectionTo(int index);
   // The page line («2 из 3», right-aligned above the hints) on button boards;
@@ -103,14 +119,13 @@ class UiListActivity : public Activity, protected UiAppHost {
   // Named apart from UiAppHost::routeTouch so the host overload stays visible
   // (not name-hidden) to subclasses with extra touch surfaces.
   bool routeListTouch();
-  // Sets the paging props; reserves the page line when the rows overflow the
-  // band. Returns whether the list pages (a button board).
-  bool reservePageLine(UiScreen& screen, freeink::ui::ListProps& props, bool trusted, int prevTop, int drawn);
-  int pageLineHeight() const;
-  void drawPageLine();
+  // Top of the page line, on the caption line over the hints.
+  int pageLineTop() const;
+  // After the screen build: the pager's layout feedback, then the page line.
+  void finishPage();
   // Render task only.
-  freeink::ui::Rect pageLine_{};
-  bool pageLineWanted_ = false;
+  ListPager pager_;
+  bool paged_ = false;
 #if FREEINK_CAP_TOUCH
   static void swipeDeleteTrampoline(const freeink::ui::ActionEvent& event, void* user);
   bool handleSwipeDeleteInput();

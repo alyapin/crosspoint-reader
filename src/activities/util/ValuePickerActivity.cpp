@@ -129,6 +129,7 @@ void ValuePickerActivity::render(RenderLock&&) {
   renderer.clearScreen();
   drawChrome();
   renderUi();
+  settleList([this] { drawChrome(); });
   drawFooter();
   renderer.displayBuffer(entryRefresh.exchange(false) ? cadence.entry() : cadence.update());
 }

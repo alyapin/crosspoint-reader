@@ -37,7 +37,6 @@ sync = lists.split("void UiListActivity::syncListViewport(", 1)[1]
 sync = "void TextSettingsActivity::syncListViewport(" + sync.split(
     "\nvoid UiListActivity::drawChrome", 1
 )[0]
-sync += method(lists, "bool UiListActivity::reservePageLine(").replace("UiListActivity::", "TextSettingsActivity::")
 tab_bar = tabs.split("void UiTabListActivity::buildTabBar(UiScreen& screen) {", 1)[1]
 chrome = activity.split("void TextSettingsActivity::drawChrome() {", 1)[1]
 chrome = chrome.split("\nvoid TextSettingsActivity::drawFooter()", 1)[0]
@@ -58,6 +57,7 @@ harness = r"""
 #include <EpdFont.h>
 #include <builtinFonts/ubuntu_10_regular.h>
 #include <builtinFonts/ubuntu_12_regular.h>
+#include <components/ListPager.h>
 #include <components/themes/lyra/LyraTheme.h>
 #include <components/themes/roundedraff/RoundedRaffTheme.h>
 #include <algorithm>
@@ -139,11 +139,11 @@ struct TextSettingsActivity : UiTabListActivity {
   fui::ListNav nav;
   fui::ListNav& activeNav() { return nav; }
   int listCount() const { return rowItems_.size(); }
-  fui::Rect pageLine_{};
-  bool pageLineWanted_ = false;
+  ListPager pager_;
+  bool paged_ = false;
+  int lineTop = -1;  // the page line takes the 28 px over the band's bottom
   bool showsPageLine() const { return true; }
-  int pageLineHeight() const { return 28; }
-  bool reservePageLine(UiScreen&, fui::ListProps&, bool, int, int);
+  int pageLineTop() const { return lineTop; }
   void syncListViewport(UiScreen&, fui::ListProps&, int);
   void syncTabListViewport(UiScreen& screen, fui::ListProps& props) {
     syncListViewport(screen, props, 1);
@@ -225,6 +225,7 @@ void checkLayout(const BoardConfig::BoardProfile& profile, GfxRenderer::Orientat
                            static_cast<int16_t>(bottom), static_cast<int16_t>(left)};
   const Rect safe = UITheme::getInstance().getScreenSafeArea(activity.renderer, true, false);
   activity.enterGeometry();
+  activity.lineTop = safe.y + safe.height - 28;
   activity.drawChrome();
   const Rect preview = activity.renderer.preview;
   assert(preview.x == safe.x && preview.width == safe.width);
@@ -383,14 +384,20 @@ void checkSharedPartialRows(const bool touch) {
   // button boards draw whole rows only.
   for (int remainder : {4, 14, 18, 20, 24, 36}) {
     for (int selected : {1, 4}) {
-      interactions.clear();
-      target.textRects.clear();
-      target.clippedText = false;
       activity.nav.reset(selected);
-      UiScreen screen(frame, theme);
-      screen.setContentMarginFromScreen(fui::Insets{100, 0, static_cast<int16_t>(260 - remainder), 0});
-      const auto content = screen.contentRect();
-      activity.buildRows(screen);
+      fui::Rect content{};
+      // Builds until the pager has walked to the selection's page and back.
+      do {
+        interactions.clear();
+        target.textRects.clear();
+        target.clippedText = false;
+        UiScreen screen(frame, theme);
+        screen.setContentMarginFromScreen(fui::Insets{100, 0, static_cast<int16_t>(260 - remainder), 0});
+        content = screen.contentRect();
+        activity.lineTop = content.bottom() - 28;
+        activity.buildRows(screen);
+        if (!touch) activity.pager_.afterLayout(activity.nav);
+      } while (activity.nav.consumeRebuildNeeded());
       const bool preview = touch && remainder >= 18;
       assert(target.clippedText == preview);
       assert(activity.nav.drawnRows == (touch || remainder >= 28 ? 3 : 2));
