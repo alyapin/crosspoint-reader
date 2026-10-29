@@ -160,6 +160,7 @@ class GameScreen : public Activity, protected UiAppHost {
   mutable BarItem shownBar[MAX_BAR_SLOTS];  // the last drawBar(), for the game menu
   mutable int shownCount = 0;
   int8_t menuIds[GamePickerActivity::MAX_ROWS] = {};  // the open menu's rows (GameScreen.cpp MenuRow)
+  int8_t lastMenuRow = -1;                            // the last bar action or own row chosen there
   setka::RefreshCadence cadence;                      // render task only
   std::atomic<uint8_t> repaint{RepaintEntry};
   ButtonNavigator keyRepeat{games::ui::kKeyRepeatMs, games::ui::kKeyRepeatStartMs};

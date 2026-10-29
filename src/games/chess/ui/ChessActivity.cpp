@@ -508,6 +508,11 @@ void ChessActivity::setView(const View next) {
     focus = kCustomDoneRow;
   } else {
     focus = mappedInput.hasTouch() ? -1 : 0;  // a touch menu shows no bar until a key moves it
+    if (next == View::Menu && focus == 0) {
+      Row rows[kMaxRows];
+      const int count = listRows(rows);
+      focus = std::max(0, static_cast<int>(std::find(rows, rows + count, lastMenuRow) - rows) % count);
+    }
   }
   requestRepaint(RepaintEntry);
 }
@@ -552,6 +557,11 @@ void ChessActivity::activateRow(const int index) {
   }
   Row rows[kMaxRows];
   if (index < 0 || index >= listRows(rows)) return;
+  if (view == View::Menu) {
+    // Keys reopen the menu on a game action chosen here last.
+    const Row row = rows[index];
+    lastMenuRow = row == Row::Undo || row == Row::Flip || row == Row::Draw || row == Row::Pieces ? row : Row::Continue;
+  }
   switch (rows[index]) {
     case Row::Start:
       startGame();
