@@ -106,7 +106,8 @@ class Game {
 
   // A letter for a number (0 erases); false when the number is locked or the letter is another number's.
   bool set(uint8_t number, uint8_t letter);
-  bool canUndo() const { return historyCount > 0 && !solved(); }
+  // A step left that still changes something.
+  bool canUndo() const;
   bool undo();
   bool canHint(uint8_t number) const;
   // Opens the number's letter, taking it from a number that held it.
@@ -129,6 +130,7 @@ class Game {
   };
 
   bool valid(const uint8_t number) const { return number >= 1 && number <= p.count(); }
+  bool undoable(const Step& step) const;
   void push(uint8_t number, uint8_t before);
   void changed(uint8_t number);
 

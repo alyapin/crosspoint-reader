@@ -66,14 +66,18 @@ bool CodewordActivity::restore() {
   char path[24];
   puzzlePath(game.id(), path);
   std::string text;
-  if (!readText(path, kPuzzleMax, text) || !game.attach(text.data(), text.size())) return false;
+  if (!readText(path, kPuzzleMax, text) || !game.attach(text.data(), text.size())) {
+    keepSave = true;
+    notice = Notice::SaveKept;
+    return true;
+  }
   resetView();
   return true;
 }
 
 void CodewordActivity::saveGame() {
   if (!game.attached()) return;
-  gamesave::save(game);
+  if (!keepSave) gamesave::save(game);
   if (solvedPending) {
     solvedPending = false;
     solved.add(game.id());
@@ -102,7 +106,7 @@ void CodewordActivity::startNext() {
     count = std::max(0, codeword::parseIndex(text.data(), text.size(), ids.get(), codeword::MAX_ID));
   }
   uint16_t current = game.id();
-  missing = true;
+  bool missing = true;
   for (int tries = 0; tries < count && missing; ++tries) {
     const uint16_t id = codeword::nextPuzzle(ids.get(), count, solved, current);
     char path[24];
@@ -111,9 +115,12 @@ void CodewordActivity::startNext() {
     current = id;
   }
   if (missing) {
+    game.pause();
+    notice = Notice::NoPack;
     requestRepaint(RepaintEntry);
     return;
   }
+  notice = Notice::None;
   resetView();
   game.resume();
   markChanged();
@@ -179,7 +186,7 @@ void CodewordActivity::runAction(const Action action) {
       if (game.undo()) afterChange();
       break;
     case Action::Menu:
-      if (game.solved()) {
+      if (game.solved() || notice != Notice::None) {
         openNewGame();
       } else {
         openGameMenu();
@@ -189,7 +196,7 @@ void CodewordActivity::runAction(const Action action) {
 }
 
 int CodewordActivity::menuRows(GamePickerActivity::Row (&rows)[MENU_ROWS]) const {
-  if (missing || game.solved()) return 0;
+  if (notice != Notice::None || game.solved()) return 0;
   int count = 0;
   if (game.opened() > game.puzzle().givenCount()) {
     menuItems[count] = MenuItem::Check;
@@ -216,7 +223,7 @@ void CodewordActivity::menuChosen(const int row) {
 }
 
 bool CodewordActivity::barShown(const int slot) const {
-  if (missing) return false;
+  if (notice != Notice::None) return notice == Notice::SaveKept && slot == static_cast<int>(Action::Menu);
   switch (static_cast<Action>(slot)) {
     case Action::Hint:
       return game.canHint(selected());
@@ -290,7 +297,7 @@ void CodewordActivity::moveCursor(const int dx, const int dy) {
 // --- input -------------------------------------------------------------------
 
 void CodewordActivity::onTouch(const fui::ActionEvent& event, const int x, const int y) {
-  if (missing) return;
+  if (notice != Notice::None && event.action != ACTION_BAR) return;
   const codeword::Puzzle& p = game.puzzle();
   switch (event.action) {
     case ACTION_BOARD: {
@@ -342,7 +349,7 @@ void CodewordActivity::tapStrip(const int slot) {
 }
 
 void CodewordActivity::onKey(const int dx, const int dy, const bool confirm) {
-  if (missing) return;
+  if (notice != Notice::None) return;
   const int before[] = {cursor, pick, stripOpen, barFocus};
   if (barFocus >= 0) {
     if (confirm) {
@@ -356,6 +363,7 @@ void CodewordActivity::onKey(const int dx, const int dy, const bool confirm) {
   } else if (stripOpen) {
     if (confirm) {
       place(pick);
+      stripOpen = false;
     } else if (dx != 0) {
       pick = stripStep(pick, dx);
     }
@@ -401,9 +409,14 @@ CodewordActivity::Layout CodewordActivity::layout() const {
 // --- render task -------------------------------------------------------------
 
 void CodewordActivity::build(UiScreen& screen) {
-  if (missing) {
+  if (notice != Notice::None) {
     drawTopLine(screen, nullptr, nullptr, false);
-    drawMissing();
+    drawNotice();
+    if (notice == Notice::SaveKept) {
+      BarItem items[BAR_SLOTS];
+      items[2] = {&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame};
+      drawBar(screen, items, -1);
+    }
     return;
   }
   char value[32];
@@ -524,14 +537,20 @@ void CodewordActivity::drawStrip(UiScreen& screen, const Layout& l) const {
                      0, shellInput());
 }
 
-void CodewordActivity::drawMissing() const {
+void CodewordActivity::drawNotice() const {
+  const bool kept = notice == Notice::SaveKept;
   const int width = renderer.getScreenWidth() - 2 * kSidePadding;
   int y = BOARD_TOP + 40;
-  renderer.drawText(kText12Font, kSidePadding, y, tr(STR_CODEWORD_NO_PACK), true, kSemiBold);
+  renderer.drawText(kText12Font, kSidePadding, y, kept ? tr(STR_CODEWORD_SAVE_KEPT) : tr(STR_CODEWORD_NO_PACK), true,
+                    kSemiBold);
   y += 2 * renderer.getLineHeight(kText12Font);
-  for (const auto& line : renderer.wrappedText(kText12Font, tr(STR_CODEWORD_NO_PACK_BODY), width, 4)) {
+  const char* body = kept ? tr(STR_CODEWORD_SAVE_KEPT_BODY) : tr(STR_CODEWORD_NO_PACK_BODY);
+  for (const auto& line : renderer.wrappedText(kText12Font, body, width, 4)) {
     renderer.drawText(kText12Font, kSidePadding, y, line.c_str());
     y += renderer.getLineHeight(kText12Font);
+  }
+  if (kept && !hasBar()) {
+    renderer.drawText(kText12Font, kSidePadding, y + renderer.getLineHeight(kText12Font), tr(STR_CODEWORD_NEXT_KEY));
   }
 }
 

@@ -181,6 +181,7 @@ TEST(CodewordGame, UndoStepsBack) {
   EXPECT_EQ(game.letter(1), T);
   ASSERT_TRUE(game.undo());
   EXPECT_EQ(game.letter(1), 0);
+  EXPECT_FALSE(game.canUndo());
   EXPECT_FALSE(game.undo());
 }
 
@@ -192,6 +193,7 @@ TEST(CodewordGame, HintTakesTheLetterAndUndoSkipsIt) {
   EXPECT_EQ(game.letter(3), 0);
   EXPECT_TRUE(game.locked(1));
   EXPECT_EQ(game.hints(), 1);
+  EXPECT_FALSE(game.canUndo());
   EXPECT_FALSE(game.undo());  // putting К back on 3 would take it from the hint
   EXPECT_EQ(game.letter(3), 0);
 }

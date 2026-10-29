@@ -27,6 +27,8 @@ class CodewordActivity final : public GameScreen {
 
   enum class Action : uint8_t { Hint, Undo, Menu };
   enum class MenuItem : uint8_t { Check, Erase };
+  // Instead of the board: no readable pack; a save that did not open, kept as it is.
+  enum class Notice : uint8_t { None, NoPack, SaveKept };
   struct Layout {
     int left;
     int gridBottom;
@@ -42,7 +44,9 @@ class CodewordActivity final : public GameScreen {
   bool restore() override;
   void saveGame() override;
   void pauseGame() override { game.pause(); }
-  void resumeGame() override { game.resume(); }
+  void resumeGame() override {
+    if (notice == Notice::None) game.resume();
+  }
   void openNewGame() override;
   void pickerChosen(int, bool) override {}
   int menuRows(GamePickerActivity::Row (&rows)[MENU_ROWS]) const override;
@@ -72,7 +76,7 @@ class CodewordActivity final : public GameScreen {
   void drawGrid(UiScreen& screen, const Layout& l) const;
   void drawLegend(UiScreen& screen, const Layout& l) const;
   void drawStrip(UiScreen& screen, const Layout& l) const;
-  void drawMissing() const;
+  void drawNotice() const;
   void drawLetter(uint8_t letter, int x, int y, int width, int height, int capHeight) const;
   void drawMarks(uint8_t number, int x, int y, int width, int height) const;
 
@@ -82,8 +86,9 @@ class CodewordActivity final : public GameScreen {
   uint8_t pick = 1;        // the strip's centre letter
   bool stripOpen = false;  // buttons: Left/Right pick a letter
   int barFocus = -1;
-  int mistakes = -1;     // the last check, shown until the next change
-  bool missing = false;  // no readable pack on the SD card
+  int mistakes = -1;  // the last check, shown until the next change
+  Notice notice = Notice::None;
+  bool keepSave = false;  // this session never writes over the save that did not open
   bool solvedPending = false;
   mutable MenuItem menuItems[2] = {};  // the rows of the last menuRows()
 };

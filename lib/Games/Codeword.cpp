@@ -318,13 +318,25 @@ bool Game::set(const uint8_t number, const uint8_t letter) {
 }
 
 // Steps a hint has overtaken or made moot are skipped.
+bool Game::undoable(const Step& step) const {
+  if (locked(step.number) || guesses[step.number] == step.before) return false;
+  const uint8_t other = holder(step.before);
+  return other == 0 || other == step.number;
+}
+
+bool Game::canUndo() const {
+  if (solved()) return false;
+  for (uint8_t i = 0; i < historyCount; ++i) {
+    if (undoable(history[i])) return true;
+  }
+  return false;
+}
+
 bool Game::undo() {
   if (solved()) return false;
   while (historyCount > 0) {
     const Step step = history[--historyCount];
-    if (locked(step.number) || guesses[step.number] == step.before) continue;
-    const uint8_t other = holder(step.before);
-    if (other != 0 && other != step.number) continue;
+    if (!undoable(step)) continue;
     guesses[step.number] = step.before;
     changed(step.number);
     return true;
