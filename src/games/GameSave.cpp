@@ -9,6 +9,7 @@
 #include <Logging.h>
 #include <Memory.h>
 #include <Minesweeper.h>
+#include <Reversi.h>
 #include <Sudoku.h>
 #include <TicTacToe.h>
 
@@ -41,6 +42,8 @@ Paths pathsOf(const Kind kind) {
       return {"/.crosspoint/games/2048.json", "/.crosspoint/games/2048.json.tmp"};
     case Kind::Hangman:
       return {"/.crosspoint/games/hangman.json", "/.crosspoint/games/hangman.json.tmp"};
+    case Kind::Reversi:
+      return {"/.crosspoint/games/reversi.json", "/.crosspoint/games/reversi.json.tmp"};
     case Kind::Klondike:
       break;
   }
@@ -58,6 +61,7 @@ uint16_t unreadGames = 0;  // a bit per Kind
 uint16_t bitOf(const Kind kind) { return static_cast<uint16_t>(1u << static_cast<unsigned>(kind)); }
 
 Record tictactoeDone{{"/.crosspoint/games/tictactoe-done.json", "/.crosspoint/games/tictactoe-done.json.tmp"}};
+Record reversiDone{{"/.crosspoint/games/reversi-done.json", "/.crosspoint/games/reversi-done.json.tmp"}};
 Record fifteenBest{{"/.crosspoint/games/fifteen-best.json", "/.crosspoint/games/fifteen-best.json.tmp"}};
 Record fiveLettersStats{{"/.crosspoint/games/fiveletters-stats.json", "/.crosspoint/games/fiveletters-stats.json.tmp"}};
 Record best2048{{"/.crosspoint/games/2048-best.txt", "/.crosspoint/games/2048-best.txt.tmp"}};
@@ -192,6 +196,10 @@ bool save(const fifteen::Game& game) { return write(Kind::Fifteen, game, fifteen
 bool save(const fiveletters::Game& game) { return write(Kind::FiveLetters, game, fiveletters::SAVE_MAX); }
 bool save(const g2048::Game& game) { return write(Kind::Game2048, game, g2048::SAVE_MAX); }
 bool save(const hangman::Game& game) { return write(Kind::Hangman, game, hangman::SAVE_MAX); }
+bool save(const reversi::Game& game) {
+  if (game.inProgress()) return write(Kind::Reversi, game, reversi::SAVE_MAX);
+  return !reversiDone.unread && writeTo(reversiDone.paths, game, reversi::SAVE_MAX) && clear(Kind::Reversi);
+}
 
 bool load(sudoku::Game& game) { return read(Kind::Sudoku, game, sudoku::SAVE_MAX); }
 bool load(minesweeper::Game& game) { return read(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
@@ -204,6 +212,9 @@ bool load(fifteen::Game& game) { return read(Kind::Fifteen, game, fifteen::SAVE_
 bool load(fiveletters::Game& game) { return read(Kind::FiveLetters, game, fiveletters::SAVE_MAX); }
 bool load(g2048::Game& game) { return read(Kind::Game2048, game, g2048::SAVE_MAX); }
 bool load(hangman::Game& game) { return read(Kind::Hangman, game, hangman::SAVE_MAX); }
+bool load(reversi::Game& game) {
+  return read(Kind::Reversi, game, reversi::SAVE_MAX) || readRecord(reversiDone, game, reversi::SAVE_MAX) == Read::Ok;
+}
 
 bool save(const fifteen::Best& best) {
   char text[48];

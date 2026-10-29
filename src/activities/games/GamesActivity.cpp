@@ -15,6 +15,7 @@
 #include "games/ui/HangmanActivity.h"
 #include "games/ui/KlondikeActivity.h"
 #include "games/ui/MinesweeperActivity.h"
+#include "games/ui/ReversiActivity.h"
 #include "games/ui/SudokuActivity.h"
 #include "games/ui/TicTacToeActivity.h"
 #include "games/ui/gameIcons.h"
@@ -47,6 +48,7 @@ constexpr Game kGames[] = {
     {StrId::STR_FIFTEEN, &icon_fifteen_24, &openFifteen, &fifteenListStatus},
     {StrId::STR_HANGMAN, &icon_hangman_24, &openHangman, &hangmanListStatus},
     {StrId::STR_FIVE_LETTERS, &icon_five_letters_24, &openFiveLetters, &fiveLettersListStatus},
+    {StrId::STR_REVERSI, &icon_reversi_24, &openReversi, &reversiListStatus},
     {},
 };
 constexpr int kGameCount = static_cast<int>(std::size(kGames)) - 1;
