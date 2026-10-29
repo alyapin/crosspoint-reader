@@ -134,7 +134,11 @@ void Game2048Activity::onKey(const int dx, const int dy, const bool confirm) {
   const int before = barFocus;
   if (barFocus < 0) {
     if (confirm) {
-      if (hasBar()) barFocus = nextBarSlot(BAR_SLOTS - 1, 1);
+      if (hasBar()) {
+        barFocus = nextBarSlot(BAR_SLOTS - 1, 1);
+      } else if (game.undo()) {
+        markChanged();  // button boards: Confirm undoes
+      }
     } else if (dx != 0) {
       slide(dx < 0 ? Dir::Left : Dir::Right);
     } else if (dy != 0) {
