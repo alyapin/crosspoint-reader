@@ -12,6 +12,7 @@
 #include "ElapsedText.h"
 #include "gameIcons.h"
 #include "games/GameSave.h"
+#include "games/chess/ui/chessIcons.h"
 #include "levelIcons.h"
 
 namespace fui = freeink::ui;
@@ -79,15 +80,6 @@ void SudokuActivity::saveGame() { gamesave::save(game); }
 
 void SudokuActivity::clearSave() { gamesave::clear(gamesave::Kind::Sudoku); }
 
-// The bar has no room for a menu: the level and clock status opens it.
-void SudokuActivity::openStatusMenu() {
-  if (game.isSolved()) {
-    openNewGame();
-  } else {
-    openGameMenu();
-  }
-}
-
 void SudokuActivity::openNewGame() {
   const GamePickerActivity::Row rows[] = {
       {tr(STR_SUDOKU_EASY), &icon_level_1_24},
@@ -109,16 +101,17 @@ void SudokuActivity::pickerChosen(const int row, bool) {
 
 // --- input -------------------------------------------------------------------
 
-void SudokuActivity::barActions(Action (&out)[BAR_SLOTS]) const {
+void SudokuActivity::barActions(Action (&out)[SLOTS]) const {
   for (Action& a : out) a = Action::None;
   if (game.isSolved()) {
-    out[1] = Action::NewGame;
+    out[3] = Action::NewGame;
     return;
   }
   out[0] = Action::Notes;
   const bool erasable = !game.isLocked(selected) && (game.value(selected) != 0 || game.notes(selected) != 0);
   if (erasable) out[1] = Action::Erase;
   if (game.canUndo()) out[2] = Action::Undo;
+  out[3] = Action::Menu;
 }
 
 void SudokuActivity::runAction(const Action action) {
@@ -132,6 +125,9 @@ void SudokuActivity::runAction(const Action action) {
       break;
     case Action::Undo:
       if (game.undo()) markChanged();
+      break;
+    case Action::Menu:
+      openGameMenu();
       break;
     case Action::NewGame:
       openNewGame();
@@ -152,9 +148,6 @@ bool SudokuActivity::padKeyShown(const int digit) const { return game.digitCount
 
 void SudokuActivity::onTouch(const fui::ActionEvent& event, const int x, const int y) {
   switch (event.action) {
-    case ACTION_STATUS:
-      openStatusMenu();
-      break;
     case ACTION_BOARD:
       if (const int cell = cellAt(x, y); cell >= 0) {
         selected = cell;
@@ -166,9 +159,9 @@ void SudokuActivity::onTouch(const fui::ActionEvent& event, const int x, const i
       enterDigit(event.value);
       break;
     case ACTION_BAR: {
-      Action actions[BAR_SLOTS];
+      Action actions[SLOTS];
       barActions(actions);
-      if (event.value >= 0 && event.value < BAR_SLOTS) runAction(actions[event.value]);
+      if (event.value >= 0 && event.value < SLOTS) runAction(actions[event.value]);
       break;
     }
     default:
@@ -178,7 +171,7 @@ void SudokuActivity::onTouch(const fui::ActionEvent& event, const int x, const i
 
 void SudokuActivity::onKey(const int dx, const int dy, const bool confirm) {
   const int before[] = {static_cast<int>(area), selected, padFocus, barFocus, notesMode ? 1 : 0};
-  Action actions[BAR_SLOTS];
+  Action actions[SLOTS];
   barActions(actions);
   // Next shown pad key / bar slot from `from` in direction `step`; `from` itself when none.
   auto nextKey = [this](const int from, const int step) {
@@ -189,8 +182,8 @@ void SudokuActivity::onKey(const int dx, const int dy, const bool confirm) {
     return from;
   };
   auto nextSlot = [&actions](const int from, const int step) {
-    for (int i = 1; i <= BAR_SLOTS; ++i) {
-      const int s = (from + step * i + BAR_SLOTS * 2) % BAR_SLOTS;
+    for (int i = 1; i <= SLOTS; ++i) {
+      const int s = (from + step * i + SLOTS * 2) % SLOTS;
       if (actions[s] != Action::None) return s;
     }
     return from;
@@ -207,13 +200,6 @@ void SudokuActivity::onKey(const int dx, const int dy, const bool confirm) {
   };
 
   switch (area) {
-    case Area::Status:
-      if (confirm) {
-        openStatusMenu();
-      } else if (dy > 0) {
-        area = Area::Grid;
-      }
-      break;
     case Area::Grid: {
       const int row = sudoku::rowOf(selected);
       if (confirm) {
@@ -221,12 +207,8 @@ void SudokuActivity::onKey(const int dx, const int dy, const bool confirm) {
         if (!game.isLocked(selected) && !game.isSolved()) toPad(value != 0 ? value - 1 : padFocus);
       } else if (dx != 0) {
         selected = (selected + dx + sudoku::CELLS) % sudoku::CELLS;
-      } else if (dy < 0) {
-        if (row > 0) {
-          selected -= sudoku::SIZE;
-        } else if (hasBar()) {
-          area = Area::Status;
-        }
+      } else if (dy < 0 && row > 0) {
+        selected -= sudoku::SIZE;
       } else if (dy > 0 && row < sudoku::SIZE - 1) {
         selected += sudoku::SIZE;
       } else if (dy > 0) {
@@ -299,7 +281,7 @@ int SudokuActivity::cellAt(const int x, const int y) const {
 void SudokuActivity::build(UiScreen& screen) {
   char clock[24];
   formatElapsed(game.elapsedMs(), clock, sizeof(clock));
-  drawTopLine(screen, levelStatus(game.level()), clock, true, area == Area::Status);
+  drawTopLine(screen, levelStatus(game.level()), clock, false);
 
   drawGrid();
   const int left = (renderer.getScreenWidth() - kGridSize) / 2;
@@ -313,10 +295,10 @@ void SudokuActivity::build(UiScreen& screen) {
     drawPad(screen);
   }
 
-  Action actions[BAR_SLOTS];
+  Action actions[SLOTS];
   barActions(actions);
-  BarItem items[BAR_SLOTS];
-  for (int i = 0; i < BAR_SLOTS; ++i) {
+  BarItem items[SLOTS];
+  for (int i = 0; i < SLOTS; ++i) {
     switch (actions[i]) {
       case Action::Notes:
         items[i] = {&icon_bar_notes_24, tr(STR_SUDOKU_NOTES), notesMode, BarItem::Mode};
@@ -326,6 +308,9 @@ void SudokuActivity::build(UiScreen& screen) {
         break;
       case Action::Undo:
         items[i] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false};
+        break;
+      case Action::Menu:
+        items[i] = {&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
         break;
       case Action::NewGame:
         items[i] = {&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame};

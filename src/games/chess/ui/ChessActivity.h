@@ -53,6 +53,7 @@ class ChessActivity final : public Activity, private UiAppHost {
     NewGame,
     Flip,
     Undo,
+    Continue,
     Exit
   };
   // Pending repaint, strongest wins: Entry = HALF, Update = cadence FAST,
@@ -85,7 +86,7 @@ class ChessActivity final : public Activity, private UiAppHost {
   void drawStatusPanel() const;
   void drawMoveList(int top, int bottom) const;
   void drawPromotion(UiScreen& screen) const;
-  void drawGameOver(UiScreen& screen) const;
+  void drawGameOver() const;
   void drawActions(UiScreen& screen) const;
 
   int listRows(Row* out) const;

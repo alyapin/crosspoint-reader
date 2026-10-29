@@ -12,8 +12,7 @@
 const char* sudokuListStatus();
 std::unique_ptr<Activity> openSudoku(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
-// Full-width 9x9 grid, a row of nine digit keys, and Заметки / Стереть / Отменить.
-// The level and the timer on the top line open the menu (Новая игра, Завершить).
+// Full-width 9x9 grid, a row of nine digit keys, and Заметки / Стереть / Отменить / Меню.
 class SudokuActivity final : public GameScreen {
  public:
   SudokuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
@@ -22,9 +21,9 @@ class SudokuActivity final : public GameScreen {
 
  private:
   // Key focus: the grid cursor is the selected cell; the pad and bar have their own.
-  // Status is the level and timer on the top line, where Confirm opens the menu.
-  enum class Area : uint8_t { Status, Grid, Pad, Bar };
-  enum class Action : uint8_t { None, Notes, Erase, Undo, NewGame };
+  enum class Area : uint8_t { Grid, Pad, Bar };
+  enum class Action : uint8_t { None, Notes, Erase, Undo, Menu, NewGame };
+  static constexpr int SLOTS = MAX_BAR_SLOTS;
   static constexpr freeink::ui::ActionId ACTION_PAD = ACTION_USER;  // value = digit
 
   bool restore() override;
@@ -34,14 +33,13 @@ class SudokuActivity final : public GameScreen {
   void openNewGame() override;
   void pickerChosen(int row, bool toggle) override;
   void clearSave() override;
-  void openStatusMenu();
   void build(UiScreen& screen) override;
   void onTouch(const freeink::ui::ActionEvent& event, int x, int y) override;
   void onKey(int dx, int dy, bool confirm) override;
   bool onBack() override;
   int32_t shownMinutes() const override;
 
-  void barActions(Action (&out)[BAR_SLOTS]) const;
+  void barActions(Action (&out)[SLOTS]) const;
   void runAction(Action action);
   void enterDigit(int digit);
   bool padKeyShown(int digit) const;

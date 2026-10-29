@@ -40,7 +40,6 @@ constexpr fui::ActionId ACTION_FLIP = 9;
 
 // List screens: the CrossPoint 2.0 header and row pitch, Setka selection bar.
 constexpr int kHeaderTop = kGameTopLineY;  // game view top line, under the status line
-constexpr int kRuleGap = 16;
 constexpr int kBarX = kSidePadding - kSelectionBarWidth;
 constexpr int kRowHeight = setka::kNavRowHeight;
 constexpr int kRowGap = 0;
@@ -312,10 +311,9 @@ void ChessActivity::loop() {
 int ChessActivity::gameActions(GameAction* out) const {
   int n = 0;
   if (!hasBar()) return n;
-  if (match->game().isOver()) out[n++] = GameAction::NewGame;
   if (match->canUndo()) out[n++] = GameAction::Undo;
   out[n++] = GameAction::Flip;
-  out[n++] = GameAction::Menu;
+  out[n++] = match->game().isOver() ? GameAction::NewGame : GameAction::Menu;
   return n;
 }
 
@@ -379,8 +377,8 @@ void ChessActivity::handleGameKeys() {
   GameAction actions[kMaxActions];
   const int ring = kCells + gameActions(actions);
   if (cursor < 0) {
-    // The first key shows the cursor; on a finished game it lands on "Новая партия".
-    cursor = match->game().isOver() ? kCells : kStartCursor;
+    // The first key shows the cursor; on a finished game it lands on Новая игра.
+    cursor = match->game().isOver() ? ring - 1 : kStartCursor;
     requestRepaint(RepaintUpdate);
     return;
   }
@@ -557,6 +555,9 @@ void ChessActivity::activateRow(const int index) {
   switch (rows[index]) {
     case Row::Start:
       startGame();
+      break;
+    case Row::Continue:
+      setView(View::Game);
       break;
     case Row::Resign:
       confirmResign();
@@ -755,15 +756,17 @@ int ChessActivity::listRows(Row* out) const {
     out[n++] = Row::Pieces;
     out[n++] = Row::Start;
   } else if (view == View::Menu) {
-    if (!hasBar() && match->canUndo()) out[n++] = Row::Undo;
-    if (!match->game().isOver()) {
-      out[n++] = Row::Resign;
-      out[n++] = Row::Draw;
-    }
-    out[n++] = Row::NewGame;
-    out[n++] = Row::Flip;
+    // The games' one menu form (GameScreen::openGameMenu).
+    const bool keys = !hasBar();
+    const bool over = match->game().isOver();
+    if (keys && !over) out[n++] = Row::Continue;
+    if (keys && match->canUndo()) out[n++] = Row::Undo;
+    if (keys) out[n++] = Row::Flip;
+    if (!over) out[n++] = Row::Draw;
     out[n++] = Row::Pieces;
-    if (!hasBar()) out[n++] = Row::Exit;
+    out[n++] = Row::NewGame;
+    if (!over) out[n++] = Row::Resign;
+    if (keys) out[n++] = Row::Exit;
   }
   return n;
 }
@@ -809,6 +812,7 @@ const freeink::Icon* ChessActivity::rowIcon(const Row row) const {
     case Row::Pieces:
       return &icon_pieces_24;
     case Row::Start:
+    case Row::Continue:
       return &icon_start_24;
     case Row::Resign:
       return &icon_finish_24;
@@ -847,7 +851,9 @@ const char* ChessActivity::rowLabel(const Row row) const {
     case Row::Draw:
       return match->settings().mode == chess::Mode::HotSeat ? tr(STR_CHESS_AGREE_DRAW) : tr(STR_CHESS_OFFER_DRAW);
     case Row::NewGame:
-      return tr(STR_CHESS_NEW_GAME);
+      return tr(STR_GAMES_NEW_GAME);
+    case Row::Continue:
+      return tr(STR_GAMES_CONTINUE);
     case Row::Flip:
       return tr(STR_CHESS_FLIP);
     case Row::Undo:
@@ -1049,9 +1055,9 @@ void ChessActivity::build(UiScreen& screen) {
 const char* ChessActivity::listTitle() const {
   switch (view) {
     case View::Setup:
-      return tr(STR_CHESS_NEW_GAME);
+      return tr(STR_GAMES_NEW_GAME);
     case View::Menu:
-      return tr(STR_CHESS_MENU);
+      return tr(STR_CHESS);
     case View::CustomTime:
       return tr(STR_CHESS_CUSTOM_TIME);
     default:
@@ -1155,7 +1161,7 @@ void ChessActivity::buildGame(UiScreen& screen) {
     return;
   }
   if (match->game().isOver()) {
-    drawGameOver(screen);
+    drawGameOver();
   } else if (match->timed()) {
     drawClockPanel();
   } else {
@@ -1257,7 +1263,7 @@ void ChessActivity::drawTurnLine(const int top) const {
     drawRightAligned(renderer, kText12Font, width - kSidePadding, top, last);
     lastWidth = renderer.getTextWidth(kText12Font, last) + kTurnLineGap;
   }
-  drawFitted(renderer, kText12Font, kRowTextX, top, turnLabel(), width - kSidePadding - lastWidth - kRowTextX,
+  drawFitted(renderer, kText12Font, kSidePadding, top, turnLabel(), width - kSidePadding - lastWidth - kSidePadding,
              match->isHumanTurn() ? kSemiBold : EpdFontFamily::REGULAR);
 }
 
@@ -1283,7 +1289,7 @@ void ChessActivity::drawClockPanel() const {
   renderer.getCodepointMetrics(kHeroFont, ':', EpdFontFamily::REGULAR, colonAdvance, glyphTop);
   int32_t naturalWidth = 0;  // 12.4 fixed point
   for (const char* c = clock; *c != '\0'; ++c) naturalWidth += *c == ':' ? colonAdvance : digitAdvance;
-  const int maxWidth = renderer.getScreenWidth() - kRowTextX - kSidePadding - unitWidth;
+  const int maxWidth = renderer.getScreenWidth() - kSidePadding - kSidePadding - unitWidth;
   int scale256 = kHeroCapTarget > 0 ? kHeroCapTarget * 256 / std::max(1, heroCapHeight(renderer, kHeroFont)) : 256;
   if (naturalWidth * scale256 > maxWidth * 16 * 256) scale256 = maxWidth * 16 * 256 / naturalWidth;
   // The digits shrink to the room above the turn line, which button boards cut by the hint row.
@@ -1295,7 +1301,7 @@ void ChessActivity::drawClockPanel() const {
   const int capHeight = heroCapHeight(renderer, kHeroFont) * scale256 / 256;
   const bool heroToMove = match->isHumanTurn() && match->game().sideToMove() == hero;
   if (heroToMove) drawSelectionBar(renderer, kBarX, capTop, capHeight);
-  int x = kRowTextX;
+  int x = kSidePadding;
   if (scale256 == 256) {
     x += drawHeroNumber(renderer, kHeroFont, x, capTop, clock);
   } else {
@@ -1353,7 +1359,7 @@ void ChessActivity::drawMoveList(const int top, const int bottom) const {
     unit.width = renderer.getTextWidth(kText10Font, unit.text);
   }
 
-  const int maxWidth = renderer.getScreenWidth() - kRowTextX - kSidePadding;
+  const int maxWidth = renderer.getScreenWidth() - kSidePadding - kSidePadding;
   const int gap = 2 * renderer.getSpaceWidth(kText10Font);
   int lineStart[kMaxUnits + 1];
   int lines = 0;
@@ -1369,7 +1375,7 @@ void ChessActivity::drawMoveList(const int top, const int bottom) const {
   lineStart[lines] = count;
   const int firstLine = std::max(0, lines - maxLines);
   for (int line = firstLine; line < lines; ++line) {
-    int lineX = kRowTextX;
+    int lineX = kSidePadding;
     const int y = top + (line - firstLine) * lineHeight;
     for (int u = lineStart[line]; u < lineStart[line + 1]; ++u) {
       renderer.drawText(kText10Font, lineX, y, units[u].text);
@@ -1381,7 +1387,7 @@ void ChessActivity::drawMoveList(const int top, const int bottom) const {
 void ChessActivity::drawPromotion(UiScreen& screen) const {
   const int width = renderer.getScreenWidth();
   const int top = kPanelTop + 18;
-  renderer.drawText(kText12Font, kRowTextX, top, tr(STR_CHESS_PROMOTE), true, kSemiBold);
+  renderer.drawText(kText12Font, kSidePadding, top, tr(STR_CHESS_PROMOTE), true, kSemiBold);
   const int cellTop = top + renderer.getLineHeight(kText12Font) + 8;
   const int cellWidth = width / static_cast<int>(std::size(kPromotions));
   const int cellHeight = actionsTop() - cellTop;
@@ -1403,36 +1409,26 @@ void ChessActivity::drawPromotion(UiScreen& screen) const {
   }
 }
 
-void ChessActivity::drawGameOver(UiScreen& screen) const {
-  const int lineHeight = renderer.getLineHeight(kText12Font);
-  int top = kPanelTop + 18;
-  renderer.drawText(kText12Font, kRowTextX, top, overTitle(match->game()), true, kSemiBold);
-  top += lineHeight + 4;
-  renderer.drawText(kText12Font, kRowTextX, top, overSubtitle(*match));
-  top += lineHeight + 8;
-  const int rowHeight = std::min(std::max(kListRowHeight, lineHeight + 2 * kRuleGap), actionsTop() - top);
-  const int textTop = top + (rowHeight - lineHeight) / 2;
-  const GameAction focused = focusedAction();
-  const bool primary = focused == GameAction::None || focused == GameAction::NewGame;
-  if (primary) drawSelectionBar(renderer, kBarX, textTop, lineHeight);
-  renderer.drawText(kText12Font, kRowTextX, textTop, tr(STR_CHESS_NEW_GAME), true,
-                    primary ? kSemiBold : EpdFontFamily::REGULAR);
-  screen.frame().hit(fui::makeRect(0, top, renderer.getScreenWidth(), rowHeight), ACTION_NEW_GAME, 0, fui::InputTouch);
+void ChessActivity::drawGameOver() const {
+  games::ui::drawResult(renderer, kPanelTop + 18, overTitle(match->game()), overSubtitle(*match),
+                        hasBar() ? nullptr : tr(STR_GAMES_NEW_GAME_KEY));
 }
 
 void ChessActivity::drawActions(UiScreen& screen) const {
   if (!hasBar()) return;
   const GameAction focused = focusedAction();
+  const bool over = match->game().isOver();
   games::ui::ActionSlot slots[] = {
       {&icon_undo_move_24, tr(STR_CHESS_UNDO), false, ACTION_UNDO, 0},
       {&icon_flip_24, tr(STR_CHESS_FLIP_SHORT), false, ACTION_FLIP, 0},
-      {&icon_menu_24, tr(STR_CHESS_MENU), false, ACTION_MENU, 0},
+      over ? games::ui::ActionSlot{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, ACTION_NEW_GAME, 0}
+           : games::ui::ActionSlot{&icon_menu_24, tr(STR_CHESS_MENU), false, ACTION_MENU, 0},
   };
   if (!match->canUndo()) slots[0].label = nullptr;
   const int focusedSlot = focused == GameAction::Undo   ? 0
                           : focused == GameAction::Flip ? 1
-                          : focused == GameAction::Menu ? 2
-                                                        : -1;
+                          : focused == GameAction::None ? -1
+                                                        : 2;
   games::ui::drawActionBar(renderer, screen, actionsTop(), slots, static_cast<int>(std::size(slots)), focusedSlot,
                            fui::InputTouch);
 }

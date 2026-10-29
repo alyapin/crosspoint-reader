@@ -143,13 +143,17 @@ void DraughtsActivity::pickerChosen(const int row, bool) {
 int DraughtsActivity::menuRows(GamePickerActivity::Row (&rows)[MENU_ROWS]) const {
   if (game.isOver()) return 0;
   rows[0] = {tr(STR_CHESS_OFFER_DRAW), &icon_draw_24};
-  rows[1] = {tr(STR_CHESS_RESIGN), &icon_finish_24};
-  return 2;
+  return 1;
 }
 
-void DraughtsActivity::menuChosen(const int row) {
-  drawDeclined = row == 0 && !game.offerDraw();
-  if (row == 1) game.resign();
+void DraughtsActivity::menuChosen(int) {
+  drawDeclined = !game.offerDraw();
+  afterChange();
+}
+
+void DraughtsActivity::resign() {
+  drawDeclined = false;
+  game.resign();
   afterChange();
 }
 
@@ -303,7 +307,7 @@ void DraughtsActivity::runBar(const int slot) {
     if (game.isOver()) {
       openNewGame();
     } else {
-      openGameMenu(true);
+      openGameMenu();
     }
   }
 }

@@ -40,6 +40,8 @@ class DraughtsActivity final : public GameScreen {
   bool onBack() override;
   int menuRows(GamePickerActivity::Row (&rows)[MENU_ROWS]) const override;
   void menuChosen(int row) override;
+  bool resigns() const override { return true; }
+  void resign() override;
 
   void reset();
   void refresh();
