@@ -363,41 +363,41 @@ void SetkaHomeActivity::drawEmpty(UiScreen& screen, const int top, const int wid
 
 void SetkaHomeActivity::drawTabs(UiScreen& screen, const int top, const int bottom, const int width) {
   drawRule(renderer, 0, top, width);
-  // Labels in the text role under the icons; only the focused one is SemiBold.
-  const int captionHeight = renderer.getLineHeight(kText10Font);
+  // Light captions under the icons (Light has no SemiBold, so key focus shows
+  // only as the bar). Equal columns would leave the two long labels a few
+  // pixels apart, so the labels span the padding edge to edge with equal gaps
+  // and each icon sits centred over its label.
+  const int captionHeight = renderer.getLineHeight(kCaptionFont);
   const int blockHeight = kTabIconSize + kTabIconGap + captionHeight;
   const int blockTop = top + kRuleWidth + (bottom - top - kRuleWidth - blockHeight) / 2;
   const int focusedTab = focus - bookFocusCount();
-  // Four labels do not fit equal quarters, so each column is its label plus
-  // an equal share of the spare width. Where keys can focus a tab, columns
-  // fit the SemiBold label so they stay put as the focus moves.
-  const bool focusable = !mappedInput.hasTouch();
-  std::array<int, TabCount> columnWidths{};
-  int spare = width;
+  std::array<int, TabCount> labelWidths{};
+  int spare = width - 2 * kSidePadding;
   for (int tab = 0; tab < TabCount; ++tab) {
-    const char* label = I18N.get(kTabs[tab].label);
-    const int labelWidth =
-        focusable ? renderer.getTextWidth(kText10Font, label, kSemiBold) : renderer.getTextWidth(kText10Font, label);
-    columnWidths[tab] = std::max(kTabIconSize, labelWidth);
-    spare -= columnWidths[tab];
+    labelWidths[tab] = std::max(kTabIconSize, renderer.getTextWidth(kCaptionFont, I18N.get(kTabs[tab].label)));
+    spare -= labelWidths[tab];
   }
-  int columnX = 0;
+  const int gap = std::max(0, spare) / (TabCount - 1);
+  int labelX = kSidePadding;
+  int hitX = 0;
   for (int tab = 0; tab < TabCount; ++tab) {
-    const bool focused = tab == focusedTab;
-    const auto style = focused ? kSemiBold : EpdFontFamily::REGULAR;
     const char* label = I18N.get(kTabs[tab].label);
-    const int columnWidth = tab + 1 < TabCount ? columnWidths[tab] + std::max(0, spare) / TabCount : width - columnX;
-    const int iconX = columnX + (columnWidth - kTabIconSize) / 2;
-    const int textX = columnX + (columnWidth - renderer.getTextWidth(kText10Font, label, style)) / 2;
+    const int textWidth = renderer.getTextWidth(kCaptionFont, label);
+    // The last label ends on the padding whatever the rounding left over.
+    if (tab + 1 == TabCount) labelX = width - kSidePadding - labelWidths[tab];
+    const int center = labelX + labelWidths[tab] / 2;
+    const int iconX = center - kTabIconSize / 2;
     screen.target().bitmap(fui::makeRect(iconX, blockTop, kTabIconSize, kTabIconSize),
                            fui::bitmapFromIcon(*kTabs[tab].icon), fui::BitmapMode::Center);
-    // Same bar-to-content distance as the list rows, beside the icon: the
-    // labels leave no room for it.
-    if (focused) drawSelectionBar(renderer, iconX - (kRowTextX - kSelectionBarX), blockTop, kTabIconSize);
-    renderer.drawText(kText10Font, textX, blockTop + kTabIconSize + kTabIconGap, label, true, style);
-    screen.frame().hit(fui::makeRect(columnX, top, columnWidth, bottom - top), ACTION_TAB, static_cast<int16_t>(tab),
+    // Same bar-to-content distance as the list rows, beside the icon.
+    if (tab == focusedTab) drawSelectionBar(renderer, iconX - (kRowTextX - kSelectionBarX), blockTop, kTabIconSize);
+    renderer.drawText(kCaptionFont, center - textWidth / 2, blockTop + kTabIconSize + kTabIconGap, label);
+    // Each tab takes the touch up to the middle of the gaps beside it.
+    const int hitRight = tab + 1 == TabCount ? width : labelX + labelWidths[tab] + gap / 2;
+    screen.frame().hit(fui::makeRect(hitX, top, hitRight - hitX, bottom - top), ACTION_TAB, static_cast<int16_t>(tab),
                        fui::InputTouch);
-    columnX += columnWidth;
+    hitX = hitRight;
+    labelX += labelWidths[tab] + gap;
   }
 }
 
