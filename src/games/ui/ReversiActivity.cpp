@@ -276,6 +276,7 @@ void ReversiActivity::drawStatus(const int top) const {
     snprintf(tally, sizeof(tally), vs ? tr(STR_GAMES_SCORE_VS) : tr(STR_REVERSI_SCORE_TWO), score.won, score.lost,
              score.draws);
     lines[0] = tally;
+    if (!hasBar()) lines[1] = tr(STR_GAMES_NEW_GAME_KEY);
   } else {
     const Disc passed = game.passed();
     lines[0] = passed == Disc::Black   ? (vs ? tr(STR_REVERSI_PASS_YOU) : tr(STR_REVERSI_PASS_BLACK))

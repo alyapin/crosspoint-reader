@@ -565,6 +565,7 @@ void DraughtsActivity::drawStatus() const {
   if (game.isOver()) {
     heading = resultText(game);
     lines[n++] = endText(game.end());
+    if (!hasBar()) lines[n++] = tr(STR_GAMES_NEW_GAME_KEY);
   } else if (game.computerToMove()) {
     heading = noEngine ? tr(STR_DICT_LOW_MEMORY) : tr(STR_CHESS_THINKING);
   } else {

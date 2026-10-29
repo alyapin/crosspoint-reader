@@ -1409,8 +1409,12 @@ void ChessActivity::drawPromotion(UiScreen& screen) const {
   }
 }
 
+// Who won first and how as the detail, as in draughts; a draw leads with how.
 void ChessActivity::drawGameOver() const {
-  games::ui::drawResult(renderer, kPanelTop + 18, overTitle(match->game()), overSubtitle(*match),
+  const bool draw = match->game().outcome() == chess::Outcome::Draw;
+  const char* how = overTitle(match->game());
+  const char* who = overSubtitle(*match);
+  games::ui::drawResult(renderer, kPanelTop + 18, draw ? how : who, draw ? who : how,
                         hasBar() ? nullptr : tr(STR_GAMES_NEW_GAME_KEY));
 }
 

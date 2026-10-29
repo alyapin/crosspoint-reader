@@ -25,7 +25,6 @@ constexpr int kTileRule = 2;
 constexpr int kFrameInset = 4;
 constexpr int kBoard = fifteen::SIDE * kTile + (fifteen::SIDE - 1) * kTileGap;
 constexpr int kResultTop = GameScreen::BOARD_TOP + kBoard + 36;
-constexpr int kResultGap = 10;
 constexpr int kLastSlot = GameScreen::BAR_SLOTS - 1;
 
 // "37 ходов": Russian picks the form by the number; English uses the last two the same.
@@ -177,7 +176,6 @@ int FifteenActivity::cellAt(const int x, const int y) const {
 // --- render task -------------------------------------------------------------
 
 void FifteenActivity::build(UiScreen& screen) {
-  const int width = renderer.getScreenWidth();
   char clock[24];
   formatElapsed(game.elapsedMs(), clock, sizeof(clock));
   char moves[24];
@@ -193,15 +191,15 @@ void FifteenActivity::build(UiScreen& screen) {
   if (game.isSolved()) {
     char line[80];
     snprintf(line, sizeof(line), tr(STR_FIFTEEN_SOLVED), moves, clock);
-    drawCentered(kText12Font, 0, width, kResultTop, line, kSemiBold);
+    char record[80];
     if (newBest) {
-      snprintf(line, sizeof(line), "%s", tr(STR_FIFTEEN_NEW_BEST));
+      snprintf(record, sizeof(record), "%s", tr(STR_FIFTEEN_NEW_BEST));
     } else {
       movesText(best.moves, moves, sizeof(moves));
       formatElapsed(best.ms, clock, sizeof(clock));
-      snprintf(line, sizeof(line), tr(STR_FIFTEEN_BEST), moves, clock);
+      snprintf(record, sizeof(record), tr(STR_FIFTEEN_BEST), moves, clock);
     }
-    drawCentered(kText10Font, 0, width, kResultTop + renderer.getLineHeight(kText12Font) + kResultGap, line);
+    drawResult(kResultTop, line, record);
   }
 
   BarItem items[BAR_SLOTS];
@@ -219,9 +217,7 @@ void FifteenActivity::drawTile(const int cell, const int left) const {
     renderer.drawRect(x, y, kTile, kTile, kTileRule, true);
     char text[4];
     snprintf(text, sizeof(text), "%d", tile);
-    const int cap = heroCapHeight(renderer, kDigitsFont);
-    renderer.drawText(kDigitsFont, x + (kTile - renderer.getTextWidth(kDigitsFont, text, kSemiBold)) / 2,
-                      y + (kTile + cap) / 2 - renderer.getFontAscenderSize(kDigitsFont), text, true, kSemiBold);
+    drawCentered(kText12Font, x, kTile, y + (kTile - renderer.getLineHeight(kText12Font)) / 2, text, kSemiBold);
   }
   if (cell == cursor && barFocus < 0 && !game.isSolved()) {
     drawCellFrame(renderer, x + kFrameInset, y + kFrameInset, kTile - 2 * kFrameInset, kTile - 2 * kFrameInset);

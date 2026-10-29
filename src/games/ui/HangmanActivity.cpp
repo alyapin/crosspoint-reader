@@ -37,7 +37,8 @@ constexpr int kStroke = 4;
 constexpr int kFigureStroke = 3;
 constexpr int kClueGap = 28;
 constexpr int kClueLines = 4;
-constexpr int kStartKey = 15;  // О
+constexpr int kResultGap = 16;  // the keyboard to the result
+constexpr int kStartKey = 15;   // О
 
 // Обычные слова, and С крепкими словами: the same words with the rude ones after them.
 const hangman::WordList kLists[] = {
@@ -229,16 +230,8 @@ HangmanActivity::Layout HangmanActivity::layout() const {
 
 void HangmanActivity::build(UiScreen& screen) {
   char value[32];
-  const char* label = nullptr;
-  if (game.status() == hangman::Status::Won) {
-    snprintf(value, sizeof(value), "%s", tr(STR_HANGMAN_WON));
-  } else if (game.status() == hangman::Status::Lost) {
-    snprintf(value, sizeof(value), "%s", tr(STR_HANGMAN_LOST));
-  } else {
-    label = tr(STR_HANGMAN_MISTAKES);
-    snprintf(value, sizeof(value), tr(STR_HANGMAN_OF), game.mistakes(), hangman::MAX_MISTAKES);
-  }
-  drawTopLine(screen, label, value, false);
+  snprintf(value, sizeof(value), tr(STR_HANGMAN_OF), game.mistakes(), hangman::MAX_MISTAKES);
+  drawTopLine(screen, tr(STR_HANGMAN_MISTAKES), value, false);
 
   const Layout l = layout();
   drawGallows(l.gallowsTop, l.gallowsBottom);
@@ -246,9 +239,13 @@ void HangmanActivity::build(UiScreen& screen) {
   for (int key = 0; key < kKeyCount; ++key) drawKey(key, l.keysTop);
   screen.frame().hit(fui::makeRect(kSidePadding, l.keysTop, kKeysPerRow * kKeyPitch, kKeysHeight), ACTION_BOARD, 0,
                      shellInput());
+  const bool over = game.isOver();
+  if (over) {
+    drawResult(l.keysTop + kKeysHeight + kResultGap,
+               game.status() == hangman::Status::Won ? tr(STR_HANGMAN_WON) : tr(STR_HANGMAN_LOST));
+  }
 
   BarItem items[BAR_SLOTS];
-  const bool over = game.isOver();
   if (barShown(0)) items[0] = {&icon_bar_hint_24, tr(STR_HANGMAN_HINT)};
   items[2] = {over ? &icon_bar_new_game_24 : &icon_menu_24, over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU), false,
               over ? BarItem::NewGame : BarItem::Menu};
@@ -291,13 +288,13 @@ void HangmanActivity::drawGallows(const int top, const int bottom) const {
 void HangmanActivity::drawClue(const int left, const int top) const {
   char caption[24];
   snprintf(caption, sizeof(caption), tr(STR_HANGMAN_LETTERS), game.length());
-  renderer.drawText(kCaptionFont, left, top, caption);
+  renderer.drawText(kText10Font, left, top, caption);
   char clue[hangman::MAX_CLUE_BYTES];
   kLists[game.list()].clue(game.wordIndex(), clue, sizeof(clue));
   scanword::ClueLines lines;
   scanword::layoutClue(clue, renderer.getScreenWidth() - kSidePadding - left, kClueLines, measureText, &renderer,
                        lines);
-  const int lineTop = top + renderer.getLineHeight(kCaptionFont) + 4;
+  const int lineTop = top + renderer.getLineHeight(kText10Font) + 4;
   for (uint8_t i = 0; i < lines.count; ++i) {
     renderer.drawText(kText12Font, left, lineTop + i * renderer.getLineHeight(kText12Font), lines.line[i]);
   }

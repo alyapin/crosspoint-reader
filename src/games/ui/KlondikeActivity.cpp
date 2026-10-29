@@ -27,6 +27,7 @@ constexpr int kCardGap = 4;
 constexpr int kFan = 18;
 constexpr int kTableauTop = GameScreen::BOARD_TOP + kCardHeight + 14;
 constexpr int kTableauGap = 8;  // between the columns and the bar rule
+constexpr int kResultGap = 24;  // a won board: the top row to the result
 constexpr int kDownStep = 10;
 constexpr int kUpStep = 30;
 constexpr int kPickFrame = 4;
@@ -297,10 +298,8 @@ int KlondikeActivity::cardAt(const int pile, const int y) const {
 void KlondikeActivity::build(UiScreen& screen) {
   char value[16];
   snprintf(value, sizeof(value), "%d", game.moveCount());
-  const char* label = game.isWon() ? tr(STR_KLONDIKE_WON)
-                      : noMoves    ? tr(STR_KLONDIKE_NO_MOVES)
-                                   : tr(STR_KLONDIKE_MOVES);
-  drawTopLine(screen, label, noMoves ? "" : value, false);
+  const char* label = noMoves && !game.isWon() ? tr(STR_KLONDIKE_NO_MOVES) : tr(STR_KLONDIKE_MOVES);
+  drawTopLine(screen, label, noMoves && !game.isWon() ? "" : value, false);
 
   for (int pile = 0; pile < PILES; ++pile) {
     drawPile(pile);
@@ -331,8 +330,10 @@ void KlondikeActivity::build(UiScreen& screen) {
     drawCursor(focus == WASTE ? wasteTopX() : pileX(focus), top, kCardWidth, kCardHeight);
   }
 
-  BarItem items[BAR_SLOTS];
   const bool won = game.isWon();
+  if (won) drawResult(kTableauTop + kResultGap, tr(STR_GAMES_WON));
+
+  BarItem items[BAR_SLOTS];
   const char* labels[BAR_SLOTS] = {tr(STR_GAMES_UNDO), tr(STR_KLONDIKE_HINT),
                                    won ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU)};
   const freeink::Icon* icons[BAR_SLOTS] = {&icon_bar_undo_24, &icon_bar_hint_24,
@@ -348,6 +349,8 @@ void KlondikeActivity::drawPile(const int pile) const {
   const Pile& p = game.pile(pile);
   const int x = pileX(pile);
   if (p.count == 0) {
+    // A won board leaves the columns blank under the result line.
+    if (isTableau(pile) && game.isWon()) return;
     // Empty stock, foundations and columns: a dashed outline to drop on.
     games::ui::drawDashedRect(renderer, x, isTableau(pile) ? kTableauTop : BOARD_TOP, kCardWidth, kCardHeight);
     return;

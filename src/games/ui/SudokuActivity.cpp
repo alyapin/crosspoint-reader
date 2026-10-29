@@ -290,7 +290,7 @@ void SudokuActivity::build(UiScreen& screen) {
   if (game.isSolved()) {
     char line[48];
     snprintf(line, sizeof(line), tr(STR_SUDOKU_SOLVED_IN), clock);
-    drawCentered(kText12Font, 0, renderer.getScreenWidth(), kPadTop + kKeyHeight / 3, line, kSemiBold);
+    drawResult(kPadTop, line);
   } else {
     drawPad(screen);
   }

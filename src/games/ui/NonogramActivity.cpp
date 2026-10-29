@@ -58,7 +58,6 @@ struct PackScan {
     return rank != 0;
   }
 };
-
 }  // namespace
 
 const char* nonogramListStatus() {
@@ -465,7 +464,6 @@ void NonogramActivity::drawGrid(const Layout& l) const {
 }
 
 void NonogramActivity::drawCaption(const int top) const {
-  const int width = renderer.getScreenWidth();
   char line[96];
   if (game.isSolved()) {
     char clock[24];
@@ -473,7 +471,6 @@ void NonogramActivity::drawCaption(const int top) const {
     char solvedIn[48];
     snprintf(solvedIn, sizeof(solvedIn), tr(STR_NONOGRAM_SOLVED), clock);
     const bool picture = game.source() == nonogram::Source::Picture;
-    drawCentered(kText12Font, 0, width, top, picture ? game.name() : solvedIn, kSemiBold);
     char best[48];
     if (newBest) {
       snprintf(best, sizeof(best), "%s", tr(STR_NONOGRAM_NEW_BEST));
@@ -486,7 +483,7 @@ void NonogramActivity::drawCaption(const int top) const {
     } else {
       snprintf(line, sizeof(line), "%s", best);
     }
-    drawCentered(kText10Font, 0, width, top + renderer.getLineHeight(kText12Font), line);
+    drawResult(top, picture ? game.name() : solvedIn, line);
     return;
   }
   if (checkShown) {

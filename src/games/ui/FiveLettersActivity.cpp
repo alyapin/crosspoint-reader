@@ -23,14 +23,14 @@ using fiveletters::Mark;
 namespace {
 constexpr int kCellGap = 6;
 constexpr int kMaxCell = 64;
-constexpr int kCursorFrame = 2;  // the cell the next letter goes to
 constexpr int kGridKeysGap = 16;
 constexpr int kKeyRows = 3;
 constexpr int kKeyHeight = 44;
 constexpr int kKeyGap = 6;
 constexpr int kKeySide = 8;
 constexpr int kKeyUnits = 12;     // the widest row; keys sit on half units
-constexpr int kCaptionBand = 32;  // under the keyboard: the totals once over
+constexpr int kCaptionBand = 64;  // under the keyboard: the result and the totals once over
+constexpr int kResultGap = 12;
 constexpr int kIconSize = 24;
 
 constexpr uint8_t kDelete = 0xFE;
@@ -246,7 +246,7 @@ void FiveLettersActivity::build(UiScreen& screen) {
   } else {
     snprintf(value, sizeof(value), tr(STR_FIVE_TRY), game.guesses() + 1, ATTEMPTS);
   }
-  drawTopLine(screen, nullptr, value, false);
+  drawTopLine(screen, nullptr, game.isOver() ? nullptr : value, false);
 
   const int size = cellSize();
   const int left = (renderer.getScreenWidth() - LETTERS * size - (LETTERS - 1) * kCellGap) / 2;
@@ -267,9 +267,7 @@ void FiveLettersActivity::build(UiScreen& screen) {
     char totals[64];
     snprintf(totals, sizeof(totals), tr(STR_FIVE_STATS), static_cast<unsigned>(stats.played),
              static_cast<unsigned>(stats.wins), static_cast<unsigned>(stats.streak));
-    const int bandTop = keysTop + keysHeight;
-    renderer.drawText(kCaptionFont, kSidePadding,
-                      bandTop + (barTop() - bandTop - renderer.getLineHeight(kCaptionFont)) / 2, totals);
+    drawResult(keysTop + keysHeight + kResultGap, value, totals);
   }
 
   BarItem items[BAR_SLOTS];
@@ -298,7 +296,7 @@ void FiveLettersActivity::drawCell(const int row, const int column, const int x,
       break;
   }
   const bool next = !game.isOver() && row == game.guesses() && column == game.typed();
-  renderer.drawRect(x, y, size, size, next ? kCursorFrame : 1, true);
+  renderer.drawRect(x, y, size, size, next ? kCellFrameWidth : 1, true);
   if (letter != fiveletters::NO_LETTER) drawLetter(letter, x, y, size, size, cap, kSemiBold, true);
 }
 
@@ -329,7 +327,7 @@ void FiveLettersActivity::drawKey(UiScreen& screen, const int row, const int ind
         break;
       case Mark::None:
         renderer.drawRect(x, y, width, kKeyHeight, true);
-        drawLetter(key, x, y, width, kKeyHeight, kKeyCap, EpdFontFamily::REGULAR, true);
+        drawLetter(key, x, y, width, kKeyHeight, kKeyCap, kSemiBold, true);
         break;
     }
   }
