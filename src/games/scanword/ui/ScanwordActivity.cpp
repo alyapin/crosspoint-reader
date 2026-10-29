@@ -13,12 +13,14 @@
 #include <cstdio>
 #include <cstring>
 
+#include "activities/util/ConfirmationActivity.h"
 #include "components/HeaderBackTapTarget.h"
 #include "components/UITheme.h"
 #include "games/chess/ui/chessIcons.h"
 #include "games/scanword/ScanwordStore.h"
 #include "games/ui/ActionBar.h"
 #include "games/ui/LetterKeyboard.h"
+#include "games/ui/gameIcons.h"
 #include "scanwordIcons.h"
 
 namespace fui = freeink::ui;
@@ -192,7 +194,12 @@ void ScanwordActivity::requestRepaint(const Repaint kind) {
 
 void ScanwordActivity::setView(const View next) {
   view = next;
-  if (next == View::Menu) focus = 0;
+  if (next == View::Menu) {
+    // As the other games: touch boards start on Новая игра, keys on the first row.
+    MenuItem rows[kMaxMenuItems];
+    const int count = menuItems(rows);
+    focus = touchBoard() ? static_cast<int>(std::find(rows, rows + count, MenuItem::NewGame) - rows) : 0;
+  }
   checkResult = -1;
   requestRepaint(RepaintEntry);
 }
@@ -393,21 +400,23 @@ bool ScanwordActivity::wordHasEntry() const {
   return false;
 }
 
-// Menu rows that do something right now.
+// Menu rows that do something right now, then the games' Новая игра (the list) and, while unsolved, Завершить.
 int ScanwordActivity::menuItems(MenuItem* out) const {
   int n = 0;
+  const bool solved = game->solved();
   // Touch boards show the answer only with the keyboard open.
-  const bool word = !touchBoard() || keyboardOpen;
+  const bool word = !solved && (!touchBoard() || keyboardOpen);
   const bool hasEntry = word && wordHasEntry();
   if (hasEntry) out[n++] = MenuItem::CheckWord;
-  if (game->filledCount() > 0) out[n++] = MenuItem::CheckAll;
+  if (!solved && game->filledCount() > 0) out[n++] = MenuItem::CheckAll;
   if (word) {
     out[n++] = MenuItem::RevealLetter;
     out[n++] = MenuItem::RevealWord;
   }
   if (hasEntry) out[n++] = MenuItem::Erase;
-  if (game->canUndo()) out[n++] = MenuItem::Undo;
-  out[n++] = MenuItem::ToList;
+  if (!solved && game->canUndo()) out[n++] = MenuItem::Undo;
+  out[n++] = MenuItem::NewGame;
+  if (!solved) out[n++] = MenuItem::Finish;
   return n;
 }
 
@@ -439,10 +448,43 @@ void ScanwordActivity::runMenu(const MenuItem item) {
       setView(View::Board);
       dirty = game->undo() || dirty;
       break;
-    case MenuItem::ToList:
+    case MenuItem::NewGame:
       closePuzzle();
       break;
+    case MenuItem::Finish:
+      confirmFinish();
+      break;
   }
+}
+
+// As the other games' Завершить: asks, then drops the puzzle's save and its list summary.
+void ScanwordActivity::confirmFinish() {
+  auto confirm =
+      makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_GAMES_FINISH_CONFIRM),
+                                              tr(STR_GAMES_FINISH_BODY), tr(STR_CANCEL), tr(STR_GAMES_FINISH));
+  if (!confirm) {
+    LOG_ERR("SCANW", "OOM: finish confirmation");
+    return;
+  }
+  app.clearTapFlash();
+  startActivityForResult(std::move(confirm), [this](const ActivityResult& result) {
+    RenderLock lock(*this);
+    if (result.isCancelled) {
+      setView(View::Board);
+      return;
+    }
+    const char* id = items[openItem].id;
+    scanwordstore::clearProgress(id);
+    if (shelf->find(id) != nullptr) {
+      shelf->remove(id);
+      shelfPending = true;
+    }
+    // An empty game is not saved again on the way out.
+    game->reset();
+    dirty = false;
+    solveUncounted = false;
+    closePuzzle();
+  });
 }
 
 // --- loop task --------------------------------------------------------------------
@@ -751,7 +793,7 @@ void ScanwordActivity::render(RenderLock&&) {
     const int pages = (itemCount + per - 1) / per;
     if (view == View::List && pages > 1) snprintf(page, sizeof(page), tr(STR_GAMES_OF), focus / per + 1, pages);
     GUI.drawHeader(renderer, Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.headerHeight},
-                   view == View::List ? tr(STR_SCANWORDS) : tr(STR_SCANWORD_MENU), page[0] ? page : nullptr);
+                   tr(STR_SCANWORDS), page[0] ? page : nullptr);
   }
   renderUi();
   const bool board = view == View::Board;
@@ -862,8 +904,8 @@ void ScanwordActivity::buildMenu(UiScreen& screen) {
   MenuItem rows[kMaxMenuItems];
   const int count = menuItems(rows);
   for (int i = 0; i < count; ++i) {
-    const freeink::Icon* icon = &icon_scanword_to_list_24;
-    StrId label = StrId::STR_SCANWORD_TO_LIST;
+    const freeink::Icon* icon = nullptr;
+    StrId label = StrId::STR_GAMES_NEW_GAME;
     switch (rows[i]) {
       case MenuItem::CheckWord:
         icon = &icon_scanword_check_24;
@@ -889,7 +931,12 @@ void ScanwordActivity::buildMenu(UiScreen& screen) {
         icon = &icon_scanword_undo_24;
         label = StrId::STR_SCANWORD_UNDO;
         break;
-      case MenuItem::ToList:
+      case MenuItem::NewGame:
+        icon = &icon_bar_new_game_24;
+        break;
+      case MenuItem::Finish:
+        icon = &icon_finish_24;
+        label = StrId::STR_GAMES_FINISH;
         break;
     }
     drawRow(screen, listTop + i * (kRowHeight + kRowGap), i, icon, I18N.get(label), nullptr);
