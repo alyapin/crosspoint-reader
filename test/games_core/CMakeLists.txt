@@ -11,11 +11,13 @@ set(GAMES_SOURCES
   ${GAMES_DIR}/Game2048.cpp
   ${GAMES_DIR}/Hangman.cpp
   ${GAMES_DIR}/Reversi.cpp
+  ${GAMES_DIR}/Nonogram.cpp
   KlondikeSolver.cpp
 )
 
 add_executable(GamesCoreTest SudokuTest.cpp MinesweeperTest.cpp KlondikeTest.cpp TicTacToeTest.cpp FifteenTest.cpp
-               FiveLettersTest.cpp Game2048Test.cpp HangmanTest.cpp ReversiTest.cpp ElapsedTextTest.cpp GameSaveTest.cpp
+               FiveLettersTest.cpp Game2048Test.cpp HangmanTest.cpp ReversiTest.cpp NonogramTest.cpp
+               ElapsedTextTest.cpp GameSaveTest.cpp
                ${REPO_ROOT}/src/games/GameSave.cpp ${GAMES_SOURCES})
 target_include_directories(GamesCoreTest PRIVATE ${GAMES_DIR} ../library_builder/stubs)
 target_link_libraries(GamesCoreTest PRIVATE crosspoint_test_common GTest::gtest_main)

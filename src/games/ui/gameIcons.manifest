@@ -31,3 +31,8 @@ exit = log-out
 five-letters = spell-check
 key-delete = delete
 key-enter = corner-down-left
+# Японские кроссворды: games list, picker, bar
+nonogram = grid-2x2-check
+pictures = image
+random = dices
+bar-cross = x

@@ -10,6 +10,7 @@
 #include <Memory.h>
 #include <Minesweeper.h>
 #include <Reversi.h>
+#include <Nonogram.h>
 #include <Sudoku.h>
 #include <TicTacToe.h>
 
@@ -44,6 +45,8 @@ Paths pathsOf(const Kind kind) {
       return {"/.crosspoint/games/hangman.json", "/.crosspoint/games/hangman.json.tmp"};
     case Kind::Reversi:
       return {"/.crosspoint/games/reversi.json", "/.crosspoint/games/reversi.json.tmp"};
+    case Kind::Nonogram:
+      return {"/.crosspoint/games/nonogram.json", "/.crosspoint/games/nonogram.json.tmp"};
     case Kind::Klondike:
       break;
   }
@@ -65,6 +68,7 @@ Record reversiDone{{"/.crosspoint/games/reversi-done.json", "/.crosspoint/games/
 Record fifteenBest{{"/.crosspoint/games/fifteen-best.json", "/.crosspoint/games/fifteen-best.json.tmp"}};
 Record fiveLettersStats{{"/.crosspoint/games/fiveletters-stats.json", "/.crosspoint/games/fiveletters-stats.json.tmp"}};
 Record best2048{{"/.crosspoint/games/2048-best.txt", "/.crosspoint/games/2048-best.txt.tmp"}};
+Record nonogramRecord{{"/.crosspoint/games/nonogram-best.json", "/.crosspoint/games/nonogram-best.json.tmp"}};
 
 enum class Read : uint8_t { Ok, Missing, Failed };
 
@@ -200,6 +204,7 @@ bool save(const reversi::Game& game) {
   if (game.inProgress()) return write(Kind::Reversi, game, reversi::SAVE_MAX);
   return !reversiDone.unread && writeTo(reversiDone.paths, game, reversi::SAVE_MAX) && clear(Kind::Reversi);
 }
+bool save(const nonogram::Game& game) { return write(Kind::Nonogram, game, nonogram::SAVE_MAX); }
 
 bool load(sudoku::Game& game) { return read(Kind::Sudoku, game, sudoku::SAVE_MAX); }
 bool load(minesweeper::Game& game) { return read(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
@@ -215,6 +220,7 @@ bool load(hangman::Game& game) { return read(Kind::Hangman, game, hangman::SAVE_
 bool load(reversi::Game& game) {
   return read(Kind::Reversi, game, reversi::SAVE_MAX) || readRecord(reversiDone, game, reversi::SAVE_MAX) == Read::Ok;
 }
+bool load(nonogram::Game& game) { return read(Kind::Nonogram, game, nonogram::SAVE_MAX); }
 
 bool save(const fifteen::Best& best) {
   char text[48];
@@ -228,6 +234,12 @@ bool saveStats(const fiveletters::Stats& stats) {
 }
 
 bool loadStats(fiveletters::Stats& stats) { return loadRecord(fiveLettersStats, stats, fiveletters::STATS_MAX); }
+
+bool save(const nonogram::Record& record) {
+  char text[nonogram::RECORD_MAX];
+  return saveRecord(nonogramRecord, text, record.serialize(text, sizeof(text)));
+}
+bool load(nonogram::Record& record) { return loadRecord(nonogramRecord, record, nonogram::RECORD_MAX); }
 
 uint32_t loadBest2048() {
   std::string text;

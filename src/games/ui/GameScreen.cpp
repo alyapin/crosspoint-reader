@@ -92,29 +92,35 @@ void GameScreen::openPicker(const char* title, const GamePickerActivity::Row* ro
 }
 
 void GameScreen::openGameMenu() {
-  const GamePickerActivity::Row rows[] = {
-      {tr(STR_GAMES_NEW_GAME), &icon_bar_new_game_24},
-      {tr(STR_GAMES_FINISH), &icon_resign_24},
-  };
-  auto menu = makeUniqueNoThrow<GamePickerActivity>(renderer, mappedInput, tr(STR_GAMES_MENU), rows,
-                                                    static_cast<int>(std::size(rows)), 0);
+  GamePickerActivity::Row extras[MENU_EXTRAS];
+  const int extraCount = std::clamp(menuExtras(extras), 0, MENU_EXTRAS);
+  GamePickerActivity::Row rows[GamePickerActivity::MAX_ROWS];
+  std::copy(extras, extras + extraCount, rows);
+  rows[extraCount] = {tr(STR_GAMES_NEW_GAME), &icon_bar_new_game_24};
+  rows[extraCount + 1] = {tr(STR_GAMES_FINISH), &icon_resign_24};
+  auto menu = makeUniqueNoThrow<GamePickerActivity>(renderer, mappedInput, tr(STR_GAMES_MENU), rows, extraCount + 2, 0);
   if (!menu) {
     LOG_ERR("GAMES", "OOM: %u bytes for the menu", static_cast<unsigned>(sizeof(GamePickerActivity)));
     return;
   }
   app.clearTapFlash();
   pauseGame();
-  startActivityForResult(std::move(menu), [this](const ActivityResult& result) {
+  startActivityForResult(std::move(menu), [this, extraCount](const ActivityResult& result) {
     RenderLock lock(*this);
     const auto* choice = std::get_if<MenuResult>(&result.data);
-    if (!result.isCancelled && choice != nullptr && choice->action == 1) {
+    const int action = !result.isCancelled && choice != nullptr ? choice->action : -1;
+    if (action == extraCount + 1) {
       confirmFinish();
       return;
     }
     resumeGame();
     clockShown = shownMinutes();
     requestRepaint(RepaintEntry);
-    if (!result.isCancelled && choice != nullptr) openNewGame();
+    if (action == extraCount) {
+      openNewGame();
+    } else if (action >= 0) {
+      menuExtraChosen(action);
+    }
   });
 }
 
