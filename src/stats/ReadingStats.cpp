@@ -1065,6 +1065,7 @@ bool ReadingStats::consumeSeedRetry() {
   Storage.mkdir(STATS_DIR);
   if (!Storage.openFileForWrite("STAT", SEED_TRIES_PATH, f) || !writeAll(f, &tries, 1) || !f.close()) {
     LOG_ERR("STAT", "Cannot count seeding retries");
+    return false;
   }
   return true;
 }

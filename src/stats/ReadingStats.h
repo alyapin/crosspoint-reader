@@ -28,6 +28,8 @@
 //               number, plus the shelf names.
 //   seeded      empty; written once the books read before statistics started
 //               are seeded.
+//   seed_tries  one byte: boots that retried seeding after a read or write
+//               failure.
 // A query adds the log records past a file's applied sequence number, so the
 // files may be rewritten in any order and a crash between two rewrites
 // neither loses nor double-counts reading. totals.bin and books.bin are
@@ -156,7 +158,8 @@ class ReadingStats {
   bool seedingDone();
   bool markSeedingDone();
   // Counts a boot whose seeding could not read or store everything; false once
-  // enough such boots have passed that seeding should stop retrying.
+  // enough such boots have passed, or the count cannot be stored, so seeding
+  // stops retrying.
   bool consumeSeedRetry();
   // Such a book gets seedStatus(progressBp) and that progress, unless it
   // already has a status. False when it could not be stored (storage, memory
