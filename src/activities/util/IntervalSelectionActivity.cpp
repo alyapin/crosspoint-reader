@@ -160,17 +160,17 @@ void IntervalSelectionActivity::intervalScreen(UiScreen& screen, void* user) {
   static_cast<IntervalSelectionActivity*>(user)->buildIntervalScreen(screen);
 }
 
-void IntervalSelectionActivity::formatStepHint(char* buffer, const size_t size, const StrId labelId,
-                                               const int step) const {
-  // Built from separate label + value strings (rather than splitting one localized sentence) so the layout
-  // doesn't depend on translators preserving a hidden separator.
-  char stepText[24];
-  if (valueFormatId != StrId::STR_NONE_OPT) {
-    snprintf(stepText, sizeof(stepText), I18N.get(valueFormatId), static_cast<unsigned int>(step));
-  } else {
-    snprintf(stepText, sizeof(stepText), "%d", step);
+void IntervalSelectionActivity::formatSteps(char* buffer, const size_t size) const {
+  char steps[2][24];
+  const int values[2] = {smallStep, largeStep};
+  for (int i = 0; i < 2; ++i) {
+    if (valueFormatId != StrId::STR_NONE_OPT) {
+      snprintf(steps[i], sizeof(steps[i]), I18N.get(valueFormatId), static_cast<unsigned int>(values[i]));
+    } else {
+      snprintf(steps[i], sizeof(steps[i]), "%d", values[i]);
+    }
   }
-  snprintf(buffer, size, "%s %s", I18N.get(labelId), stepText);
+  snprintf(buffer, size, tr(STR_STEP_HINT_KEYS), steps[0], steps[1]);
 }
 
 void IntervalSelectionActivity::buildIntervalScreen(UiScreen& screen) {
@@ -238,8 +238,13 @@ void IntervalSelectionActivity::drawKeyDialog() const {
   const int titleLine = renderer.getLineHeight(kText12Font);
   const int captionLine = renderer.getLineHeight(kCaptionFont);
   const int valueHeight = heroCapHeight(renderer, kDigitsFont);
+  // The steps are a key hint: the dense face, one line where it fits.
+  char steps[96];
+  formatSteps(steps, sizeof(steps));
+  const auto stepLines = renderer.wrappedText(kDenseFont, steps, textWidth, 2);
+  const int stepLine = renderer.getLineHeight(kDenseFont);
   const int cardHeight = kPadding + titleLine + kGap + valueHeight + 2 * kGap + captionLine + 4 + kProgressHeight +
-                         kGap + 2 * captionLine + kPadding;
+                         kGap + static_cast<int>(stepLines.size()) * stepLine + kPadding;
   const int cardY = (renderer.getScreenHeight() - cardHeight) / 2;
 
   drawRule(renderer, 0, cardY - kBandMargin - kRuleWidth, width);
@@ -265,10 +270,10 @@ void IntervalSelectionActivity::drawKeyDialog() const {
   y += kProgressHeight + kGap;
 
   // Front buttons do the small step, side buttons the large step.
-  formatStepHint(text, sizeof(text), StrId::STR_STEP_HINT_FRONT, smallStep);
-  renderer.drawText(kCaptionFont, textX, y, text);
-  formatStepHint(text, sizeof(text), StrId::STR_STEP_HINT_SIDE, largeStep);
-  renderer.drawText(kCaptionFont, textX, y + captionLine, text);
+  for (const auto& line : stepLines) {
+    renderer.drawText(kDenseFont, textX, y, line.c_str());
+    y += stepLine;
+  }
 }
 
 void IntervalSelectionActivity::render(RenderLock&&) {
