@@ -985,10 +985,11 @@ void ScanwordActivity::drawClueCell(const uint16_t cell, const int x, const int 
   uint8_t ids[2];
   const uint8_t n = puzzle->cluesAt(cell, ids);
   const int halfHeight = n == 2 ? size / 2 : size;
-  // Three lines in a cell, two per half of a two-clue cell, at a pitch that fits.
+  // Three lines in a cell at a pitch that fits, a fourth at a closer one when the clue needs it; two per half
+  // of a two-clue cell.
   const int font = kDenseFont;
-  const uint8_t maxLines = n == 2 ? 2 : scanword::CLUE_MAX_LINES;
-  const int lineHeight = std::min(renderer.getLineHeight(font), (halfHeight - 2) / maxLines);
+  const uint8_t roomyLines = n == 2 ? 2 : scanword::CLUE_MAX_LINES;
+  const uint8_t maxLines = n == 2 ? 2 : scanword::CLUE_MAX_LINES + 1;
   Measure measure{&renderer, font, EpdFontFamily::REGULAR, kClueTracking};
   for (uint8_t i = 0; i < n; ++i) {
     const std::string_view clue = puzzle->clue(ids[i]);
@@ -998,6 +999,8 @@ void ScanwordActivity::drawClueCell(const uint16_t cell, const int x, const int 
     text[len] = '\0';
     scanword::ClueLines lines;
     scanword::layoutClue(text, size - 3, maxLines, measureText, &measure, lines);
+    const int lineHeight =
+        std::min(renderer.getLineHeight(font), (halfHeight - 2) / std::max<int>(roomyLines, lines.count));
     // Glyphs hang from the line top; centre the lines' ink, not their boxes.
     const int ink = (lines.count - 1) * lineHeight + renderer.getFontAscenderSize(font);
     const int top = y + i * halfHeight + (halfHeight - ink) / 2 - (renderer.getLineHeight(font) - lineHeight) / 2;

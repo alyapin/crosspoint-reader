@@ -34,6 +34,13 @@ bool startsPart(const uint8_t letter) { return letter != 30 && letter != 28 && l
 // Л, М, Н, Р.
 bool isSonorant(const uint8_t letter) { return letter == 13 || letter == 14 || letter == 15 || letter == 18; }
 
+// Г, К, П, Ф, Х before Л or Р open a syllable together: no Russian prefix ends on those letters, so the pair
+// is not a prefix boundary ("со-кращение", "жертво-приношений"), unlike "под-ровнять".
+bool keepsLiquid(const uint8_t before, const uint8_t letter) {
+  const bool closes = before == 4 || before == 12 || before == 17 || before == 22 || before == 23;
+  return closes && (letter == 13 || letter == 18);
+}
+
 // Break before letters[split] (a consonant that starts a part): after a vowel or Ь/Ъ/Й ("Боже-ство",
 // "Свой-ство"), between two single consonants ("Кош-ка"), after Л/М/Н/Р closing a syllable
 // ("Отвер-стие"), or before "ств" ("Цар-ство"); never inside "ств" ("Божес-тво", "Свойст-во").
@@ -41,7 +48,7 @@ bool goodBreak(const uint8_t* letters, const size_t count, const size_t split) {
   const uint8_t before = letters[split - 1];
   if (!startsPart(before)) return true;
   if (split + 2 < count && letters[split] == 19 && letters[split + 1] == 20 && letters[split + 2] == 3) return true;
-  if (!isVowel(letters[split - 2])) return false;
+  if (!isVowel(letters[split - 2]) || keepsLiquid(before, letters[split])) return false;
   return isVowel(letters[split + 1]) || isSonorant(before);
 }
 

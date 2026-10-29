@@ -694,6 +694,10 @@ TEST(ScanwordClueLayout, HyphenatesLongWords) {
   // Between two single consonants, or after Л/М/Н/Р before a cluster.
   EXPECT_EQ(layout("Кошка", 4), (std::vector<std::string>{"Кош-", "ка"}));
   EXPECT_EQ(layout("Отверстие", 6), (std::vector<std::string>{"Отвер-", "стие"}));
+  // Г, К, П, Ф, Х keep a following Л or Р; a prefix-ending consonant does not.
+  EXPECT_EQ(layout("Место жертвоприношений", 8, 4), (std::vector<std::string>{"Место", "жертво-", "приноше-", "ний"}));
+  EXPECT_EQ(layout("Реклама", 4), (std::vector<std::string>{"Ре-", "кла-", "ма"}));
+  EXPECT_EQ(layout("Подровнять", 4), (std::vector<std::string>{"Под-", "ров-", "нять"}));
 }
 
 TEST(ScanwordClueLayout, EllipsisWhenTooLong) {
