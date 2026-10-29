@@ -137,18 +137,18 @@ bool ReversiActivity::barShown(const int slot) const {
 // Keys walk the legal moves, then the bar where it is shown, and wrap.
 void ReversiActivity::stepFocus(const int step) {
   const uint64_t moves = playerToMove() ? game.moves() : 0;
-  int ring[CELLS + BAR_SLOTS];  // a square, or -1 - bar slot
+  int8_t ring[CELLS + BAR_SLOTS];  // a square, or -1 - bar slot
   int count = 0;
   int at = -1;
   for (int s = 0; s < CELLS; ++s) {
     if (!(moves >> s & 1)) continue;
     if (barFocus < 0 && s == cursor) at = count;
-    ring[count++] = s;
+    ring[count++] = static_cast<int8_t>(s);
   }
   for (int slot = 0; hasBar() && slot < BAR_SLOTS; ++slot) {
     if (!barShown(slot)) continue;
     if (slot == barFocus) at = count;
-    ring[count++] = -1 - slot;
+    ring[count++] = static_cast<int8_t>(-1 - slot);
   }
   if (count == 0) return;
   const int next = at < 0 ? (step > 0 ? 0 : count - 1) : (at + step + count) % count;

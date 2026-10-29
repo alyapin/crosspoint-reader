@@ -2,6 +2,7 @@
 
 #include <GfxRenderer.h>
 #include <I18n.h>
+#include <Logging.h>
 #include <Memory.h>
 #include <esp_random.h>
 
@@ -108,10 +109,19 @@ void DraughtsActivity::saveGame() { gamesave::save(game); }
 
 void DraughtsActivity::clearSave() { gamesave::clear(gamesave::Kind::Draughts); }
 
+void DraughtsActivity::pauseGame() {
+  if (engine) engine->cancel();
+}
+
 void DraughtsActivity::resumeGame() {
-  if (game.computerToMove() && !engine.thinking() && !engine.ready()) {
-    engine.start(game.position(), game.mode(), esp_random(), &GameScreen::nowMs);
+  if (!game.computerToMove() || (engine && (engine->thinking() || engine->ready()))) return;
+  if (!engine) engine = makeUniqueNoThrow<draughts::Engine>();
+  noEngine = !engine;
+  if (noEngine) {
+    LOG_ERR("DRAUGHTS", "OOM: %u bytes for the engine", static_cast<unsigned>(sizeof(draughts::Engine)));
+    return;
   }
+  engine->start(game.position(), game.mode(), esp_random(), &GameScreen::nowMs);
 }
 
 void DraughtsActivity::openNewGame() {
@@ -126,6 +136,7 @@ void DraughtsActivity::openNewGame() {
 
 void DraughtsActivity::pickerChosen(const int row, bool) {
   game.newGame(static_cast<draughts::Mode>(std::clamp(row, 0, draughts::MODE_COUNT - 1)), esp_random());
+  if (!game.vsComputer()) engine.reset();
   reset();
 }
 
@@ -145,12 +156,12 @@ void DraughtsActivity::menuChosen(const int row) {
 // --- loop task ---------------------------------------------------------------
 
 void DraughtsActivity::loop() {
-  if (engine.thinking()) engine.step(kSliceMs);
-  if (engine.ready()) {
+  if (engine && engine->thinking()) engine->step(kSliceMs);
+  if (engine && engine->ready()) {
     RenderLock lock(RenderLock::Mode::Try);
     if (lock.ownsLock()) {
-      const Move move = engine.bestMove();
-      engine.cancel();
+      const Move move = engine->bestMove();
+      engine->cancel();
       if (game.computerToMove()) play(move);
     }
   }
@@ -171,7 +182,7 @@ void DraughtsActivity::refresh() {
   selected = soleMover() ? moves[0].from : -1;
   chainLen = 0;
   if (cursor >= 0) placeCursor();
-  engine.cancel();
+  pauseGame();
   resumeGame();
 }
 
@@ -544,7 +555,7 @@ void DraughtsActivity::drawStatus() const {
     heading = resultText(game);
     lines[n++] = endText(game.end());
   } else if (game.computerToMove()) {
-    heading = tr(STR_CHESS_THINKING);
+    heading = noEngine ? tr(STR_DICT_LOW_MEMORY) : tr(STR_CHESS_THINKING);
   } else {
     const bool capture = moveCount > 0 && moves[0].captured != 0;
     const bool chain = selected >= 0 && std::any_of(moves, moves + moveCount,

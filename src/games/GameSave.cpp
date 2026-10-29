@@ -219,7 +219,7 @@ bool save(const fiveletters::Game& game) { return write(Kind::FiveLetters, game,
 bool save(const g2048::Game& game) { return write(Kind::Game2048, game, g2048::SAVE_MAX); }
 bool save(const hangman::Game& game) { return write(Kind::Hangman, game, hangman::SAVE_MAX); }
 bool save(const reversi::Game& game) {
-  if (game.inProgress()) return write(Kind::Reversi, game, reversi::SAVE_MAX);
+  if (game.inProgress()) return !reversiDone.unread && write(Kind::Reversi, game, reversi::SAVE_MAX);
   return !reversiDone.unread && writeTo(reversiDone.paths, game, reversi::SAVE_MAX) && clear(Kind::Reversi);
 }
 bool save(const nonogram::Game& game) { return write(Kind::Nonogram, game, nonogram::SAVE_MAX); }

@@ -1,8 +1,12 @@
 #include <HalStorage.h>
 #include <gtest/gtest.h>
+#include <pthread.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
+#include <cstring>
+#include <initializer_list>
 #include <string>
 #include <vector>
 
@@ -95,6 +99,77 @@ Move think(Engine& engine, const Game& g, const uint32_t seed) {
   while (!engine.step(20)) {
   }
   return engine.bestMove();
+}
+
+uint32_t step() { return ++ticks; }
+
+bool foeCaptures(const Game& g) {
+  Move legal[MAX_MOVES];
+  return g.moves(legal, MAX_MOVES) > 0 && legal[0].captured != 0;
+}
+
+// A king and three men a side, far apart. Moves are random but never end the game or offer a
+// capture, and a man moves before the kings could draw: the game outlasts the undo history.
+Game longGame(const int plies) {
+  Position start;
+  for (const char* name : {"a1", "b2", "a3"}) start.white |= 1u << sq(name);
+  for (const char* name : {"h8", "g7", "h6"}) start.black |= 1u << sq(name);
+  start.white |= 1u << sq("c1");
+  start.black |= 1u << sq("f8");
+  start.kings = 1u << sq("c1") | 1u << sq("f8");
+  Game g;
+  g.newGame(Mode::TwoPlayers, 1, start);
+  games::Rng rng(1);
+  for (int ply = 0; ply < plies && !g.isOver(); ++ply) {
+    Move legal[MAX_MOVES];
+    const int n = g.moves(legal, MAX_MOVES);
+    const bool wantMan = g.position().quiet >= 24;
+    int pick = -1;
+    for (int pass = 0; pass < 3 && pick < 0; ++pass) {
+      for (int tries = 0; tries < 40 && pick < 0; ++tries) {
+        const int i = static_cast<int>(rng.below(static_cast<uint32_t>(n)));
+        Game next = g;
+        next.play(legal[i]);
+        const bool man = (g.position().kings >> legal[i].from & 1u) == 0;
+        if (next.isOver() || (pass < 2 && foeCaptures(next)) || (pass < 1 && wantMan != man)) continue;
+        pick = i;
+      }
+    }
+    EXPECT_TRUE(g.play(legal[pick < 0 ? 0 : pick]));
+  }
+  return g;
+}
+
+// Bytes of a fresh thread stack that `run(game, text)` touches.
+struct Probe {
+  Game* game;
+  const std::string* text;
+  bool ok;
+};
+
+void* probeLoad(void* arg) {
+  auto* probe = static_cast<Probe*>(arg);
+  if (probe->text != nullptr) probe->ok = probe->game->deserialize(probe->text->data(), probe->text->size());
+  return nullptr;
+}
+
+size_t stackTouched(Probe& probe) {
+  constexpr size_t kSize = 512 * 1024;
+  void* memory = nullptr;
+  if (posix_memalign(&memory, 16384, kSize) != 0) return SIZE_MAX;
+  memset(memory, 0xA5, kSize);
+  pthread_attr_t attr;
+  pthread_attr_init(&attr);
+  pthread_attr_setstack(&attr, memory, kSize);
+  pthread_t thread;
+  pthread_create(&thread, &attr, &probeLoad, &probe);
+  pthread_join(thread, nullptr);
+  pthread_attr_destroy(&attr);
+  const auto* bytes = static_cast<const unsigned char*>(memory);
+  size_t untouched = 0;
+  while (untouched < kSize && bytes[untouched] == 0xA5) ++untouched;
+  free(memory);
+  return kSize - untouched;
 }
 
 }  // namespace
@@ -415,6 +490,113 @@ TEST(DraughtsEngine, AlwaysPlaysALegalMove) {
         }
       }
     }
+  }
+}
+
+TEST(Draughts, LongGameFoldsAndSurvivesASave) {
+  const Game g = longGame(260);
+  ASSERT_FALSE(g.isOver());
+  EXPECT_LT(g.plyCount(), 200);
+  EXPECT_GE(g.plyCount(), 100);
+  const std::string text = save(g);
+  ASSERT_FALSE(text.empty());
+  Game loaded;
+  ASSERT_TRUE(loaded.deserialize(text.data(), text.size()));
+  EXPECT_TRUE(loaded.position().samePlacement(g.position()));
+  EXPECT_EQ(loaded.position().quiet, g.position().quiet);
+  EXPECT_EQ(loaded.plyCount(), g.plyCount());
+  EXPECT_EQ(save(loaded), text);
+}
+
+// The C3 loop task has 8 KB: opening a long save must stay far below it (host frames are larger).
+TEST(Draughts, LoadingALongSaveUsesLittleStack) {
+  const std::string text = save(longGame(199));
+  ASSERT_FALSE(text.empty());
+  Game loaded;
+  Probe idle{&loaded, nullptr, false};
+  Probe load{&loaded, &text, false};
+  const size_t base = stackTouched(idle);
+  const size_t used = stackTouched(load);
+  EXPECT_TRUE(load.ok);
+  EXPECT_LT(used - base, 2048u) << used << " vs " << base;
+}
+
+// Only king moves repeat a position, and a fold keeps far more plies than that.
+TEST(Draughts, RepetitionIsCaughtAfterTheFold) {
+  Game g = longGame(230);
+  ASSERT_GE(g.plyCount(), 100);
+  bool drawn = false;
+  for (int tries = 0; tries < 40 && !drawn; ++tries) {
+    Move legal[MAX_MOVES];
+    const int n = g.moves(legal, MAX_MOVES);
+    for (int i = 0; i < n && !drawn; ++i) {
+      const Move& a = legal[i];
+      if (a.captured != 0 || (g.position().kings >> a.from & 1u) == 0) continue;
+      Game t = g;
+      t.play(a);
+      Move replies[MAX_MOVES];
+      const int r = t.moves(replies, MAX_MOVES);
+      for (int j = 0; j < r && !drawn; ++j) {
+        const Move& b = replies[j];
+        if (b.captured != 0 || (t.position().kings >> b.from & 1u) == 0) continue;
+        Game u = t;
+        const std::string there[2] = {text(a), text(b)};
+        std::string back[2] = {text(a), text(b)};
+        for (std::string& m : back) m = m.substr(3, 2) + "-" + m.substr(0, 2);
+        u.play(b);
+        bool ok = true;
+        for (int round = 0; round < 2 && ok; ++round) {
+          for (const std::string& m : {back[0], back[1], there[0], there[1]}) {
+            if (u.isOver()) break;
+            Move list[MAX_MOVES];
+            const int k = u.moves(list, MAX_MOVES);
+            const Move* found = nullptr;
+            for (int x = 0; x < k; ++x) {
+              if (text(list[x]) == m) found = &list[x];
+            }
+            ok = found != nullptr && u.play(*found);
+            if (!ok) break;
+          }
+        }
+        if (u.isOver() && u.end() == End::Repetition) drawn = true;
+      }
+    }
+    Move list[MAX_MOVES];
+    if (!drawn) g.play(list[g.moves(list, MAX_MOVES) - 1]);
+  }
+  EXPECT_TRUE(drawn);
+}
+
+TEST(DraughtsEngine, SlicingDoesNotChangeTheMove) {
+  Game opening;
+  opening.newGame(Mode::Hard, 5);
+  play(opening, "c3-d4");
+  const Game middle = longGame(120);
+  Game capture;
+  capture.newGame(Mode::Medium, 1,
+                  board("........"
+                        "........"
+                        "...b...."
+                        "........"
+                        ".b...b.."
+                        "..w...w."
+                        "........"
+                        "........"));
+  static Engine whole;
+  static Engine sliced;
+  for (const auto& [g, mode] :
+       {std::pair<const Game*, Mode>{&opening, Mode::Hard}, {&middle, Mode::Hard}, {&capture, Mode::Medium}}) {
+    whole.start(g->position(), mode, 9, &step, false);
+    while (!whole.step(UINT32_MAX)) {
+    }
+    sliced.start(g->position(), mode, 9, &step, false);
+    int slices = 0;
+    while (!sliced.step(1)) ++slices;
+    EXPECT_EQ(text(sliced.bestMove()), text(whole.bestMove()));
+    EXPECT_EQ(sliced.depth(), whole.depth());
+    EXPECT_EQ(sliced.nodes(), whole.nodes());
+    if (whole.nodes() > 10 * Engine::CHECK_NODES)
+      EXPECT_GE(slices, static_cast<int>(whole.nodes() / Engine::CHECK_NODES) / 2);
   }
 }
 

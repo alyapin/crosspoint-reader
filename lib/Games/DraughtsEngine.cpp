@@ -26,14 +26,18 @@ uint16_t keyOf(const Move& m) { return static_cast<uint16_t>(m.from | m.to << 8)
 
 const Level& levelOf(const Mode mode) { return LEVELS[std::min(static_cast<int>(mode), 2)]; }
 
-void Engine::start(const Position& rootPosition, const Mode mode, const uint32_t seed, const games::MillisFn now) {
+void Engine::start(const Position& rootPosition, const Mode mode, const uint32_t seed, const games::MillisFn now,
+                   const bool timeLimits) {
   rootPos = rootPosition;
   level = levelOf(mode);
   rng = games::Rng(seed);
   clock = now;
+  timed = timeLimits;
   startMs = clock();
   nodeCount = 0;
+  checked = 0;
   doneDepth = 0;
+  aborted = false;
   chosen = Move{};
   std::fill(std::begin(killers), std::end(killers), NO_KILLER);
   rootCount = legalMoves(rootPos, root, MAX_MOVES);
@@ -46,34 +50,62 @@ void Engine::start(const Position& rootPosition, const Mode mode, const uint32_t
   iterDepth = 1;
   rootIndex = 0;
   iterBest = -INF;
+  sp = -1;
   state = State::Searching;
 }
 
 bool Engine::step(const uint32_t sliceMs) {
   if (state != State::Searching) return state == State::Done;
-  const uint32_t sliceStart = clock();
+  sliceStart = clock();
+  this->sliceMs = sliceMs;
   while (state == State::Searching) {
-    searchRootMove();
-    if (state == State::Searching && clock() - sliceStart >= sliceMs) return false;
+    if (sliceUsed()) return false;
+    if (aborted) {
+      finish();
+    } else if (sp < 0) {
+      openRootMove();
+    } else if (Frame& f = stack[sp]; f.next < f.count && f.alpha < f.beta) {
+      Position child = f.pos;
+      apply(child, arena[f.first + f.next].step());
+      ++f.next;
+      if (!enter(child, f.depth - 1, -f.beta, -f.alpha) && !aborted) childReturned(-result);
+    } else {
+      result = f.best;
+      top = f.first;
+      --sp;
+      if (sp >= 0) {
+        childReturned(-result);
+      } else {
+        rootMoveDone(-result);
+      }
+    }
   }
   return true;
 }
 
-bool Engine::outOfTime() { return clock() - startMs >= HARD_MS; }
+// Every CHECK_NODES nodes: true once the slice is used up; past the hard cap the search stops.
+bool Engine::sliceUsed() {
+  if (nodeCount - checked < CHECK_NODES) return false;
+  checked = nodeCount;
+  const uint32_t now = clock();
+  if (timed && now - startMs >= HARD_MS) {
+    aborted = true;
+    return false;
+  }
+  return now - sliceStart >= sliceMs;
+}
 
 // Moves after the first are searched against the best so far less the margin:
 // a score above that floor is exact, one below is only a bound.
-void Engine::searchRootMove() {
-  const int floor = rootIndex == 0 ? -INF : iterBest - level.margin - 1;
+void Engine::openRootMove() {
+  floor = rootIndex == 0 ? -INF : iterBest - level.margin - 1;
   Position child = rootPos;
   apply(child, root[rootIndex].step());
-  aborted = false;
   top = 0;
-  const int score = -search(child, iterDepth - 1, -INF, -floor, 1);
-  if (aborted) {
-    finish();
-    return;
-  }
+  if (!enter(child, iterDepth - 1, -INF, -floor) && !aborted) rootMoveDone(-result);
+}
+
+void Engine::rootMoveDone(const int score) {
   scores[rootIndex] = static_cast<int16_t>(score);
   exact[rootIndex] = score > floor;
   iterBest = std::max(iterBest, score);
@@ -93,7 +125,7 @@ void Engine::iterationDone() {
   std::copy(exact, exact + rootCount, doneExact);
   doneDepth = iterDepth;
   if (iterDepth >= level.depth || std::abs(iterBest) >= DECIDED || nodeCount >= level.maxNodes ||
-      clock() - startMs >= SOFT_MS) {
+      (timed && clock() - startMs >= SOFT_MS)) {
     finish();
     return;
   }
@@ -117,19 +149,35 @@ void Engine::finish() {
       }
     }
   }
+  sp = -1;
   state = State::Done;
 }
 
-int Engine::search(const Position& p, const int depth, int alpha, const int beta, const int ply) {
-  if (++nodeCount >= level.maxNodes || ((nodeCount & 255) == 0 && outOfTime())) aborted = true;
-  if (aborted) return 0;
-  if (p.quiet >= KING_DRAW_PLIES) return 0;
-  if (ply >= MAX_PLY || ARENA - top < MAX_MOVES / 2) return evaluate(p);
+bool Engine::enter(const Position& p, const int depth, const int alpha, const int beta) {
+  if (++nodeCount >= level.maxNodes) {
+    aborted = true;
+    return false;
+  }
+  const int ply = sp + 2;
+  if (p.quiet >= KING_DRAW_PLIES) {
+    result = 0;
+    return false;
+  }
+  if (ply >= MAX_PLY || ARENA - top < MAX_MOVES / 2) {
+    result = evaluate(p);
+    return false;
+  }
   Move* list = arena + top;
-  const int n = legalMoves(p, list, ARENA - top);
-  if (n == 0) return ply - WIN;
+  const int n = legalMoves(p, list, std::min(ARENA - top, MAX_MOVES));
+  if (n == 0) {
+    result = ply - WIN;
+    return false;
+  }
   const bool capture = list[0].captured != 0;
-  if (depth <= 0 && !(capture && level.extend)) return evaluate(p);
+  if (depth <= 0 && !(capture && level.extend)) {
+    result = evaluate(p);
+    return false;
+  }
   if (!capture) {
     for (int i = 1; i < n; ++i) {
       if (keyOf(list[i]) == killers[ply]) {
@@ -138,22 +186,24 @@ int Engine::search(const Position& p, const int depth, int alpha, const int beta
       }
     }
   }
+  stack[++sp] = {p,
+                 static_cast<int16_t>(alpha),
+                 static_cast<int16_t>(beta),
+                 static_cast<int16_t>(-INF),
+                 static_cast<int8_t>(depth),
+                 capture,
+                 static_cast<uint16_t>(top),
+                 static_cast<uint8_t>(n),
+                 0};
   top += n;
-  int best = -INF;
-  for (int i = 0; i < n; ++i) {
-    Position child = p;
-    apply(child, list[i].step());
-    const int score = -search(child, depth - 1, -beta, -alpha, ply + 1);
-    if (aborted) break;
-    best = std::max(best, score);
-    alpha = std::max(alpha, score);
-    if (alpha >= beta) {
-      if (!capture) killers[ply] = keyOf(list[i]);
-      break;
-    }
-  }
-  top -= n;
-  return best;
+  return true;
+}
+
+void Engine::childReturned(const int score) {
+  Frame& f = stack[sp];
+  f.best = static_cast<int16_t>(std::max<int>(f.best, score));
+  f.alpha = static_cast<int16_t>(std::max<int>(f.alpha, score));
+  if (f.alpha >= f.beta && !f.capture) killers[sp + 1] = keyOf(arena[f.first + f.next - 1]);
 }
 
 }  // namespace draughts

@@ -91,7 +91,7 @@ class Engine {
   Frame stack[MAX_PLY];
   int top = -1;
   int32_t result = 0;
-  uint8_t rootMoves[32];
+  uint8_t rootMoves[64];
   int rootCount = 0;
   int rootBest = -1;
   int iterationDepth = 0;

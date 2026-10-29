@@ -23,6 +23,7 @@ constexpr int MAX_MOVES = 128;
 constexpr int MAX_PLIES = 200;       // undo reaches back this far; older plies fold into the start position
 constexpr int KING_DRAW_PLIES = 30;  // 15 moves each
 constexpr size_t SAVE_MAX = 2560;
+static_assert(KING_DRAW_PLIES < MAX_PLIES / 2, "a fold must keep every position a repetition can match");
 
 enum Side : uint8_t { White, Black };
 

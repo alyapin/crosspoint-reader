@@ -39,13 +39,16 @@ constexpr bool has(const uint32_t set, const int square) { return (set >> square
 
 bool lastRow(const Side side, const int square) { return side == White ? square < 4 : square >= SQUARES - 4; }
 
-// Fills the moves of one position; captures first, plain moves only when there are none.
+// Hands the moves of one position to a sink; captures first, plain moves only when there are none.
 class Generator {
  public:
-  Generator(const Position& pos, Move* out, const int cap)
-      : pos(pos), out(out), cap(cap), foe(pos.side == White ? pos.black : pos.white) {}
+  using Sink = void (*)(void* ctx, const Move& move);
 
-  int run() {
+  Generator(const Position& pos, const Sink sink, void* ctx)
+      : pos(pos), sink(sink), ctx(ctx), foe(pos.side == White ? pos.black : pos.white) {}
+
+  // True when the position has a move.
+  bool run() {
     const uint32_t own = pos.side == White ? pos.white : pos.black;
     const uint32_t occupied = pos.white | pos.black;
     for (int s = 0; s < SQUARES; ++s) {
@@ -54,12 +57,12 @@ class Generator {
       cur.from = static_cast<uint8_t>(s);
       jumps(s, has(pos.kings, s), false, 0, 0);
     }
-    if (count > 0 || found) return count;
+    if (found) return true;
     empty = ~occupied;
     for (int s = 0; s < SQUARES; ++s) {
       if (has(own, s)) plain(s);
     }
-    return count;
+    return found;
   }
 
  private:
@@ -125,18 +128,48 @@ class Generator {
   }
 
   void emit() {
-    if (count < cap) out[count++] = cur;
+    found = true;
+    sink(ctx, cur);
   }
 
   const Position& pos;
-  Move* out;
-  int cap;
+  Sink sink;
+  void* ctx;
   uint32_t foe;
   uint32_t empty = 0;
   Move cur;
-  int count = 0;
   bool found = false;
 };
+
+bool hasMove(const Position& pos) {
+  return Generator(pos, [](void*, const Move&) {}, nullptr).run();
+}
+
+// The first legal move `match` accepts, without a move list on the stack.
+template <typename Match>
+bool findMove(const Position& pos, Move& out, const Match& match) {
+  struct Find {
+    const Match* match;
+    Move* out;
+    bool found;
+  } find{&match, &out, false};
+  Generator(
+      pos,
+      [](void* ctx, const Move& m) {
+        auto& f = *static_cast<Find*>(ctx);
+        if (!f.found && (*f.match)(m)) {
+          *f.out = m;
+          f.found = true;
+        }
+      },
+      &find)
+      .run();
+  return find.found;
+}
+
+bool sameStep(const Move& m, const Step& step) {
+  return m.from == step.from && m.to == step.to && m.captured == step.captured && m.promotes == step.promotes;
+}
 
 int pieceValue(const Position& p, const int s, const bool white) {
   const int row = rowOf(s);
@@ -162,6 +195,55 @@ int parseSquare(const char* text) {
 
 constexpr char PIECES[] = ".wWbB";
 
+// One move of the save text: "c3-d4" or "c3:e5:g3".
+struct Token {
+  int from = -1;
+  int count = 0;
+  bool capture = false;
+  uint8_t stops[MAX_JUMPS] = {};
+
+  bool matches(const Move& m) const {
+    if (m.from != from || m.stops() != count || (m.jumps > 0) != capture) return false;
+    for (int k = 0; k < count; ++k) {
+      if (m.stopAt(k) != stops[k]) return false;
+    }
+    return true;
+  }
+};
+
+// Reads the token at `i` and the space after it; false when malformed.
+bool readToken(const char* text, const size_t len, size_t& i, Token& t) {
+  if (i + 2 > len) return false;
+  t.from = parseSquare(text + i);
+  const char sep = i + 2 < len ? text[i + 2] : ' ';
+  i += 2;
+  while (i + 3 <= len && text[i] == sep && t.count < MAX_JUMPS) {
+    const int s = parseSquare(text + i + 1);
+    if (s < 0) return false;
+    t.stops[t.count++] = static_cast<uint8_t>(s);
+    i += 3;
+  }
+  t.capture = sep == ':';
+  if (t.from < 0 || t.count == 0 || (sep != '-' && !t.capture) || (sep == '-' && t.count != 1)) return false;
+  return i == len || text[i++] == ' ';
+}
+
+// Replays the save text from `p`, showing `each(p, move)` every move before it is made; false
+// on a token that is malformed or not a legal move, or when `each` refuses.
+template <typename Each>
+bool replayText(Position& p, const char* text, const size_t len, const Each& each) {
+  size_t i = 0;
+  while (i < len) {
+    Token t;
+    Move m;
+    if (!readToken(text, len, i, t) || !findMove(p, m, [&](const Move& c) { return t.matches(c); }) || !each(p, m)) {
+      return false;
+    }
+    apply(p, m.step());
+  }
+  return true;
+}
+
 }  // namespace
 
 int rowOf(const int square) { return square / 4; }
@@ -177,7 +259,22 @@ Position Position::initial() {
   return p;
 }
 
-int legalMoves(const Position& pos, Move* out, const int cap) { return Generator(pos, out, cap).run(); }
+int legalMoves(const Position& pos, Move* out, const int cap) {
+  struct List {
+    Move* out;
+    int cap;
+    int count;
+  } list{out, cap, 0};
+  Generator(
+      pos,
+      [](void* ctx, const Move& m) {
+        auto& l = *static_cast<List*>(ctx);
+        if (l.count < l.cap) l.out[l.count++] = m;
+      },
+      &list)
+      .run();
+  return list.count;
+}
 
 void apply(Position& pos, const Step& step) {
   uint32_t& own = pos.side == White ? pos.white : pos.black;
@@ -223,8 +320,7 @@ void Game::replay(const int count) {
 void Game::judge() {
   state = Status::Playing;
   reason = End::None;
-  Move any;
-  if (legalMoves(pos, &any, 1) == 0) {
+  if (!hasMove(pos)) {
     state = pos.side == White ? Status::BlackWon : Status::WhiteWon;
     reason = End::NoMoves;
     return;
@@ -234,7 +330,8 @@ void Game::judge() {
     reason = End::KingMoves;
     return;
   }
-  // Only king moves repeat a position: earlier ones cannot match.
+  // Only king moves repeat a position, so earlier ones cannot match. The window is
+  // shorter than what a fold keeps (static_assert in Draughts.h), so folding loses nothing.
   int seen = 0;
   Position p = base;
   for (int k = 0; k < plies; ++k) {
@@ -248,14 +345,9 @@ void Game::judge() {
 }
 
 bool Game::play(const Move& move) {
-  if (isOver()) return false;
-  Move legal[MAX_MOVES];
-  const int n = legalMoves(pos, legal, MAX_MOVES);
   const Step step = move.step();
-  const bool ok = std::any_of(legal, legal + n, [&](const Move& m) {
-    return m.from == step.from && m.to == step.to && m.captured == step.captured && m.promotes == step.promotes;
-  });
-  if (!ok) return false;
+  Move legal;
+  if (isOver() || !findMove(pos, legal, [&](const Move& m) { return sameStep(m, step); })) return false;
   if (plies == MAX_PLIES) {
     constexpr int kFold = MAX_PLIES / 2;
     for (int i = 0; i < kFold; ++i) apply(base, history[i]);
@@ -309,20 +401,16 @@ size_t Game::serialize(char* out, const size_t cap) const {
   w.number("quiet", base.quiet);
   w.beginString("moves");
   Position p = base;
-  Move legal[MAX_MOVES];
   for (int i = 0; i < plies; ++i) {
     const Step& step = history[i];
-    const int n = legalMoves(p, legal, MAX_MOVES);
-    const Move* m = std::find_if(legal, legal + n, [&](const Move& c) {
-      return c.from == step.from && c.to == step.to && c.captured == step.captured;
-    });
-    if (m == legal + n) return 0;
+    Move m;
+    if (!findMove(p, m, [&](const Move& c) { return sameStep(c, step); })) return 0;
     char text[MOVE_TEXT_MAX];
-    squareText(m->from, text);
+    squareText(m.from, text);
     int len = 2;
-    for (int k = 0; k < m->stops(); ++k) {
-      text[len++] = m->jumps > 0 ? ':' : '-';
-      squareText(m->stopAt(k), text + len);
+    for (int k = 0; k < m.stops(); ++k) {
+      text[len++] = m.jumps > 0 ? ':' : '-';
+      squareText(m.stopAt(k), text + len);
       len += 2;
     }
     if (i > 0) w.put(' ');
@@ -363,37 +451,35 @@ bool Game::deserialize(const char* text, const size_t len) {
   p.side = static_cast<Side>(side);
   p.quiet = static_cast<uint8_t>(quiet);
 
-  Game g;
-  g.newGame(static_cast<Mode>(mode), seed, p);
-  Move legal[MAX_MOVES];
-  size_t i = 0;
-  while (i < movesLen) {
-    if (g.isOver() || i + 2 > movesLen) return false;
-    uint8_t stops[MAX_JUMPS];
-    int count = 0;
-    const int from = parseSquare(moves + i);
-    const char sep = i + 2 < movesLen ? moves[i + 2] : ' ';
-    i += 2;
-    while (i + 3 <= movesLen && moves[i] == sep && count < MAX_JUMPS) {
-      const int s = parseSquare(moves + i + 1);
-      if (s < 0) return false;
-      stops[count++] = static_cast<uint8_t>(s);
-      i += 3;
-    }
-    if (from < 0 || count == 0 || (sep != '-' && sep != ':') || (sep == '-' && count != 1)) return false;
-    if (i < movesLen && moves[i++] != ' ') return false;
-    const int n = legalMoves(g.pos, legal, MAX_MOVES);
-    const Move* m = std::find_if(legal, legal + n, [&](const Move& c) {
-      if (c.from != from || c.stops() != count || (c.jumps > 0) != (sep == ':')) return false;
-      for (int k = 0; k < count; ++k) {
-        if (c.stopAt(k) != stops[k]) return false;
-      }
-      return true;
-    });
-    if (m == legal + n || !g.play(*m)) return false;
+  // The line must be legal and not over: a first pass replays it, a second counts the
+  // repeats of where it ends, and only then is it taken. Nothing large on the stack.
+  Position end = p;
+  int count = 0;
+  if (!replayText(
+          end, moves, movesLen,
+          [&](const Position& at, const Move&) { return ++count <= MAX_PLIES && at.quiet < KING_DRAW_PLIES; }) ||
+      !hasMove(end) || end.quiet >= KING_DRAW_PLIES) {
+    return false;
   }
-  if (g.isOver()) return false;
-  *this = g;
+  int seen = 0;
+  int k = 0;
+  Position again = p;
+  replayText(again, moves, movesLen, [&](const Position& at, const Move&) {
+    if (k++ >= count - end.quiet && at.samePlacement(end)) ++seen;
+    return true;
+  });
+  if (seen >= 2) return false;
+
+  gameMode = static_cast<Mode>(mode);
+  seedValue = seed;
+  base = p;
+  pos = p;
+  plies = 0;
+  replayText(pos, moves, movesLen, [&](const Position&, const Move& m) {
+    history[plies++] = m.step();
+    return true;
+  });
+  judge();
   return true;
 }
 
