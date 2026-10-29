@@ -628,7 +628,7 @@ bool LibraryShelvesActivity::generateMissingThumbs() {
 void LibraryShelvesActivity::render(RenderLock&&) {
   renderer.clearScreen();
   renderUi();
-  statsui::drawHints(renderer, mappedInput, tr(STR_SELECT));
+  statsui::drawHints(renderer, mappedInput, focus < 0 ? tr(STR_SHELF_TAB_NEXT) : tr(STR_SELECT));
   renderer.displayBuffer(entryRefresh ? cadence.entry() : cadence.update());
   entryRefresh = false;
   // Visible covers without a thumb at this height get one, then a single repaint.
