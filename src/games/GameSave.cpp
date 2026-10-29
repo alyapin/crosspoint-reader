@@ -1,6 +1,7 @@
 #include "GameSave.h"
 
 #include <HalStorage.h>
+#include <Hangman.h>
 #include <Klondike.h>
 #include <Logging.h>
 #include <Memory.h>
@@ -25,6 +26,8 @@ Paths pathsOf(const Kind kind) {
       return {"/.crosspoint/games/sudoku.json", "/.crosspoint/games/sudoku.json.tmp"};
     case Kind::Minesweeper:
       return {"/.crosspoint/games/minesweeper.json", "/.crosspoint/games/minesweeper.json.tmp"};
+    case Kind::Hangman:
+      return {"/.crosspoint/games/hangman.json", "/.crosspoint/games/hangman.json.tmp"};
     case Kind::Klondike:
       break;
   }
@@ -91,9 +94,11 @@ void clear(const Kind kind) {
 bool save(const sudoku::Game& game) { return write(Kind::Sudoku, game, sudoku::SAVE_MAX); }
 bool save(const minesweeper::Game& game) { return write(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
 bool save(const klondike::Game& game) { return write(Kind::Klondike, game, klondike::SAVE_MAX); }
+bool save(const hangman::Game& game) { return write(Kind::Hangman, game, hangman::SAVE_MAX); }
 
 bool load(sudoku::Game& game) { return read(Kind::Sudoku, game, sudoku::SAVE_MAX); }
 bool load(minesweeper::Game& game) { return read(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
 bool load(klondike::Game& game) { return read(Kind::Klondike, game, klondike::SAVE_MAX); }
+bool load(hangman::Game& game) { return read(Kind::Hangman, game, hangman::SAVE_MAX); }
 
 }  // namespace gamesave

@@ -898,3 +898,12 @@ STR_SCANWORD_REVEAL_LETTER: "Открыть букву"
 STR_SCANWORD_REVEAL_WORD: "Открыть слово"
 STR_SCANWORD_UNDO: "Отменить"
 STR_SCANWORD_TO_LIST: "К списку"
+
+# Hangman
+STR_HANGMAN: "Виселица"
+STR_HANGMAN_MISTAKES: "ошибок"
+STR_HANGMAN_OF: "%d из %d"
+STR_HANGMAN_LETTERS: "%d букв"
+STR_HANGMAN_HINT: "Подсказка"
+STR_HANGMAN_WON: "Отгадано"
+STR_HANGMAN_LOST: "Не отгадано"

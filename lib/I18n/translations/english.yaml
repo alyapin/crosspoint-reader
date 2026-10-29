@@ -898,3 +898,12 @@ STR_SCANWORD_REVEAL_LETTER: "Reveal a letter"
 STR_SCANWORD_REVEAL_WORD: "Reveal the word"
 STR_SCANWORD_UNDO: "Undo"
 STR_SCANWORD_TO_LIST: "Back to the list"
+
+# Hangman
+STR_HANGMAN: "Hangman"
+STR_HANGMAN_MISTAKES: "mistakes"
+STR_HANGMAN_OF: "%d of %d"
+STR_HANGMAN_LETTERS: "%d letters"
+STR_HANGMAN_HINT: "Hint"
+STR_HANGMAN_WON: "Guessed"
+STR_HANGMAN_LOST: "Not guessed"
