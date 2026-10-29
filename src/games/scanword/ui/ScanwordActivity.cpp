@@ -967,6 +967,7 @@ void ScanwordActivity::drawTopLine(UiScreen& screen) const {
   // Touch boards have no band under the grid: the solve and the whole-grid check show here.
   char value[24];
   char hints[8];
+  char wrong[8];
   games::ui::StatusItem status[2];
   int parts = 1;
   if (touchBoard() && game->solved()) {
@@ -980,13 +981,17 @@ void ScanwordActivity::drawTopLine(UiScreen& screen) const {
     }
   } else if (touchBoard() && checkedGrid && checkResult == 0) {
     status[0] = {tr(STR_SCANWORD_ALL_RIGHT), nullptr};
-  } else if (touchBoard() && checkedGrid && checkResult > 0) {
-    snprintf(value, sizeof(value), "%d", static_cast<int>(checkResult));
-    status[0] = {tr(STR_SCANWORD_WRONG_LABEL), value};
   } else {
     snprintf(value, sizeof(value), tr(STR_GAMES_OF), static_cast<int>(game->filledCount()),
              static_cast<int>(puzzle->letterCount()));
     status[0] = {tr(STR_SCANWORD_FILLED), value};
+    // The progress stays beside the wrong letters of a whole-grid check, without its word if too long.
+    if (touchBoard() && checkedGrid && checkResult > 0) {
+      snprintf(wrong, sizeof(wrong), "%d", static_cast<int>(checkResult));
+      status[1] = {tr(STR_SCANWORD_WRONG_LABEL), wrong};
+      parts = 2;
+      if (games::ui::statusWidth(renderer, status, parts) > width - kSidePadding - exitWidth) status[0].label = nullptr;
+    }
   }
   games::ui::drawStatus(renderer, width - kSidePadding, kHeaderTop, status, parts);
 }

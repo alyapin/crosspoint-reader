@@ -954,7 +954,7 @@ STR_2048_NO_MOVES: "Ходов нет"
 
 # Hangman
 STR_HANGMAN: "Виселица"
-STR_HANGMAN_MISTAKES: "ошибок"
+STR_HANGMAN_MISTAKES: "ошибки"
 STR_HANGMAN_LETTERS: "%d букв"
 STR_HANGMAN_HINT: "Подсказка"
 STR_HANGMAN_WON: "Отгадано"
