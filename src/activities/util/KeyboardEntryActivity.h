@@ -23,7 +23,8 @@ class KeyboardEntryActivity : public Activity {
                                  const size_t maxLength = 0, InputType inputType = InputType::Text)
       : Activity("KeyboardEntry", renderer, mappedInput),
         title(std::move(title)),
-        text(std::move(initialText)),
+        initialText(std::move(initialText)),
+        text(this->initialText),
         maxLength(maxLength),
         inputType(inputType) {}
 
@@ -35,6 +36,7 @@ class KeyboardEntryActivity : public Activity {
 
  private:
   std::string title;
+  std::string initialText;  // Back asks before dropping an edit of it (button boards)
   std::string text;
   size_t maxLength;
   InputType inputType;
@@ -124,6 +126,7 @@ class KeyboardEntryActivity : public Activity {
 
   void onComplete(std::string text);
   void onCancel();
+  void confirmDiscard();
   bool cursorPositionFromPoint(int x, int y, size_t& position) const;
   std::string displayTextForCurrentState() const;
   // Advance of s[start, end) measured in place by temporarily null-terminating

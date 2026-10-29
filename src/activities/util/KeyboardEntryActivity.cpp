@@ -3,6 +3,8 @@
 #include <BidiUtils.h>
 #include <HalGPIO.h>
 #include <I18n.h>
+#include <Logging.h>
+#include <Memory.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -11,6 +13,7 @@
 #include "HapticFeedback.h"
 #include "KeyboardLayoutSet.h"
 #include "MappedInputManager.h"
+#include "activities/util/ConfirmationActivity.h"
 #include "components/UITheme.h"
 #include "components/setka/SetkaStyle.h"
 #include "fontIds.h"
@@ -887,7 +890,12 @@ void KeyboardEntryActivity::loop() {
   }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
-    onCancel();
+    // A stray Back on a button board would throw away a long entry.
+    if (!mappedInput.hasTouch() && text != initialText) {
+      confirmDiscard();
+    } else {
+      onCancel();
+    }
   }
 
   if (hintVisible && !cursorMode && millis() - hintShowTime > 4000) {
@@ -1264,4 +1272,17 @@ void KeyboardEntryActivity::onCancel() {
   result.isCancelled = true;
   setResult(std::move(result));
   finish();
+}
+
+void KeyboardEntryActivity::confirmDiscard() {
+  auto confirm = makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_KEYBOARD_DISCARD_CONFIRM), "",
+                                                         tr(STR_CANCEL), tr(STR_KEYBOARD_DISCARD));
+  if (!confirm) {
+    LOG_ERR("KBD", "OOM: discard confirmation");
+    onCancel();
+    return;
+  }
+  startActivityForResult(std::move(confirm), [this](const ActivityResult& result) {
+    if (!result.isCancelled) onCancel();
+  });
 }
