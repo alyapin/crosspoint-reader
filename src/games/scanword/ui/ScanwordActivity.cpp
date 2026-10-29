@@ -73,8 +73,12 @@ constexpr uint8_t kKeys[kKeyRows][kKeysPerRow] = {
     {33, 25, 19, 14, 10, 20, 30, 2, 32, 7, 28},
 };
 
-// Clue cells set the caption face one pixel tighter, so a 60 px cell takes a seven-letter line.
+// Clue cells set the caption face one pixel tighter, so a 60 px cell takes a seven-letter line; a clue that
+// does not fit that way is set dense, a pixel tighter again and then at a closer line pitch.
 constexpr int8_t kClueTracking = -1;
+constexpr int8_t kClueDenseTracking = -2;
+constexpr int kCluePad = 2;      // clue ink to the grid lines
+constexpr int kClueLineGap = 1;  // a descender to the caps of the line below
 
 struct Measure {
   const GfxRenderer* renderer;
@@ -1025,12 +1029,29 @@ void ScanwordActivity::drawClueCell(const uint16_t cell, const int x, const int 
   uint8_t ids[2];
   const uint8_t n = puzzle->cluesAt(cell, ids);
   const int halfHeight = n == 2 ? cellHeight() / 2 : cellHeight();
-  // Three lines in a cell at a pitch that fits, a fourth at a closer one when the clue needs it; two per half
-  // of a two-clue cell.
   const int font = kDenseFont;
-  const uint8_t roomyLines = n == 2 ? 2 : scanword::CLUE_MAX_LINES;
-  const uint8_t maxLines = n == 2 ? 2 : scanword::CLUE_MAX_LINES + 1;
-  Measure measure{&renderer, font, EpdFontFamily::REGULAR, kClueTracking};
+  int32_t advance = 0;
+  int cap = 0;
+  if (!renderer.getCodepointMetrics(font, 0x41D, EpdFontFamily::REGULAR, advance, cap)) return;
+  const int ascender = renderer.getFontAscenderSize(font);
+  // One line's ink: the caps over the baseline and the descent under it.
+  const int inkLine = cap + renderer.getLineHeight(font) - ascender;
+  const int innerWidth = size - 1 - 2 * kCluePad;  // the cell's left grid line is its own
+  // Lines whose descenders clear the next line inside the padding, then a fourth line (two per half of a
+  // two-clue cell) at a closer pitch with less padding above and below.
+  const int roomyRoom = halfHeight - 1 - 2 * kCluePad;
+  const int roomyLines = 1 + std::max(0, (roomyRoom - inkLine) / (inkLine + kClueLineGap));
+  const int densePad = n == 2 ? 0 : 1;
+  const int denseLines = n == 2 ? 2 : scanword::CLUE_MAX_LINES + 1;
+  struct Setting {
+    int lines;
+    int8_t tracking;
+    int pad;
+  };
+  const Setting settings[] = {{roomyLines, kClueTracking, kCluePad},
+                              {roomyLines, kClueDenseTracking, kCluePad},
+                              {denseLines, kClueTracking, densePad},
+                              {denseLines, kClueDenseTracking, densePad}};
   for (uint8_t i = 0; i < n; ++i) {
     const std::string_view clue = puzzle->clue(ids[i]);
     char text[scanword::MAX_CLUE_BYTES + 1];
@@ -1038,16 +1059,26 @@ void ScanwordActivity::drawClueCell(const uint16_t cell, const int x, const int 
     memcpy(text, clue.data(), len);
     text[len] = '\0';
     scanword::ClueLines lines;
-    scanword::layoutClue(text, size - 3, maxLines, measureText, &measure, lines);
-    const int lineHeight =
-        std::min(renderer.getLineHeight(font), (halfHeight - 2) / std::max<int>(roomyLines, lines.count));
-    // Glyphs hang from the line top; centre the lines' ink, not their boxes.
-    const int ink = (lines.count - 1) * lineHeight + renderer.getFontAscenderSize(font);
-    const int top = y + i * halfHeight + (halfHeight - ink) / 2 - (renderer.getLineHeight(font) - lineHeight) / 2;
+    Measure measure{&renderer, font, EpdFontFamily::REGULAR, kClueTracking};
+    const Setting* use = &settings[std::size(settings) - 1];
+    for (const Setting& setting : settings) {
+      measure.tracking = setting.tracking;
+      const bool last = &setting == use;
+      scanword::layoutClue(text, innerWidth, last ? setting.lines : scanword::LAYOUT_MAX_LINES, measureText, &measure,
+                           lines);
+      if (last || lines.count <= setting.lines) {
+        use = &setting;
+        break;
+      }
+    }
+    const int room = halfHeight - 1 - 2 * use->pad;
+    const int pitch =
+        lines.count > 1 ? std::min(renderer.getLineHeight(font), (room - inkLine) / (lines.count - 1)) : 0;
+    const int capTop = y + i * halfHeight + 1 + use->pad + (room - (lines.count - 1) * pitch - inkLine) / 2;
     for (uint8_t l = 0; l < lines.count; ++l) {
       const int w = measureText(&measure, lines.line[l]);
-      renderer.drawText(font, x + (size - w) / 2 + 1, top + l * lineHeight, lines.line[l], true, EpdFontFamily::REGULAR,
-                        BidiUtils::BidiBaseDir::AUTO, kClueTracking);
+      renderer.drawText(font, x + 1 + kCluePad + (innerWidth - w) / 2, capTop + cap - ascender + l * pitch,
+                        lines.line[l], true, EpdFontFamily::REGULAR, BidiUtils::BidiBaseDir::AUTO, use->tracking);
     }
   }
   if (n == 2) renderer.drawLine(x, y + halfHeight, std::min(x + size, renderer.getScreenWidth() - 1), y + halfHeight);
