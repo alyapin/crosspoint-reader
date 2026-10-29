@@ -422,7 +422,6 @@ STR_KB_HINT_SHOW_PASSWORD: "Tahan KANAN lalu tekan [abc] untuk menampilkan kata 
 STR_KB_HINT_TOGGLE_HIDE_PASSWORD: "Tekan [***] untuk menyembunyikan kata sandi"
 STR_KB_HINT_TOGGLE_SHOW_PASSWORD: "Tekan [abc] untuk menampilkan kata sandi"
 STR_KB_HINT_EDIT_ENTRY: "Tahan ATAS untuk mengedit entri"
-STR_KB_TIPS: "Tips:"
 STR_KB_HINT_RETURN_KEYBOARD: "Tekan BAWAH untuk kembali ke papan ketik"
 STR_KB_HINT_EXIT_URL_MODE: "Tekan ABC untuk keluar dari mode URL"
 STR_KB_HINT_CLEAR_TEXT: "Tahan DEL untuk menghapus semua teks"

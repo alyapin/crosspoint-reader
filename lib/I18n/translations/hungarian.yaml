@@ -422,7 +422,6 @@ STR_KB_HINT_SHOW_PASSWORD: "Tartsd nyomva a JOBBRA-t, majd nyomd meg az [abc]-t 
 STR_KB_HINT_TOGGLE_HIDE_PASSWORD: "Nyomd meg a [***]-ot a jelszó elrejtéséhez"
 STR_KB_HINT_TOGGLE_SHOW_PASSWORD: "Nyomd meg az [abc]-t a jelszó megjelenítéséhez"
 STR_KB_HINT_EDIT_ENTRY: "Tartsd nyomva a FEL-t a bejegyzés szerkesztéséhez"
-STR_KB_TIPS: "Tippek:"
 STR_KB_HINT_RETURN_KEYBOARD: "Nyomd meg a LE-t a billentyűzethez való visszatéréshez"
 STR_KB_HINT_EXIT_URL_MODE: "Nyomd meg az ABC-t az URL mód elhagyásához"
 STR_KB_HINT_CLEAR_TEXT: "Tartsd nyomva a DEL-t az összes szöveg törléséhez"

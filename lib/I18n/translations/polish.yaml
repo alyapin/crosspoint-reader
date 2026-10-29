@@ -414,7 +414,6 @@ STR_KB_HINT_SHOW_PASSWORD: "Przytrzymaj PRAWO potem naciśnij [abc] aby pokazać
 STR_KB_HINT_TOGGLE_HIDE_PASSWORD: "Naciśnij [***] aby ukryć hasło"
 STR_KB_HINT_TOGGLE_SHOW_PASSWORD: "Naciśnij [abc] aby pokazać hasło"
 STR_KB_HINT_EDIT_ENTRY: "Przytrzymaj GÓRA aby edytować wpis"
-STR_KB_TIPS: "Porady:"
 STR_KB_HINT_RETURN_KEYBOARD: "Naciśnij DÓŁ aby powrócić do klawiatury"
 STR_KB_HINT_EXIT_URL_MODE: "Naciśnij ABC aby wyjść z trybu URL"
 STR_KB_HINT_CLEAR_TEXT: "Przytrzymaj 'Backspace' aby wyczyścić cały tekst"

@@ -422,7 +422,6 @@ STR_KB_HINT_SHOW_PASSWORD: "Затисніть ВПРАВО, натисніть 
 STR_KB_HINT_TOGGLE_HIDE_PASSWORD: "Натисніть [***], щоб приховати пароль"
 STR_KB_HINT_TOGGLE_SHOW_PASSWORD: "Натисніть [abc], щоб показати пароль"
 STR_KB_HINT_EDIT_ENTRY: "Затисніть ВГОРУ для редагування"
-STR_KB_TIPS: "Поради:"
 STR_KB_HINT_RETURN_KEYBOARD: "Натисніть ВНИЗ, щоб повернутися до клавіатури"
 STR_KB_HINT_EXIT_URL_MODE: "Натисніть [ABC] для виходу з режиму URL"
 STR_KB_HINT_CLEAR_TEXT: "Затисніть <--, щоб видалити весь текст"

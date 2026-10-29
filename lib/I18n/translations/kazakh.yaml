@@ -424,7 +424,6 @@ STR_KB_HINT_SHOW_PASSWORD: "ОҢ түймесін басып тұрып, құп�
 STR_KB_HINT_TOGGLE_HIDE_PASSWORD: "Құпия сөзді жасыру үшін [***] басыңыз"
 STR_KB_HINT_TOGGLE_SHOW_PASSWORD: "Құпия сөзді көрсету үшін [abc] басыңыз"
 STR_KB_HINT_EDIT_ENTRY: "Жазбаны өзгерту үшін ЖОҒАРЫ түймесін басып тұрыңыз"
-STR_KB_TIPS: "Кеңестер:"
 STR_KB_HINT_RETURN_KEYBOARD: "Пернетақтаға оралу үшін ТӨМЕН түймесін басыңыз"
 STR_KB_HINT_EXIT_URL_MODE: "URL режимінен шығу үшін ABC басыңыз"
 STR_KB_HINT_CLEAR_TEXT: "Барлық мәтінді тазалау үшін DEL түймесін басып тұрыңыз"

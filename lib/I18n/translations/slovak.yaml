@@ -422,7 +422,6 @@ STR_KB_HINT_SHOW_PASSWORD: "Podržte VPRAVO a potom stlačte [abc] na zobrazenie
 STR_KB_HINT_TOGGLE_HIDE_PASSWORD: "Stlačte [***] na skrytie hesla"
 STR_KB_HINT_TOGGLE_SHOW_PASSWORD: "Stlačte [abc] na zobrazenie hesla"
 STR_KB_HINT_EDIT_ENTRY: "Podržte HORE pre úpravu položky"
-STR_KB_TIPS: "Tipy:"
 STR_KB_HINT_RETURN_KEYBOARD: "Stlačte DOLE pre návrat ku klávesnici"
 STR_KB_HINT_EXIT_URL_MODE: "Stlačte ABC pre ukončenie režimu URL"
 STR_KB_HINT_CLEAR_TEXT: "Podržte DEL pre vymazanie celého textu"

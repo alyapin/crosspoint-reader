@@ -480,7 +480,6 @@ STR_KB_HINT_SHOW_PASSWORD: "Mantenha premido DIREITA e depois prima [abc] para m
 STR_KB_HINT_TOGGLE_HIDE_PASSWORD: "Prima [***] para ocultar a palavra-passe"
 STR_KB_HINT_TOGGLE_SHOW_PASSWORD: "Prima [abc] para mostrar a palavra-passe"
 STR_KB_HINT_EDIT_ENTRY: "Mantenha premido CIMA para editar a entrada"
-STR_KB_TIPS: "Dicas:"
 STR_KB_HINT_RETURN_KEYBOARD: "Prima BAIXO para regressar ao teclado"
 STR_KB_HINT_EXIT_URL_MODE: "Prima ABC para sair do modo URL"
 STR_KB_HINT_CLEAR_TEXT: "Mantenha premido DEL para limpar todo o texto"

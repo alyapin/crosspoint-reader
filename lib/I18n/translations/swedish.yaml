@@ -441,7 +441,6 @@ STR_KB_HINT_SHOW_PASSWORD: "Håll HÖGER och tryck sedan på [abc] för att visa
 STR_KB_HINT_TOGGLE_HIDE_PASSWORD: "Tryck på [***] för att dölja lösenordet"
 STR_KB_HINT_TOGGLE_SHOW_PASSWORD: "Tryck på [abc] för att visa lösenordet"
 STR_KB_HINT_EDIT_ENTRY: "Håll UPP för att redigera fältet"
-STR_KB_TIPS: "Tips:"
 STR_KB_HINT_RETURN_KEYBOARD: "Tryck NER för att återgå till tangentbordet"
 STR_KB_HINT_EXIT_URL_MODE: "Tryck på ABC för att avsluta URL-läget"
 STR_KB_HINT_CLEAR_TEXT: "Håll DEL för att rensa all text"

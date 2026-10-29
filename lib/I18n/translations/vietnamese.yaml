@@ -479,7 +479,6 @@ STR_KB_HINT_SHOW_PASSWORD: "Giữ PHẢI rồi nhấn [abc] để hiện mật k
 STR_KB_HINT_TOGGLE_HIDE_PASSWORD: "Nhấn [***] để ẩn mật khẩu"
 STR_KB_HINT_TOGGLE_SHOW_PASSWORD: "Nhấn [abc] để hiện mật khẩu"
 STR_KB_HINT_EDIT_ENTRY: "Giữ LÊN để sửa mục"
-STR_KB_TIPS: "Mẹo:"
 STR_KB_HINT_RETURN_KEYBOARD: "Nhấn XUỐNG để quay lại bàn phím"
 STR_KB_HINT_EXIT_URL_MODE: "Nhấn ABC để thoát chế độ URL"
 STR_KB_HINT_CLEAR_TEXT: "Giữ DEL để xóa toàn bộ chữ"

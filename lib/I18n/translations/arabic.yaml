@@ -431,7 +431,6 @@ STR_KB_HINT_SHOW_PASSWORD: "اضغط مطولا على زر اليمين ثم ا
 STR_KB_HINT_TOGGLE_HIDE_PASSWORD: "اضغط [***] لإخفاء كلمة المرور"
 STR_KB_HINT_TOGGLE_SHOW_PASSWORD: "اضغط [abc] لإظهار كلمة المرور"
 STR_KB_HINT_EDIT_ENTRY: "اضغط مطولا على زر الأعلى للتعديل"
-STR_KB_TIPS: "نصائح:"
 STR_KB_HINT_RETURN_KEYBOARD: "اضغط زر الأسفل للعودة إلى لوحة المفاتيح"
 STR_KB_HINT_EXIT_URL_MODE: "اضغط ABC للخروج من وضع URL"
 STR_KB_HINT_CLEAR_TEXT: "اضغط مطولا على DEL لمسح كل النص"

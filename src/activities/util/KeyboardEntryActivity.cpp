@@ -1089,18 +1089,21 @@ void KeyboardEntryActivity::render(RenderLock&&) {
 
   const int tipsLh = renderer.getLineHeight(SMALL_FONT_ID);
   const int underlineBottom = inputStartY + inputHeight + lineHeight + metrics.verticalSpacing + 4;
-  auto drawTip = [&](const char* tip, int y) { renderer.drawCenteredText(SMALL_FONT_ID, y, tip, true); };
+  // Tips start on the side padding, one line each.
+  const int tipsWidth = renderer.getScreenWidth() - 2 * setka::kSidePadding;
+  auto drawTip = [&](const char* tip, int y) {
+    renderer.drawText(SMALL_FONT_ID, setka::kSidePadding, y,
+                      renderer.truncatedText(SMALL_FONT_ID, tip, tipsWidth).c_str(), true);
+  };
 
   // Reserve the Clear Text row even when the entry is empty.
   const int tipCount = cursorMode ? 1 : urlPanel ? 3 : symbols ? 2 : 3 + (inputType == InputType::Url ? 1 : 0);
-  const int tipsHeight = (tipCount + 1) * tipsLh;
+  const int tipsHeight = tipCount * tipsLh;
   // Reserve cursor instructions even for an empty field; passwords need a second row.
   const int tipsTop = underlineBottom + (cursorMode ? (isPassword ? 2 : 1) * tipsLh : 0);
 
   if (showTips && kbRect.y - tipsTop >= tipsHeight) {
     int y = tipsTop + (kbRect.y - tipsTop - tipsHeight) / 2;
-    drawTip(tr(STR_KB_TIPS), y);
-    y += tipsLh;
     if (!cursorMode) {
       drawTip(tr(STR_KB_HINT_EDIT_ENTRY), y);
       y += tipsLh;
@@ -1209,9 +1212,9 @@ void KeyboardEntryActivity::render(RenderLock&&) {
 }
 
 // Draws the grid over the keys keyboard() just registered: a 2 px rule on
-// top, 1 px lines under every row and between keys, and the OK key as the
-// primary action (bar + SemiBold). Key edges come from their hit rects, which
-// match the drawn keys away from the side edges.
+// top, 1 px lines under every row and between keys, and the Done key as the
+// primary action in SemiBold (no bar: the bar marks only the focus). Key edges
+// come from their hit rects, which match the drawn keys away from the side edges.
 void KeyboardEntryActivity::drawKeyGrid(const fui::Rect& keysRect, const int rowCount) const {
   using namespace setka;
   const int width = renderer.getScreenWidth();
@@ -1230,19 +1233,17 @@ void KeyboardEntryActivity::drawKeyGrid(const fui::Rect& keysRect, const int row
     const int right = key.x + key.width;
     if (keysRect.right() - right >= KEY_EDGE_SNAP) renderer.drawLine(right, key.y, right, bottom);
     if (hits[i].value != fui::QWERTY_KEY_ENTER) continue;
-    const int fontId = keyLabelFont(keysRect.width);
+    int fontId = keyLabelFont(keysRect.width);
     const int keyWidth = std::min<int>(right, keysRect.right()) - key.x;
-    // The bar and the label keep 4 px clear of the key edges; a narrower key says OK.
+    // The label keeps 4 px clear of the key edges: in the smaller UI face when
+    // the key face is too wide, and only a key too narrow for both says OK.
     const char* label = tr(STR_KEYBOARD_DONE);
-    if (renderer.getTextWidth(fontId, label, kSemiBold) + kSelectionBarWidth + 6 > keyWidth - 8) {
-      label = tr(STR_OK_BUTTON);
-    }
+    if (renderer.getTextWidth(fontId, label, kSemiBold) > keyWidth - 8) fontId = UI_10_FONT_ID;
+    if (renderer.getTextWidth(fontId, label, kSemiBold) > keyWidth - 8) label = tr(STR_OK_BUTTON);
     const int lineHeight = renderer.getLineHeight(fontId);
     const int labelWidth = renderer.getTextWidth(fontId, label, kSemiBold);
-    const int labelX = key.x + (keyWidth - labelWidth + kSelectionBarWidth + 6) / 2;
-    const int labelY = key.y + (rowHeight - lineHeight) / 2;
-    drawSelectionBar(renderer, labelX - kSelectionBarWidth - 6, labelY, lineHeight);
-    renderer.drawText(fontId, labelX, labelY, label, true, kSemiBold);
+    renderer.drawText(fontId, key.x + (keyWidth - labelWidth) / 2, key.y + (rowHeight - lineHeight) / 2, label, true,
+                      kSemiBold);
   }
 }
 

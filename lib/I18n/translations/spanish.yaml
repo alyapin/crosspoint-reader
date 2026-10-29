@@ -472,7 +472,6 @@ STR_KB_HINT_SHOW_PASSWORD: "Pulse DCHA., luego [abc] para mostrar la contraseña
 STR_KB_HINT_TOGGLE_HIDE_PASSWORD: "Pulse [***] para ocultar la contraseña"
 STR_KB_HINT_TOGGLE_SHOW_PASSWORD: "Pulse [abc] para mostrar la contraseña"
 STR_KB_HINT_EDIT_ENTRY: "Mantenga SUBIR para editar la entrada"
-STR_KB_TIPS: "Consejos: "
 STR_KB_HINT_RETURN_KEYBOARD: "Pulse BAJAR para volver al teclado"
 STR_KB_HINT_EXIT_URL_MODE: "Pulse ABC para salir del modo URL"
 STR_KB_HINT_CLEAR_TEXT: "Mantenga RETROCESO para borrar todo"

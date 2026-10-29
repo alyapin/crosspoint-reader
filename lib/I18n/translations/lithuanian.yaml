@@ -422,7 +422,6 @@ STR_KB_HINT_SHOW_PASSWORD: "Laikykite DEŠINĘ ir spauskite [abc] slaptažodžiu
 STR_KB_HINT_TOGGLE_HIDE_PASSWORD: "Spauskite [***] slaptažodžiui slėpti"
 STR_KB_HINT_TOGGLE_SHOW_PASSWORD: "Spauskite [abc] slaptažodžiui rodyti"
 STR_KB_HINT_EDIT_ENTRY: "Laikykite AUKŠTYN įrašo redagavimui"
-STR_KB_TIPS: "Patarimai:"
 STR_KB_HINT_RETURN_KEYBOARD: "Spauskite ŽEMYN grįžimui į klaviatūrą"
 STR_KB_HINT_EXIT_URL_MODE: "Spauskite ABC išeiti iš URL režimo"
 STR_KB_HINT_CLEAR_TEXT: "Laikykite DEL visam tekstui ištrinti"

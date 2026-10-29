@@ -445,7 +445,6 @@ STR_KB_HINT_SHOW_PASSWORD: "החזק ימינה ולחץ על [abc] כדי לה�
 STR_KB_HINT_TOGGLE_HIDE_PASSWORD: "לחץ על [***] כדי להסתיר סיסמה"
 STR_KB_HINT_TOGGLE_SHOW_PASSWORD: "לחץ על [abc] כדי להציג סיסמה"
 STR_KB_HINT_EDIT_ENTRY: "החזק למעלה כדי לערוך"
-STR_KB_TIPS: "טיפים:"
 STR_KB_HINT_RETURN_KEYBOARD: "לחץ למטה כדי לחזור למקלדת"
 STR_KB_HINT_EXIT_URL_MODE: "לחץ על ABC ליציאה ממצב URL"
 STR_KB_HINT_CLEAR_TEXT: "החזק מחיקה (DEL) לניקוי כל הטקסט"

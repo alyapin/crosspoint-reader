@@ -420,7 +420,6 @@ STR_KB_HINT_SHOW_PASSWORD: "Утрымлівайце ЎПРАВА, потым [a
 STR_KB_HINT_TOGGLE_HIDE_PASSWORD: "Націсніце [***], каб схаваць пароль"
 STR_KB_HINT_TOGGLE_SHOW_PASSWORD: "Націсніце [abc], каб паказаць пароль"
 STR_KB_HINT_EDIT_ENTRY: "Утрымлівайце ЎВЕРХ, каб рэдагаваць запіс"
-STR_KB_TIPS: "Падказкі:"
 STR_KB_HINT_RETURN_KEYBOARD: "Націсніце ЎНІЗ, каб вярнуцца да клавіятуры"
 STR_KB_HINT_EXIT_URL_MODE: "Націсніце ABC, каб выйсці з рэжыму URL"
 STR_KB_HINT_CLEAR_TEXT: "Утрымлівайце DEL, каб сцерці ўвесь тэкст"

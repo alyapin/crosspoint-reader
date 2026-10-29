@@ -498,7 +498,6 @@ STR_KB_HINT_SHOW_PASSWORD: "Şifrəni göstərmək üçün SAĞ bas saxla və [a
 STR_KB_HINT_TOGGLE_HIDE_PASSWORD: "[***] ilə şifrəni gizlət"
 STR_KB_HINT_TOGGLE_SHOW_PASSWORD: "[abc] ilə şifrəni göstər"
 STR_KB_HINT_EDIT_ENTRY: "YUXARI ilə daxil ediləni dəyiş"
-STR_KB_TIPS: "İp ucları:"
 STR_KB_HINT_RETURN_KEYBOARD: "AŞAĞI ilə klaviaturaya qayıt"
 STR_KB_HINT_EXIT_URL_MODE: "ABC ilə URL rejimindən çıx"
 STR_KB_HINT_CLEAR_TEXT: "SİL ilə bütün mətni sil"

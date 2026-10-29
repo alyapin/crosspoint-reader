@@ -434,7 +434,6 @@ STR_KB_HINT_SHOW_PASSWORD: "RIGHT را نگه دارید و [abc] را بزنی�
 STR_KB_HINT_TOGGLE_HIDE_PASSWORD: "[***] را بزنید تا رمز مخفی شود"
 STR_KB_HINT_TOGGLE_SHOW_PASSWORD: "[abc] را بزنید تا رمز نمایش داده شود"
 STR_KB_HINT_EDIT_ENTRY: "برای ویرایش، UP را نگه دارید"
-STR_KB_TIPS: "راهنما:"
 STR_KB_HINT_RETURN_KEYBOARD: "برای برگشت به صفحه‌کلید DOWN را بزنید"
 STR_KB_HINT_EXIT_URL_MODE: "برای خروج از حالت URL، ABC را بزنید"
 STR_KB_HINT_CLEAR_TEXT: "DEL را نگه دارید تا کل متن پاک شود"
