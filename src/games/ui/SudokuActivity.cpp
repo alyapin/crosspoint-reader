@@ -360,11 +360,13 @@ void SudokuActivity::drawGrid() const {
                      y + 1 + (d - 1) / 3 * kNoteCell + (kNoteCell - noteHeight) / 2, digit);
       }
     }
-    // Keys on the pad or the bar: the cell waits for its digit.
-    if (cell == selected && area != Area::Grid) {
-      drawPick(x, y, kCell, kCell);
-    } else if (cell == selected) {
-      drawCellFrame(renderer, x, y, kCell, kCell);
+    // Keys on the pad or the bar: the cell waits for its digit. A solved grid shows neither.
+    if (cell == selected && !game.isSolved()) {
+      if (area != Area::Grid) {
+        drawPick(x, y, kCell, kCell);
+      } else {
+        drawCellFrame(renderer, x, y, kCell, kCell);
+      }
     }
   }
 }

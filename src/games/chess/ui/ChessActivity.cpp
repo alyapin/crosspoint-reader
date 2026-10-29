@@ -1275,7 +1275,7 @@ void ChessActivity::drawBoard() const {
       drawDashedFrame(renderer, x, y, kSquare);
     }
   }
-  const bool cursorShown = cursor >= 0 && cursor < kCells && (hasBar() || !game.isOver());
+  const bool cursorShown = cursor >= 0 && cursor < kCells && !game.isOver();
   if (selected != kNoSquare) {
     squareOrigin(selected, flip, x, y);
     drawPick(renderer, x, y, cursorShown && squareAtCell(cursor) == selected);

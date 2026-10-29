@@ -254,7 +254,7 @@ void MinesweeperActivity::build(UiScreen& screen) {
   const int height = size * game.rows();
   for (int x = 0; x <= game.columns(); ++x) renderer.fillRect(left + x * size, BOARD_TOP, 1, height + 1, true);
   for (int y = 0; y <= game.rows(); ++y) renderer.fillRect(left, BOARD_TOP + y * size, width + 1, 1, true);
-  if (cursor >= 0 && barFocus < 0) {
+  if (cursor >= 0 && barFocus < 0 && !game.isOver()) {
     drawCellFrame(renderer, left + cursor % game.columns() * size, BOARD_TOP + cursor / game.columns() * size, size + 1,
                   size + 1);
   }
