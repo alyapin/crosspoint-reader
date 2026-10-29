@@ -87,6 +87,9 @@ bool generateThumb(RecentBook& book, const int height) {
 
 // The tab last opened with Confirm, for this boot; -1 = the books.
 int rememberedTab = -1;
+// The newest recent book when the tab was remembered; a different one means a
+// book was opened since (from any screen), so Home goes back to the books.
+std::string rememberedNewest;
 }  // namespace
 
 void SetkaHomeActivity::onEnter() {
@@ -95,6 +98,9 @@ void SetkaHomeActivity::onEnter() {
   RenderLock lock(*this);
   Activity::onEnter();
   loadBooks();
+  if (rememberedTab >= 0 && (slotCount > 0 ? slots[0].book.path : std::string()) != rememberedNewest) {
+    rememberedTab = -1;
+  }
   focus = rememberedTab >= 0 ? bookFocusCount() + rememberedTab : 0;
   entryRefresh = true;
   thumbsChecked = false;
@@ -187,6 +193,7 @@ void SetkaHomeActivity::moveFocus(const int delta) {
 void SetkaHomeActivity::activateFocus() {
   const int index = focus;
   rememberedTab = index >= bookFocusCount() ? index - bookFocusCount() : -1;
+  rememberedNewest = slotCount > 0 ? slots[0].book.path : std::string();
   if (rememberedTab >= 0) {
     openTab(rememberedTab);
   } else if (slotCount == 0) {
