@@ -31,6 +31,16 @@ constexpr int kActionBarHeight = 70;  // the rule included
 void drawActionBar(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, int top, const ActionSlot* slots,
                    int count, int focused, uint16_t input);
 
+// One part of a game's status at the right of the top line: a word label in Regular, then its number
+// (a count, "1 из 6", "<1 мин") in SemiBold; either may be nullptr. Parts are joined by " · ".
+struct StatusItem {
+  const char* label = nullptr;
+  const char* value = nullptr;
+};
+int statusWidth(const GfxRenderer& renderer, const StatusItem* items, int count);
+// Draws the status ending at `right` on the top line at `y`.
+void drawStatus(const GfxRenderer& renderer, int right, int y, const StatusItem* items, int count);
+
 // A finished game's result under the board at the left margin: the result in
 // UI 11 SemiBold, then an optional detail and, on button boards, the Confirm
 // cue in UI 9. Returns the y below the last line.

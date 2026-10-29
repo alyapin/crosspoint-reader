@@ -905,10 +905,11 @@ void ScanwordActivity::drawTopLine(UiScreen& screen) const {
     const int exitWidth = renderer.getTextWidth(kText12Font, exitLabel) + 2 * kSidePadding;
     screen.frame().hit(fui::makeRect(0, 0, exitWidth, kGridTop), ACTION_BACK, 0, kTap);
   }
-  char count[16];
-  snprintf(count, sizeof(count), "%u/%u", static_cast<unsigned>(game->filledCount()),
-           static_cast<unsigned>(puzzle->letterCount()));
-  drawRightAligned(renderer, kText12Font, width - kSidePadding, kHeaderTop, count, kSemiBold);
+  char count[24];
+  snprintf(count, sizeof(count), tr(STR_GAMES_OF), static_cast<int>(game->filledCount()),
+           static_cast<int>(puzzle->letterCount()));
+  const games::ui::StatusItem status[] = {{tr(STR_SCANWORD_FILLED), count}};
+  games::ui::drawStatus(renderer, width - kSidePadding, kHeaderTop, status, 1);
 }
 
 // Letters are the text face's glyphs scaled to a cap height, so no large font is needed.
@@ -984,10 +985,11 @@ void ScanwordActivity::drawClueCell(const uint16_t cell, const int x, const int 
   uint8_t ids[2];
   const uint8_t n = puzzle->cluesAt(cell, ids);
   const int halfHeight = n == 2 ? size / 2 : size;
-  // Three lines in a cell, two per half of a two-clue cell, at a pitch that fits.
+  // Three lines in a cell at a pitch that fits, a fourth at a closer one when the clue needs it; two per half
+  // of a two-clue cell.
   const int font = kDenseFont;
-  const uint8_t maxLines = n == 2 ? 2 : scanword::CLUE_MAX_LINES;
-  const int lineHeight = std::min(renderer.getLineHeight(font), (halfHeight - 2) / maxLines);
+  const uint8_t roomyLines = n == 2 ? 2 : scanword::CLUE_MAX_LINES;
+  const uint8_t maxLines = n == 2 ? 2 : scanword::CLUE_MAX_LINES + 1;
   Measure measure{&renderer, font, EpdFontFamily::REGULAR, kClueTracking};
   for (uint8_t i = 0; i < n; ++i) {
     const std::string_view clue = puzzle->clue(ids[i]);
@@ -997,6 +999,8 @@ void ScanwordActivity::drawClueCell(const uint16_t cell, const int x, const int 
     text[len] = '\0';
     scanword::ClueLines lines;
     scanword::layoutClue(text, size - 3, maxLines, measureText, &measure, lines);
+    const int lineHeight =
+        std::min(renderer.getLineHeight(font), (halfHeight - 2) / std::max<int>(roomyLines, lines.count));
     // Glyphs hang from the line top; centre the lines' ink, not their boxes.
     const int ink = (lines.count - 1) * lineHeight + renderer.getFontAscenderSize(font);
     const int top = y + i * halfHeight + (halfHeight - ink) / 2 - (renderer.getLineHeight(font) - lineHeight) / 2;

@@ -77,6 +77,9 @@ const char* GamesActivity::rowStatus(const int index) const {
 
 const char* GamesActivity::emptyText() const { return tr(STR_NO_GAMES); }
 
+// The X4 Pro's twelve games fit one page at 52 px; the X4's nine keep the Setka pitch.
+int GamesActivity::compactRowHeight() const { return 52; }
+
 void GamesActivity::activateIndex(const int index) {
   app.clearTapFlash();
   if (auto game = kGames[index].open(renderer, mappedInput)) openChild(std::move(game));

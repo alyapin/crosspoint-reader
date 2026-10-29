@@ -25,6 +25,7 @@ using namespace setka;
 namespace {
 constexpr int kCursorArm = 14;
 constexpr int kKeyCursorOut = 3;
+constexpr int kPickInCursor = kCellFrameWidth + 2;  // brackets inside the cursor's frame
 constexpr int kModeIcon = 24;
 constexpr int kModeIconGap = 8;
 // Menu rows other than a bar slot (0..BAR_SLOTS-1); a game's own row is kRowOwn + its index.
@@ -317,8 +318,8 @@ void GameScreen::screenFn(UiScreen& screen, void* user) {
   if (self->hasGame) self->build(screen);
 }
 
-void GameScreen::drawTopLine(UiScreen& screen, const char* label, const char* value, const bool tappable,
-                             const bool focused) const {
+void GameScreen::drawTopLine(UiScreen& screen, const std::initializer_list<games::ui::StatusItem> status,
+                             const bool tappable, const bool focused) const {
   const int width = renderer.getScreenWidth();
   drawStatusLine(renderer);
 
@@ -330,15 +331,9 @@ void GameScreen::drawTopLine(UiScreen& screen, const char* label, const char* va
     screen.frame().hit(fui::makeRect(0, 0, exitWidth, BOARD_TOP), ACTION_EXIT, 0, shellInput());
   }
 
-  int left = width - kSidePadding;
-  if (value != nullptr && *value != '\0') {
-    left -= renderer.getTextWidth(kText12Font, value, kSemiBold);
-    renderer.drawText(kText12Font, left, TOP_LINE_Y, value, true, kSemiBold);
-  }
-  if (label != nullptr && *label != '\0') {
-    left -= renderer.getTextWidth(kText12Font, label) + renderer.getSpaceWidth(kText12Font);
-    renderer.drawText(kText12Font, left, TOP_LINE_Y, label);
-  }
+  const auto count = static_cast<int>(status.size());
+  const int left = width - kSidePadding - games::ui::statusWidth(renderer, status.begin(), count);
+  games::ui::drawStatus(renderer, width - kSidePadding, TOP_LINE_Y, status.begin(), count);
   if (focused) {
     constexpr int kPadX = 8;
     constexpr int kPadY = 3;  // clear of the clock/battery line above
@@ -393,7 +388,13 @@ void GameScreen::drawCentered(const int font, const int x, const int width, cons
   renderer.drawText(font, x + (width - renderer.getTextWidth(font, text, style)) / 2, y, text, true, style);
 }
 
-void GameScreen::drawCursor(const int x, const int y, const int width, const int height) const {
+void GameScreen::drawPick(int x, int y, int width, int height, const bool underCursor) const {
+  if (underCursor) {
+    x += kPickInCursor;
+    y += kPickInCursor;
+    width -= 2 * kPickInCursor;
+    height -= 2 * kPickInCursor;
+  }
   const int arm = std::min(kCursorArm, std::min(width, height) / 2);
   for (const int cx : {x, x + width - arm}) {
     for (const int cy : {y, y + height - kCellFrameWidth}) renderer.fillRect(cx, cy, arm, kCellFrameWidth, true);
@@ -404,7 +405,7 @@ void GameScreen::drawCursor(const int x, const int y, const int width, const int
 }
 
 void GameScreen::drawKeyCursor(const int x, const int y, const int width, const int height) const {
-  drawCursor(x - kKeyCursorOut, y - kKeyCursorOut, width + 2 * kKeyCursorOut, height + 2 * kKeyCursorOut);
+  drawPick(x - kKeyCursorOut, y - kKeyCursorOut, width + 2 * kKeyCursorOut, height + 2 * kKeyCursorOut);
 }
 
 void GameScreen::formatElapsed(const uint32_t ms, char* out, const size_t cap) {

@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 
 #include "ActionBar.h"
 #include "BoardKeys.h"
@@ -122,8 +123,9 @@ class GameScreen : public Activity, protected UiAppHost {
   }
   void leave();
 
-  // `focused` frames the status for key focus.
-  void drawTopLine(UiScreen& screen, const char* label, const char* value, bool tappable, bool focused = false) const;
+  // The status parts as games::ui::drawStatus; `focused` frames the status for key focus.
+  void drawTopLine(UiScreen& screen, std::initializer_list<games::ui::StatusItem> status, bool tappable,
+                   bool focused = false) const;
   template <size_t N>
   void drawBar(UiScreen& screen, const BarItem (&items)[N], const int focused) const {
     static_assert(N <= MAX_BAR_SLOTS, "the bar holds four slots at most");
@@ -136,10 +138,12 @@ class GameScreen : public Activity, protected UiAppHost {
   int resultHeight(bool detail) const;
   void drawCentered(int font, int x, int width, int y, const char* text,
                     EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
-  // Key cursor where the board already frames a pick or marks a move: corner brackets inside the box.
-  // Board cells take the 4 px inset frame (drawCellFrame) instead.
-  void drawCursor(int x, int y, int width, int height) const;
-  // Key cursor on a keyboard key, whatever the key shows: corner brackets just outside it.
+  // The key cursor is the 4 px inset frame (drawCellFrame) on a cell, a card or a pad key. What is picked and
+  // waits for its target (a piece, a run of cards, the Sudoku cell while the keys are on the pad) takes corner
+  // brackets inside the box; under the cursor's frame they step inside it.
+  void drawPick(int x, int y, int width, int height, bool underCursor = false) const;
+  // Key cursor on a keyboard key, which may carry a 4 px frame of its own (5 букв): corner brackets just
+  // outside it.
   void drawKeyCursor(int x, int y, int width, int height) const;
   // "4 мин" / "<1 мин".
   static void formatElapsed(uint32_t ms, char* out, size_t cap);

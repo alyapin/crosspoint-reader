@@ -30,7 +30,6 @@ constexpr int kTableauGap = 8;  // between the columns and the bar rule
 constexpr int kResultGap = 24;  // a won board: the top row to the result
 constexpr int kDownStep = 10;
 constexpr int kUpStep = 30;
-constexpr int kPickFrame = 4;
 constexpr games::ui::CardStyle kCardStyle{kCardWidth, kCardHeight, kText12Font, 16, 5};
 constexpr int kBarFocus = PILES;  // focus values past the piles are bar slots
 constexpr int kFirstFoundationColumn = 3;
@@ -300,8 +299,11 @@ int KlondikeActivity::cardAt(const int pile, const int y) const {
 void KlondikeActivity::build(UiScreen& screen) {
   char value[16];
   snprintf(value, sizeof(value), "%d", game.moveCount());
-  const char* label = noMoves && !game.isWon() ? tr(STR_KLONDIKE_NO_MOVES) : tr(STR_KLONDIKE_MOVES);
-  drawTopLine(screen, label, noMoves && !game.isWon() ? "" : value, false);
+  if (noMoves && !game.isWon()) {
+    drawTopLine(screen, {{tr(STR_KLONDIKE_NO_MOVES), nullptr}}, false);
+  } else {
+    drawTopLine(screen, {{tr(STR_GAMES_MOVES), value}}, false);
+  }
 
   for (int pile = 0; pile < PILES; ++pile) {
     drawPile(pile);
@@ -312,24 +314,25 @@ void KlondikeActivity::build(UiScreen& screen) {
     screen.frame().hit(fui::makeRect(x, top, width, height), ACTION_PILE, static_cast<int16_t>(pile), fui::InputTouch);
   }
 
+  const bool cursorShown = focus != kNone && focus < kBarFocus;
   if (pickPile != kNone) {
     const Pile& p = game.pile(pickPile);
     const int top = cardY(pickPile, pickIndex);
     const int bottom = cardY(pickPile, p.count - 1) + kCardHeight;
     const int x = pickPile == WASTE ? wasteTopX() : pileX(pickPile);
-    renderer.drawRect(x, top, kCardWidth, bottom - top, kPickFrame, true);
+    drawPick(x, top, kCardWidth, bottom - top, cursorShown && focus == pickPile && pickIndex == p.count - 1);
   }
   if (hintPile != kNone) {
     const int pad = 3;
     const int top = isTableau(hintPile) ? cardY(hintPile, std::max(0, game.pile(hintPile).count - 1)) : BOARD_TOP;
     games::ui::drawDashedRect(renderer, pileX(hintPile) - pad, top - pad, kCardWidth + 2 * pad, kCardHeight + 2 * pad);
   }
-  if (focus != kNone && focus < kBarFocus) {
+  if (cursorShown) {
     const Pile& p = game.pile(focus);
     const int top = isTableau(focus) && p.count > 0 ? cardY(focus, p.count - 1)
                     : isTableau(focus)              ? kTableauTop
                                                     : BOARD_TOP;
-    drawCursor(focus == WASTE ? wasteTopX() : pileX(focus), top, kCardWidth, kCardHeight);
+    drawCellFrame(renderer, focus == WASTE ? wasteTopX() : pileX(focus), top, kCardWidth, kCardHeight);
   }
 
   const bool won = game.isWon();

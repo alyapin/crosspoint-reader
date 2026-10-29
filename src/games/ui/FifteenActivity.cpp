@@ -184,17 +184,17 @@ int FifteenActivity::cellAt(const int x, const int y) const {
 void FifteenActivity::build(UiScreen& screen) {
   char clock[24];
   formatElapsed(game.elapsedMs(), clock, sizeof(clock));
-  char moves[24];
-  movesText(game.moveCount(), moves, sizeof(moves));
-  char value[56];
-  snprintf(value, sizeof(value), "%s \xC2\xB7 %s", moves, clock);
-  drawTopLine(screen, nullptr, value, false);
+  char count[12];
+  snprintf(count, sizeof(count), "%d", game.moveCount());
+  drawTopLine(screen, {{tr(STR_GAMES_MOVES), count}, {nullptr, clock}}, false);
 
   const int left = boardLeft();
   for (int cell = 0; cell < fifteen::CELLS; ++cell) drawTile(cell, left);
   screen.frame().hit(fui::makeRect(left, BOARD_TOP, kBoard, kBoard), ACTION_BOARD, 0, fui::InputTouch);
 
   if (game.isSolved()) {
+    char moves[24];
+    movesText(game.moveCount(), moves, sizeof(moves));
     char line[80];
     snprintf(line, sizeof(line), tr(STR_FIFTEEN_SOLVED), moves, clock);
     char record[80];

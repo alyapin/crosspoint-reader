@@ -107,7 +107,14 @@ bool DraughtsActivity::restore() {
   return true;
 }
 
-void DraughtsActivity::saveGame() { gamesave::save(game); }
+// A finished game (won, lost, resigned or drawn) leaves no save: its moves alone would replay to a running position.
+void DraughtsActivity::saveGame() {
+  if (game.isOver()) {
+    clearSave();
+  } else {
+    gamesave::save(game);
+  }
+}
 
 void DraughtsActivity::clearSave() { gamesave::clear(gamesave::Kind::Draughts); }
 
@@ -463,13 +470,13 @@ void DraughtsActivity::cellOrigin(const int square, int& x, int& y) const {
 // --- render task -------------------------------------------------------------
 
 void DraughtsActivity::build(UiScreen& screen) {
-  char mode[32];
-  const char* value = tr(STR_GAMES_TWO_PLAYERS);
+  char level[12];
+  snprintf(level, sizeof(level), "%d", static_cast<int>(game.mode()) + 1);
   if (game.vsComputer()) {
-    snprintf(mode, sizeof(mode), tr(STR_CHESS_COMPUTER_LEVEL), static_cast<int>(game.mode()) + 1);
-    value = mode;
+    drawTopLine(screen, {{tr(STR_GAMES_VS_LEVEL), level}}, false);
+  } else {
+    drawTopLine(screen, {{tr(STR_GAMES_TWO_PLAYERS), nullptr}}, false);
   }
-  drawTopLine(screen, nullptr, value, false);
   drawBoard();
   screen.frame().hit(fui::makeRect((renderer.getScreenWidth() - kBoardSize) / 2, kBoardTop, kBoardSize, kBoardSize),
                      ACTION_BOARD, 0, shellInput());
@@ -532,9 +539,10 @@ void DraughtsActivity::drawBoard() const {
       drawDashedFrame(renderer, x, y, kSquare);
     }
   }
+  const bool cursorShown = cursor >= 0 && barFocus < 0 && moveCount > 0;
   if (selected >= 0) {
     cellOrigin(at, x, y);
-    drawCellFrame(renderer, x, y, kSquare, kSquare);
+    drawPick(x, y, kSquare, kSquare, cursorShown && cursor == at);
   }
   for (int s = 0; s < draughts::SQUARES; ++s) {
     if (!has(dots, s)) continue;
@@ -542,9 +550,9 @@ void DraughtsActivity::drawBoard() const {
     renderer.fillRoundedRect(x + (kSquare - kDotSize) / 2, y + (kSquare - kDotSize) / 2, kDotSize, kDotSize,
                              kDotSize / 2, Color::Black);
   }
-  if (cursor >= 0 && barFocus < 0 && moveCount > 0) {
+  if (cursorShown) {
     cellOrigin(cursor, x, y);
-    drawCursor(x, y, kSquare, kSquare);
+    drawCellFrame(renderer, x, y, kSquare, kSquare);
   }
 }
 

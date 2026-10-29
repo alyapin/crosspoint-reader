@@ -236,19 +236,23 @@ int FiveLettersActivity::keyAt(const int row, const int x) const {
 // --- render task -------------------------------------------------------------
 
 void FiveLettersActivity::build(UiScreen& screen) {
-  char value[48];
+  char value[48] = "";
   if (game.status() == fiveletters::Status::Won) {
     snprintf(value, sizeof(value), tr(STR_FIVE_WON), game.guesses());
   } else if (game.status() == fiveletters::Status::Lost) {
     char word[2 * LETTERS + 1];
     game.answerText(word, sizeof(word));
     snprintf(value, sizeof(value), tr(STR_FIVE_LOST), word);
-  } else if (unknownWord) {
-    snprintf(value, sizeof(value), "%s", tr(STR_FIVE_UNKNOWN));
-  } else {
-    snprintf(value, sizeof(value), tr(STR_FIVE_TRY), game.guesses() + 1, ATTEMPTS);
   }
-  drawTopLine(screen, nullptr, game.isOver() ? nullptr : value, false);
+  char attempt[16];
+  snprintf(attempt, sizeof(attempt), tr(STR_GAMES_OF), game.guesses() + 1, ATTEMPTS);
+  if (game.isOver()) {
+    drawTopLine(screen, {}, false);
+  } else if (unknownWord) {
+    drawTopLine(screen, {{tr(STR_FIVE_UNKNOWN), nullptr}}, false);
+  } else {
+    drawTopLine(screen, {{tr(STR_FIVE_TRY), attempt}}, false);
+  }
 
   const int size = cellSize();
   const int left = (renderer.getScreenWidth() - LETTERS * size - (LETTERS - 1) * kCellGap) / 2;

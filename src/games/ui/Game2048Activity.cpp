@@ -29,13 +29,13 @@ constexpr uint8_t kThickFrom = 4;   // 16
 constexpr uint8_t kFilledFrom = 7;  // 128
 constexpr int kMenuSlot = 2;
 
-// "2 340".
+// "2340", "12 340": four digits stay whole, longer numbers group by thousands.
 void formatScore(const uint32_t value, char* out, const size_t cap) {
   char digits[12];
   const int n = snprintf(digits, sizeof(digits), "%lu", static_cast<unsigned long>(value));
   size_t len = 0;
   for (int i = 0; i < n && len + 2 < cap; ++i) {
-    if (i > 0 && (n - i) % 3 == 0) out[len++] = ' ';
+    if (n > 4 && i > 0 && (n - i) % 3 == 0) out[len++] = ' ';
     out[len++] = digits[i];
   }
   out[len] = '\0';
@@ -168,7 +168,7 @@ bool Game2048Activity::onBack() {
 void Game2048Activity::build(UiScreen& screen) {
   char score[16];
   formatScore(game.score(), score, sizeof(score));
-  drawTopLine(screen, tr(STR_2048_SCORE), score, false);
+  drawTopLine(screen, {{tr(STR_2048_SCORE), score}}, false);
 
   const int left = (renderer.getScreenWidth() - kGridSize) / 2;
   for (int cell = 0; cell < g2048::CELLS; ++cell) {
@@ -177,13 +177,12 @@ void Game2048Activity::build(UiScreen& screen) {
   }
 
   int y = kGridTop + kGridSize + kFooterGap;
-  char footer[96] = "";
-  int len = 0;
+  char footer[48] = "";
   const uint32_t record = std::max(best, game.score());
   if (record > 0) {
     char digits[16];
     formatScore(record, digits, sizeof(digits));
-    len = std::max(0, snprintf(footer, sizeof(footer), "%s %s", tr(STR_2048_BEST), digits));
+    snprintf(footer, sizeof(footer), "%s %s", tr(STR_2048_BEST), digits);
   }
   if (game.isOver()) {
     drawResult(y, tr(STR_2048_NO_MOVES), footer);
@@ -192,11 +191,13 @@ void Game2048Activity::build(UiScreen& screen) {
       renderer.drawText(kText12Font, kSidePadding, y, tr(STR_2048_WON), true, kSemiBold);
       y += renderer.getLineHeight(kText12Font) + kFooterGap / 2;
     }
-    if (len < static_cast<int>(sizeof(footer))) {
-      snprintf(footer + len, sizeof(footer) - len, "%s%s", len > 0 ? "  \xC2\xB7  " : "",
-               mappedInput.hasTouch() ? tr(STR_2048_SWIPE_HINT) : tr(STR_2048_SIDE_HINT));
+    // The record, then how to move, as the other boards' captions.
+    for (const char* line : {static_cast<const char*>(footer),
+                             mappedInput.hasTouch() ? tr(STR_2048_SWIPE_HINT) : tr(STR_2048_SIDE_HINT)}) {
+      if (*line == '\0') continue;
+      renderer.drawText(kText10Font, kSidePadding, y, line);
+      y += renderer.getLineHeight(kText10Font);
     }
-    renderer.drawText(kCaptionFont, kSidePadding, y, footer);
   }
 
   BarItem items[BAR_SLOTS];

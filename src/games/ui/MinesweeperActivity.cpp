@@ -137,7 +137,8 @@ void MinesweeperActivity::onTouch(const fui::ActionEvent& event, const int x, co
 }
 
 bool MinesweeperActivity::barShown(const int slot) const {
-  // Флажок while playing on touch, Заново once there is something to deal again, Меню (Новая игра once over) always.
+  // Флажок while playing on touch, Начать заново once there is something to deal again,
+  // Меню (Новая игра once over) always.
   if (slot == 0) return hasBar() && !game.isOver();
   if (slot == 1) return game.status() != minesweeper::Status::Ready;
   return slot == 2;
@@ -211,10 +212,14 @@ int MinesweeperActivity::boardLeft() const { return (renderer.getScreenWidth() -
 void MinesweeperActivity::build(UiScreen& screen) {
   char clock[24];
   formatElapsed(game.elapsedMs(), clock, sizeof(clock));
-  char value[40];
+  char mines[12];
   const bool over = game.isOver();
-  snprintf(value, sizeof(value), "%d \xC2\xB7 %s", game.minesLeft(), clock);
-  drawTopLine(screen, over ? nullptr : tr(STR_MINES_LEFT), over ? clock : value, false);
+  snprintf(mines, sizeof(mines), "%d", game.minesLeft());
+  if (over) {
+    drawTopLine(screen, {{nullptr, clock}}, false);
+  } else {
+    drawTopLine(screen, {{tr(STR_MINES_LEFT), mines}, {nullptr, clock}}, false);
+  }
 
   const int size = cellSize();
   const int left = boardLeft();
@@ -235,10 +240,15 @@ void MinesweeperActivity::build(UiScreen& screen) {
   if (over) {
     drawResult(BOARD_TOP + height + kResultGap,
                game.status() == minesweeper::Status::Won ? tr(STR_GAMES_WON) : tr(STR_MINES_LOST));
+  } else if (!hasBar()) {
+    // Button boards flag with a held Confirm (the bar's Флажок is touch only).
+    char line[64];
+    snprintf(line, sizeof(line), tr(STR_MINES_FLAG_HOLD), tr(STR_GAMES_DIG));
+    renderer.drawText(kText10Font, kSidePadding, BOARD_TOP + height + kResultGap, line);
   }
 
   BarItem items[BAR_SLOTS];
-  const char* labels[BAR_SLOTS] = {tr(STR_MINES_FLAG), tr(STR_MINES_NEW),
+  const char* labels[BAR_SLOTS] = {tr(STR_MINES_FLAG), tr(STR_GAMES_RESTART),
                                    over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU)};
   const freeink::Icon* icons[BAR_SLOTS] = {&icon_bar_flag_24, &icon_bar_restart_24,
                                            over ? &icon_bar_new_game_24 : &icon_menu_24};

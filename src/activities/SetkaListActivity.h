@@ -29,6 +29,8 @@ class SetkaListActivity : public UiListActivity {
   virtual const char* rowStatus(int index) const { return nullptr; }
   // Shown under the header when the list is empty.
   virtual const char* emptyText() const { return nullptr; }
+  // A closer row pitch that may fit the whole list on one page where the Setka pitch does not; 0 for none.
+  virtual int compactRowHeight() const { return 0; }
   // Opens a screen on top of this one; coming back repaints with the entry refresh.
   void openChild(std::unique_ptr<Activity> child);
   // A screen opened with openChild() closed.
@@ -38,6 +40,7 @@ class SetkaListActivity : public UiListActivity {
   bool handleCustomInput() override;
   void buildScreen(UiScreen& screen) override;
   int rowsPerPage() const;
+  int rowHeight() const;
 
   setka::RefreshCadence cadence;  // render task only
   std::atomic<bool> entryRefresh{true};

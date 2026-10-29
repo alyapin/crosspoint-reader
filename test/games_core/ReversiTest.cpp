@@ -209,6 +209,38 @@ TEST(Reversi, FinishedGameCountsAndCannotBeUndone) {
   EXPECT_EQ(g.score().won + g.score().lost + g.score().draws, 1);
 }
 
+TEST(Reversi, ResignCountsALossAndStaysOverAfterASave) {
+  Game g;
+  g.newGame(Mode::Easy, 7);
+  games::Rng rng(7);
+  playRandom(g, rng, 6);
+  ASSERT_FALSE(g.isOver());
+  ASSERT_TRUE(g.resign());
+  EXPECT_TRUE(g.resigned());
+  EXPECT_EQ(g.status(), Status::WhiteWon);
+  EXPECT_EQ(g.score().lost, 1);
+  EXPECT_FALSE(g.resign());
+  EXPECT_FALSE(g.canUndo());
+  const std::string text = save(g);
+  Game loaded;
+  ASSERT_TRUE(loaded.deserialize(text.data(), text.size()));
+  EXPECT_FALSE(loaded.inProgress());
+  EXPECT_TRUE(loaded.resigned());
+  EXPECT_EQ(loaded.status(), Status::WhiteWon);
+  EXPECT_EQ(loaded.score().lost, 1);
+  EXPECT_EQ(save(loaded), text);
+}
+
+TEST(Reversi, TwoPlayersTheSideToMoveResigns) {
+  Game g;
+  g.newGame(Mode::TwoPlayers, 3);
+  ASSERT_TRUE(g.play(19));
+  ASSERT_EQ(g.toMove(), Disc::White);
+  ASSERT_TRUE(g.resign());
+  EXPECT_EQ(g.status(), Status::BlackWon);
+  EXPECT_EQ(g.score().won, 1);
+}
+
 TEST(Reversi, ComputerPicksALegalMoveOnEveryLevel) {
   for (const Mode mode : {Mode::Easy, Mode::Medium, Mode::Hard}) {
     for (int game = 0; game < 6; ++game) {

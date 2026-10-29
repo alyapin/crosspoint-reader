@@ -291,7 +291,7 @@ int SudokuActivity::cellAt(const int x, const int y) const {
 void SudokuActivity::build(UiScreen& screen) {
   char clock[24];
   formatElapsed(game.elapsedMs(), clock, sizeof(clock));
-  drawTopLine(screen, levelStatus(game.level()), clock, false);
+  drawTopLine(screen, {{levelStatus(game.level()), nullptr}, {nullptr, clock}}, false);
 
   drawGrid();
   const int left = (renderer.getScreenWidth() - kGridSize) / 2;
@@ -359,7 +359,12 @@ void SudokuActivity::drawGrid() const {
                      y + 1 + (d - 1) / 3 * kNoteCell + (kNoteCell - noteHeight) / 2, digit);
       }
     }
-    if (cell == selected) drawCellFrame(renderer, x, y, kCell, kCell);
+    // Keys on the pad or the bar: the cell waits for its digit.
+    if (cell == selected && area != Area::Grid) {
+      drawPick(x, y, kCell, kCell);
+    } else if (cell == selected) {
+      drawCellFrame(renderer, x, y, kCell, kCell);
+    }
   }
 }
 
@@ -374,7 +379,7 @@ void SudokuActivity::drawPad(UiScreen& screen) const {
     renderer.drawRect(x, kPadTop, kKeyWidth, kKeyHeight, kKeyRule, true);
     const char digit[2] = {static_cast<char>('1' + k), '\0'};
     drawCentered(kText12Font, x, kKeyWidth, kPadTop + (kKeyHeight - lineHeight) / 2, digit, kSemiBold);
-    if (area == Area::Pad && k == padFocus) drawKeyCursor(x, kPadTop, kKeyWidth, kKeyHeight);
+    if (area == Area::Pad && k == padFocus) drawCellFrame(renderer, x, kPadTop, kKeyWidth, kKeyHeight);
     screen.frame().hit(fui::makeRect(x, kPadTop, kKeyWidth, kKeyHeight), ACTION_PAD, static_cast<int16_t>(k + 1),
                        fui::InputTouch);
   }

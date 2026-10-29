@@ -17,7 +17,38 @@ namespace {
 constexpr int kIconSize = 24;
 constexpr int kIconGap = 4;
 constexpr int kResultLineGap = 4;
+constexpr const char* kStatusJoin = "\xC2\xB7";  // between spaces: a trailing space adds no width
+
+// Walks the status left to right from `x`; draws when `draw`. Returns the x after it.
+int layoutStatus(const GfxRenderer& renderer, int x, const int y, const StatusItem* items, const int count,
+                 const bool draw) {
+  const int space = renderer.getSpaceWidth(kText12Font);
+  const auto text = [&](const char* s, const EpdFontFamily::Style style) {
+    if (draw) renderer.drawText(kText12Font, x, y, s, true, style);
+    x += renderer.getTextWidth(kText12Font, s, style);
+  };
+  for (int i = 0; i < count; ++i) {
+    const StatusItem& item = items[i];
+    if (i > 0) {
+      x += space;
+      text(kStatusJoin, EpdFontFamily::REGULAR);
+      x += space;
+    }
+    if (item.label != nullptr) text(item.label, EpdFontFamily::REGULAR);
+    if (item.label != nullptr && item.value != nullptr) x += space;
+    if (item.value != nullptr) text(item.value, kSemiBold);
+  }
+  return x;
+}
 }  // namespace
+
+int statusWidth(const GfxRenderer& renderer, const StatusItem* items, const int count) {
+  return layoutStatus(renderer, 0, 0, items, count, false);
+}
+
+void drawStatus(const GfxRenderer& renderer, const int right, const int y, const StatusItem* items, const int count) {
+  layoutStatus(renderer, right - statusWidth(renderer, items, count), y, items, count, true);
+}
 
 void drawActionBar(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, const int top, const ActionSlot* slots,
                    const int count, const int focused, const uint16_t input) {
