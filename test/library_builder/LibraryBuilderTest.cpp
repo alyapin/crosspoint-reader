@@ -100,6 +100,20 @@ TEST_F(LibraryBuilderTest, SkipsSystemFolderContents) {
   EXPECT_EQ(fake::directoryEntriesByPath["/System Volume Information/notes.txt"], 0u);
 }
 
+TEST_F(LibraryBuilderTest, SkipsTheFlashcardFolder) {
+  EXPECT_FALSE(isLibraryBookFile("/Карточки/es.txt"));
+  EXPECT_TRUE(isLibraryBookFile("/Карточки старые/es.txt"));
+  fake::add("/Карточки/es.txt");
+  fake::add("/Книги/book.txt");
+
+  initial();
+
+  LibraryIndexFile index;
+  ASSERT_TRUE(index.open(INDEX));
+  EXPECT_EQ(index.header().bookCount, 3u);  // a.epub, b.epub, book.txt
+  EXPECT_EQ(fake::directoryEntriesByPath["/Карточки/es.txt"], 0u);
+}
+
 TEST_F(LibraryBuilderTest, XtcTitleAndAuthorComeFromTheFile) {
   fake::add("/Comics/one.xtc");
   fake::add("/Comics/two.xtch");

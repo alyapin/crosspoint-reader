@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <BufferedFile.h>
+#include <CardDeck.h>
 #include <Epub.h>
 #include <FsHelpers.h>
 #include <HalStorage.h>
@@ -490,9 +491,12 @@ void walk(WalkState& st, const std::string& path, const int depth) {
     const std::string name(st.nameBuf);
 
     if (isDir) {
+      const std::string child = joinLibraryPath(path, name);
+      // Flashcard decks are text files, not books.
+      if (child == cards::DECK_DIR) continue;
       const size_t resumePosition = dir.position();
       dir.close();
-      walk(st, joinLibraryPath(path, name), depth + 1);
+      walk(st, child, depth + 1);
       if (st.failed || st.books >= CLIX_MAX_RECORDS) return;
 
       dir = Storage.open(path.c_str());
@@ -1061,6 +1065,10 @@ bool emitIndex(const char* folderStagePath, WalkState& st, const uint16_t* order
 const char* libraryIndexPath() { return INDEX_PATH; }
 
 bool isLibraryBookFile(const std::string_view path) {
+  if (path.starts_with(cards::DECK_DIR) && path.size() > sizeof(cards::DECK_DIR) - 1 &&
+      path[sizeof(cards::DECK_DIR) - 1] == '/') {
+    return false;
+  }
   // Match the walk's exclusions in every path component. A lone "." names the folder itself.
   size_t start = 0;
   while (start < path.size()) {

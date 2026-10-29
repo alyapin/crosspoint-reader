@@ -1,5 +1,6 @@
 #include "LocalSendReceiver.h"
 
+#include <FsHelpers.h>
 #include <LibraryBuilder.h>
 #include <Logging.h>
 #include <WiFi.h>
@@ -11,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include "CardDeck.h"
 #include "CrossPointSettings.h"
 #include "util/BookCacheUtils.h"
 #include "util/TaskWatchdog.h"
@@ -30,7 +32,7 @@ constexpr char PART_SUFFIX[] = ".localsend";
 uint32_t hardwareRandom() { return esp_random(); }
 }  // namespace
 
-LocalSendReceiver::LocalSendReceiver() : connection(sessionState, identity, store) {}
+LocalSendReceiver::LocalSendReceiver() : store(sessionState), connection(sessionState, identity, store) {}
 
 void LocalSendReceiver::defaultDestDir(char* out, const size_t cap) {
   snprintf(out, cap, "%s", SETTINGS.opdsDownloadFolder[0] ? SETTINGS.opdsDownloadFolder : DEFAULT_DIR);
@@ -69,7 +71,8 @@ bool LocalSendReceiver::start(const Config& config) {
     LOG_ERR("LSND", "mkdir %s failed, using SD root", store.dir);
     store.dir[0] = 0;
   }
-  store.reclaimPartials();
+  store.reclaimPartials(store.dir);
+  if (Storage.exists(cards::DECK_DIR)) store.reclaimPartials(cards::DECK_DIR);
   store.forgetFreeSpace();
   // The first query scans the FAT (seconds on a large card): do it now, while
   // no sender waits on a prepare-upload.
@@ -164,21 +167,37 @@ uint64_t LocalSendReceiver::Store::freeBytes() {
 #endif
 }
 
-bool LocalSendReceiver::Store::open(const localsend::FileEntry& entry) {
-  abort();
+int LocalSendReceiver::Store::entryIndex(const localsend::FileEntry& entry) const {
+  for (size_t i = 0; i < session.entryCount() && i < 16; i++) {
+    if (&session.entry(i) == &entry) return static_cast<int>(i);
+  }
+  return -1;
+}
+
+// Picks a free final path in `folder` and its partial next to it.
+bool LocalSendReceiver::Store::placeIn(const char* folder, const char* entryName) {
   char name[localsend::FILE_NAME_MAX + 16];
-  bool found = false;
-  for (int i = 0; i < MAX_COLLISIONS && !found; i++) {
-    if (!localsend::makeCollisionName(entry.name, i, name, sizeof(name))) return false;
-    const int n = snprintf(finalPath, sizeof(finalPath), "%s/%s", dir, name);
+  for (int i = 0; i < MAX_COLLISIONS; i++) {
+    if (!localsend::makeCollisionName(entryName, i, name, sizeof(name))) return false;
+    const int n = snprintf(finalPath, sizeof(finalPath), "%s/%s", folder, name);
     const int m = snprintf(tmpPath, sizeof(tmpPath), "%s%s", finalPath, PART_SUFFIX);
     if (n <= 0 || static_cast<size_t>(n) >= sizeof(finalPath) || m <= 0 || static_cast<size_t>(m) >= sizeof(tmpPath)) {
       return false;
     }
     // A partial without its book is left over from an interrupted transfer.
-    found = !Storage.exists(finalPath) && (!Storage.exists(tmpPath) || Storage.remove(tmpPath));
+    if (!Storage.exists(finalPath) && (!Storage.exists(tmpPath) || Storage.remove(tmpPath))) return true;
   }
-  if (!found || !Storage.openFileForWrite("LSND", tmpPath, file)) {
+  return false;
+}
+
+bool LocalSendReceiver::Store::open(const localsend::FileEntry& entry) {
+  abort();
+  const int index = entryIndex(entry);
+  if (index >= 0) toCards &= static_cast<uint16_t>(~(1u << index));
+  // Flashcard tables go straight to the deck folder; a .txt is sorted at commit().
+  const bool deck =
+      cards::isTableName(entry.name) && (Storage.exists(cards::DECK_DIR) || Storage.mkdir(cards::DECK_DIR));
+  if (!placeIn(deck ? cards::DECK_DIR : dir, entry.name) || !Storage.openFileForWrite("LSND", tmpPath, file)) {
     LOG_ERR("LSND", "cannot create a file for %s", entry.name);
     tmpPath[0] = 0;
     return false;
@@ -219,10 +238,33 @@ int LocalSendReceiver::Store::commit(const localsend::FileEntry& entry) {
       return 422;
     }
   }
+  if (FsHelpers::hasTxtExtension(std::string_view(entry.name))) {
+    // An Anki export is a deck, not a book.
+    uint8_t head[64];
+    HalFile f;
+    int got = -1;
+    if (Storage.openFileForRead("LSND", tmpPath, f)) {
+      got = f.read(head, sizeof(head));
+      f.close();
+    }
+    char partial[sizeof(tmpPath)];
+    snprintf(partial, sizeof(partial), "%s", tmpPath);
+    if (got > 0 && cards::hasAnkiHeader(head, static_cast<size_t>(got)) &&
+        (Storage.exists(cards::DECK_DIR) || Storage.mkdir(cards::DECK_DIR)) && placeIn(cards::DECK_DIR, entry.name)) {
+      snprintf(tmpPath, sizeof(tmpPath), "%s", partial);
+    } else {
+      snprintf(tmpPath, sizeof(tmpPath), "%s", partial);
+      snprintf(finalPath, sizeof(finalPath), "%.*s", static_cast<int>(strlen(partial) - strlen(PART_SUFFIX)), partial);
+    }
+  }
   if (!Storage.rename(tmpPath, finalPath)) {
     LOG_ERR("LSND", "rename failed: %s", finalPath);
     abort();
     return 500;
+  }
+  const int index = entryIndex(entry);
+  if (index >= 0 && strncmp(finalPath, cards::DECK_DIR, strlen(cards::DECK_DIR)) == 0) {
+    toCards |= static_cast<uint16_t>(1u << index);
   }
   tmpPath[0] = 0;
   clearBookCache(finalPath);
@@ -240,10 +282,10 @@ void LocalSendReceiver::Store::abort() {
 }
 
 // A transfer cut by a reset leaves its partial, which would count against the free space.
-void LocalSendReceiver::Store::reclaimPartials() {
+void LocalSendReceiver::Store::reclaimPartials(const char* folder) {
   std::vector<std::string> stale;
   {
-    HalFile root = Storage.open(dir[0] ? dir : "/");
+    HalFile root = Storage.open(folder[0] ? folder : "/");
     if (!root || !root.isDirectory()) return;
     constexpr size_t suffixLen = sizeof(PART_SUFFIX) - 1;
     char name[256];
@@ -256,7 +298,7 @@ void LocalSendReceiver::Store::reclaimPartials() {
     }
   }
   for (const std::string& name : stale) {
-    const std::string path = std::string(dir) + "/" + name;
+    const std::string path = std::string(folder) + "/" + name;
     if (Storage.remove(path.c_str())) LOG_INF("LSND", "removed partial %s", path.c_str());
   }
 }

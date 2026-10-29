@@ -47,6 +47,8 @@ class LocalSendReceiver {
   // An exchange is moving bytes (not waiting for the user): run the loop at full speed.
   bool streaming() const { return started && connection.active() && !connection.holding(); }
   const char* destDir() const { return store.dir; }
+  // Entry i went to the flashcard folder.
+  bool toCards(const size_t i) const { return i < 16 && (store.toCards & (1u << i)); }
 
   // The configured download folder, else /Книги.
   static void defaultDestDir(char* out, size_t cap);
@@ -54,16 +56,19 @@ class LocalSendReceiver {
  private:
   class Store final : public localsend::FileStore {
    public:
+    explicit Store(const localsend::Session& session) : session(session) {}
     char dir[64] = {};
+    uint16_t toCards = 0;  // a bit per session entry
     uint64_t freeBytes() override;
     bool open(const localsend::FileEntry& entry) override;
     bool write(const uint8_t* data, size_t len) override;
     int commit(const localsend::FileEntry& entry) override;
     void abort() override;
     void forgetFreeSpace() { freeKnown = false; }
-    void reclaimPartials();
+    void reclaimPartials(const char* folder);
 
    private:
+    const localsend::Session& session;
     HalFile file;
     char finalPath[208] = {};
     char tmpPath[216] = {};
@@ -72,6 +77,8 @@ class LocalSendReceiver {
     uint64_t freeCache = 0;
     bool freeKnown = false;
     void stopHashing();
+    bool placeIn(const char* folder, const char* name);
+    int entryIndex(const localsend::FileEntry& entry) const;
   };
 
   localsend::Session sessionState;

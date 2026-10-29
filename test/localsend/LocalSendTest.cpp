@@ -332,7 +332,8 @@ TEST(LocalSendNames, TruncationKeepsExtensionAndUtf8) {
 }
 
 TEST(LocalSendNames, AcceptedFormats) {
-  for (const char* ok : {"a.epub", "A.EPUB", "a.fb2", "a.FB2.ZIP", "a.txt", "a.md", "a.xtc", "a.xtch"}) {
+  for (const char* ok :
+       {"a.epub", "A.EPUB", "a.fb2", "a.FB2.ZIP", "a.txt", "a.md", "a.xtc", "a.xtch", "a.tsv", "a.CSV"}) {
     EXPECT_TRUE(isAcceptedBookName(ok)) << ok;
   }
   for (const char* bad : {"a.pdf", "a.zip", "a.epub.exe", "a.json", "a", "a.mobi"}) {
