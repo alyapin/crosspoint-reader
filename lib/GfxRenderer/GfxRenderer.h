@@ -311,6 +311,8 @@ class GfxRenderer {
     clipBottom_ = y + height;
   }
   void drawPixel(int x, int y, bool state = true) const;
+  // True when logical row y of the frame holds no black pixel (false while a strip target is active).
+  bool isRowClear(int y) const;
   // Draw glyph ink with clipping and orientation resolved once per glyph.
   void drawGlyphBitmap(const uint8_t* bitmap, int width, int height, const glyphBitmap::Frame& frame, bool twoBit,
                        RenderMode mode, bool state) const;

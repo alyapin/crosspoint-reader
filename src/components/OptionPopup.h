@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstdlib>
 #include <functional>
 #include <string>
 #include <vector>
@@ -175,7 +176,8 @@ class OptionPopup {
   // aligned and wrapped; one or two options sit in a row ("Отмена ▌Удалить"),
   // more become rows like the Library book menu. The focused option carries
   // the bar and SemiBold. A full-width band around the card is cleared and
-  // ruled so the screen underneath never shows through at its edges.
+  // ruled so the screen underneath never shows through at its edges; its
+  // edges sit in gaps of that screen, so no row shows cut.
   void render(const GfxRenderer& renderer) const {
     if (!active) return;
     namespace fui = freeink::ui;
@@ -227,15 +229,27 @@ class OptionPopup {
     const int cardHeight = std::min(maxCardHeight, textBlock + optionsHeight);
     const int cardY = std::max(kBandMargin + kRuleWidth, (screenHeight - cardHeight) / 2);
 
-    if (!standalone) {
-      const int bandTop = std::max(0, cardY - kBandMargin);
-      const int bandBottom = std::min(screenHeight, cardY + cardHeight + kBandMargin);
-      renderer.fillRect(0, bandTop, screenWidth, bandBottom - bandTop, false);
-      if (bandTop > 0) drawRule(renderer, 0, bandTop - kRuleWidth, screenWidth);
-      if (bandBottom < screenHeight) drawRule(renderer, 0, bandBottom, screenWidth);
-    } else {
-      renderer.fillRect(cardX, cardY, cardWidth, cardHeight, false);
+    if (bandTop < 0) {
+      // First paint over the host screen: each band edge moves out to the
+      // nearest clear gap there (none within kBandGrowMax: it stays), so the
+      // band never cuts a row in two. Repaints keep these edges.
+      constexpr int kGap = kRuleWidth + kBandAir;  // the edge's rule and clear air outside it
+      const auto snap = [&](const int edge, const int step) {
+        for (int y = edge; std::abs(y - edge) <= kBandGrowMax; y += step) {
+          const int from = step < 0 ? y - kGap : y;
+          if (from < 0 || from + kGap > screenHeight) break;
+          int clear = 0;
+          while (clear < kGap && renderer.isRowClear(from + clear)) ++clear;
+          if (clear == kGap) return y;
+        }
+        return edge;
+      };
+      bandTop = snap(std::max(0, cardY - kBandMargin), -1);
+      bandBottom = snap(std::min(screenHeight, cardY + cardHeight + kBandMargin), 1);
     }
+    renderer.fillRect(0, bandTop, screenWidth, bandBottom - bandTop, false);
+    if (bandTop > 0) drawRule(renderer, 0, bandTop - kRuleWidth, screenWidth);
+    if (bandBottom < screenHeight) drawRule(renderer, 0, bandBottom, screenWidth);
     renderer.drawRect(cardX, cardY, cardWidth, cardHeight, kRuleWidth, true);
 
     // Chrome guard first, options after: route() scans newest-first, so the
@@ -309,10 +323,6 @@ class OptionPopup {
     return labelsWidth <= renderer.getScreenWidth() - 2 * (kSidePadding + kDialogSidePadding);
   }
 
-  // The dialog is the only thing on a cleared screen (ConfirmationActivity):
-  // no band to clear around it.
-  void setStandalone(const bool value) { standalone = value; }
-
   bool isActive() const { return active; }
 
   // Close without firing the callback (the surface under the popup is going
@@ -338,7 +348,9 @@ class OptionPopup {
   static constexpr int kButtonGap = 24;                                 // least air between two option labels
   static constexpr int kButtonBarSpan = setka::kSelectionBarWidth + 6;  // bar + gap before an option label
   static constexpr int kRowsBottomPadding = 8;
-  static constexpr int kBandMargin = 20;  // cleared band around the card
+  static constexpr int kBandMargin = 20;                          // cleared band around the card
+  static constexpr int kBandGrowMax = 2 * setka::kListRowHeight;  // how far a band edge may move to a clear gap
+  static constexpr int kBandAir = 4;                              // least gap between a band rule and the screen
 
   void activate(int currentIndex, std::function<void(int)> onSelect) {
     const int count = std::min<int>(ownedStrings.size(), MAX_OPTIONS);
@@ -351,12 +363,15 @@ class OptionPopup {
     }
     onSelectCallback = std::move(onSelect);
     message.clear();
+    bandTop = bandBottom = -1;
     uiReady = false;
     active = count > 0;
   }
 
   bool active = false;
-  bool standalone = false;
+  // Band edges fixed on the first paint after show(); -1 until then. Render task only.
+  mutable int bandTop = -1;
+  mutable int bandBottom = -1;
   std::string title;
   std::string headline;
   std::string message;
