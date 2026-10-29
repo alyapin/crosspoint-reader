@@ -9,3 +9,15 @@ target_include_directories(ScanwordCoreTest PRIVATE ${REPO_ROOT}/lib/Scanword)
 target_compile_definitions(ScanwordCoreTest PRIVATE SCANWORD_SAMPLES_DIR="${REPO_ROOT}/tools/scanword/samples")
 target_link_libraries(ScanwordCoreTest PRIVATE crosspoint_test_common GTest::gtest_main)
 gtest_discover_tests(ScanwordCoreTest DISCOVERY_TIMEOUT 60)
+
+add_executable(ScanwordStoreTest
+  ScanwordStoreTest.cpp
+  ${REPO_ROOT}/src/games/scanword/ScanwordStore.cpp
+  ${REPO_ROOT}/lib/Scanword/ScanwordPuzzle.cpp
+  ${REPO_ROOT}/lib/Scanword/ScanwordGame.cpp
+  ${REPO_ROOT}/lib/Scanword/ScanwordShelf.cpp
+)
+target_include_directories(ScanwordStoreTest PRIVATE ${REPO_ROOT}/lib/Scanword ../library_builder/stubs)
+target_compile_definitions(ScanwordStoreTest PRIVATE SCANWORD_SAMPLES_DIR="${REPO_ROOT}/tools/scanword/samples")
+target_link_libraries(ScanwordStoreTest PRIVATE crosspoint_test_common GTest::gtest_main)
+gtest_discover_tests(ScanwordStoreTest DISCOVERY_TIMEOUT 60)
