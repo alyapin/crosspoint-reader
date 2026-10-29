@@ -1272,6 +1272,10 @@ void ChessActivity::drawClockPanel() const {
   const int maxWidth = renderer.getScreenWidth() - kRowTextX - kSidePadding - unitWidth;
   int scale256 = kHeroCapTarget > 0 ? kHeroCapTarget * 256 / std::max(1, heroCapHeight(renderer, kHeroFont)) : 256;
   if (naturalWidth * scale256 > maxWidth * 16 * 256) scale256 = maxWidth * 16 * 256 / naturalWidth;
+  // The digits shrink to the room above the turn line, which button boards cut by the hint row.
+  const int room = actionsTop() - 6 - renderer.getLineHeight(kText12Font) - 14 - (kPanelTop + 22);
+  const int naturalCap = std::max(1, heroCapHeight(renderer, kHeroFont));
+  if (naturalCap * scale256 / 256 > room) scale256 = room * 256 / naturalCap;
 
   const int capTop = kPanelTop + 22;
   const int capHeight = heroCapHeight(renderer, kHeroFont) * scale256 / 256;
@@ -1290,8 +1294,7 @@ void ChessActivity::drawClockPanel() const {
     // On the digits' baseline.
     renderer.drawText(kText12Font, x + kUnitGap, capTop + capHeight - renderer.getFontAscenderSize(kText12Font), unit);
   }
-  // Button boards lose the hint row's height under the panel: the line keeps clear of the bar.
-  drawTurnLine(std::min(capTop + capHeight + 14, actionsTop() - renderer.getLineHeight(kText12Font) - 6));
+  drawTurnLine(capTop + capHeight + 14);
 }
 
 void ChessActivity::drawStatusPanel() const {
@@ -1378,7 +1381,7 @@ void ChessActivity::drawPromotion(UiScreen& screen) const {
     const int nameTop = std::min(cellTop + 16 + bitmap.size,
                                  cellTop + cellHeight - kCellFrameWidth - 2 - renderer.getLineHeight(kText10Font));
     chess::ui::drawPiece(renderer, bitmap, x + (cellWidth - bitmap.size) / 2,
-                         std::min(cellTop + 8, nameTop - 4 - bitmap.size));
+                         std::max(cellTop + kCellFrameWidth, std::min(cellTop + 8, nameTop - 4 - bitmap.size)));
     drawCentered(renderer, kText10Font, x, cellWidth, nameTop, names[i]);
     if (i == promoFocus) drawCellFrame(renderer, x, cellTop, cellWidth, cellHeight);
     screen.frame().hit(fui::makeRect(x, cellTop, cellWidth, cellHeight), ACTION_PROMOTE, static_cast<int16_t>(i),
