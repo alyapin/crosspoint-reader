@@ -40,7 +40,21 @@ class ChessActivity final : public Activity, private UiAppHost {
 
  private:
   enum class View : uint8_t { Setup, Picker, CustomTime, Game, Menu };
-  enum class Row : uint8_t { Opponent, Level, Color, Time, Rotate, Pieces, Start, Resign, Draw, NewGame, Flip };
+  enum class Row : uint8_t {
+    Opponent,
+    Level,
+    Color,
+    Time,
+    Rotate,
+    Pieces,
+    Start,
+    Resign,
+    Draw,
+    NewGame,
+    Flip,
+    Undo,
+    Exit
+  };
   // Pending repaint, strongest wins: Entry = HALF, Update = cadence FAST,
   // Clock = plain FAST that does not count toward the cadence.
   enum Repaint : uint8_t { RepaintNone, RepaintClock, RepaintUpdate, RepaintEntry };
@@ -91,6 +105,8 @@ class ChessActivity final : public Activity, private UiAppHost {
   void runAction(GameAction action);
   void activateRow(int index);
   void confirmResign();
+  // Touch boards: "‹ Выйти" and the action bar; on button boards Back opens the menu, which holds the actions.
+  bool hasBar() const;
   // Top of the action bar, above the button hints on button boards.
   int actionsTop() const;
   void applyOption(int option);

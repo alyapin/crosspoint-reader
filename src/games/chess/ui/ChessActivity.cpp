@@ -22,6 +22,7 @@
 #include "components/UITheme.h"
 #include "games/chess/ChessSave.h"
 #include "games/ui/ActionBar.h"
+#include "games/ui/gameIcons.h"
 
 namespace fui = freeink::ui;
 using namespace setka;
@@ -328,6 +329,7 @@ void ChessActivity::loop() {
 
 int ChessActivity::gameActions(GameAction* out) const {
   int n = 0;
+  if (!hasBar()) return n;
   if (match->game().isOver()) out[n++] = GameAction::NewGame;
   if (match->canUndo()) out[n++] = GameAction::Undo;
   out[n++] = GameAction::Flip;
@@ -363,7 +365,7 @@ void ChessActivity::runAction(const GameAction action) {
 }
 
 // Keys only (X4 without touch, or by choice): a cursor walks the 64 squares and
-// then the actions; Confirm acts like a tap. Left/Right step along the ring,
+// then the bar's actions, if shown; Confirm acts like a tap. Left/Right step along the ring,
 // Up/Down change rank (on edge-button boards the side buttons step instead).
 void ChessActivity::handleGameKeys() {
   using Button = MappedInputManager::Button;
@@ -388,6 +390,10 @@ void ChessActivity::handleGameKeys() {
     requestRepaint(RepaintUpdate);
     return;
   }
+  if (!hasBar() && match->game().isOver()) {
+    if (confirm) runAction(GameAction::NewGame);
+    return;
+  }
   GameAction actions[kMaxActions];
   const int ring = kCells + gameActions(actions);
   if (cursor < 0) {
@@ -409,7 +415,7 @@ void ChessActivity::handleGameKeys() {
   if (dy != 0 && cursor < kCells) {
     const int row = cursor / 8 + dy;
     if (row > 7) {
-      cursor = kCells;
+      if (ring > kCells) cursor = kCells;
     } else if (row >= 0) {
       cursor = row * 8 + cursor % 8;
     }
@@ -495,6 +501,8 @@ void ChessActivity::goBack() {
         promoFrom = promoTo = kNoSquare;
         clearSelection();
         requestRepaint(RepaintUpdate);
+      } else if (!hasBar()) {
+        setView(View::Menu);
       } else {
         app.clearTapFlash();
         finish();
@@ -581,6 +589,14 @@ void ChessActivity::activateRow(const int index) {
     case Row::Flip:
       manualFlip = !manualFlip;
       setView(View::Game);
+      break;
+    case Row::Undo:
+      if (match->undo()) afterPly();
+      setView(View::Game);
+      break;
+    case Row::Exit:
+      app.clearTapFlash();
+      finish();
       break;
     default:
       openPicker(rows[index]);
@@ -757,6 +773,7 @@ int ChessActivity::listRows(Row* out) const {
     out[n++] = Row::Pieces;
     out[n++] = Row::Start;
   } else if (view == View::Menu) {
+    if (!hasBar() && match->canUndo()) out[n++] = Row::Undo;
     if (!match->game().isOver()) {
       out[n++] = Row::Resign;
       out[n++] = Row::Draw;
@@ -764,6 +781,7 @@ int ChessActivity::listRows(Row* out) const {
     out[n++] = Row::NewGame;
     out[n++] = Row::Flip;
     out[n++] = Row::Pieces;
+    if (!hasBar()) out[n++] = Row::Exit;
   }
   return n;
 }
@@ -818,6 +836,10 @@ const freeink::Icon* ChessActivity::rowIcon(const Row row) const {
       return &icon_new_game_24;
     case Row::Flip:
       return &icon_flip_24;
+    case Row::Undo:
+      return &icon_undo_move_24;
+    case Row::Exit:
+      return &icon_exit_24;
   }
   return nullptr;
 }
@@ -846,6 +868,10 @@ const char* ChessActivity::rowLabel(const Row row) const {
       return tr(STR_CHESS_NEW_GAME);
     case Row::Flip:
       return tr(STR_CHESS_FLIP);
+    case Row::Undo:
+      return tr(STR_CHESS_UNDO);
+    case Row::Exit:
+      return tr(STR_GAMES_LEAVE);
   }
   return "";
 }
@@ -1002,8 +1028,9 @@ void ChessActivity::render(RenderLock&&) {
   renderUi();
   // Button boards only; the lists and the action bar end above the hints.
   const bool board = view == View::Game;
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), board ? tr(STR_DIR_LEFT) : tr(STR_DIR_UP),
-                                            board ? tr(STR_DIR_RIGHT) : tr(STR_DIR_DOWN));
+  const auto labels =
+      mappedInput.mapLabels(board ? tr(STR_CHESS_MENU) : tr(STR_BACK), tr(STR_SELECT),
+                            board ? tr(STR_DIR_LEFT) : tr(STR_DIR_UP), board ? tr(STR_DIR_RIGHT) : tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   const uint8_t kind = repaint.exchange(RepaintNone);
   renderer.displayBuffer(kind == RepaintEntry   ? cadence.entry()
@@ -1011,8 +1038,10 @@ void ChessActivity::render(RenderLock&&) {
                                                 : cadence.update());
 }
 
+bool ChessActivity::hasBar() const { return UITheme::getInstance().getMetrics().buttonHintsHeight == 0; }
+
 int ChessActivity::actionsTop() const {
-  return renderer.getScreenHeight() - games::ui::kActionBarHeight -
+  return renderer.getScreenHeight() - (hasBar() ? games::ui::kActionBarHeight : 0) -
          UITheme::getInstance().getMetrics().buttonHintsHeight;
 }
 
@@ -1156,10 +1185,13 @@ void ChessActivity::buildGame(UiScreen& screen) {
 void ChessActivity::drawTopLine(UiScreen& screen) const {
   const int width = renderer.getScreenWidth();
   drawStatusLine(renderer);
-  const char* exitLabel = tr(STR_CHESS_NAV_EXIT);
-  renderer.drawText(kText12Font, kSidePadding, kHeaderTop, exitLabel);
-  const int exitWidth = renderer.getTextWidth(kText12Font, exitLabel) + 2 * kSidePadding;
-  screen.frame().hit(fui::makeRect(0, 0, exitWidth, kBoardTop), ACTION_BACK, 0, fui::InputTouch);
+  int exitWidth = 0;
+  if (hasBar()) {
+    const char* exitLabel = tr(STR_CHESS_NAV_EXIT);
+    renderer.drawText(kText12Font, kSidePadding, kHeaderTop, exitLabel);
+    exitWidth = renderer.getTextWidth(kText12Font, exitLabel) + 2 * kSidePadding;
+    screen.frame().hit(fui::makeRect(0, 0, exitWidth, kBoardTop), ACTION_BACK, 0, fui::InputTouch);
+  }
 
   // The far side of the board: the computer, or between friends the side not to move.
   const chess::Color far = chess::opposite(heroSide());
@@ -1218,7 +1250,7 @@ void ChessActivity::drawBoard() const {
     squareOrigin(selected, flip, x, y);
     drawCellFrame(renderer, x, y, kSquare, kSquare);
   }
-  if (cursor >= 0 && cursor < kCells) {
+  if (cursor >= 0 && cursor < kCells && (hasBar() || !game.isOver())) {
     drawCursor(renderer, boardLeft() + cursor % 8 * kSquare, kBoardTop + cursor / 8 * kSquare);
   }
   for (int square = 0; square < 64; ++square) {
@@ -1407,6 +1439,7 @@ void ChessActivity::drawGameOver(UiScreen& screen) const {
 }
 
 void ChessActivity::drawActions(UiScreen& screen) const {
+  if (!hasBar()) return;
   const GameAction focused = focusedAction();
   games::ui::ActionSlot slots[] = {
       {&icon_undo_move_24, tr(STR_CHESS_UNDO), false, ACTION_UNDO, 0},
