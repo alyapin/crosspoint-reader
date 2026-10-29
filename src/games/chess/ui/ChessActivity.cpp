@@ -519,7 +519,7 @@ void ChessActivity::setView(const View next) {
   } else if (next == View::CustomTime) {
     focus = kCustomDoneRow;
   } else {
-    focus = -1;  // the menu shows no bar until a key moves it
+    focus = mappedInput.hasTouch() ? -1 : 0;  // a touch menu shows no bar until a key moves it
   }
   requestRepaint(RepaintEntry);
 }
@@ -1290,7 +1290,8 @@ void ChessActivity::drawClockPanel() const {
     // On the digits' baseline.
     renderer.drawText(kText12Font, x + kUnitGap, capTop + capHeight - renderer.getFontAscenderSize(kText12Font), unit);
   }
-  drawTurnLine(capTop + capHeight + 14);
+  // Button boards lose the hint row's height under the panel: the line keeps clear of the bar.
+  drawTurnLine(std::min(capTop + capHeight + 14, actionsTop() - renderer.getLineHeight(kText12Font) - 6));
 }
 
 void ChessActivity::drawStatusPanel() const {
@@ -1373,8 +1374,12 @@ void ChessActivity::drawPromotion(UiScreen& screen) const {
     const int x = i * cellWidth;
     const auto& bitmap =
         chess::ui::pieceBitmap(prefs.pieceSet, color, pieceKind(kPromotions[i]), chess::ui::PieceSize::Small);
-    chess::ui::drawPiece(renderer, bitmap, x + (cellWidth - bitmap.size) / 2, cellTop + 8);
-    drawCentered(renderer, kText10Font, x, cellWidth, cellTop + 16 + bitmap.size, names[i]);
+    // A short cell (button boards) lifts the name above the focus frame, and the piece above the name.
+    const int nameTop = std::min(cellTop + 16 + bitmap.size,
+                                 cellTop + cellHeight - kCellFrameWidth - 2 - renderer.getLineHeight(kText10Font));
+    chess::ui::drawPiece(renderer, bitmap, x + (cellWidth - bitmap.size) / 2,
+                         std::min(cellTop + 8, nameTop - 4 - bitmap.size));
+    drawCentered(renderer, kText10Font, x, cellWidth, nameTop, names[i]);
     if (i == promoFocus) drawCellFrame(renderer, x, cellTop, cellWidth, cellHeight);
     screen.frame().hit(fui::makeRect(x, cellTop, cellWidth, cellHeight), ACTION_PROMOTE, static_cast<int16_t>(i),
                        fui::InputTouch);
@@ -1388,7 +1393,7 @@ void ChessActivity::drawGameOver(UiScreen& screen) const {
   top += lineHeight + 4;
   renderer.drawText(kText12Font, kRowTextX, top, overSubtitle(*match));
   top += lineHeight + 8;
-  const int rowHeight = std::max(kListRowHeight, lineHeight + 2 * kRuleGap);
+  const int rowHeight = std::min(std::max(kListRowHeight, lineHeight + 2 * kRuleGap), actionsTop() - top);
   const int textTop = top + (rowHeight - lineHeight) / 2;
   const GameAction focused = focusedAction();
   const bool primary = focused == GameAction::None || focused == GameAction::NewGame;

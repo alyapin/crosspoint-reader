@@ -25,7 +25,8 @@ struct ActionSlot {
 
 constexpr int kActionBarHeight = 70;  // the rule included
 
-// Draws the bar from `top` (its rule) to the bottom of the screen and adds a hit per shown slot.
+// Draws the bar from `top` (its rule) down to the button hints (the screen bottom on touch boards)
+// and adds a hit per shown slot.
 void drawActionBar(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, int top, const ActionSlot* slots,
                    int count, int focused, uint16_t input);
 
