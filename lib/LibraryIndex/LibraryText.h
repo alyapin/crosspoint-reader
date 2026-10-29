@@ -54,8 +54,14 @@ std::string fold(std::string_view text);
 // number/non-letter. The Library renders 0 as its shared '#' group.
 uint32_t foldedGroupInitial(std::string_view folded);
 
+// Length of a role some books store before the name in the creator field
+// ("автор Николай Гоголь", "by Lewis Carroll"); 0 when there is none.
+size_t authorRoleLength(std::string_view author);
+
 // Tidy a person's name for DISPLAY, without reordering it.
 //
+// Drops a leading role ("автор ", "by "), so the role neither shows nor splits
+// one person's books into two groups.
 // Drops bracketed spans ("George Sand [Sand, George]"), everything after a
 // multi-author separator, and the trailing underscores and punctuation that
 // exporters leave behind ("Lu Xun_", "Herbert G_ Wells"). An underscore

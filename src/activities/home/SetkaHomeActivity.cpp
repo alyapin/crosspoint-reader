@@ -5,6 +5,7 @@
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <I18n.h>
+#include <LibraryText.h>
 #include <Logging.h>
 #include <Memory.h>
 #include <Xtc.h>
@@ -19,7 +20,6 @@
 #include "components/icons/listIcons.h"
 #include "components/setka/setkaIcons.h"
 #include "util/ButtonNavigator.h"
-#include "util/StringUtils.h"
 
 namespace fui = freeink::ui;
 using namespace setka;
@@ -136,7 +136,7 @@ void SetkaHomeActivity::loadBooks() {
     currentSubtitle = text;
   } else {
     const std::string& author = slots[0].book.author;
-    currentSubtitle.assign(author, StringUtils::authorRoleLength(author.c_str()));
+    currentSubtitle.assign(author, library::authorRoleLength(author));
   }
 }
 

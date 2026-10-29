@@ -229,7 +229,15 @@ uint32_t foldedGroupInitial(const std::string_view folded) {
   return isUnicodeLetter(cp) ? cp : 0;
 }
 
-std::string cleanPersonName(const std::string_view author) {
+size_t authorRoleLength(const std::string_view author) {
+  for (const std::string_view role : {"автор ", "Автор ", "by ", "By "}) {
+    if (author.substr(0, role.size()) == role) return role.size();
+  }
+  return 0;
+}
+
+std::string cleanPersonName(std::string_view author) {
+  author.remove_prefix(authorRoleLength(author));
   std::string out;
   out.reserve(author.size());
   int depth = 0;
