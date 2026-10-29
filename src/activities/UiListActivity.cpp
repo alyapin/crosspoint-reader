@@ -220,6 +220,11 @@ void UiListActivity::syncListViewport(UiScreen& screen, fui::ListProps& props, c
   const int prevTop = n.top;
   const bool trusted = n.trusts(listCount());
   const int drawn = n.drawnRows;
+  // While the selected row is on screen every build follows it, so a row that
+  // grew in place (a new value wraps its label) cannot slip below the last
+  // whole row. A swipe still moves the viewport off the selection.
+  const int selectedRow = n.selected.load() - selectionOffset;
+  if (trusted && drawn > 0 && selectedRow >= prevTop && selectedRow < prevTop + drawn) n.followOnBuild = true;
 
   screen.syncListViewport(n, props, listCount(), selectionOffset);
 
