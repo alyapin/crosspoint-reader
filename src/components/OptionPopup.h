@@ -290,6 +290,14 @@ class OptionPopup {
     if (inRow) {
       // The last option is the action and sits on the right; a lone one too.
       const int textTop = optionsTop + (kButtonRowHeight - titleLine) / 2;
+      // Two options split their tap areas in the gap between the labels, not at the card's middle.
+      int split = cardX + cardWidth / 2;
+      if (count == 2) {
+        const int leftEnd = textX + renderer.getTextWidth(kText12Font, ownedStrings[0].c_str(), kSemiBold);
+        const int rightBar =
+            textX + textWidth - renderer.getTextWidth(kText12Font, ownedStrings[1].c_str(), kSemiBold) - kButtonBarSpan;
+        split = (leftEnd + rightBar) / 2;
+      }
       for (int i = 0; i < count; ++i) {
         const bool focused = i == selectedIndex;
         const auto style = focused ? kSemiBold : EpdFontFamily::REGULAR;
@@ -298,8 +306,8 @@ class OptionPopup {
         const int labelX = right ? textX + textWidth - renderer.getTextWidth(kText12Font, label, style) : textX;
         if (focused) drawSelectionBar(renderer, labelX - kButtonBarSpan, textTop, titleLine);
         renderer.drawText(kText12Font, labelX, textTop, label, true, style);
-        const int hitX = right && count == 2 ? cardX + cardWidth / 2 : cardX;
-        const int hitWidth = count == 2 ? cardWidth / 2 : cardWidth;
+        const int hitX = right && count == 2 ? split : cardX;
+        const int hitWidth = count == 2 ? (right ? cardX + cardWidth - split : split - cardX) : cardWidth;
         frame.hit(fui::makeRect(hitX, optionsTop, hitWidth, kButtonRowHeight), ACTION_OPTION, static_cast<int16_t>(i),
                   fui::InputTouch);
       }
