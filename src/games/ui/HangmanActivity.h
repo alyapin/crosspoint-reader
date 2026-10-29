@@ -13,14 +13,14 @@ std::unique_ptr<Activity> openHangman(GfxRenderer& renderer, MappedInputManager&
 // The gallows with the word's definition beside it, the word as letter slots,
 // and the word games' keyboard (LetterKeyboard.h): a tap (or Confirm on the key cursor) guesses. Подсказка
 // opens a letter for a mistake; Меню holds Новая игра and Завершить, and once
-// the round is over the slot opens Новая игра: Обычные слова, or С крепкими
+// the round is over the middle slot opens Новая игра: Обычные слова, or С крепкими
 // словами, which mixes the rude words in. The last pick is remembered.
 class HangmanActivity final : public GameScreen {
  public:
   HangmanActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
  private:
-  enum class Action : uint8_t { Hint, None, Menu };
+  enum class Action : uint8_t { Hint, NewGame, Menu };
   struct Layout {
     int gallowsTop;
     int gallowsBottom;

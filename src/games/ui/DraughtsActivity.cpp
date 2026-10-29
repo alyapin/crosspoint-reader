@@ -35,8 +35,8 @@ constexpr int kCross = 7;  // half the × inside the inner ring
 constexpr int kCrossStroke = 3;
 constexpr int kCountDot = 14;
 constexpr int kLineGap = 6;
-constexpr int kFlipSlot = 1;
-constexpr int kNewGameSlot = 2;
+constexpr int kFlipSlot = 1;  // Новая игра once over
+constexpr int kMenuSlot = 2;
 constexpr uint32_t kSliceMs = 40;
 constexpr uint32_t kEngineRetryMs = 1000;
 constexpr int kCenter = 17;  // d4: the key cursor starts on the piece nearest to it
@@ -314,22 +314,20 @@ void DraughtsActivity::placeCursor() {
 void DraughtsActivity::runBar(const int slot) {
   if (slot == 0) {
     if (game.undo()) afterChange();
+  } else if (slot == kFlipSlot && game.isOver()) {
+    openNewGame();
   } else if (slot == kFlipSlot) {
     flipped = !flipped;
     requestRepaint(RepaintUpdate);
-  } else if (slot == kNewGameSlot) {
-    if (game.isOver()) {
-      openNewGame();
-    } else {
-      openGameMenu();
-    }
+  } else if (slot == kMenuSlot) {
+    openGameMenu();
   }
 }
 
 bool DraughtsActivity::barShown(const int slot) const {
   if (slot == 0) return game.canUndo();
-  if (slot == kFlipSlot) return !game.vsComputer();
-  return slot == kNewGameSlot;
+  if (slot == kFlipSlot) return game.isOver() || !game.vsComputer();
+  return slot == kMenuSlot;
 }
 
 int DraughtsActivity::nextBarSlot(const int from, const int step) const {
@@ -485,10 +483,12 @@ void DraughtsActivity::build(UiScreen& screen) {
   const bool over = game.isOver();
   BarItem items[BAR_SLOTS];
   if (barShown(0)) items[0] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false, BarItem::Action};
-  if (barShown(kFlipSlot)) items[kFlipSlot] = {&icon_flip_24, tr(STR_CHESS_FLIP_SHORT), false, BarItem::Action};
-  items[kNewGameSlot] = {over ? &icon_bar_new_game_24 : &icon_menu_24,
-                         over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU), false,
-                         over ? BarItem::NewGame : BarItem::Menu};
+  if (over) {
+    items[kFlipSlot] = {&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame};
+  } else if (barShown(kFlipSlot)) {
+    items[kFlipSlot] = {&icon_flip_24, tr(STR_CHESS_FLIP_SHORT), false, BarItem::Action};
+  }
+  items[kMenuSlot] = {&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 

@@ -37,7 +37,7 @@ class FifteenActivity final : public GameScreen {
   void startGame();
   void slideAt(int cell);
   void afterSlide();
-  void runBar();
+  void runBar(int slot);
   int cellAt(int x, int y) const;
   int boardLeft() const;
   void drawTile(int cell, int left) const;

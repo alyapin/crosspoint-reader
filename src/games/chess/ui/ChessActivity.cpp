@@ -324,8 +324,8 @@ int ChessActivity::gameActions(GameAction* out) const {
   int n = 0;
   if (!hasBar()) return n;
   if (match->canUndo()) out[n++] = GameAction::Undo;
-  out[n++] = GameAction::Flip;
-  out[n++] = match->game().isOver() ? GameAction::NewGame : GameAction::Menu;
+  out[n++] = match->game().isOver() ? GameAction::NewGame : GameAction::Flip;
+  out[n++] = GameAction::Menu;
   return n;
 }
 
@@ -389,8 +389,8 @@ void ChessActivity::gameKey(const int dx, const int dy, const bool confirm) {
   GameAction actions[kMaxActions];
   const int ring = kCells + gameActions(actions);
   if (cursor < 0) {
-    // The first key shows the cursor; on a finished game it lands on Новая игра.
-    cursor = match->game().isOver() ? ring - 1 : kStartCursor;
+    // The first key shows the cursor; on a finished game it lands on Новая игра, before Меню.
+    cursor = match->game().isOver() ? ring - 2 : kStartCursor;
     requestRepaint(RepaintUpdate);
     return;
   }
@@ -1461,15 +1461,15 @@ void ChessActivity::drawActions(UiScreen& screen) const {
   const bool over = match->game().isOver();
   games::ui::ActionSlot slots[] = {
       {&icon_undo_move_24, tr(STR_GAMES_UNDO), false, ACTION_UNDO, 0},
-      {&icon_flip_24, tr(STR_CHESS_FLIP_SHORT), false, ACTION_FLIP, 0},
       over ? games::ui::ActionSlot{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, ACTION_NEW_GAME, 0}
-           : games::ui::ActionSlot{&icon_menu_24, tr(STR_CHESS_MENU), false, ACTION_MENU, 0},
+           : games::ui::ActionSlot{&icon_flip_24, tr(STR_CHESS_FLIP_SHORT), false, ACTION_FLIP, 0},
+      {&icon_menu_24, tr(STR_CHESS_MENU), false, ACTION_MENU, 0},
   };
   if (!match->canUndo()) slots[0].label = nullptr;
-  const int focusedSlot = focused == GameAction::Undo   ? 0
-                          : focused == GameAction::Flip ? 1
-                          : focused == GameAction::None ? -1
-                                                        : 2;
+  const int focusedSlot = focused == GameAction::Undo                                     ? 0
+                          : focused == GameAction::Flip || focused == GameAction::NewGame ? 1
+                          : focused == GameAction::None                                   ? -1
+                                                                                          : 2;
   games::ui::drawActionBar(renderer, screen, actionsTop(), slots, static_cast<int>(std::size(slots)), focusedSlot,
                            fui::InputTouch);
 }

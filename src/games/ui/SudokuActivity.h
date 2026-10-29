@@ -41,7 +41,8 @@ class SudokuActivity final : public GameScreen {
   const char* confirmHint() const override;
   int32_t shownMinutes() const override;
 
-  void barActions(Action (&out)[SLOTS]) const;
+  // The bar's slot count.
+  int barActions(Action (&out)[SLOTS]) const;
   void runAction(Action action);
   void enterDigit(int digit);
   bool padKeyShown(int digit) const;

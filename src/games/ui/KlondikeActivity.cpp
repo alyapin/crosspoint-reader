@@ -181,14 +181,12 @@ void KlondikeActivity::runBar(const int slot) {
   if (slot == 0 && game.undo()) {
     clearPick();
     markChanged();
+  } else if (slot == 1 && game.isWon()) {
+    openNewGame();
   } else if (slot == 1) {
     showHint();
   } else if (slot == 2) {
-    if (game.isWon()) {
-      openNewGame();
-    } else {
-      openGameMenu();
-    }
+    openGameMenu();
   }
 }
 
@@ -201,9 +199,8 @@ void KlondikeActivity::onTouch(const fui::ActionEvent& event, int, const int y) 
 }
 
 bool KlondikeActivity::barShown(const int slot) const {
-  if (slot == 0) return game.canUndo();
-  if (slot == 1) return !game.isWon();
-  return slot == 2;
+  // Подсказка while playing, Новая игра once won, Меню always.
+  return slot != 0 || game.canUndo();
 }
 
 int KlondikeActivity::nextBarSlot(const int from, const int step) const {
@@ -339,11 +336,11 @@ void KlondikeActivity::build(UiScreen& screen) {
   if (won) drawResult(kTableauTop + kResultGap, tr(STR_GAMES_WON));
 
   BarItem items[BAR_SLOTS];
-  const char* labels[BAR_SLOTS] = {tr(STR_GAMES_UNDO), tr(STR_KLONDIKE_HINT),
-                                   won ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU)};
-  const freeink::Icon* icons[BAR_SLOTS] = {&icon_bar_undo_24, &icon_bar_hint_24,
-                                           won ? &icon_bar_new_game_24 : &icon_menu_24};
-  const BarItem::Kind kinds[BAR_SLOTS] = {BarItem::Action, BarItem::Action, won ? BarItem::NewGame : BarItem::Menu};
+  const char* labels[BAR_SLOTS] = {tr(STR_GAMES_UNDO), won ? tr(STR_GAMES_NEW_GAME) : tr(STR_KLONDIKE_HINT),
+                                   tr(STR_GAMES_MENU)};
+  const freeink::Icon* icons[BAR_SLOTS] = {&icon_bar_undo_24, won ? &icon_bar_new_game_24 : &icon_bar_hint_24,
+                                           &icon_menu_24};
+  const BarItem::Kind kinds[BAR_SLOTS] = {BarItem::Action, won ? BarItem::NewGame : BarItem::Action, BarItem::Menu};
   for (int i = 0; i < BAR_SLOTS; ++i) {
     if (barShown(i)) items[i] = {icons[i], labels[i], false, kinds[i]};
   }

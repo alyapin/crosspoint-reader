@@ -128,14 +128,11 @@ void HangmanActivity::runAction(const Action action) {
     case Action::Hint:
       if (game.hint()) markChanged();
       break;
-    case Action::Menu:
-      if (game.isOver()) {
-        openNewGame();
-      } else {
-        openGameMenu();
-      }
+    case Action::NewGame:
+      openNewGame();
       break;
-    case Action::None:
+    case Action::Menu:
+      openGameMenu();
       break;
   }
 }
@@ -164,6 +161,7 @@ void HangmanActivity::onTouch(const fui::ActionEvent& event, const int x, const 
 
 bool HangmanActivity::barShown(const int slot) const {
   if (slot == static_cast<int>(Action::Hint)) return game.canHint();
+  if (slot == static_cast<int>(Action::NewGame)) return game.isOver();
   return slot == static_cast<int>(Action::Menu);
 }
 
@@ -250,8 +248,8 @@ void HangmanActivity::build(UiScreen& screen) {
 
   BarItem items[BAR_SLOTS];
   if (barShown(0)) items[0] = {&icon_bar_hint_24, tr(STR_HANGMAN_HINT), false, BarItem::Action};
-  items[2] = {over ? &icon_bar_new_game_24 : &icon_menu_24, over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU), false,
-              over ? BarItem::NewGame : BarItem::Menu};
+  if (over) items[1] = {&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame};
+  items[2] = {&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 

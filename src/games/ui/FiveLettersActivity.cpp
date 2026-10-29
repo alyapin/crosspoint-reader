@@ -111,7 +111,7 @@ void FiveLettersActivity::submit() {
         stats.record(game.status() == fiveletters::Status::Won);
         statsPending = true;
       }
-      if (barFocus >= 0) barFocus = game.isOver() ? MENU_SLOT : -1;
+      if (barFocus >= 0) barFocus = game.isOver() ? DONE_SLOT : -1;
       markChanged();
       break;
     case fiveletters::Submit::Unknown:
@@ -130,21 +130,21 @@ void FiveLettersActivity::runSlot(const int slot) {
       if (game.erase()) requestRepaint(RepaintUpdate);
       break;
     case DONE_SLOT:
-      submit();
-      break;
-    case MENU_SLOT:
       if (game.isOver()) {
         openNewGame();
       } else {
-        openGameMenu();
+        submit();
       }
+      break;
+    case MENU_SLOT:
+      openGameMenu();
       break;
     default:
       break;
   }
 }
 
-bool FiveLettersActivity::barShown(const int slot) const { return slot == MENU_SLOT || !game.isOver(); }
+bool FiveLettersActivity::barShown(const int slot) const { return slot != ERASE_SLOT || !game.isOver(); }
 
 int FiveLettersActivity::nextBarSlot(const int from, const int step) const {
   for (int i = 1; i <= BAR_SLOTS; ++i) {
@@ -260,9 +260,10 @@ void FiveLettersActivity::build(UiScreen& screen) {
   if (!over) {
     items[ERASE_SLOT] = {&icon_key_delete_24, tr(STR_SCANWORD_ERASE), false, BarItem::Action};
     items[DONE_SLOT] = {&icon_done_24, tr(STR_SCANWORD_DONE), false, BarItem::Action};
+  } else {
+    items[DONE_SLOT] = {&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame};
   }
-  items[MENU_SLOT] = over ? BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame}
-                          : BarItem{&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
+  items[MENU_SLOT] = {&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 

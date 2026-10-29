@@ -41,7 +41,7 @@ constexpr fui::ActionId ACTION_HINT = 8;
 constexpr fui::ActionId ACTION_DONE = 9;
 constexpr fui::ActionId ACTION_CHECK_ALL = 10;
 constexpr fui::ActionId ACTION_MENU = 11;
-constexpr fui::ActionId ACTION_TO_LIST = 12;
+constexpr fui::ActionId ACTION_NEW_GAME = 12;
 
 constexpr int kHeaderTop = kGameTopLineY;  // board top line, under the status line
 constexpr int kGridTop = kGameBoardTop;
@@ -602,9 +602,9 @@ void ScanwordActivity::handleAction(const fui::ActionEvent& event, const int x, 
       if (board && !keyboardOpen && game->filledCount() > 0) showCheck(game->checkAll(), true);
       break;
     case ACTION_MENU:
-      if (board && !game->solved()) setView(View::Menu);
+      if (board) setView(View::Menu);
       break;
-    case ACTION_TO_LIST:
+    case ACTION_NEW_GAME:
       if (board && game->solved()) closePuzzle();
       break;
     default:
@@ -1289,14 +1289,14 @@ void ScanwordActivity::drawLetterStrip(const int top) const {
 
 void ScanwordActivity::drawBand(UiScreen& screen) const {
   if (touchBoard()) {
-    // Keyboard closed: Проверить всё once something is filled, and Меню (К списку once solved).
+    // Keyboard closed: Проверить всё once something is filled, Новая игра (the list) once solved, and Меню.
     games::ui::ActionSlot acts[3];
-    if (!game->solved() && game->filledCount() > 0) {
+    if (game->solved()) {
+      acts[1] = {&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, ACTION_NEW_GAME, 0};
+    } else if (game->filledCount() > 0) {
       acts[0] = {&icon_scanword_check_all_24, tr(STR_SCANWORD_CHECK_ALL), false, ACTION_CHECK_ALL, 0};
     }
-    acts[2] = game->solved()
-                  ? games::ui::ActionSlot{&icon_scanword_to_list_24, tr(STR_SCANWORD_TO_LIST), false, ACTION_TO_LIST, 0}
-                  : games::ui::ActionSlot{&icon_menu_24, tr(STR_GAMES_MENU), false, ACTION_MENU, 0};
+    acts[2] = {&icon_menu_24, tr(STR_GAMES_MENU), false, ACTION_MENU, 0};
     games::ui::drawActionBar(renderer, screen, bottom() - kActionHeight, acts, static_cast<int>(std::size(acts)), -1,
                              kTap);
     return;

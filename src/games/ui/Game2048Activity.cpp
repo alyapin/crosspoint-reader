@@ -27,6 +27,7 @@ constexpr int kFooterGap = 18;
 constexpr int kTileRule = 2;        // as the 15 puzzle's tiles
 constexpr uint8_t kThickFrom = 4;   // 16
 constexpr uint8_t kFilledFrom = 7;  // 128
+constexpr int kNewGameSlot = 1;     // once over
 constexpr int kMenuSlot = 2;
 
 // "2340", "12 340": four digits stay whole, longer numbers group by thousands.
@@ -107,16 +108,17 @@ void Game2048Activity::runBar(const int slot) {
   if (!barShown(slot)) return;
   if (slot == 0 && game.undo()) {
     markChanged();
+  } else if (slot == kNewGameSlot) {
+    openNewGame();
   } else if (slot == kMenuSlot) {
-    if (game.isOver()) {
-      openNewGame();
-    } else {
-      openGameMenu();
-    }
+    openGameMenu();
   }
 }
 
-bool Game2048Activity::barShown(const int slot) const { return slot == 0 ? game.canUndo() : slot == kMenuSlot; }
+bool Game2048Activity::barShown(const int slot) const {
+  if (slot == 0) return game.canUndo();
+  return slot == kMenuSlot || game.isOver();
+}
 
 int Game2048Activity::nextBarSlot(const int from, const int step) const {
   for (int i = 1; i <= BAR_SLOTS; ++i) {
@@ -203,8 +205,10 @@ void Game2048Activity::build(UiScreen& screen) {
 
   BarItem items[BAR_SLOTS];
   if (barShown(0)) items[0] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false, BarItem::Action};
-  items[kMenuSlot] = game.isOver() ? BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame}
-                                   : BarItem{&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
+  if (barShown(kNewGameSlot)) {
+    items[kNewGameSlot] = {&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame};
+  }
+  items[kMenuSlot] = {&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 

@@ -100,14 +100,17 @@ void MinesweeperActivity::runAction(const Action action) {
       requestRepaint(RepaintUpdate);
       break;
     case Action::New:
-      confirmRestart();
+      // A finished field has nothing to lose: it deals again at once.
+      if (game.isOver()) {
+        game.newGame(game.config(), esp_random());
+        flagMode = false;
+        markChanged();
+      } else {
+        confirmRestart();
+      }
       break;
     case Action::Menu:
-      if (game.isOver()) {
-        openNewGame();
-      } else {
-        openGameMenu();
-      }
+      openGameMenu();
       break;
   }
 }
@@ -159,8 +162,8 @@ void MinesweeperActivity::onTouch(const fui::ActionEvent& event, const int x, co
 }
 
 bool MinesweeperActivity::barShown(const int slot) const {
-  // Флажок while playing on touch, Начать заново once there is something to deal again,
-  // Меню (Новая игра once over) always.
+  // Флажок while playing on touch, Начать заново once there is something to deal again (the new game once
+  // over), Меню always.
   if (slot == 0) return hasBar() && !game.isOver();
   if (slot == 1) return game.status() != minesweeper::Status::Ready;
   return slot == 2;
@@ -271,11 +274,9 @@ void MinesweeperActivity::build(UiScreen& screen) {
   }
 
   BarItem items[BAR_SLOTS];
-  const char* labels[BAR_SLOTS] = {tr(STR_MINES_FLAG), tr(STR_GAMES_RESTART),
-                                   over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU)};
-  const freeink::Icon* icons[BAR_SLOTS] = {&icon_bar_flag_24, &icon_bar_restart_24,
-                                           over ? &icon_bar_new_game_24 : &icon_menu_24};
-  const BarItem::Kind kinds[BAR_SLOTS] = {BarItem::Mode, BarItem::Action, over ? BarItem::NewGame : BarItem::Menu};
+  const char* labels[BAR_SLOTS] = {tr(STR_MINES_FLAG), tr(STR_GAMES_RESTART), tr(STR_GAMES_MENU)};
+  const freeink::Icon* icons[BAR_SLOTS] = {&icon_bar_flag_24, &icon_bar_restart_24, &icon_menu_24};
+  const BarItem::Kind kinds[BAR_SLOTS] = {BarItem::Mode, over ? BarItem::NewGame : BarItem::Action, BarItem::Menu};
   for (int i = 0; i < BAR_SLOTS; ++i) {
     if (barShown(i)) items[i] = {icons[i], labels[i], i == 0 && flagMode, kinds[i]};
   }

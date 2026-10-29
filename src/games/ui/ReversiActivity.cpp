@@ -25,6 +25,7 @@ using reversi::SIZE;
 using reversi::Status;
 
 namespace {
+constexpr int kNewGameSlot = 1;  // once over
 constexpr int kMenuSlot = 2;
 constexpr int kSliceMs = 20;
 constexpr int kDiscInset = 7;
@@ -120,18 +121,16 @@ void ReversiActivity::runBar(const int slot) {
   if (slot == 0) {
     engine.cancel();
     if (game.undo()) changed();
+  } else if (slot == kNewGameSlot) {
+    openNewGame();
   } else if (slot == kMenuSlot) {
-    if (game.isOver()) {
-      openNewGame();
-    } else {
-      openGameMenu();
-    }
+    openGameMenu();
   }
 }
 
 bool ReversiActivity::barShown(const int slot) const {
   if (slot == 0) return game.canUndo();
-  return slot == kMenuSlot;
+  return slot == kMenuSlot || game.isOver();
 }
 
 // Keys walk the legal moves, then the bar where it is shown, and wrap.
@@ -258,8 +257,8 @@ void ReversiActivity::build(UiScreen& screen) {
   BarItem items[BAR_SLOTS];
   if (barShown(0)) items[0] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false, BarItem::Action};
   const bool over = game.isOver();
-  items[kMenuSlot] = {over ? &icon_bar_new_game_24 : &icon_menu_24, over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU),
-                      false, over ? BarItem::NewGame : BarItem::Menu};
+  if (over) items[kNewGameSlot] = {&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame};
+  items[kMenuSlot] = {&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 
