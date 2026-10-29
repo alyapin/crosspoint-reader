@@ -37,6 +37,7 @@ sync = lists.split("void UiListActivity::syncListViewport(", 1)[1]
 sync = "void TextSettingsActivity::syncListViewport(" + sync.split(
     "\nvoid UiListActivity::drawChrome", 1
 )[0]
+sync += method(lists, "bool UiListActivity::reservePageLine(").replace("UiListActivity::", "TextSettingsActivity::")
 tab_bar = tabs.split("void UiTabListActivity::buildTabBar(UiScreen& screen) {", 1)[1]
 chrome = activity.split("void TextSettingsActivity::drawChrome() {", 1)[1]
 chrome = chrome.split("\nvoid TextSettingsActivity::drawFooter()", 1)[0]
@@ -138,6 +139,11 @@ struct TextSettingsActivity : UiTabListActivity {
   fui::ListNav nav;
   fui::ListNav& activeNav() { return nav; }
   int listCount() const { return rowItems_.size(); }
+  fui::Rect pageLine_{};
+  bool pageLineWanted_ = false;
+  bool showsPageLine() const { return true; }
+  int pageLineHeight() const { return 28; }
+  bool reservePageLine(UiScreen&, fui::ListProps&, bool, int, int);
   void syncListViewport(UiScreen&, fui::ListProps&, int);
   void syncTabListViewport(UiScreen& screen, fui::ListProps& props) {
     syncListViewport(screen, props, 1);
@@ -287,7 +293,8 @@ void checkLayout(const BoardConfig::BoardProfile& profile, GfxRenderer::Orientat
       assert(rect.x >= safe.x && rect.right() <= safe.x + safe.width);
       assert(rect.y >= content.y && rect.bottom() <= content.bottom());
     }
-    assert(std::any_of(target.fills.begin(), target.fills.end(), [safe, content, theme](fui::Rect rect) {
+    // Button boards page instead: no track.
+    assert(touch == std::any_of(target.fills.begin(), target.fills.end(), [safe, content, theme](fui::Rect rect) {
       return rect.width == theme.listScrollWidth && rect.x >= safe.x && rect.right() <= safe.x + safe.width &&
              rect.y == content.y && rect.bottom() == content.bottom();
     }));
@@ -353,20 +360,27 @@ void checkStyleRowsFit(const BoardConfig::BoardProfile& profile, GfxRenderer::Or
     }
   }
 }
-void checkSharedPartialRows() {
+void checkSharedPartialRows(const bool touch) {
   Target target;
   fui::DeviceContext device;
   device.width = 800;
   device.height = 480;
+  device.hasTouch = touch;
   fui::InputSnapshot input;
   fui::InteractionBuffer<32> interactions;
   fui::Frame<32> frame(target, device, input, interactions);
   auto theme = fui::themeTokensForLineHeight(29);
   theme.listMinRowHeight = 40;
+  // Touch rows as tall as button rows, so both boards fit three.
+  theme.listTouchMinRowHeight = theme.listMinRowHeight;
+  theme.listTouchRowPaddingY = theme.listRowPaddingY;
+  theme.listTouchRowGap = 0;
+  theme.minTouchSize = device.minTouchSize = 0;
   TextSettingsActivity activity;
   activity.rowItems_.assign(10, fui::ListItem{});
   for (auto& row : activity.rowItems_) { row.label = "Paragraph Indentation"; row.value = "2"; }
-  // Text Settings uses the shared next-row preview policy, including pixel clipping.
+  // Text Settings uses the shared next-row preview policy, including pixel clipping;
+  // button boards draw whole rows only.
   for (int remainder : {4, 14, 18, 20, 24, 36}) {
     for (int selected : {1, 4}) {
       interactions.clear();
@@ -377,14 +391,14 @@ void checkSharedPartialRows() {
       screen.setContentMarginFromScreen(fui::Insets{100, 0, static_cast<int16_t>(260 - remainder), 0});
       const auto content = screen.contentRect();
       activity.buildRows(screen);
-      const bool preview = remainder >= 18;
+      const bool preview = touch && remainder >= 18;
       assert(target.clippedText == preview);
-      assert(activity.nav.drawnRows == 3);
-      assert(target.textRects.size() == (preview ? 8 : 6));
+      assert(activity.nav.drawnRows == (touch || remainder >= 28 ? 3 : 2));
+      assert(target.textRects.size() == (preview ? 8 : 2 * static_cast<size_t>(activity.nav.drawnRows)));
       for (const auto& rect : target.textRects) {
         assert(rect.y >= content.y && rect.bottom() <= content.bottom());
       }
-      assert(activity.nav.top <= selected - 1 && selected - 1 < activity.nav.top + 3);
+      assert(activity.nav.top <= selected - 1 && selected - 1 < activity.nav.top + activity.nav.drawnRows);
     }
   }
 }
@@ -405,7 +419,8 @@ int main() {
       for (const auto& metrics : {LyraMetrics::values, RoundedRaffMetrics::values})
         for (Tab tab : {Tab::Family, Tab::Size, Tab::Layout, Tab::Style})
           checkLayout(profile, orientation, metrics, tab);
-  checkSharedPartialRows();
+  checkSharedPartialRows(true);
+  checkSharedPartialRows(false);
 }
 """
 with tempfile.TemporaryDirectory() as directory:

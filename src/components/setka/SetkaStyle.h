@@ -44,6 +44,8 @@ constexpr int kSidePadding = 20;
 // text starts past it, so a label does not shift when the selection moves.
 constexpr int kSelectionBarX = kSidePadding - kSelectionBarWidth;
 constexpr int kRowTextX = kSidePadding + 12;
+// Captions above the button hints: the last line's baseline sits this far above the hint frames.
+constexpr int kHintCaptionGap = 14;
 constexpr int kProgressHeight = 12;
 constexpr int kMinTouch = 44;
 // Row pitch, no gap between rows: a navigation row (icon + label) and a

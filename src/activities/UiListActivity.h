@@ -82,9 +82,14 @@ class UiListActivity : public Activity, protected UiAppHost {
   // right before screen.list(props).
   // SDK resolves fonts, content padding and touch minimum before measuring.
   // selectionOffset reserves leading ring entries such as the tab bar.
+  // Button boards page by whole rows: no preview of the next row, no scroll
+  // track, and the selection opens the page it is on.
   void syncListViewport(UiScreen& screen, freeink::ui::ListProps& props, int selectionOffset = 0);
   // Move the selection to index and pull the viewport to it.
   void moveSelectionTo(int index);
+  // The page line («2 из 3», right-aligned above the hints) on button boards;
+  // screens with their own position readout turn it off.
+  virtual bool showsPageLine() const { return true; }
 
   // --- shared state ----------------------------------------------------------
   // Selection + viewport (selected/top/visibleRows/followOnBuild). Access via
@@ -98,6 +103,14 @@ class UiListActivity : public Activity, protected UiAppHost {
   // Named apart from UiAppHost::routeTouch so the host overload stays visible
   // (not name-hidden) to subclasses with extra touch surfaces.
   bool routeListTouch();
+  // Sets the paging props; reserves the page line when the rows overflow the
+  // band. Returns whether the list pages (a button board).
+  bool reservePageLine(UiScreen& screen, freeink::ui::ListProps& props, bool trusted, int prevTop, int drawn);
+  int pageLineHeight() const;
+  void drawPageLine();
+  // Render task only.
+  freeink::ui::Rect pageLine_{};
+  bool pageLineWanted_ = false;
 #if FREEINK_CAP_TOUCH
   static void swipeDeleteTrampoline(const freeink::ui::ActionEvent& event, void* user);
   bool handleSwipeDeleteInput();

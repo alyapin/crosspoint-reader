@@ -24,8 +24,10 @@ struct UiScreen {
 struct UiListActivity {
   fui::ListNav nav;
   int count = 16;
+  bool paged = false;
   fui::ListNav& activeNav() { return nav; }
   int listCount() const { return count; }
+  bool reservePageLine(UiScreen&, fui::ListProps&, bool, int, int) { return paged; }
   void syncListViewport(UiScreen&, fui::ListProps&, int = 0);
 };
 """ + method + r"""
@@ -57,12 +59,28 @@ int main() {
     activity.syncListViewport(screen, props, offset);
     assert(nav.top == 2 && props.topIndex == 2);
   }
+
+  // Button boards page by whole rows: a selection off the page opens its page.
+  UiListActivity activity;
+  activity.paged = true;
+  UiScreen screen;
+  fui::ListProps props;
+  auto& nav = activity.nav;
+  nav.reset(0);
+  activity.syncListViewport(screen, props);
+  nav.onListRendered(0, 4, true);
+  for (const auto& [selection, top] : {std::pair{4, 4}, {3, 0}, {15, 12}, {11, 8}, {9, 8}}) {
+    nav.requestSelection(selection);
+    activity.syncListViewport(screen, props);
+    assert(nav.top == top && props.topIndex == top);
+    nav.onListRendered(static_cast<uint16_t>(top), 4, true);
+  }
 }
 """
 with tempfile.TemporaryDirectory() as directory:
     cpp = Path(directory) / "viewport.cpp"
     executable = Path(directory) / "viewport"
-    cpp.write_text("#include <initializer_list>\n" + harness)
+    cpp.write_text("#include <algorithm>\n#include <initializer_list>\n#include <utility>\n" + harness)
     subprocess.run([
         "c++", "-std=c++17", "-I",
         str(ROOT / "freeink-sdk/libs/ui/FreeInkUI/include"),

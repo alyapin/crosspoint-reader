@@ -8,6 +8,7 @@
 
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
+#include "components/setka/SetkaStyle.h"
 #if FREEINK_CAP_TOUCH
 #include "components/UiAppHelpers.h"
 #endif
@@ -33,7 +34,9 @@ void UiListActivity::onEnter() {
 }
 
 void UiListActivity::screenTrampoline(UiScreen& screen, void* user) {
-  static_cast<UiListActivity*>(user)->buildScreen(screen);
+  auto* self = static_cast<UiListActivity*>(user);
+  self->buildScreen(screen);
+  self->drawPageLine();
 }
 
 void UiListActivity::rowActionTrampoline(const fui::ActionEvent& event, void* user) {
@@ -213,11 +216,11 @@ void UiListActivity::syncListViewport(UiScreen& screen, fui::ListProps& props, c
   props.toggleCheckbox = true;
   props.toggleWidth = 28;
   props.toggleHeight = 28;
-  props.partialTrailingRow = true;
   auto& n = activeNav();
   const int prevTop = n.top;
   const bool trusted = n.trusts(listCount());
   const int drawn = n.drawnRows;
+  const bool paged = reservePageLine(screen, props, trusted, prevTop, drawn);
 
   screen.syncListViewport(n, props, listCount(), selectionOffset);
 
@@ -225,13 +228,18 @@ void UiListActivity::syncListViewport(UiScreen& screen, fui::ListProps& props, c
   // the measured drawnRows rather than the unweighted visibleRows estimate),
   // keep selection-follow anchored instead of jumping to top. Explicit swipe
   // scrolling clears followPending and must retain its new viewport.
-  if (n.followPending && trusted && drawn > 0) {
-    const int sel = props.selectedIndex;
-    if (sel >= prevTop && sel < prevTop + drawn) {
-      n.top = prevTop;
-      props.topIndex = static_cast<uint16_t>(prevTop);
-    }
+  const int sel = props.selectedIndex;
+  if (!n.followPending || sel < 0) return;
+  if (trusted && drawn > 0 && sel >= prevTop && sel < prevTop + drawn) {
+    n.top = prevTop;
+  } else if (paged) {
+    // A page holds the rows the last full page drew, the estimate before that.
+    int page = n.visibleRows;
+    if (trusted && drawn > 0 && prevTop + drawn < listCount()) page = std::min(page, drawn);
+    page = std::max(1, page);
+    n.top = sel / page * page;
   }
+  props.topIndex = static_cast<uint16_t>(n.top);
 }
 
 void UiListActivity::drawChrome() {
@@ -239,6 +247,46 @@ void UiListActivity::drawChrome() {
   if (!title) return;
   const auto& metrics = UITheme::getInstance().getMetrics();
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.headerHeight}, title);
+}
+
+bool UiListActivity::reservePageLine(UiScreen& screen, fui::ListProps& props, const bool trusted, const int prevTop,
+                                     const int drawn) {
+  pageLine_ = {};
+  pageLineWanted_ = false;
+  const bool paged = !screen.device().hasTouch;
+  props.partialTrailingRow = !paged;
+  if (!paged) return false;
+  props.scrollIndicator = false;
+  if (!showsPageLine()) return true;
+  pageLineWanted_ = true;
+  const int count = listCount();
+  const fui::ListProps resolved = screen.resolveListProps(props);
+  const int fit = fui::listVisibleRows(screen.contentRect(), resolved.rowHeight, resolved.rowGap);
+  if (count > fit || (trusted && (prevTop > 0 || prevTop + drawn < count))) {
+    pageLine_ = screen.takeBottom(static_cast<int16_t>(pageLineHeight()));
+  }
+  return true;
+}
+
+int UiListActivity::pageLineHeight() const { return setka::kHintCaptionGap + renderer.getFontAscenderSize(SMALL_FONT_ID); }
+
+void UiListActivity::drawPageLine() {
+  auto& n = activeNav();
+  const int count = listCount();
+  if (!pageLineWanted_ || count <= 0 || n.drawnRows <= 0 || (n.top == 0 && n.drawnRows >= count)) return;
+  // Wrapped rows overflowed a band the estimate said they fit: build again with the line.
+  if (pageLine_.height == 0) {
+    n.rebuildNeeded = true;
+    return;
+  }
+  const bool last = n.top + n.drawnRows >= count;
+  const int page = std::max(1, last ? std::max(n.drawnRows, n.visibleRows) : n.drawnRows);
+  const int pages = (count + page - 1) / page;
+  const int current = last ? pages : std::min(pages, n.top / page + 1);
+  char text[24];
+  snprintf(text, sizeof(text), tr(STR_LIST_PAGE), current, pages);
+  const int x = pageLine_.right() - setka::kSidePadding - renderer.getTextWidth(SMALL_FONT_ID, text);
+  renderer.drawText(SMALL_FONT_ID, x, pageLine_.y, text);
 }
 
 void UiListActivity::drawFooter() {
