@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdio>
+#include <cstring>
 #include <map>
 #include <memory>
 #include <string>
@@ -394,23 +395,71 @@ TEST(CardStore, LowerCaseFolderAndUtf16) {
   EXPECT_EQ(store.open("u.csv", DAY), Status::Unsupported);
 }
 
-TEST(CardStore, DeletingTheFirstOfTwoFrontsKeepsTheOthersProgress) {
-  fake::reset();
-  addDeck("bank\tбанк\nbank\tберег\n", 1);
-  {
-    DeckStore store;
-    ASSERT_EQ(store.open("es.txt", DAY), Status::Ok);
-    ASSERT_EQ(store.startSession(0), Status::Ok);
-    ASSERT_TRUE(store.grade(Grade::Easy));  // банк: 3 days
-    ASSERT_TRUE(store.grade(Grade::Good));  // берег: 1 day
+namespace {
+// Studies "bank\tбанк\nbank\tберег\n": банк Easy (3 days), берег Good (1 day).
+void studyBanks(const char* deck) {
+  addDeck(deck, 1);
+  DeckStore store;
+  ASSERT_EQ(store.open("es.txt", DAY), Status::Ok);
+  ASSERT_EQ(store.startSession(0), Status::Ok);
+  while (!store.finished()) {
+    auto fields = std::make_unique<Fields>();
+    ASSERT_EQ(store.loadCard(*fields), Status::Ok);
+    ASSERT_TRUE(store.grade(strcmp(fields->text[1], "банк") == 0 ? Grade::Easy : Grade::Good));
   }
-  addDeck("bank\tберег\nbank\tновое\n", 2);
+}
+
+std::string answer(DeckStore& store) {
+  auto fields = std::make_unique<Fields>();
+  EXPECT_EQ(store.loadCard(*fields), Status::Ok);
+  return fields->text[1];
+}
+}  // namespace
+
+TEST(CardStore, RemovingOneOfTwoFrontsKeepsTheOthersProgress) {
+  fake::reset();
+  studyBanks("bank\tбанк\nbank\tберег\n");
+  addDeck("bank\tберег\n", 2);
   DeckStore store;
   ASSERT_EQ(store.open("es.txt", DAY + 1), Status::Ok);
   const Summary s = summary(store);
-  EXPECT_EQ(s.cards, 2);
-  EXPECT_EQ(s.reviews, 1);  // берег, due on day + 1
-  EXPECT_EQ(s.fresh, 1);    // новое does not take банк's progress
+  EXPECT_EQ(s.cards, 1);
+  EXPECT_EQ(s.reviews, 1);  // берег, due on day + 1, not банк's day + 3
+}
+
+TEST(CardStore, SwappedSameFrontCardsKeepTheirProgress) {
+  fake::reset();
+  studyBanks("bank\tбанк\nbank\tберег\n");
+  addDeck("bank\tберег\nbank\tбанк\n", 2);
+  DeckStore store;
+  ASSERT_EQ(store.open("es.txt", DAY + 1), Status::Ok);
+  EXPECT_EQ(summary(store).reviews, 1);
+  store.close();
+  ASSERT_EQ(store.open("es.txt", DAY + 3), Status::Ok);
+  ASSERT_EQ(store.startSession(0), Status::Ok);
+  ASSERT_EQ(store.length(), 2);
+  EXPECT_EQ(answer(store), "берег");  // due first, on day + 1
+  EXPECT_EQ(store.currentState().box, 1);
+  ASSERT_TRUE(store.grade(Grade::Good));
+  EXPECT_EQ(answer(store), "банк");
+  EXPECT_EQ(store.currentState().box, 2);
+}
+
+TEST(CardStore, NewSameFrontCardAboveInheritsNothing) {
+  fake::reset();
+  studyBanks("bank\tбанк\n");
+  addDeck("bank\tновое\nbank\tбанк\n", 2);
+  DeckStore store;
+  ASSERT_EQ(store.open("es.txt", DAY + 3), Status::Ok);
+  const Summary s = summary(store);
+  EXPECT_EQ(s.fresh, 1);
+  EXPECT_EQ(s.reviews, 1);
+  ASSERT_EQ(store.startSession(0), Status::Ok);
+  EXPECT_EQ(answer(store), "банк");
+  EXPECT_EQ(store.currentState().box, 2);
+  ASSERT_TRUE(store.grade(Grade::Good));
+  EXPECT_EQ(answer(store), "новое");
+  EXPECT_EQ(store.currentState().box, 0);
 }
 
 TEST(CardStore, ReadErrorIsNotAnEdit) {

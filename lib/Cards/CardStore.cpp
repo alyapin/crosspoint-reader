@@ -66,14 +66,23 @@ uint32_t get32(const uint8_t* p) {
   return v;
 }
 
+// Decks are at most 4 MiB: the offset's top 10 bits hold a mark of the card's
+// answer (0: none), which tells cards with one front apart on re-index.
+constexpr uint32_t OFFSET_BITS = 22;
+constexpr uint32_t OFFSET_MASK = (1u << OFFSET_BITS) - 1;
+static_assert(MAX_DECK_BYTES <= OFFSET_MASK + 1);
+
+uint16_t answerMark(const uint32_t altKey) { return static_cast<uint16_t>(altKey % 1023 + 1); }
+
 struct Record {
   uint32_t offset = 0;
   uint32_t key = 0;
   CardState state;
+  uint16_t mark = 0;
 };
 
 void encodeRecord(uint8_t* p, const Record& r) {
-  put32(p, r.offset);
+  put32(p, (r.offset & OFFSET_MASK) | (static_cast<uint32_t>(r.mark) << OFFSET_BITS));
   put32(p + 4, r.key);
   put16(p + 8, r.state.due);
   p[10] = r.state.box;
@@ -82,7 +91,8 @@ void encodeRecord(uint8_t* p, const Record& r) {
 
 Record decodeRecord(const uint8_t* p) {
   Record r;
-  r.offset = get32(p);
+  r.offset = get32(p) & OFFSET_MASK;
+  r.mark = static_cast<uint16_t>(get32(p) >> OFFSET_BITS);
   r.key = get32(p + 4);
   r.state.due = get16(p + 8);
   r.state.box = p[10];
@@ -116,6 +126,7 @@ bool decodeLog(const uint8_t* p, LogEntry& e) {
 struct OldState {
   uint32_t key;
   CardState state;
+  uint16_t mark;
 };
 
 bool readAll(HalFile& f, void* data, const size_t size) {
@@ -412,7 +423,7 @@ Status DeckStore::rebuild(const bool keepOld, const uint32_t size, const uint32_
     uint8_t rec[RECORD];
     for (; oldCount < head->count && readAll(f, rec, sizeof(rec)); oldCount++) {
       const Record r = decodeRecord(rec);
-      old[oldCount] = {r.key, r.state};
+      old[oldCount] = {r.key, r.state, r.mark};
     }
     f.close();
     std::sort(old.get(), old.get() + oldCount, [](const OldState& a, const OldState& b) { return a.key < b.key; });
@@ -434,26 +445,28 @@ Status DeckStore::rebuild(const bool keepOld, const uint32_t size, const uint32_
   // told apart by its answer, a repeated card is dropped.
   auto keys = makeUniqueNoThrow<uint32_t[]>(2 * MAX_CARDS);
   auto fields = makeUniqueNoThrow<Fields>();
-  FileSource source(deck);
-  auto reader = makeUniqueNoThrow<RecordReader>(source, head->format, head->format.dataStart);
-  if (!keys || !fields || !reader) return Status::NoMemory;
-  if (!deck.seekSet(head->format.dataStart)) return Status::Failed;
+  // Old records matched exactly (pass one), and those already handed out (pass two).
+  const size_t bitmapBytes = (oldCount + 7u) / 8u;
+  auto claimed = makeUniqueNoThrow<uint8_t[]>(bitmapBytes + 1);
+  auto given = makeUniqueNoThrow<uint8_t[]>(bitmapBytes + 1);
+  if (!keys || !fields || !claimed || !given) return Status::NoMemory;
+  const auto test = [](const uint8_t* bits, const int i) { return (bits[i >> 3] >> (i & 7)) & 1; };
+  const auto mark = [](uint8_t* bits, const int i) { bits[i >> 3] |= static_cast<uint8_t>(1u << (i & 7)); };
+  const auto find = [&](const uint32_t k) -> int {
+    const OldState* at = std::lower_bound(old.get(), old.get() + oldCount, k,
+                                          [](const OldState& o, const uint32_t v) { return o.key < v; });
+    return at != old.get() + oldCount && at->key == k ? static_cast<int>(at - old.get()) : -1;
+  };
+  // The old record that is this very card: same guid, same front and answer, or
+  // the same front with the same answer mark.
+  const auto exact = [&](const uint32_t frontKey, const uint32_t alt, const uint32_t guidHash) {
+    if (guidHash != 0) return find(guidHash);
+    const int byAnswer = find(alt);
+    if (byAnswer >= 0) return byAnswer;
+    const int byFront = find(frontKey);
+    return byFront >= 0 && old[byFront].mark == answerMark(alt) ? byFront : -1;
+  };
 
-  head->count = 0;
-  head->skipped = 0;
-  head->dropped = 0;
-  head->rows = 0;
-  head->deckSize = size;
-  head->deckTime = time;
-  const TmpPath tmp(datPath);
-  HalFile out;
-  if (!Storage.openFileForWrite("CARD", tmp.c_str(), out)) return Status::Failed;
-  uint8_t headBuf[FIXED + DECK_NAME_MAX + 4];
-  const size_t headSize = head->encode(headBuf);
-  bool ok = writeAll(out, headBuf, headSize);
-
-  uint8_t buf[IO_RECORDS * RECORD];
-  size_t buffered = 0;
   uint16_t keyCount = 0;
   const auto has = [&](const uint32_t k) { return std::binary_search(keys.get(), keys.get() + keyCount, k); };
   const auto add = [&](const uint32_t k) {
@@ -464,52 +477,88 @@ Status DeckStore::rebuild(const bool keepOld, const uint32_t size, const uint32_
     *at = k;
     keyCount++;
   };
-  uint32_t crc = 0;
-  uint32_t offset = 0;
-  uint32_t guidHash = 0;
-  while (ok && reader->next(*fields, offset, guidHash)) {
-    serviceWork(units);
-    if (!hasFront(*fields)) {
-      if (head->skipped < UINT16_MAX) head->skipped++;
-      continue;
-    }
-    const uint32_t frontKey = cardKey(*fields, guidHash);
-    uint32_t key = frontKey;
-    if (head->count < MAX_CARDS) {
-      const uint32_t alt = cardAltKey(*fields);
-      if (has(alt) || (has(key) && guidHash != 0)) {
-        if (head->dropped < UINT16_MAX) head->dropped++;
+  FileSource source(deck);
+  std::unique_ptr<RecordReader> reader;
+  // One pass over the deck; keep(frontKey, key, alt, offset, guidHash) sees each
+  // card that is kept, and returns false to stop.
+  const auto scan = [&](const auto& keep) {
+    keyCount = 0;
+    head->count = head->skipped = head->dropped = head->rows = 0;
+    reader = makeUniqueNoThrow<RecordReader>(source, head->format, head->format.dataStart);
+    if (!reader || !deck.seekSet(head->format.dataStart)) return false;
+    uint32_t offset = 0;
+    uint32_t guidHash = 0;
+    while (reader->next(*fields, offset, guidHash)) {
+      serviceWork(units);
+      if (!hasFront(*fields)) {
+        if (head->skipped < UINT16_MAX) head->skipped++;
         continue;
       }
-      if (has(key)) key = alt;
-      add(key);
-      add(alt);
-      Record r;
-      r.offset = offset;
-      r.key = key;
-      // A card once told apart by its answer keeps that progress, even when the
-      // other card with its front is gone.
-      const auto find = [&](const uint32_t k) -> const OldState* {
-        const OldState* at = std::lower_bound(old.get(), old.get() + oldCount, k,
-                                              [](const OldState& s, const uint32_t v) { return s.key < v; });
-        return at != old.get() + oldCount && at->key == k ? at : nullptr;
-      };
-      const OldState* found = guidHash != 0 ? nullptr : find(alt);
-      if (found == nullptr && key == frontKey) found = find(frontKey);
-      if (found != nullptr) r.state = found->state;
-      encodeRecord(buf + buffered, r);
-      buffered += RECORD;
-      head->count++;
-      if (buffered == sizeof(buf)) {
-        crc = crc32(crc, buf, buffered);
-        ok = writeAll(out, buf, buffered);
-        buffered = 0;
+      if (head->count < MAX_CARDS) {
+        const uint32_t frontKey = cardKey(*fields, guidHash);
+        const uint32_t alt = cardAltKey(*fields);
+        if (has(alt) || (has(frontKey) && guidHash != 0)) {
+          if (head->dropped < UINT16_MAX) head->dropped++;
+          continue;
+        }
+        const uint32_t key = has(frontKey) ? alt : frontKey;
+        add(key);
+        add(alt);
+        if (!keep(frontKey, key, alt, offset, guidHash)) return false;
+        head->count++;
       }
+      if (head->rows < UINT16_MAX) head->rows++;
     }
-    if (head->rows < UINT16_MAX) head->rows++;
+    return !reader->failed();
+  };
+
+  // Exact matches first, so a card that only shares a front with an old one
+  // takes its progress only when no card claims it as its own.
+  if (oldCount > 0 && !scan([&](const uint32_t frontKey, uint32_t, const uint32_t alt, uint32_t, const uint32_t guid) {
+        const int j = exact(frontKey, alt, guid);
+        if (j >= 0) mark(claimed.get(), j);
+        return true;
+      })) {
+    return reader ? Status::Failed : Status::NoMemory;
   }
+
+  head->deckSize = size;
+  head->deckTime = time;
+  const TmpPath tmp(datPath);
+  HalFile out;
+  if (!Storage.openFileForWrite("CARD", tmp.c_str(), out)) return Status::Failed;
+  uint8_t headBuf[FIXED + DECK_NAME_MAX + 4];
+  const size_t headSize = head->encode(headBuf);
+  bool ok = writeAll(out, headBuf, headSize);
+  uint8_t buf[IO_RECORDS * RECORD];
+  size_t buffered = 0;
+  uint32_t crc = 0;
+  const bool scanned = scan(
+      [&](const uint32_t frontKey, const uint32_t key, const uint32_t alt, const uint32_t offset, const uint32_t guid) {
+        Record r;
+        r.offset = offset;
+        r.key = key;
+        r.mark = answerMark(alt);
+        int j = exact(frontKey, alt, guid);
+        if (j < 0 && guid == 0) {
+          j = find(frontKey);
+          if (j >= 0 && test(claimed.get(), j)) j = -1;
+        }
+        if (j >= 0 && !test(given.get(), j)) {
+          r.state = old[j].state;
+          mark(given.get(), j);
+        }
+        encodeRecord(buf + buffered, r);
+        buffered += RECORD;
+        if (buffered == sizeof(buf)) {
+          crc = crc32(crc, buf, buffered);
+          ok = writeAll(out, buf, buffered);
+          buffered = 0;
+        }
+        return ok;
+      });
+  if (!scanned) ok = false;
   deck.close();
-  if (reader->failed()) ok = false;
   crc = crc32(crc, buf, buffered);
   ok = ok && writeAll(out, buf, buffered);
   uint8_t crcBytes[4];
