@@ -213,7 +213,9 @@ void UiListActivity::syncListViewport(UiScreen& screen, fui::ListProps& props, c
   props.toggleCheckbox = true;
   props.toggleWidth = 28;
   props.toggleHeight = 28;
-  props.partialTrailingRow = true;
+  // Touch boards preview the next row as a swipe hint; button boards draw
+  // whole rows only, and the follow keeps the selected row among them.
+  props.partialTrailingRow = screen.device().hasTouch;
   auto& n = activeNav();
   const int prevTop = n.top;
   const bool trusted = n.trusts(listCount());

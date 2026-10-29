@@ -928,7 +928,8 @@ void WifiSelectionActivity::buildListScreen(UiScreen& screen) {
   props.labelText.maxLines = 2;
   props.balanceWrappedLabelWithValue = false;
   listNav.selected = static_cast<int>(selectedNetworkIndex);
-  props.partialTrailingRow = true;
+  // Button boards draw whole rows only.
+  props.partialTrailingRow = mappedInput.hasTouch();
   screen.syncListViewport(listNav, props, static_cast<int>(networks.size()));
   screen.list(props);
 }

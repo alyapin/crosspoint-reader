@@ -353,20 +353,27 @@ void checkStyleRowsFit(const BoardConfig::BoardProfile& profile, GfxRenderer::Or
     }
   }
 }
-void checkSharedPartialRows() {
+void checkSharedPartialRows(const bool touch) {
   Target target;
   fui::DeviceContext device;
   device.width = 800;
   device.height = 480;
+  device.hasTouch = touch;
   fui::InputSnapshot input;
   fui::InteractionBuffer<32> interactions;
   fui::Frame<32> frame(target, device, input, interactions);
   auto theme = fui::themeTokensForLineHeight(29);
   theme.listMinRowHeight = 40;
+  // Touch rows as tall as button rows, so both boards fit three.
+  theme.listTouchMinRowHeight = theme.listMinRowHeight;
+  theme.listTouchRowPaddingY = theme.listRowPaddingY;
+  theme.listTouchRowGap = 0;
+  theme.minTouchSize = device.minTouchSize = 0;
   TextSettingsActivity activity;
   activity.rowItems_.assign(10, fui::ListItem{});
   for (auto& row : activity.rowItems_) { row.label = "Paragraph Indentation"; row.value = "2"; }
-  // Text Settings uses the shared next-row preview policy, including pixel clipping.
+  // Text Settings uses the shared next-row preview policy, including pixel
+  // clipping, on touch boards; button boards draw whole rows only.
   for (int remainder : {4, 14, 18, 20, 24, 36}) {
     for (int selected : {1, 4}) {
       interactions.clear();
@@ -377,7 +384,7 @@ void checkSharedPartialRows() {
       screen.setContentMarginFromScreen(fui::Insets{100, 0, static_cast<int16_t>(260 - remainder), 0});
       const auto content = screen.contentRect();
       activity.buildRows(screen);
-      const bool preview = remainder >= 18;
+      const bool preview = touch && remainder >= 18;
       assert(target.clippedText == preview);
       assert(activity.nav.drawnRows == 3);
       assert(target.textRects.size() == (preview ? 8 : 6));
@@ -405,7 +412,8 @@ int main() {
       for (const auto& metrics : {LyraMetrics::values, RoundedRaffMetrics::values})
         for (Tab tab : {Tab::Family, Tab::Size, Tab::Layout, Tab::Style})
           checkLayout(profile, orientation, metrics, tab);
-  checkSharedPartialRows();
+  checkSharedPartialRows(true);
+  checkSharedPartialRows(false);
 }
 """
 with tempfile.TemporaryDirectory() as directory:
