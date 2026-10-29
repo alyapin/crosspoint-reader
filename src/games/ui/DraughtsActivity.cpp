@@ -118,12 +118,12 @@ void DraughtsActivity::pauseGame() {
 void DraughtsActivity::resumeGame() {
   if (!game.computerToMove() || (engine && (engine->thinking() || engine->ready()))) return;
   if (!engine) engine = makeUniqueNoThrow<draughts::Engine>();
+  if (!engine && !noEngine) {
+    LOG_ERR("DRAUGHTS", "OOM: %u bytes for the engine", static_cast<unsigned>(sizeof(draughts::Engine)));
+  }
   noEngine = !engine;
   engineTriedMs = GameScreen::nowMs();
-  if (noEngine) {
-    LOG_ERR("DRAUGHTS", "OOM: %u bytes for the engine", static_cast<unsigned>(sizeof(draughts::Engine)));
-    return;
-  }
+  if (noEngine) return;
   engine->start(game.position(), game.mode(), esp_random(), &GameScreen::nowMs);
 }
 
