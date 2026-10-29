@@ -3248,9 +3248,10 @@ std::string EpubReaderActivity::moreRowValue(int row) const {
     case MA::ROTATE_SCREEN:
       return I18N.get(kOrient[SETTINGS.orientation % CrossPointSettings::ORIENTATION_COUNT]);
     case MA::AUTO_PAGE_TURN:
-      return (autoTurnOption == 0 || autoTurnOption >= static_cast<int>(std::size(PAGE_TURN_RATES)))
-                 ? std::string(tr(STR_STATE_OFF))
-                 : std::to_string(PAGE_TURN_RATES[autoTurnOption]);
+      return EpubReaderMenuActivity::pageTurnLabel(
+          (autoTurnOption == 0 || autoTurnOption >= static_cast<int>(std::size(PAGE_TURN_RATES)))
+              ? 0
+              : PAGE_TURN_RATES[autoTurnOption]);
     default:
       return "";
   }
@@ -3280,8 +3281,10 @@ void EpubReaderActivity::activateMoreRow(int row) {
     case MA::AUTO_PAGE_TURN: {
       std::vector<std::string> labels;
       labels.reserve(std::size(PAGE_TURN_RATES));
-      labels.emplace_back(tr(STR_STATE_OFF));
-      for (size_t i = 1; i < std::size(PAGE_TURN_RATES); ++i) labels.push_back(std::to_string(PAGE_TURN_RATES[i]));
+      labels.push_back(EpubReaderMenuActivity::pageTurnLabel(0));
+      for (size_t i = 1; i < std::size(PAGE_TURN_RATES); ++i) {
+        labels.push_back(EpubReaderMenuActivity::pageTurnLabel(PAGE_TURN_RATES[i]));
+      }
       openPanelPicker(StrId::STR_AUTO_TURN_PAGES_PER_MIN, std::move(labels), autoTurnOption, [this](const int idx) {
         autoTurnOption = idx;
         toggleAutoPageTurn(static_cast<uint8_t>(idx));

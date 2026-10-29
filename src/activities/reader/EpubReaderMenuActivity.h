@@ -38,6 +38,8 @@ class EpubReaderMenuActivity final : public UiListActivity {
   };
 
   static void toggleBluetooth();
+  // Automatic page turn rate as a menu value: "6 страниц в минуту", 0 = off.
+  static std::string pageTurnLabel(int pagesPerMinute);
   static void buildMenuItems(std::vector<MenuItem>& items, bool hasFootnotes, bool hasBookmarks, bool hasClippings);
 
   explicit EpubReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const std::string& title,
@@ -79,7 +81,8 @@ class EpubReaderMenuActivity final : public UiListActivity {
   uint8_t selectedPageTurnOption = 0;
   const std::vector<StrId> orientationLabels = {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_INVERTED,
                                                 StrId::STR_LANDSCAPE_CCW};
-  const std::vector<const char*> pageTurnLabels = {I18N.get(StrId::STR_STATE_OFF), "1", "3", "6", "12"};
+  const std::vector<std::string> pageTurnLabels = {pageTurnLabel(0), pageTurnLabel(1), pageTurnLabel(3),
+                                                   pageTurnLabel(6), pageTurnLabel(12)};
   int currentPage = 0;
   int totalPages = 0;
   int bookProgressPercent = 0;

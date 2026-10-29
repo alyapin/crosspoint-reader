@@ -132,11 +132,14 @@ void intervalText(const uint16_t days, char* out, const size_t cap) {
   } else if (days == 1) {
     snprintf(out, cap, "%s", tr(STR_CARDS_TOMORROW));
   } else if (days < 7) {
-    snprintf(out, cap, tr(STR_CARDS_IN_DAYS), days);
+    snprintf(out, cap, tr(STR_CARDS_IN), days,
+             plural(days, StrId::STR_CARDS_DAY_ONE, StrId::STR_CARDS_DAY_FEW, StrId::STR_CARDS_DAY_MANY));
   } else if (days < 30) {
-    snprintf(out, cap, tr(STR_CARDS_IN_WEEKS), days / 7);
+    snprintf(out, cap, tr(STR_CARDS_IN), days / 7,
+             plural(days / 7, StrId::STR_CARDS_WEEK_ONE, StrId::STR_CARDS_WEEK_FEW, StrId::STR_CARDS_WEEK_MANY));
   } else {
-    snprintf(out, cap, tr(STR_CARDS_IN_MONTHS), days / 30);
+    snprintf(out, cap, tr(STR_CARDS_IN), days / 30,
+             plural(days / 30, StrId::STR_CARDS_MONTH_ONE, StrId::STR_CARDS_MONTH_FEW, StrId::STR_CARDS_MONTH_MANY));
   }
 }
 
