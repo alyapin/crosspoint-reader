@@ -18,7 +18,7 @@ set(GAMES_SOURCES
 
 add_executable(GamesCoreTest SudokuTest.cpp MinesweeperTest.cpp KlondikeTest.cpp FifteenTest.cpp
                FiveLettersTest.cpp Game2048Test.cpp HangmanTest.cpp ReversiTest.cpp NonogramTest.cpp
-               ElapsedTextTest.cpp GameSaveTest.cpp DraughtsTest.cpp
+               ElapsedTextTest.cpp GameSaveTest.cpp DraughtsTest.cpp KeyQueueTest.cpp
                ${REPO_ROOT}/src/games/GameSave.cpp ${GAMES_SOURCES})
 target_include_directories(GamesCoreTest PRIVATE ${GAMES_DIR} ../library_builder/stubs)
 target_link_libraries(GamesCoreTest PRIVATE crosspoint_test_common GTest::gtest_main)

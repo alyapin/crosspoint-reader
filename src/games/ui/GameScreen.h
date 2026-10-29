@@ -151,7 +151,7 @@ class GameScreen : public Activity, protected UiAppHost {
  private:
   static void screenFn(UiScreen& screen, void* user);
   void confirmFinish();
-  void applyKeys();
+  bool applyKeys();
   void drawMode(UiScreen& screen, const BarItem* items, int count) const;
   void addMenuRow(GamePickerActivity::Row* rows, int& count, int8_t id, const GamePickerActivity::Row& row);
   void addOwnRows(GamePickerActivity::Row* rows, int& count);

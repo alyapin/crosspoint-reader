@@ -1,25 +1,22 @@
 #pragma once
 
-#include <cstdint>
+#include <Arduino.h>
+#include <KeyQueue.h>
 
 #include "MappedInputManager.h"
 #include "util/ButtonNavigator.h"
 
 namespace games::ui {
 
-// Board keys of the button boards: the arrows (a held one repeats) and Confirm. The loop reads them
-// every pass but applies them only when the render lock is free, so keys pressed during a panel
-// refresh queue up and apply in order, and the next render shows where they ended.
+// Reads the board keys of the button boards into a KeyQueue every loop pass: the arrows (a held one
+// repeats), Confirm, a held Confirm (timed from its own press, not from an arrow held before it) and
+// Back. The screen applies them in order once the render lock is free, so keys pressed during a panel
+// refresh are neither lost nor reordered, and the next render shows where they ended.
 class BoardKeys {
  public:
-  struct Key {
-    int8_t dx;
-    int8_t dy;
-    bool confirm;
-  };
-
-  // `sideStep`: Up/Down step like Left/Right (chess on edge-button boards).
-  void read(const MappedInputManager& input, const bool sideStep = false) {
+  // `sideStep`: Up/Down step like Left/Right (chess on edge-button boards). `holdable`: a held Confirm
+  // is its own key; otherwise Confirm acts on release only.
+  void read(const MappedInputManager& input, const bool sideStep, const bool holdable) {
     using Button = MappedInputManager::Button;
     int dx = 0;
     int dy = 0;
@@ -39,37 +36,45 @@ class BoardKeys {
       repeat.onPressAndContinuous({Button::Up}, [&vertical] { vertical = -1; });
       repeat.onPressAndContinuous({Button::Down}, [&vertical] { vertical = 1; });
     }
-    const bool confirm = input.wasReleased(Button::Confirm);
-    if ((dx != 0 || dy != 0 || confirm) && count < kCapacity) {
-      keys[(head + count++) % kCapacity] = {static_cast<int8_t>(dx), static_cast<int8_t>(dy), confirm};
+    if (dx != 0 || dy != 0) queue.push({static_cast<int8_t>(dx), static_cast<int8_t>(dy), BoardKey::Step});
+
+    if (input.wasPressed(Button::Confirm)) {
+      confirmDownMs = millis();
+      confirmHeld = false;
     }
+    if (holdable && !confirmHeld && input.isPressed(Button::Confirm) && millis() - confirmDownMs >= kHoldMs) {
+      confirmHeld = true;
+      queue.push({0, 0, BoardKey::Hold});
+    }
+    if (input.wasReleased(Button::Confirm)) {
+      if (!confirmHeld) queue.push({0, 0, BoardKey::Confirm});
+      confirmHeld = false;
+    }
+    if (input.wasReleased(Button::Back)) queue.push({0, 0, BoardKey::Back});
   }
 
-  bool pending() const { return count > 0; }
-
-  bool pop(Key& key) {
-    if (count == 0) return false;
-    key = keys[head];
-    head = static_cast<uint8_t>((head + 1) % kCapacity);
-    --count;
-    return true;
+  bool pending() const { return queue.pending(); }
+  template <typename Apply>
+  bool drain(Apply&& apply) {
+    return queue.drain(apply);
   }
 
   // Back from another screen: drop what was queued, and a key still held does not repeat until let go.
   void reset() {
-    count = 0;
+    queue.clear();
     holdOff = true;
   }
 
  private:
+  using BoardKey = games::BoardKey;
   static constexpr uint16_t kRepeatStartMs = 400;
   static constexpr uint16_t kRepeatMs = 250;
-  static constexpr uint8_t kCapacity = 16;
+  static constexpr unsigned long kHoldMs = 450;
 
   ButtonNavigator repeat{kRepeatMs, kRepeatStartMs};
-  Key keys[kCapacity] = {};
-  uint8_t head = 0;
-  uint8_t count = 0;
+  KeyQueue queue;
+  unsigned long confirmDownMs = 0;
+  bool confirmHeld = false;  // the held Confirm already queued; its release is not a Confirm
   bool holdOff = false;
 };
 

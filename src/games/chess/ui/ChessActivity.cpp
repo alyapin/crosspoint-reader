@@ -276,14 +276,20 @@ void ChessActivity::loop() {
     tickClocks();
   }
 
+  if (view == View::Game) keys.read(mappedInput, gpio.hasEdgeSideButtons(), false);
   if (const auto touch = routeTouch(mappedInput)) {
     RenderLock lock(*this);
-    handleAction(touch.event, touch.snap.touchX, touch.snap.touchY);
+    // Keys pressed before the tap act first; one that may have opened another view drops the tap.
+    if (!applyGameKeys()) handleAction(touch.event, touch.snap.touchX, touch.snap.touchY);
+  } else if (view == View::Game) {
+    if (keys.pending()) {
+      // A panel refresh holds the lock: the keys wait in the queue, in order, and none is lost.
+      RenderLock lock(RenderLock::Mode::Try);
+      if (lock.ownsLock()) applyGameKeys();
+    }
   } else if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     RenderLock lock(*this);
     goBack();
-  } else if (view == View::Game) {
-    handleGameKeys();
   } else {
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
       RenderLock lock(*this);
@@ -344,22 +350,21 @@ void ChessActivity::runAction(const GameAction action) {
   }
 }
 
+// In order; true after a Confirm or Back, which may change the view (the board's queue is dropped on return).
+bool ChessActivity::applyGameKeys() {
+  return keys.drain([this](const games::BoardKey& key) {
+    if (view != View::Game) return;
+    if (key.action == games::BoardKey::Back) {
+      goBack();
+    } else {
+      gameKey(key.dx, key.dy, key.action == games::BoardKey::Confirm);
+    }
+  });
+}
+
 // Keys only (X4 without touch, or by choice): a cursor walks the 64 squares and
 // then the bar's actions, if shown; Confirm acts like a tap. Left/Right step along the ring,
 // Up/Down change rank (on edge-button boards the side buttons step instead).
-void ChessActivity::handleGameKeys() {
-  keys.read(mappedInput, gpio.hasEdgeSideButtons());
-  if (!keys.pending()) return;
-  // A panel refresh holds the lock: the keys wait in the queue and none is lost.
-  RenderLock lock(RenderLock::Mode::Try);
-  if (!lock.ownsLock()) return;
-  games::ui::BoardKeys::Key key{};
-  while (view == View::Game && keys.pop(key)) {
-    gameKey(key.dx, key.dy, key.confirm);
-    if (key.confirm) return;
-  }
-}
-
 void ChessActivity::gameKey(const int dx, const int dy, const bool confirm) {
   if (promoFrom != kNoSquare) {
     if (confirm) {

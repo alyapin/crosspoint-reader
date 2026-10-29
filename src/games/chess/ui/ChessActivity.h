@@ -101,7 +101,7 @@ class ChessActivity final : public Activity, private UiAppHost {
   int currentOption(Row row) const;
 
   void handleAction(const freeink::ui::ActionEvent& event, int x, int y);
-  void handleGameKeys();
+  bool applyGameKeys();
   void gameKey(int dx, int dy, bool confirm);
   int gameActions(GameAction* out) const;
   GameAction focusedAction() const;

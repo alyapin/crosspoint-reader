@@ -25,7 +25,6 @@ using namespace setka;
 namespace {
 constexpr int kCursorArm = 14;
 constexpr int kKeyCursorOut = 3;
-constexpr unsigned long kConfirmHoldMs = 450;
 constexpr int kModeIcon = 24;
 constexpr int kModeIconGap = 8;
 // Menu rows other than a bar slot (0..BAR_SLOTS-1); a game's own row is kRowOwn + its index.
@@ -176,18 +175,39 @@ void GameScreen::showMenu(const char* title, const GamePickerActivity::Row* rows
   });
 }
 
-// In order; a Confirm ends the pass, as it may open another screen (which drops the rest on return).
-void GameScreen::applyKeys() {
-  games::ui::BoardKeys::Key key{};
-  while (keys.pop(key)) {
-    const int over = key.confirm && !hasBar() ? newGameSlot() : -1;
+// In order; true after a Confirm, a held Confirm or Back, which may open another screen (whose return
+// drops the rest).
+bool GameScreen::applyKeys() {
+  return keys.drain([this](const games::BoardKey& key) {
+    switch (key.action) {
+      case games::BoardKey::Back:
+        if (!onBack()) {
+          if (hasBar()) {
+            leave();
+          } else {
+            openGameMenu();
+          }
+        }
+        return;
+      case games::BoardKey::Hold:
+        if (holdsConfirm()) {
+          onConfirmHold();
+          return;
+        }
+        break;
+      case games::BoardKey::Step:
+        onKey(key.dx, key.dy, false);
+        return;
+      case games::BoardKey::Confirm:
+        break;
+    }
+    const int over = !hasBar() ? newGameSlot() : -1;
     if (over >= 0) {
       runBarSlot(over);
     } else {
-      onKey(key.dx, key.dy, key.confirm);
+      onKey(0, 0, true);
     }
-    if (key.confirm) return;
-  }
+  });
 }
 
 void GameScreen::runBarSlot(const int slot) {
@@ -244,34 +264,22 @@ void GameScreen::requestRepaint(const Repaint kind) {
 
 void GameScreen::loop() {
   if (!hasGame) return;
-  using Button = MappedInputManager::Button;
+  keys.read(mappedInput, false, !hasBar() && holdsConfirm());
   if (const auto touch = routeTouch(mappedInput, wantsLongPress())) {
     RenderLock lock(*this);
+    // Keys pressed before the tap act first; one that may have opened a screen drops the tap.
+    if (applyKeys()) return;
     if (touch.event.action == ACTION_EXIT) {
       leave();
       return;
     }
     onTouch(touch.event, touch.snap.touchX, touch.snap.touchY);
-  } else if (mappedInput.wasReleased(Button::Back)) {
-    RenderLock lock(*this);
-    if (!onBack()) {
-      if (hasBar()) {
-        leave();
-      } else {
-        openGameMenu();
-      }
-      return;
-    }
-  } else if (holdsConfirm() && mappedInput.wasLongPressed(Button::Confirm, kConfirmHoldMs)) {
-    RenderLock lock(*this);
-    onConfirmHold();
-  } else {
-    keys.read(mappedInput);
+    return;
   }
   if (keys.pending()) {
-    // A panel refresh holds the lock: the keys wait in the queue and none is lost.
+    // A panel refresh holds the lock: the keys wait in the queue, in order, and none is lost.
     RenderLock lock(RenderLock::Mode::Try);
-    if (lock.ownsLock()) applyKeys();
+    if (lock.ownsLock() && applyKeys()) return;
   }
 
   // The timer repaints when its minute turns; a change in the same pass merges into one refresh.
