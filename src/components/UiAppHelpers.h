@@ -48,7 +48,8 @@ inline const freeink::ui::ThemeTokens& refreshSharedUiThemeTokens(const freeink:
   auto& cell = sharedUiThemeCell();
   const auto* current = cell.load(std::memory_order_relaxed);
   freeink::ui::ThemeTokens* next = (current == &pool[0]) ? &pool[1] : &pool[0];
-  *next = uiThemeTokens(target);
+  const freeink::ui::DeviceContext device = target.deviceContext();
+  *next = uiThemeTokens(target, device.height > device.width);
   cell.store(next, std::memory_order_release);
   return *next;
 }

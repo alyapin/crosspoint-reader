@@ -8,15 +8,22 @@
 // style) with the uiScale-derived sizes into FreeInkUI theme tokens: the
 // theme says what lists look like, the scale says how big they are.
 // Everything read here is plain data from ThemeMetrics — the same values an
-// SD-card theme file will eventually supply.
-inline freeink::ui::ThemeTokens uiThemeTokens(const freeink::ui::GfxRendererTarget& target) {
+// SD-card theme file will eventually supply. `portrait`: the screen is taller
+// than it is wide.
+inline freeink::ui::ThemeTokens uiThemeTokens(const freeink::ui::GfxRendererTarget& target,
+                                              const bool portrait = false) {
   namespace fui = freeink::ui;
   const ThemeMetrics& metrics = UITheme::getInstance().getMetrics();
 
   fui::ThemeTokens tokens = fui::themeTokensForLineHeight(target.lineHeight(fui::GfxRendererTarget::FONT_BODY));
-  // Button-device lists retain the theme's preferred density. The SDK still
-  // grows individual rows for wrapping, subtitles and icons.
-  if (!BoardConfig::hasTouch()) tokens.listMinRowHeight = static_cast<int16_t>(metrics.listRowHeight);
+  // Button-device lists keep the theme's preferred density in landscape; in
+  // portrait they take the Setka settings pitch (setka::kListRowHeight), as
+  // the menus beside them do. The SDK still grows individual rows for
+  // wrapping, subtitles and icons.
+  constexpr int16_t kPortraitRowHeight = 56;
+  if (!BoardConfig::hasTouch()) {
+    tokens.listMinRowHeight = portrait ? kPortraitRowHeight : static_cast<int16_t>(metrics.listRowHeight);
+  }
   tokens.listRowGap = static_cast<int16_t>(metrics.listRowGap);
   tokens.listRowRadius = static_cast<uint8_t>(metrics.listRowRadius);
   tokens.listInset = static_cast<int16_t>(metrics.listInset);
