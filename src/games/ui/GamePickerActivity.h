@@ -5,7 +5,7 @@
 // The new-game picker of the game screens: a Setka list of options. Choosing a
 // row finishes with MenuResult{action = row, pageTurnOption = toggle state};
 // Back finishes cancelled. An optional toggle row flips an option in place
-// (shown as вкл/выкл in the row status) instead of finishing; other rows may carry a fixed status.
+// (shown as a checkbox, like the settings toggles) instead of finishing; other rows may carry a fixed status.
 class GamePickerActivity final : public SetkaListActivity {
  public:
   struct Row {
@@ -26,6 +26,7 @@ class GamePickerActivity final : public SetkaListActivity {
   const char* rowLabel(int index) const override { return rows[index].label; }
   const freeink::Icon* rowIcon(int index) const override { return rows[index].icon; }
   const char* rowStatus(int index) const override;
+  int rowCheck(int index) const override { return index == toggleRow ? static_cast<int>(toggleOn) : -1; }
   void activateIndex(int index) override;
   void onBackButton() override;
 

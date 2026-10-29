@@ -97,6 +97,16 @@ void SetkaListActivity::buildScreen(UiScreen& screen) {
       renderer.drawText(kText10Font, width - kSidePadding - renderer.getTextWidth(kText10Font, status), statusTop,
                         status);
     }
+    if (const int check = rowCheck(i); check >= 0) {
+      // As the settings lists draw it: a 22 px box, a filled square inside when checked.
+      constexpr int kBox = 22;
+      constexpr int kInset = kBox / 4;
+      const int boxX = width - kSidePadding - kBox;
+      const int boxY = top + (pitch - kBox) / 2;
+      renderer.drawRoundedRect(boxX, boxY, kBox, kBox, 2, 2, true);
+      if (check > 0)
+        renderer.fillRoundedRect(boxX + kInset, boxY + kInset, kBox - 2 * kInset, kBox - 2 * kInset, 2, Color::Black);
+    }
     screen.frame().hit(fui::makeRect(0, top, width, pitch), ACTION_ROW, static_cast<int16_t>(i), fui::InputTouch);
   }
 }
