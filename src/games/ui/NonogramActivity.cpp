@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <iterator>
 
 #include "ElapsedText.h"
@@ -28,7 +29,7 @@ constexpr int kLargeCell = 25;  // 15x15
 constexpr int kClueGap = 6;     // between the clues and the grid
 constexpr int kNumberPad = 6;   // a row clue number's cell beyond its widest digit
 constexpr int kEdge = 8;        // the board is full-bleed
-constexpr int kCaptionGap = 10;
+constexpr int kNoticeGap = 10;
 constexpr int kBoardGap = 8;  // above the bar rule
 constexpr int kClueFrame = 2;
 constexpr int kStroke = 2;
@@ -176,7 +177,7 @@ void NonogramActivity::menuChosen(const int row) {
 
 void NonogramActivity::confirmRestart() {
   auto confirm =
-      makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_NONOGRAM_RESTART_CONFIRM),
+      makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_GAMES_RESTART_CONFIRM),
                                               tr(STR_NONOGRAM_RESTART_BODY), tr(STR_CANCEL), tr(STR_GAMES_RESTART));
   if (!confirm) {
     LOG_ERR("NONOGRAM", "OOM: restart confirmation, the board stays");
@@ -337,8 +338,15 @@ bool NonogramActivity::holdsConfirm() const {
   return !hasBar() && boardShown() && game.inProgress() && keyCursor && cursor >= 0 && barFocus < 0 && !stroking;
 }
 
+// The line puts what a press puts on an empty first cell (a fill, a cross in Крестик mode) and carries on
+// the mark of a marked one.
 void NonogramActivity::onConfirmHold() {
-  strokeMark = game.mark(cursor) == nonogram::Filled ? nonogram::Filled : nonogram::Crossed;
+  const Mark first = game.mark(cursor);
+  if (first == nonogram::Empty) {
+    strokeMark = crossMode ? nonogram::Crossed : nonogram::Filled;
+  } else {
+    strokeMark = first;
+  }
   stroking = true;
   if (game.mark(cursor) != strokeMark) {
     apply(cursor, strokeMark);
@@ -401,7 +409,8 @@ NonogramActivity::Layout NonogramActivity::layout() const {
     clueLines = std::max<int>(clueLines, game.columnClue(i).count);
   }
   const int width = renderer.getScreenWidth();
-  const int captionHeight = kCaptionGap + renderer.getLineHeight(kText12Font) + renderer.getLineHeight(kText10Font);
+  const int captionHeight =
+      games::ui::kCaptionGap + renderer.getLineHeight(kText12Font) + renderer.getLineHeight(kText10Font);
   const int roomX = width - 2 * kEdge - clueWidth - kClueGap;
   const int roomY = barTop() - kBoardGap - captionHeight - BOARD_TOP - clueLines * l.pitch - kClueGap;
   l.cell = std::max(8, std::min({n <= 10 ? kSmallCell : kLargeCell, roomX / n, roomY / n}));
@@ -425,14 +434,14 @@ void NonogramActivity::build(UiScreen& screen) {
       snprintf(text, sizeof(text), "%s",
                notice == Notice::NoRandom ? tr(STR_NONOGRAM_NO_RANDOM) : tr(STR_NONOGRAM_NO_PACK));
     }
-    int y = BOARD_TOP + kCaptionGap;
+    int y = BOARD_TOP + kNoticeGap;
     for (const auto& line : renderer.wrappedText(kText12Font, text, width - 2 * kSidePadding, 4)) {
       renderer.drawText(kText12Font, kSidePadding, y, line.c_str());
       y += renderer.getLineHeight(kText12Font);
     }
   } else {
     char size[16];
-    snprintf(size, sizeof(size), "%d\xC3\x97%d", game.side(), game.side());
+    snprintf(size, sizeof(size), "%d \xC3\x97 %d", game.side(), game.side());
     char clock[24];
     formatElapsed(game.elapsedMs(), clock, sizeof(clock));
     drawTopLine(screen, {{size, nullptr}, {nullptr, clock}}, false);
@@ -443,7 +452,7 @@ void NonogramActivity::build(UiScreen& screen) {
     const int span = game.side() * l.cell;
     screen.frame().hit(fui::makeRect(l.gridLeft, l.gridTop, span, span), ACTION_BOARD, 0,
                        static_cast<uint16_t>(fui::InputTouch | fui::InputLongPress));
-    drawCaption(l.gridTop + span + kCaptionGap);
+    drawCaption(l.gridTop + span + 1);  // the grid's last rule ends on its bottom row
   }
 
   BarItem items[BAR_SLOTS];
@@ -534,7 +543,7 @@ void NonogramActivity::drawGrid(const Layout& l) const {
   }
 }
 
-void NonogramActivity::drawCaption(const int top) const {
+void NonogramActivity::drawCaption(const int edge) const {
   char line[96];
   if (game.isSolved()) {
     char clock[24];
@@ -543,18 +552,19 @@ void NonogramActivity::drawCaption(const int top) const {
     snprintf(solvedIn, sizeof(solvedIn), tr(STR_NONOGRAM_SOLVED), clock);
     const bool picture = game.source() == nonogram::Source::Picture;
     char best[48];
+    // The record opens the line of a random puzzle, and follows the time after a picture.
     if (newBest) {
-      snprintf(best, sizeof(best), "%s", tr(STR_NONOGRAM_NEW_BEST));
+      snprintf(best, sizeof(best), "%s", picture ? tr(STR_NONOGRAM_NEW_BEST) : tr(STR_NONOGRAM_NEW_BEST_LINE));
     } else {
       formatElapsed(record.bestMs(game.source(), game.side()), clock, sizeof(clock));
-      snprintf(best, sizeof(best), tr(STR_NONOGRAM_BEST), clock);
+      snprintf(best, sizeof(best), picture ? tr(STR_NONOGRAM_BEST) : tr(STR_NONOGRAM_BEST_LINE), clock);
     }
     if (picture) {
       snprintf(line, sizeof(line), "%s \xC2\xB7 %s", solvedIn, best);
     } else {
       snprintf(line, sizeof(line), "%s", best);
     }
-    drawResult(top, picture ? game.name() : solvedIn, line);
+    drawResult(games::ui::captionTop(renderer, edge, kText12Font), picture ? game.name() : solvedIn, line);
     return;
   }
   if (checkShown) {
@@ -564,7 +574,8 @@ void NonogramActivity::drawCaption(const int top) const {
     } else {
       snprintf(line, sizeof(line), tr(STR_NONOGRAM_ERRORS), mistakes);
     }
-    renderer.drawText(kText10Font, kSidePadding, top, line, true, kSemiBold);
+    renderer.drawText(kText10Font, kSidePadding, games::ui::captionTop(renderer, edge, kText10Font), line, true,
+                      kSemiBold);
     return;
   }
   const char* hint = mappedInput.hasTouch()
@@ -575,9 +586,19 @@ void NonogramActivity::drawCaption(const int top) const {
     // The keys caption names the Confirm hint.
     char text[160];
     snprintf(text, sizeof(text), hint, tr(STR_NONOGRAM_MARK), tr(STR_NONOGRAM_MARK));
-    captionLines = renderer.wrappedText(kText10Font, text, renderer.getScreenWidth() - 2 * kSidePadding, 2);
+    // A line break in the text starts the second line.
+    captionLines.clear();
+    for (char* part = text; part != nullptr && captionLines.size() < 2;) {
+      char* next = strchr(part, '\n');
+      if (next != nullptr) *next++ = '\0';
+      for (auto& wrapped : renderer.wrappedText(kText10Font, part, renderer.getScreenWidth() - 2 * kSidePadding,
+                                                static_cast<int>(2 - captionLines.size()))) {
+        captionLines.push_back(std::move(wrapped));
+      }
+      part = next;
+    }
   }
-  int y = top;
+  int y = games::ui::captionTop(renderer, edge, kText10Font);
   for (const auto& text : captionLines) {
     renderer.drawText(kText10Font, kSidePadding, y, text.c_str());
     y += renderer.getLineHeight(kText10Font);

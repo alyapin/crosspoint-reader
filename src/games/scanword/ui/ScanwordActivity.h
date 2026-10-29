@@ -18,9 +18,9 @@
 const char* scanwordListStatus();
 std::unique_ptr<Activity> openScanwords(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
-// Scanwords in the Setka style: the puzzle list, the board and (buttons only)
-// the action menu are views of one activity, so the puzzle, the play state and
-// the list summary are allocated once.
+// Scanwords in the Setka style: the puzzle list, the board and the action menu
+// (the board's Меню on touch boards) are views of one activity, so the puzzle,
+// the play state and the list summary are allocated once.
 //
 // The board follows the approved input model: on touch boards the grid never
 // moves; selecting an answer opens an answer strip (clue + letter boxes) and a
@@ -100,7 +100,8 @@ class ScanwordActivity final : public Activity, private UiAppHost {
   void saveProgress();
 
   bool touchBoard() const;
-  int cellSize() const;
+  int cellWidth() const;
+  int cellHeight() const;
   // Bottom of the content, above the button hints on button boards.
   int bottom() const;
   int gridLeft() const;

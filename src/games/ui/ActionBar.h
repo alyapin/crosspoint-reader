@@ -41,6 +41,11 @@ int statusWidth(const GfxRenderer& renderer, const StatusItem* items, int count)
 // Draws the status ending at `right` on the top line at `y`.
 void drawStatus(const GfxRenderer& renderer, int right, int y, const StatusItem* items, int count);
 
+// Text under a board: its first line's caps start kCaptionGap below the board's edge, whatever the face.
+// Returns the y to draw that line at.
+constexpr int kCaptionGap = 24;
+int captionTop(const GfxRenderer& renderer, int edge, int font);
+
 // A finished game's result under the board at the left margin: the result in
 // UI 11 SemiBold, then an optional detail and, on button boards, the Confirm
 // cue in UI 9. Returns the y below the last line.

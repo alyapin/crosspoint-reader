@@ -34,7 +34,6 @@ constexpr int kDotSize = 16;
 constexpr int kCross = 7;  // half the × inside the inner ring
 constexpr int kCrossStroke = 3;
 constexpr int kCountDot = 14;
-constexpr int kStatusGap = 20;  // the rule under the board to the heading
 constexpr int kLineGap = 6;
 constexpr int kFlipSlot = 1;
 constexpr int kNewGameSlot = 2;
@@ -470,10 +469,11 @@ void DraughtsActivity::cellOrigin(const int square, int& x, int& y) const {
 // --- render task -------------------------------------------------------------
 
 void DraughtsActivity::build(UiScreen& screen) {
-  char level[12];
-  snprintf(level, sizeof(level), "%d", static_cast<int>(game.mode()) + 1);
   if (game.vsComputer()) {
-    drawTopLine(screen, {{tr(STR_GAMES_VS_LEVEL), level}}, false);
+    // The level as the picker names it.
+    const StrId levels[] = {StrId::STR_SUDOKU_EASY_LOWER, StrId::STR_SUDOKU_MEDIUM_LOWER, StrId::STR_SUDOKU_HARD_LOWER};
+    const int level = std::clamp(static_cast<int>(game.mode()), 0, static_cast<int>(std::size(levels)) - 1);
+    drawTopLine(screen, {{tr(STR_CHESS_COMPUTER), nullptr}, {I18N.get(levels[level]), nullptr}}, false);
   } else {
     drawTopLine(screen, {{tr(STR_GAMES_TWO_PLAYERS), nullptr}}, false);
   }
@@ -579,9 +579,7 @@ void DraughtsActivity::drawPiece(const int x, const int y, const bool white, con
 
 void DraughtsActivity::drawStatus() const {
   const int width = renderer.getScreenWidth();
-  int y = kBoardTop + kBoardSize;
-  drawRule(renderer, 0, y, width);
-  y += kStatusGap;
+  int y = games::ui::captionTop(renderer, kBoardTop + kBoardSize, kText12Font);
 
   const char* heading = nullptr;
   const char* lines[3] = {};

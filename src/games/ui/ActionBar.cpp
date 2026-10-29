@@ -59,7 +59,7 @@ void drawActionBar(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, con
   const int cellTop = top + kRuleWidth;
   const int cellHeight = bottom - cellTop;
   const int captionHeight = renderer.getLineHeight(kCaptionFont);
-  // A short bar (the scanword keyboard's) closes the gap under the icon first.
+  // A short bar closes the gap under the icon first.
   const int gap = std::clamp((cellHeight - kIconSize - captionHeight) / 3, 0, kIconGap);
   const int iconTop = cellTop + (cellHeight - kIconSize - gap - captionHeight) / 2;
   const bool dividers = std::count_if(slots, slots + count, [](const ActionSlot& s) { return s.label; }) > 1;
@@ -80,6 +80,13 @@ void drawActionBar(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, con
     if (i == focused) drawSelectionBar(renderer, iconX - (kRowTextX - kSelectionBarX), iconTop, kIconSize);
     screen.frame().hit(fui::makeRect(x0, cellTop, x1 - x0, cellHeight), slot.action, slot.value, input);
   }
+}
+
+int captionTop(const GfxRenderer& renderer, const int edge, const int font) {
+  int32_t advance = 0;
+  int cap = 0;
+  if (!renderer.getCodepointMetrics(font, 0x41D, EpdFontFamily::REGULAR, advance, cap)) cap = 0;
+  return edge + kCaptionGap - (renderer.getFontAscenderSize(font) - cap);
 }
 
 int drawResult(const GfxRenderer& renderer, const int top, const char* result, const char* detail, const char* cue) {

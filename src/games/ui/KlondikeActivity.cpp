@@ -314,7 +314,7 @@ void KlondikeActivity::build(UiScreen& screen) {
     screen.frame().hit(fui::makeRect(x, top, width, height), ACTION_PILE, static_cast<int16_t>(pile), fui::InputTouch);
   }
 
-  const bool cursorShown = focus != kNone && focus < kBarFocus;
+  const bool cursorShown = focus != kNone && focus < kBarFocus && !game.isWon();
   if (pickPile != kNone) {
     const Pile& p = game.pile(pickPile);
     const int top = cardY(pickPile, pickIndex);

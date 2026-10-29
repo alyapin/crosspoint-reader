@@ -27,6 +27,8 @@ class SetkaListActivity : public UiListActivity {
   virtual const freeink::Icon* rowIcon(int index) const { return nullptr; }
   // Right-aligned status text, e.g. an unfinished game; nullptr or empty for none.
   virtual const char* rowStatus(int index) const { return nullptr; }
+  // A checkbox at the right instead of the status: 1 checked, 0 clear, -1 none.
+  virtual int rowCheck(int index) const { return -1; }
   // Shown under the header when the list is empty.
   virtual const char* emptyText() const { return nullptr; }
   // A closer row pitch that may fit the whole list on one page where the Setka pitch does not; 0 for none.

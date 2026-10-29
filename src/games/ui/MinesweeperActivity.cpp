@@ -2,6 +2,7 @@
 
 #include <GfxRenderer.h>
 #include <I18n.h>
+#include <Logging.h>
 #include <Memory.h>
 #include <esp_random.h>
 
@@ -10,6 +11,7 @@
 #include <iterator>
 
 #include "ElapsedText.h"
+#include "activities/util/ConfirmationActivity.h"
 #include "gameIcons.h"
 #include "games/GameSave.h"
 #include "games/chess/ui/chessIcons.h"
@@ -18,8 +20,7 @@ namespace fui = freeink::ui;
 using namespace setka;
 
 namespace {
-constexpr int kBoardGap = 8;    // between the board and the bar rule
-constexpr int kResultGap = 12;  // between the board and the result
+constexpr int kBoardGap = 8;  // between the board and the bar rule
 constexpr minesweeper::Config kFields[] = {minesweeper::BEGINNER, minesweeper::PORTRAIT};
 
 // A pennant on a pole, sized to the cell.
@@ -99,9 +100,7 @@ void MinesweeperActivity::runAction(const Action action) {
       requestRepaint(RepaintUpdate);
       break;
     case Action::New:
-      game.newGame(game.config(), esp_random());
-      flagMode = false;
-      markChanged();
+      confirmRestart();
       break;
     case Action::Menu:
       if (game.isOver()) {
@@ -111,6 +110,29 @@ void MinesweeperActivity::runAction(const Action action) {
       }
       break;
   }
+}
+
+// As Японские: Начать заново asks first.
+void MinesweeperActivity::confirmRestart() {
+  auto confirm =
+      makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_GAMES_RESTART_CONFIRM),
+                                              tr(STR_MINES_RESTART_BODY), tr(STR_CANCEL), tr(STR_GAMES_RESTART));
+  if (!confirm) {
+    LOG_ERR("MINES", "OOM: restart confirmation, the board stays");
+    return;
+  }
+  app.clearTapFlash();
+  pauseGame();
+  startActivityForResult(std::move(confirm), [this](const ActivityResult& result) {
+    RenderLock lock(*this);
+    if (!result.isCancelled) {
+      game.newGame(game.config(), esp_random());
+      flagMode = false;
+      markChanged();
+    }
+    resumeGame();
+    requestRepaint(RepaintEntry);
+  });
 }
 
 void MinesweeperActivity::act(const int x, const int y, const bool flag) {
@@ -201,7 +223,7 @@ bool MinesweeperActivity::onBack() {
 }
 
 int MinesweeperActivity::cellSize() const {
-  const int room = barTop() - kBoardGap - kResultGap - resultHeight(false) - BOARD_TOP;
+  const int room = barTop() - kBoardGap - games::ui::kCaptionGap - resultHeight(false) - BOARD_TOP;
   return std::min(renderer.getScreenWidth() / game.columns(), room / game.rows());
 }
 
@@ -231,20 +253,21 @@ void MinesweeperActivity::build(UiScreen& screen) {
   const int height = size * game.rows();
   for (int x = 0; x <= game.columns(); ++x) renderer.fillRect(left + x * size, BOARD_TOP, 1, height + 1, true);
   for (int y = 0; y <= game.rows(); ++y) renderer.fillRect(left, BOARD_TOP + y * size, width + 1, 1, true);
-  if (cursor >= 0 && barFocus < 0) {
+  if (cursor >= 0 && barFocus < 0 && !game.isOver()) {
     drawCellFrame(renderer, left + cursor % game.columns() * size, BOARD_TOP + cursor / game.columns() * size, size + 1,
                   size + 1);
   }
   screen.frame().hit(fui::makeRect(left, BOARD_TOP, width, height), ACTION_BOARD, 0,
                      static_cast<uint16_t>(fui::InputTouch | fui::InputLongPress));
   if (over) {
-    drawResult(BOARD_TOP + height + kResultGap,
+    drawResult(games::ui::captionTop(renderer, BOARD_TOP + height + 1, kText12Font),
                game.status() == minesweeper::Status::Won ? tr(STR_GAMES_WON) : tr(STR_MINES_LOST));
   } else if (!hasBar()) {
     // Button boards flag with a held Confirm (the bar's Флажок is touch only).
     char line[64];
     snprintf(line, sizeof(line), tr(STR_MINES_FLAG_HOLD), tr(STR_GAMES_DIG));
-    renderer.drawText(kText10Font, kSidePadding, BOARD_TOP + height + kResultGap, line);
+    renderer.drawText(kText10Font, kSidePadding, games::ui::captionTop(renderer, BOARD_TOP + height + 1, kText10Font),
+                      line);
   }
 
   BarItem items[BAR_SLOTS];

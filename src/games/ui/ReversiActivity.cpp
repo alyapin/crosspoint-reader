@@ -29,11 +29,9 @@ constexpr int kMenuSlot = 2;
 constexpr int kSliceMs = 20;
 constexpr int kDiscInset = 7;
 constexpr int kDot = 10;
-constexpr int kMark = 12;
 constexpr int kCursorInset = 4;
-constexpr int kStatusGap = 22;
 constexpr int kLineGap = 10;
-constexpr int kCountDisc = 18;
+constexpr int kCountDisc = 14;  // as Шашки's count discs
 constexpr int kCountGap = 8;
 constexpr int kCountSpace = 22;
 }  // namespace
@@ -216,11 +214,12 @@ bool ReversiActivity::onBack() {
 // --- render task -------------------------------------------------------------
 
 void ReversiActivity::build(UiScreen& screen) {
-  char level[12];
   const bool vs = game.vsComputer();
-  snprintf(level, sizeof(level), "%d", static_cast<int>(game.mode()) + 1);
   if (vs) {
-    drawTopLine(screen, {{tr(STR_GAMES_VS_LEVEL), level}}, false);
+    // The level as the picker names it.
+    const StrId levels[] = {StrId::STR_SUDOKU_EASY_LOWER, StrId::STR_SUDOKU_MEDIUM_LOWER, StrId::STR_SUDOKU_HARD_LOWER};
+    const int level = std::clamp(static_cast<int>(game.mode()), 0, static_cast<int>(std::size(levels)) - 1);
+    drawTopLine(screen, {{tr(STR_CHESS_COMPUTER), nullptr}, {I18N.get(levels[level]), nullptr}}, false);
   } else {
     drawTopLine(screen, {{tr(STR_GAMES_TWO_PLAYERS), nullptr}}, false);
   }
@@ -242,9 +241,8 @@ void ReversiActivity::build(UiScreen& screen) {
     const Disc disc = game.at(s);
     if (disc != Disc::None) {
       drawDisc(disc, x + kDiscInset, y + kDiscInset, cell - 2 * kDiscInset);
-      if (s == last) {
-        renderer.fillRect(x + (cell - kMark) / 2, y + (cell - kMark) / 2, kMark, kMark, disc == Disc::White);
-      }
+      // The last move framed as in Шахматы and Шашки.
+      if (s == last) drawDashedFrame(renderer, x, y, cell);
     } else if (moves >> s & 1) {
       renderer.fillRoundedRect(x + (cell - kDot) / 2, y + (cell - kDot) / 2, kDot, kDot, kDot / 2, Color::Black);
     }
@@ -255,7 +253,7 @@ void ReversiActivity::build(UiScreen& screen) {
   }
   screen.frame().hit(fui::makeRect(left, BOARD_TOP, side, side), ACTION_BOARD, 0, shellInput());
 
-  drawStatus(BOARD_TOP + side + kStatusGap);
+  drawStatus(games::ui::captionTop(renderer, BOARD_TOP + side, kText12Font));
 
   BarItem items[BAR_SLOTS];
   if (barShown(0)) items[0] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false, BarItem::Repeat};
@@ -306,7 +304,6 @@ void ReversiActivity::drawStatus(const int top) const {
     lines[0] = passed == Disc::Black   ? (vs ? tr(STR_REVERSI_PASS_YOU) : tr(STR_REVERSI_PASS_BLACK))
                : passed == Disc::White ? (vs ? tr(STR_REVERSI_PASS_COMPUTER) : tr(STR_REVERSI_PASS_WHITE))
                                        : tr(STR_REVERSI_HINT_DOTS);
-    lines[1] = vs ? tr(STR_REVERSI_HINT_LAST) : tr(STR_REVERSI_HINT_LAST_TWO);
   }
   int y = top + lineHeight + kLineGap;
   for (const char* line : lines) {

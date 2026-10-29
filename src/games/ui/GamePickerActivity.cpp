@@ -1,7 +1,5 @@
 #include "GamePickerActivity.h"
 
-#include <I18n.h>
-
 #include <algorithm>
 
 GamePickerActivity::GamePickerActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const char* title,
@@ -22,8 +20,7 @@ void GamePickerActivity::onEnter() {
 }
 
 const char* GamePickerActivity::rowStatus(const int index) const {
-  if (index != toggleRow) return rows[index].status;
-  return toggleOn ? tr(STR_GAMES_ON) : tr(STR_GAMES_OFF);
+  return index == toggleRow ? nullptr : rows[index].status;
 }
 
 void GamePickerActivity::activateIndex(const int index) {

@@ -934,7 +934,7 @@ int ChessActivity::optionCount(const Row row) const {
 const char* ChessActivity::optionLabel(const Row row, const int option) const {
   switch (row) {
     case Row::Opponent:
-      return option == 1 ? tr(STR_CHESS_FRIEND) : tr(STR_CHESS_COMPUTER);
+      return option == 1 ? tr(STR_GAMES_TWO_PLAYERS) : tr(STR_CHESS_COMPUTER);
     case Row::Level:
       return kLevelLabels[std::clamp(option, 0, static_cast<int>(std::size(kLevelLabels)) - 1)];
     case Row::Color:
@@ -1224,18 +1224,22 @@ void ChessActivity::drawTopLine(UiScreen& screen) const {
       snprintf(clock, sizeof(clock), "%s", time.text);
     }
   }
-  games::ui::StatusItem status[2];
+  games::ui::StatusItem status[3];
   int count = 0;
   const bool vs = match->settings().mode == chess::Mode::VsComputer;
   if (vs) {
-    status[count++] = {tr(STR_GAMES_VS_LEVEL), level};
+    status[count++] = {tr(STR_CHESS_COMPUTER), nullptr};
+    status[count++] = {tr(STR_GAMES_LEVEL), level};
   } else if (timed) {
     status[count++] = {far == chess::WHITE ? tr(STR_CHESS_WHITE) : tr(STR_CHESS_BLACK), nullptr};
   }
   if (timed) status[count++] = {nullptr, clock};
   // With a clock, too long beside "‹ Выйти": the level without "Компьютер", then the clock alone.
   const int room = width - kSidePadding - exitWidth;
-  if (timed && vs && games::ui::statusWidth(renderer, status, count) > room) status[0].label = tr(STR_GAMES_LEVEL);
+  if (timed && vs && games::ui::statusWidth(renderer, status, count) > room) {
+    std::copy(status + 1, status + count, status);
+    --count;
+  }
   if (timed && games::ui::statusWidth(renderer, status, count) > room) {
     status[0] = status[count - 1];
     count = 1;
@@ -1271,7 +1275,7 @@ void ChessActivity::drawBoard() const {
       drawDashedFrame(renderer, x, y, kSquare);
     }
   }
-  const bool cursorShown = cursor >= 0 && cursor < kCells && (hasBar() || !game.isOver());
+  const bool cursorShown = cursor >= 0 && cursor < kCells && !game.isOver();
   if (selected != kNoSquare) {
     squareOrigin(selected, flip, x, y);
     drawPick(renderer, x, y, cursorShown && squareAtCell(cursor) == selected);
@@ -1356,7 +1360,7 @@ void ChessActivity::drawClockPanel() const {
 }
 
 void ChessActivity::drawStatusPanel() const {
-  const int top = kPanelTop + 18;
+  const int top = games::ui::captionTop(renderer, kPanelTop, kText12Font);
   drawTurnLine(top);
   drawMoveList(top + renderer.getLineHeight(kText12Font) + 12, actionsTop() - 6);
 }
@@ -1424,7 +1428,7 @@ void ChessActivity::drawMoveList(const int top, const int bottom) const {
 
 void ChessActivity::drawPromotion(UiScreen& screen) const {
   const int width = renderer.getScreenWidth();
-  const int top = kPanelTop + 18;
+  const int top = games::ui::captionTop(renderer, kPanelTop, kText12Font);
   renderer.drawText(kText12Font, kSidePadding, top, tr(STR_CHESS_PROMOTE), true, kSemiBold);
   const int cellTop = top + renderer.getLineHeight(kText12Font) + 8;
   const int cellWidth = width / static_cast<int>(std::size(kPromotions));
@@ -1452,8 +1456,8 @@ void ChessActivity::drawGameOver() const {
   const bool draw = match->game().outcome() == chess::Outcome::Draw;
   const char* how = overTitle(match->game());
   const char* who = overSubtitle(*match);
-  games::ui::drawResult(renderer, kPanelTop + 18, draw ? how : who, draw ? who : how,
-                        hasBar() ? nullptr : tr(STR_GAMES_NEW_GAME_KEY));
+  games::ui::drawResult(renderer, games::ui::captionTop(renderer, kPanelTop, kText12Font), draw ? how : who,
+                        draw ? who : how, hasBar() ? nullptr : tr(STR_GAMES_NEW_GAME_KEY));
 }
 
 void ChessActivity::drawActions(UiScreen& screen) const {

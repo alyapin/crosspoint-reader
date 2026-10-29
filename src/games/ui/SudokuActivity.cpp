@@ -265,7 +265,8 @@ uint32_t SudokuActivity::idleSleepBudgetMs() const {
 const char* SudokuActivity::confirmHint() const {
   if (area == Area::Bar) return nullptr;
   if (game.isLocked(selected)) return "";
-  return notesMode ? tr(STR_GAMES_NOTE) : tr(STR_GAMES_DIGIT);
+  // Verbs, as the other boards' Confirm hints; «Пометить» does not fit the 72 px label.
+  return notesMode ? tr(STR_SUDOKU_MARK_KEY) : tr(STR_SUDOKU_WRITE_KEY);
 }
 
 bool SudokuActivity::onBack() {
@@ -300,7 +301,7 @@ void SudokuActivity::build(UiScreen& screen) {
   if (game.isSolved()) {
     char line[48];
     snprintf(line, sizeof(line), tr(STR_SUDOKU_SOLVED_IN), clock);
-    drawResult(kPadTop, line);
+    drawResult(games::ui::captionTop(renderer, BOARD_TOP + kGridSize, kText12Font), line);
   } else {
     drawPad(screen);
   }
@@ -359,11 +360,13 @@ void SudokuActivity::drawGrid() const {
                      y + 1 + (d - 1) / 3 * kNoteCell + (kNoteCell - noteHeight) / 2, digit);
       }
     }
-    // Keys on the pad or the bar: the cell waits for its digit.
-    if (cell == selected && area != Area::Grid) {
-      drawPick(x, y, kCell, kCell);
-    } else if (cell == selected) {
-      drawCellFrame(renderer, x, y, kCell, kCell);
+    // Keys on the pad or the bar: the cell waits for its digit. A solved grid shows neither.
+    if (cell == selected && !game.isSolved()) {
+      if (area != Area::Grid) {
+        drawPick(x, y, kCell, kCell);
+      } else {
+        drawCellFrame(renderer, x, y, kCell, kCell);
+      }
     }
   }
 }
