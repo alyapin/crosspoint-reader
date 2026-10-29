@@ -85,6 +85,9 @@ class GameScreen : public Activity, protected UiAppHost {
   virtual void onKey(int dx, int dy, bool confirm) = 0;
   // Back with something to drop first; true when consumed.
   virtual bool onBack() { return false; }
+  // Button boards: whether a held Confirm means something now; it then runs onConfirmHold() instead of onKey().
+  virtual bool holdsConfirm() const { return false; }
+  virtual void onConfirmHold() {}
   // Shown play time in whole minutes (ElapsedText.h), or -1 when no timer is shown.
   virtual int32_t shownMinutes() const { return -1; }
   // Board hits carry InputLongPress (event.longPress on a held tap).

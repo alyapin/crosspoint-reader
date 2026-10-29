@@ -25,6 +25,7 @@ using namespace setka;
 namespace {
 constexpr int kCursorArm = 14;
 constexpr int kKeyCursorOut = 3;
+constexpr unsigned long kConfirmHoldMs = 450;
 constexpr int kModeIcon = 24;
 constexpr int kModeIconGap = 8;
 // Menu rows other than a bar slot (0..BAR_SLOTS-1); a game's own row is kRowOwn + its index.
@@ -236,6 +237,9 @@ void GameScreen::loop() {
       }
       return;
     }
+  } else if (holdsConfirm() && mappedInput.wasLongPressed(Button::Confirm, kConfirmHoldMs)) {
+    RenderLock lock(*this);
+    onConfirmHold();
   } else {
     int dx = 0;
     int dy = 0;
