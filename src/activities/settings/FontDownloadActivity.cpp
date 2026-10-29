@@ -940,11 +940,8 @@ void FontDownloadActivity::render(RenderLock&&) {
                          ? str(scriptGroupLabels_[scriptGroupIndex])
                          : tr(STR_ALL_FONTS);
   }
-  const auto drawHeader = [&] {
-    GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_FONT_BROWSER),
-                   headerSubtitle);
-  };
-  drawHeader();
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_FONT_BROWSER),
+                 headerSubtitle);
 
   const auto lineHeight = renderer.getLineHeight(UI_10_FONT_ID);
   const auto centerY = (pageHeight - lineHeight) / 2;
@@ -953,12 +950,10 @@ void FontDownloadActivity::render(RenderLock&&) {
     renderer.drawCenteredText(UI_10_FONT_ID, centerY, tr(STR_LOADING_FONT_LIST));
   } else if (state_ == GROUP_LIST) {
     renderUi();
-    settleList(drawHeader);
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_OPEN), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   } else if (state_ == FAMILY_LIST) {
     renderUi();
-    settleList(drawHeader);
 
     const bool hasVisibleFamilies = !filteredIndices_.empty();
     const char* confirmLabel = !hasVisibleFamilies            ? ""

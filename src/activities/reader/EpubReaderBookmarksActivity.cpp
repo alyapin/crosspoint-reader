@@ -12,7 +12,6 @@
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "components/UiAppHelpers.h"
-#include "components/setka/SetkaStyle.h"
 #include "fontIds.h"
 
 namespace fui = freeink::ui;
@@ -265,10 +264,14 @@ void EpubReaderBookmarksActivity::buildScreen(UiScreen& screen) {
   }
 
   // This caption names a physical button, so omit it on touch boards.
-  fui::Rect helpBand{};
   if (!mappedInput.hasTouch()) {
     const int helpLineHeight = renderer.getLineHeight(SMALL_FONT_ID);
-    helpBand = screen.takeBottom(static_cast<int16_t>(helpLineHeight + 2 * metrics.verticalSpacing));
+    const fui::Rect band = screen.takeBottom(static_cast<int16_t>(helpLineHeight + 2 * metrics.verticalSpacing));
+    renderer.drawText(
+        SMALL_FONT_ID, band.x + metrics.contentSidePadding, band.y + metrics.verticalSpacing,
+        renderer
+            .truncatedText(SMALL_FONT_ID, tr(STR_HOLD_OPEN_FOR_ACTIONS), band.width - 2 * metrics.contentSidePadding)
+            .c_str());
   }
 
   // bookmarkSubtitles/bookmarkRowItems are built once whenever `bookmarks`
@@ -284,28 +287,12 @@ void EpubReaderBookmarksActivity::buildScreen(UiScreen& screen) {
   configureSwipeDelete(screen, props);
 #endif
   screen.list(props);
-
-  if (helpBand.height == 0) return;
-  // On the page line's baseline, leaving it room once the bookmarks take more
-  // than a page; the caption wraps rather than lose its end.
-  int width = helpBand.width - 2 * metrics.contentSidePadding;
-  const auto& n = activeNav();
-  if (n.top > 0 || n.top + n.drawnRows < listCount()) {
-    char widest[24];
-    snprintf(widest, sizeof(widest), tr(STR_LIST_PAGE), listCount(), listCount());
-    width -= renderer.getTextWidth(SMALL_FONT_ID, widest) + metrics.contentSidePadding;
-  }
-  const char* help = tr(STR_HOLD_OPEN_FOR_ACTIONS);
-  const int lines = setka::textLines(renderer, SMALL_FONT_ID, help, width, 2);
-  setka::drawTextLines(renderer, SMALL_FONT_ID, helpBand.x + metrics.contentSidePadding,
-                       pageLineTop() - (lines - 1) * renderer.getLineHeight(SMALL_FONT_ID), help, width, 2);
 }
 
 void EpubReaderBookmarksActivity::render(RenderLock&&) {
   renderer.clearScreen();
   drawChrome();
   renderUi();
-  settleList([this] { drawChrome(); });
 
   if (confirmPopup.processRender(renderer, mappedInput)) return;
 

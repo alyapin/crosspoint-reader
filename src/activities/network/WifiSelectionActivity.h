@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "activities/Activity.h"
-#include "components/ListPager.h"
 #include "components/UiAppHost.h"
 #include "util/ButtonNavigator.h"
 
@@ -104,8 +103,6 @@ class WifiSelectionActivity final : public Activity, private UiAppHost {
   // Viewport memory (top/visibleRows) for the network list; `selected` is
   // mirrored from selectedNetworkIndex at build/move time.
   freeink::ui::ListNav listNav;
-  // Button boards page the list by whole rows, with the page line.
-  ListPager pager;
 
   static void listScreen(UiScreen& screen, void* user);
   static void onRowEvent(const freeink::ui::ActionEvent& event, void* user);
@@ -115,7 +112,6 @@ class WifiSelectionActivity final : public Activity, private UiAppHost {
   void buildPromptDialog(UiScreen& screen);
 
   void renderNetworkList(const Rect* screen, const ThemeMetrics* metrics);
-  void drawListHeader();
   void renderPasswordEntry(const Rect* screen, const ThemeMetrics* metrics) const;
   void renderConnecting(const Rect* screen, const ThemeMetrics* metrics) const;
   void renderConnected(const Rect* screen, const ThemeMetrics* metrics) const;

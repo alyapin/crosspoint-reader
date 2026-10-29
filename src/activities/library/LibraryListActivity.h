@@ -129,8 +129,6 @@ class LibraryListActivity final : public UiTabListActivity {
   int holdHelpWidth() const;
   void drawHoldHelp() const;
   const char* headerTitle() const override;
-  // The position readout says where the list is.
-  bool showsPageLine() const override { return false; }
 
   // Ring 0 is the strip; the selected BOOK is ring - 1, with the strip keeping
   // row 0 as the working selection exactly as the pre-ring code did.
