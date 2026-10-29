@@ -67,6 +67,7 @@ struct OutOfMemory {
 };
 OutOfMemory outOfMemory[8];
 uint8_t outOfMemoryCount = 0;
+uint8_t outOfMemoryNext = 0;
 
 bool knownOutOfMemory(const uint32_t id, const uint32_t size, const uint32_t time) {
   for (uint8_t i = 0; i < outOfMemoryCount; i++) {
@@ -77,8 +78,9 @@ bool knownOutOfMemory(const uint32_t id, const uint32_t size, const uint32_t tim
 }
 
 void rememberOutOfMemory(const uint32_t id, const uint32_t size, const uint32_t time) {
-  outOfMemory[outOfMemoryCount % std::size(outOfMemory)] = {id, size, time};
-  if (outOfMemoryCount < 2 * std::size(outOfMemory)) outOfMemoryCount++;
+  outOfMemory[outOfMemoryNext] = {id, size, time};
+  outOfMemoryNext = static_cast<uint8_t>((outOfMemoryNext + 1) % std::size(outOfMemory));
+  if (outOfMemoryCount < std::size(outOfMemory)) outOfMemoryCount++;
 }
 
 // Russian forms; a language whose "few" and "many" match (English) has one and other.
@@ -432,13 +434,13 @@ void CardsActivity::goBack() {
   switch (view) {
     case Screen::Front:
     case Screen::Back:
-      store->endSession();
+      if (store) store->endSession();
       showOverview();
       return;
     case Screen::Overview:
     case Screen::Done:
     case Screen::Message:
-      store->endSession();
+      if (store) store->endSession();
       if (!direct && (view != Screen::Message || deckTitle[0] != '\0')) {
         runAfterPaint(Job::LoadList, StrId::STR_CARDS_PREPARING);
         return;
@@ -1062,6 +1064,8 @@ void CardsActivity::buildCard(UiScreen& screen) {
       total = answer.height() + (extra.lines.count > 0 ? kAnswerGap + extra.height() : 0);
       if (!answer.lines.overflow && !extra.lines.overflow && total <= zone) break;
     }
+    // An example with no room left is cut too: the answer says so.
+    if (extra.lines.count == 0 && *extra.text) answer.lines.overflow = true;
     int y = zoneTop + std::max(0, (zone - total) / 2);
     drawBlock(renderer, answer, y, scratch);
     if (extra.lines.count > 0) drawBlock(renderer, extra, y + answer.height() + kAnswerGap, scratch);
