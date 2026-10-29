@@ -2957,13 +2957,18 @@ void EpubReaderActivity::handleOverlayInput() {
       closeOverlayToPage();
       return;
     }
-    if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
+    // Button boards have no hint for the side keys, so they step the tools as in
+    // every list; touch boards keep them on the chapter arrows they see.
+    const bool sideTools = !mappedInput.hasTouch();
+    if (mappedInput.wasReleased(MappedInputManager::Button::Left) ||
+        (sideTools && mappedInput.wasReleased(MappedInputManager::Button::Up))) {
       focusedTool = (focusedTool + 2) % 3;
       panelCursorShown = true;
       fastRedraw();
       return;
     }
-    if (mappedInput.wasReleased(MappedInputManager::Button::Right)) {
+    if (mappedInput.wasReleased(MappedInputManager::Button::Right) ||
+        (sideTools && mappedInput.wasReleased(MappedInputManager::Button::Down))) {
       focusedTool = (focusedTool + 1) % 3;
       panelCursorShown = true;
       fastRedraw();
