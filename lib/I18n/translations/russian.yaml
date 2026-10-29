@@ -944,3 +944,16 @@ STR_HANGMAN_WON: "Отгадано"
 STR_HANGMAN_LOST: "Не отгадано"
 STR_HANGMAN_NORMAL: "Обычные слова"
 STR_HANGMAN_RUDE: "С крепкими словами"
+
+# FreeCell
+STR_FREECELL: "FreeCell"
+
+# Spider
+STR_SPIDER: "Паук"
+STR_SPIDER_ONE_SUIT: "1 масть"
+STR_SPIDER_TWO_SUITS: "2 масти"
+STR_SPIDER_FOUR_SUITS: "4 масти"
+STR_SPIDER_EASY: "легко"
+STR_SPIDER_MEDIUM: "средне"
+STR_SPIDER_HARD: "трудно"
+STR_SPIDER_EMPTY_COLUMN: "пустая колонка"

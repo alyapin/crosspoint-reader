@@ -944,3 +944,16 @@ STR_HANGMAN_WON: "Guessed"
 STR_HANGMAN_LOST: "Not guessed"
 STR_HANGMAN_NORMAL: "Ordinary words"
 STR_HANGMAN_RUDE: "With strong language"
+
+# FreeCell
+STR_FREECELL: "FreeCell"
+
+# Spider
+STR_SPIDER: "Spider"
+STR_SPIDER_ONE_SUIT: "1 suit"
+STR_SPIDER_TWO_SUITS: "2 suits"
+STR_SPIDER_FOUR_SUITS: "4 suits"
+STR_SPIDER_EASY: "easy"
+STR_SPIDER_MEDIUM: "medium"
+STR_SPIDER_HARD: "hard"
+STR_SPIDER_EMPTY_COLUMN: "empty column"

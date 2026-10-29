@@ -10,13 +10,18 @@ set(GAMES_SOURCES
   ${GAMES_DIR}/FiveLetters.cpp
   ${GAMES_DIR}/Game2048.cpp
   ${GAMES_DIR}/Hangman.cpp
+  ${GAMES_DIR}/Cards.cpp
+  ${GAMES_DIR}/FreeCell.cpp
+  ${GAMES_DIR}/Spider.cpp
   KlondikeSolver.cpp
+  ${REPO_ROOT}/tools/spider/SpiderSolver.cpp
 )
 
 add_executable(GamesCoreTest SudokuTest.cpp MinesweeperTest.cpp KlondikeTest.cpp TicTacToeTest.cpp FifteenTest.cpp
                FiveLettersTest.cpp Game2048Test.cpp HangmanTest.cpp ElapsedTextTest.cpp GameSaveTest.cpp
+               FreeCellTest.cpp SpiderTest.cpp
                ${REPO_ROOT}/src/games/GameSave.cpp ${GAMES_SOURCES})
-target_include_directories(GamesCoreTest PRIVATE ${GAMES_DIR} ../library_builder/stubs)
+target_include_directories(GamesCoreTest PRIVATE ${GAMES_DIR} ${REPO_ROOT}/tools/spider ../library_builder/stubs)
 target_link_libraries(GamesCoreTest PRIVATE crosspoint_test_common GTest::gtest_main)
 gtest_discover_tests(GamesCoreTest DISCOVERY_TIMEOUT 60)
 
@@ -28,3 +33,7 @@ target_link_libraries(SudokuBankGen PRIVATE crosspoint_test_common)
 add_executable(KlondikeDealGen KlondikeDealGen.cpp ${GAMES_SOURCES})
 target_include_directories(KlondikeDealGen PRIVATE ${GAMES_DIR})
 target_link_libraries(KlondikeDealGen PRIVATE crosspoint_test_common)
+
+add_executable(SpiderDealGen ${REPO_ROOT}/tools/spider/SpiderDealGen.cpp ${GAMES_SOURCES})
+target_include_directories(SpiderDealGen PRIVATE ${GAMES_DIR} ${REPO_ROOT}/tools/spider)
+target_link_libraries(SpiderDealGen PRIVATE crosspoint_test_common)

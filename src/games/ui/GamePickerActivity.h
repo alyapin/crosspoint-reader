@@ -5,12 +5,14 @@
 // The new-game picker of the game screens: a Setka list of options. Choosing a
 // row finishes with MenuResult{action = row, pageTurnOption = toggle state};
 // Back finishes cancelled. An optional toggle row flips a yes/no option in
-// place (shown as the row status) instead of finishing.
+// place (shown as the row status) instead of finishing; other rows may carry
+// a fixed status.
 class GamePickerActivity final : public SetkaListActivity {
  public:
   struct Row {
     const char* label;
     const freeink::Icon* icon;
+    const char* status = nullptr;  // right-aligned, e.g. the difficulty
   };
   static constexpr int MAX_ROWS = 6;
 
