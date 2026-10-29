@@ -289,17 +289,19 @@ void FreeCellActivity::build(UiScreen& screen) {
     games::ui::drawDashedRect(renderer, placeX(hintPlace) - pad, top - pad, kCardWidth + 2 * pad,
                               kCardHeight + 2 * pad);
   }
-  if (focus != kNone && focus < kBarFocus) {
+  if (focus != kNone && focus < kBarFocus && !won) {
     const int count = game.pile(focus).count;
     drawCursor(placeX(focus), isColumn(focus) && count > 0 ? cardY(focus, count - 1) : cardY(focus, 0), kCardWidth,
                kCardHeight);
   }
   if (won) {
-    char line[48];
+    char deal[32];
+    snprintf(deal, sizeof(deal), tr(STR_FREECELL_DEAL), static_cast<unsigned>(game.dealNumber()));
+    char line[80];
     if (newBest) {
-      snprintf(line, sizeof(line), "%s", tr(STR_FIFTEEN_NEW_BEST));
+      snprintf(line, sizeof(line), "%s \xC2\xB7 %s", deal, tr(STR_FIFTEEN_NEW_BEST));
     } else {
-      snprintf(line, sizeof(line), "%s %u", tr(STR_2048_BEST), static_cast<unsigned>(best.moves[0]));
+      snprintf(line, sizeof(line), "%s \xC2\xB7 %s %u", deal, tr(STR_2048_BEST), static_cast<unsigned>(best.moves[0]));
     }
     drawCentered(kText12Font, 0, renderer.getScreenWidth(), kTableauTop + kResultGap, line, kSemiBold);
   }

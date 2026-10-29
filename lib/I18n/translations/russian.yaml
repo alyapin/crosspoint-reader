@@ -1007,6 +1007,7 @@ STR_CODEWORD_NO_PACK: "Кейворды не найдены"
 STR_CODEWORD_NO_PACK_BODY: "Скопируйте папку codewords из набора в корень карты памяти."
 # FreeCell
 STR_FREECELL: "FreeCell"
+STR_FREECELL_DEAL: "Раздача %u"
 
 # Spider
 STR_SPIDER: "Паук"
