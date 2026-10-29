@@ -47,14 +47,17 @@ Paths pathsOf(const Kind kind) {
   return {"/.crosspoint/games/klondike.json", "/.crosspoint/games/klondike.json.tmp"};
 }
 
-constexpr Paths TICTACTOE_DONE{"/.crosspoint/games/tictactoe-done.json", "/.crosspoint/games/tictactoe-done.json.tmp"};
-
-// A record that is there but cannot be read is not written over until it reads.
+// A save or record that is there but cannot be read is not written over until it reads.
 struct Record {
   Paths paths;
   bool unread = false;
 };
 
+uint16_t unreadGames = 0;  // a bit per Kind
+
+uint16_t bitOf(const Kind kind) { return static_cast<uint16_t>(1u << static_cast<unsigned>(kind)); }
+
+Record tictactoeDone{{"/.crosspoint/games/tictactoe-done.json", "/.crosspoint/games/tictactoe-done.json.tmp"}};
 Record fifteenBest{{"/.crosspoint/games/fifteen-best.json", "/.crosspoint/games/fifteen-best.json.tmp"}};
 Record fiveLettersStats{{"/.crosspoint/games/fiveletters-stats.json", "/.crosspoint/games/fiveletters-stats.json.tmp"}};
 Record best2048{{"/.crosspoint/games/2048-best.txt", "/.crosspoint/games/2048-best.txt.tmp"}};
@@ -97,11 +100,8 @@ bool writeTo(const Paths& p, const T& value, const size_t cap) {
 
 template <typename GameT>
 bool write(const Kind kind, const GameT& game, const size_t cap) {
-  if (!game.inProgress()) {
-    clear(kind);
-    return true;
-  }
-  return writeTo(pathsOf(kind), game, cap);
+  if (!game.inProgress()) return clear(kind);
+  return !(unreadGames & bitOf(kind)) && writeTo(pathsOf(kind), game, cap);
 }
 
 // A power cut inside replaceFile, after the old file is removed, leaves only
@@ -147,14 +147,22 @@ Read readFrom(const Paths& p, T& value, const size_t cap) {
 
 template <typename GameT>
 bool read(const Kind kind, GameT& game, const size_t cap) {
-  return readFrom(pathsOf(kind), game, cap) == Read::Ok;
+  const Read result = readFrom(pathsOf(kind), game, cap);
+  unreadGames = result == Read::Failed ? unreadGames | bitOf(kind) : unreadGames & ~bitOf(kind);
+  return result == Read::Ok;
+}
+
+template <typename T>
+Read readRecord(Record& record, T& value, const size_t cap) {
+  const Read result = readFrom(record.paths, value, cap);
+  record.unread = result == Read::Failed;
+  return result;
 }
 
 template <typename T>
 bool loadRecord(Record& record, T& value, const size_t cap) {
   value = T{};
-  record.unread = readFrom(record.paths, value, cap) == Read::Failed;
-  return !record.unread;
+  return readRecord(record, value, cap) != Read::Failed;
 }
 
 bool saveRecord(const Record& record, const char* text, const size_t len) {
@@ -165,21 +173,20 @@ bool saveRecord(const Record& record, const char* text, const size_t len) {
 
 bool hasGameInProgress(const Kind kind) { return present(pathsOf(kind)); }
 
-void clear(const Kind kind) {
+bool clear(const Kind kind) {
+  if (unreadGames & bitOf(kind)) return false;
   const Paths p = pathsOf(kind);
-  for (const char* path : {p.path, p.tmp}) {
-    if (Storage.exists(path)) Storage.remove(path);
-  }
+  bool ok = true;
+  for (const char* path : {p.path, p.tmp}) ok = (!Storage.exists(path) || Storage.remove(path)) && ok;
+  return ok;
 }
 
 bool save(const sudoku::Game& game) { return write(Kind::Sudoku, game, sudoku::SAVE_MAX); }
 bool save(const minesweeper::Game& game) { return write(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
 bool save(const klondike::Game& game) { return write(Kind::Klondike, game, klondike::SAVE_MAX); }
 bool save(const tictactoe::Game& game) {
-  if (game.inProgress()) return writeTo(pathsOf(Kind::TicTacToe), game, tictactoe::SAVE_MAX);
-  const bool ok = writeTo(TICTACTOE_DONE, game, tictactoe::SAVE_MAX);
-  if (ok) clear(Kind::TicTacToe);
-  return ok;
+  if (game.inProgress()) return write(Kind::TicTacToe, game, tictactoe::SAVE_MAX);
+  return !tictactoeDone.unread && writeTo(tictactoeDone.paths, game, tictactoe::SAVE_MAX) && clear(Kind::TicTacToe);
 }
 bool save(const fifteen::Game& game) { return write(Kind::Fifteen, game, fifteen::SAVE_MAX); }
 bool save(const fiveletters::Game& game) { return write(Kind::FiveLetters, game, fiveletters::SAVE_MAX); }
@@ -191,7 +198,7 @@ bool load(minesweeper::Game& game) { return read(Kind::Minesweeper, game, minesw
 bool load(klondike::Game& game) { return read(Kind::Klondike, game, klondike::SAVE_MAX); }
 bool load(tictactoe::Game& game) {
   return read(Kind::TicTacToe, game, tictactoe::SAVE_MAX) ||
-         readFrom(TICTACTOE_DONE, game, tictactoe::SAVE_MAX) == Read::Ok;
+         readRecord(tictactoeDone, game, tictactoe::SAVE_MAX) == Read::Ok;
 }
 bool load(fifteen::Game& game) { return read(Kind::Fifteen, game, fifteen::SAVE_MAX); }
 bool load(fiveletters::Game& game) { return read(Kind::FiveLetters, game, fiveletters::SAVE_MAX); }

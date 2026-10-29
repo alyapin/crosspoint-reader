@@ -40,7 +40,8 @@ namespace gamesave {
 enum class Kind { Sudoku, Minesweeper, Klondike, TicTacToe, Fifteen, FiveLetters, Game2048, Hangman };
 
 bool hasGameInProgress(Kind kind);
-void clear(Kind kind);
+// False when a file stays, also for a save that a load could not read.
+bool clear(Kind kind);
 
 // Write an unfinished game (pause() it first so its clock is charged); a
 // finished one removes the save instead. Crash-safe: tmp file + rename.
@@ -54,7 +55,8 @@ bool save(const g2048::Game& game);
 bool save(const hangman::Game& game);
 
 // Restore the saved game, paused. False on failure; a file that reads but does
-// not parse is removed.
+// not parse is removed. One that cannot be read is kept: until a load reads it,
+// that game is not saved or cleared, so a new game in its place plays unsaved.
 bool load(sudoku::Game& game);
 bool load(minesweeper::Game& game);
 bool load(klondike::Game& game);
