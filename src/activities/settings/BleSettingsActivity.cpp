@@ -114,7 +114,7 @@ void BleSettingsActivity::refresh() {
   const auto st = bleturner::status();
   char failure[48];
   if (!SETTINGS.ble.enabled || st.stopping) {
-    status = tr(STR_STATE_OFF);
+    status = tr(STR_BT_STATUS_OFF);
   } else if (bleturner::takeConnectFailure(failure, sizeof(failure))) {
     status = failure;
   } else if (!st.running) {
@@ -126,7 +126,7 @@ void BleSettingsActivity::refresh() {
   } else if (st.scanning) {
     status = tr(STR_SCANNING);
   } else {
-    status = tr(STR_STATE_ON);
+    status = tr(STR_BT_STATUS_ON);
   }
 
   // Labels first: the rows point into them.
