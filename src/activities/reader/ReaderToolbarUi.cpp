@@ -106,10 +106,12 @@ void ReaderToolbarUi::screenFn(UiScreen& screen, void* user) {
 }
 
 // The Contents / Text / More row: three equal slots, an icon centred in each,
-// the active one inside the Setka 4 px inset frame. Each
-// slot is registered as one tap target, so the row stays light (no filled
-// tiles, no labels -- the glyphs carry the meaning).
+// the active one inside the Setka 4 px inset frame (other themes: an outline
+// pill). Each slot is registered as one tap target, so the row stays light
+// (no filled tiles, no labels -- the glyphs carry the meaning).
 void ReaderToolbarUi::buildToolRow(UiScreen& screen, const fui::LayoutAnchor anchor, const int16_t sideInset) {
+  const auto& tokens = screen.theme();
+  const bool setkaFrame = tokens.listSelectionStyle == fui::SelectionStyle::LeftBar;
   const fui::BitmapRef icons[kToolCount] = {fui::bitmapFromIcon(icon_reader_contents_24),
                                             fui::bitmapFromIcon(icon_reader_text_24),
                                             fui::bitmapFromIcon(icon_reader_more_24)};
@@ -123,7 +125,8 @@ void ReaderToolbarUi::buildToolRow(UiScreen& screen, const fui::LayoutAnchor anc
     const fui::Rect slot{static_cast<int16_t>(row.x + slotW * i), row.y, slotW, row.height};
     if (i == model_.activeTool) {
       screen.target().stroke(slot.inset(fui::Insets{4, kToolPillInset, 4, kToolPillInset}),
-                             fui::Paint::solid(fui::Color::Black), setka::kCellFrameWidth, 0);
+                             fui::Paint::solid(fui::Color::Black), setkaFrame ? setka::kCellFrameWidth : 2,
+                             setkaFrame ? 0 : tokens.controlRadius);
     }
     const fui::Rect iconRect{static_cast<int16_t>(slot.x + (slot.width - 24) / 2),
                              static_cast<int16_t>(slot.y + (slot.height - 24) / 2), 24, 24};
