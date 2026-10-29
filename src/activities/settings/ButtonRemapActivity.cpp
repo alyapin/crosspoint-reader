@@ -6,6 +6,7 @@
 #include "CrossPointSettings.h"
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
+#include "components/setka/SetkaStyle.h"
 
 namespace fui = freeink::ui;
 
@@ -16,6 +17,8 @@ constexpr uint8_t kRoleCount = 4;
 constexpr uint8_t kUnassigned = 0xFF;
 // Duration to show temporary error text when reassigning a button.
 constexpr unsigned long kErrorDisplayMs = 1500;
+// Gap between the header and the prompt, and between the notes and the hints.
+constexpr int kPromptGap = 12;
 }  // namespace
 
 void ButtonRemapActivity::onEnter() {
@@ -117,7 +120,8 @@ void ButtonRemapActivity::render(RenderLock&&) {
         return getRoleName(i);
       }
     }
-    return "-";
+    // A key still waiting for its role has no hint.
+    return "";
   };
 
   const auto& metrics = UITheme::getInstance().getMetrics();
@@ -126,27 +130,25 @@ void ButtonRemapActivity::render(RenderLock&&) {
 
   renderer.clearScreen();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_REMAP_FRONT_BUTTONS));
-  GUI.drawSubHeader(renderer, Rect{0, metrics.topPadding + metrics.headerHeight, pageWidth, metrics.tabBarHeight},
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_CAT_CONTROLS));
+  renderer.drawText(setka::kCaptionFont, setka::kSidePadding, metrics.topPadding + metrics.headerHeight + kPromptGap,
                     tr(STR_REMAP_PROMPT));
-
-  int topOffset = metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight + metrics.verticalSpacing;
   renderUi();
 
-  // Temporary warning banner for duplicates.
-  if (!errorMessage.empty()) {
-    GUI.drawHelpText(renderer,
-                     Rect{0, pageHeight - metrics.buttonHintsHeight - metrics.contentSidePadding - 15, pageWidth, 20},
-                     errorMessage.c_str());
+  // Side-button notes above the hints, bottom up: the reset question replaces both.
+  const int line = renderer.getLineHeight(setka::kCaptionFont);
+  int y = pageHeight - metrics.buttonHintsHeight - kPromptGap - line;
+  if (resetAsked) {
+    renderer.drawText(setka::kCaptionFont, setka::kSidePadding, y, tr(STR_REMAP_RESET_CONFIRM_HINT));
+  } else {
+    renderer.drawText(setka::kCaptionFont, setka::kSidePadding, y, tr(STR_REMAP_CANCEL_HINT));
+    y -= line;
+    renderer.drawText(setka::kCaptionFont, setka::kSidePadding, y, tr(STR_REMAP_RESET_HINT));
   }
-
-  // Provide side button actions at the bottom of the screen (split across two lines).
-  GUI.drawHelpText(renderer,
-                   Rect{0, topOffset + 4 * metrics.listRowHeight + 4 * metrics.verticalSpacing, pageWidth, 20},
-                   resetAsked ? tr(STR_REMAP_RESET_CONFIRM_HINT) : tr(STR_REMAP_RESET_HINT));
-  GUI.drawHelpText(renderer,
-                   Rect{0, topOffset + 4 * metrics.listRowHeight + 5 * metrics.verticalSpacing + 20, pageWidth, 20},
-                   resetAsked ? tr(STR_REMAP_RESET_KEEP_HINT) : tr(STR_REMAP_CANCEL_HINT));
+  // Temporary warning for a key that already has a role.
+  if (!errorMessage.empty()) {
+    renderer.drawText(setka::kCaptionFont, setka::kSidePadding, y - line - kPromptGap, errorMessage.c_str());
+  }
 
   // Live preview of logical labels under front buttons.
   // This mirrors the on-device front button order: Back, Confirm, Left, Right.
@@ -164,7 +166,8 @@ void ButtonRemapActivity::screenTrampoline(UiScreen& screen, void* user) {
 void ButtonRemapActivity::buildScreen(UiScreen& screen) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-  const int topOffset = metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight + metrics.verticalSpacing;
+  const int topOffset = metrics.topPadding + metrics.headerHeight + kPromptGap +
+                        renderer.getLineHeight(setka::kCaptionFont) + metrics.verticalSpacing;
   screen.setContentMarginFromScreen(
       fui::Insets{static_cast<int16_t>(safe.y + topOffset),
                   static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width) + metrics.verticalSpacing),
@@ -214,7 +217,7 @@ const char* ButtonRemapActivity::getRoleName(const uint8_t roleIndex) {
     case 0:
       return tr(STR_BACK);
     case 1:
-      return tr(STR_CONFIRM);
+      return tr(STR_SELECT);
     case 2:
       return tr(STR_DIR_LEFT);
     case 3:
