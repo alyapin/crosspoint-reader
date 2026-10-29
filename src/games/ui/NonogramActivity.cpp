@@ -177,7 +177,10 @@ void NonogramActivity::confirmRestart() {
   auto confirm =
       makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_NONOGRAM_RESTART_CONFIRM),
                                               tr(STR_NONOGRAM_RESTART_BODY), tr(STR_CANCEL), tr(STR_NONOGRAM_RESTART));
-  if (!confirm) return;
+  if (!confirm) {
+    LOG_ERR("NONOGRAM", "OOM: restart confirmation, the board stays");
+    return;
+  }
   app.clearTapFlash();
   pauseGame();
   startActivityForResult(std::move(confirm), [this](const ActivityResult& result) {
@@ -290,8 +293,11 @@ void NonogramActivity::onKey(const int dx, const int dy, const bool confirm) {
       requestRepaint(RepaintUpdate);
     } else if (dx != 0 || dy != 0) {
       const int y = cursor / n + dy;
-      if (dx != 0) cursor = (cursor + dx + n * n) % (n * n);
-      if (dy != 0 && y >= 0 && y < n) cursor += dy * n;
+      if (dx != 0) {
+        cursor = (cursor + dx + n * n) % (n * n);
+      } else if (y >= 0 && y < n) {
+        cursor += dy * n;
+      }
       if (game.mark(cursor) == nonogram::Empty) apply(cursor, strokeMark);
       stroking = game.inProgress();
     }
