@@ -147,7 +147,7 @@ void drawIconRow(const GfxRenderer& renderer, freeink::ui::DrawTarget& target, c
 void drawMenuBox(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, const char* title, const int count,
                  const int focus, const bool showFocus, const MenuEntryFn entry, void* ctx, const int areaTop,
                  const int bottom, const int width, const freeink::ui::ActionId itemAction,
-                 const freeink::ui::ActionId dismissAction, const int rowPitch) {
+                 const freeink::ui::ActionId dismissAction, const int rowPitch, const MenuAnchor* anchor) {
   namespace fui = freeink::ui;
   using namespace setka;
   constexpr int kPad = 16;
@@ -169,13 +169,39 @@ void drawMenuBox(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, const
   // The screen under the box is cleared full width down to `bottom`, from a
   // row boundary when the caller lists rows, so no row shows cut by the frame.
   int bandTop = std::max(areaTop, boxY - kBandMargin);
-  if (rowPitch > 0) {
+  int bandBottom = bottom;
+  bool anchored = false;
+  if (anchor && anchor->pitch > 0) {
+    // Band edges sit mid-gap between rows (or past the content), the box centred between them.
+    const int need = boxHeight + 2 * kBandMargin;
+    const int firstEdge = anchor->gridTop - anchor->gap / 2;  // edges: firstEdge + k * pitch
+    const int under = firstEdge + (anchor->row + 1) * anchor->pitch;
+    int end = under + need;
+    if (end < anchor->contentEnd) {
+      const int nextEdge = firstEdge + (end - firstEdge + anchor->pitch - 1) / anchor->pitch * anchor->pitch;
+      end = std::min(nextEdge, anchor->contentEnd);
+    }
+    const int over = firstEdge + anchor->row * anchor->pitch;
+    const int start = over - need;
+    if (end <= bottom) {
+      bandTop = under;
+      bandBottom = end;
+      anchored = true;
+    } else if (start >= areaTop) {
+      bandTop = start < firstEdge ? areaTop : firstEdge + (start - firstEdge) / anchor->pitch * anchor->pitch;
+      bandBottom = over;
+      anchored = true;
+    }
+    if (anchored) boxY = bandTop + (bandBottom - bandTop - boxHeight) / 2;
+  }
+  if (!anchored && rowPitch > 0) {
     bandTop = areaTop + (bandTop - areaTop) / rowPitch * rowPitch;
     // The box moves up under the band's edge, so no blank row sits above it.
     boxY = std::min(boxY, bandTop + kBandMargin);
   }
-  renderer.fillRect(0, bandTop, width, bottom - bandTop, false);
+  renderer.fillRect(0, bandTop, width, bandBottom - bandTop, false);
   if (bandTop > areaTop) drawRule(renderer, 0, bandTop - kRuleWidth, width);
+  if (bandBottom < bottom) drawRule(renderer, 0, bandBottom, width);
   renderer.drawRect(boxX, boxY, boxWidth, boxHeight, kRuleWidth, true);
   int titleTop = boxY + kPad;
   for (const auto& line : titleLines) {

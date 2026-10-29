@@ -42,7 +42,8 @@ class ShelfActivity final : public Activity, private UiAppHost {
   // reload() for a caller that holds the render lock.
   void reloadLocked();
   void draw(UiScreen& screen);
-  void drawGrid(UiScreen& screen, int areaTop, int bottom, int width);
+  // Returns where its content ends.
+  int drawGrid(UiScreen& screen, int areaTop, int bottom, int width);
   void drawPicker(UiScreen& screen, int areaTop, int bottom, int width);
   bool generateMissingThumbs();
 

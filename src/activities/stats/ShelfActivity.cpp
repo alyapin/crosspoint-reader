@@ -258,7 +258,7 @@ void ShelfActivity::loop() {
   ButtonNavigator::onPreviousPress([this] { moveFocus(-1); });
 }
 
-void ShelfActivity::drawGrid(UiScreen& screen, const int areaTop, const int bottom, const int width) {
+int ShelfActivity::drawGrid(UiScreen& screen, const int areaTop, const int bottom, const int width) {
   const int captionHeight = renderer.getLineHeight(kCaptionFont);
   const int line12 = renderer.getLineHeight(kText12Font);
   const int pitch = kCoverHeight + kCaptionGap + captionHeight + kGridGap;
@@ -312,6 +312,7 @@ void ShelfActivity::drawGrid(UiScreen& screen, const int areaTop, const int bott
   const int rows = (last - first + kColumns - 1) / kColumns;
   const int summaryTop = std::min(gridTop + rows * pitch, bottom - line12);
   renderer.drawText(kText12Font, kSidePadding, summaryTop, summary);
+  return summaryTop + line12;
 }
 
 void ShelfActivity::drawPicker(UiScreen& screen, const int areaTop, const int bottom, const int width) {
@@ -343,11 +344,16 @@ void ShelfActivity::draw(UiScreen& screen) {
     drawPicker(screen, bands.contentTop, bands.contentBottom, bands.width);
     return;
   }
-  drawGrid(screen, bands.contentTop, bands.contentBottom, bands.width);
+  const int contentEnd = drawGrid(screen, bands.contentTop, bands.contentBottom, bands.width);
   if (menuOpen && menuCell >= 0 && menuCell < static_cast<int>(books.size())) {
-    const int pitch = kCoverHeight + kCaptionGap + renderer.getLineHeight(kCaptionFont) + kGridGap;
+    statsui::MenuAnchor anchor;
+    anchor.row = menuCell / kColumns - top;
+    anchor.gridTop = bands.contentTop + kGridGap;
+    anchor.pitch = kCoverHeight + kCaptionGap + renderer.getLineHeight(kCaptionFont) + kGridGap;
+    anchor.gap = kGridGap;
+    anchor.contentEnd = contentEnd;
     statsui::drawMenuBox(renderer, screen, books[menuCell].title.c_str(), 1, 0, buttonsUsed, &describeMenu, this,
-                         bands.contentTop, bands.contentBottom, bands.width, ACTION_MENU, ACTION_DISMISS, pitch);
+                         bands.contentTop, bands.contentBottom, bands.width, ACTION_MENU, ACTION_DISMISS, 0, &anchor);
   }
 }
 

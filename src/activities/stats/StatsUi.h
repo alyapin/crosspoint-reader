@@ -71,10 +71,20 @@ void drawIconRow(const GfxRenderer& renderer, freeink::ui::DrawTarget& target, c
 // fires itemAction with its index. rowPitch: the height of the list rows that
 // start at areaTop, so the band starts on a row boundary with the box right
 // under it (0: no rows).
+// anchor: the box sits right under the long-pressed item's row instead, or
+// right over it when there is no room below.
 using MenuEntryFn = void (*)(int index, const freeink::Icon*& icon, const char*& label, void* ctx);
+struct MenuAnchor {
+  int row = 0;         // the item's row, 0 = the one at gridTop
+  int gridTop = 0;     // the first row's top
+  int pitch = 0;       // row pitch; its last `gap` px are blank
+  int gap = 0;
+  int contentEnd = 0;  // nothing is drawn below this
+};
 void drawMenuBox(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, const char* title, int count, int focus,
                  bool showFocus, MenuEntryFn entry, void* ctx, int areaTop, int bottom, int width,
-                 freeink::ui::ActionId itemAction, freeink::ui::ActionId dismissAction, int rowPitch = 0);
+                 freeink::ui::ActionId itemAction, freeink::ui::ActionId dismissAction, int rowPitch = 0,
+                 const MenuAnchor* anchor = nullptr);
 
 // Dashed outline, for the add-a-book tile.
 void drawDashedRect(const GfxRenderer& renderer, int x, int y, int width, int height);
