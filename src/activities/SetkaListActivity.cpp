@@ -3,6 +3,7 @@
 #include <FreeInkUIIcon.h>
 #include <GfxRenderer.h>
 
+#include <algorithm>
 #include <utility>
 
 #include "components/UITheme.h"
@@ -29,11 +30,21 @@ void SetkaListActivity::openChild(std::unique_ptr<Activity> child) {
   startActivityForResult(std::move(child), [this](const ActivityResult&) { entryRefresh = true; });
 }
 
+int SetkaListActivity::rowsPerPage() const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int listTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+  return std::max(1, (renderer.getScreenHeight() - metrics.buttonHintsHeight - listTop) / (kRowHeight + kRowGap));
+}
+
 bool SetkaListActivity::handleCustomInput() {
-  // The rows fit one screen: a vertical swipe has nothing to scroll, so it
-  // must not cost a repaint.
+  // A vertical swipe turns the page of a list longer than one screen; on a
+  // shorter one it has nothing to scroll and must not cost a repaint.
   const auto swipe = mappedInput.wasSwipe();
-  return swipe == MappedInputManager::SwipeDir::Up || swipe == MappedInputManager::SwipeDir::Down;
+  if (swipe != MappedInputManager::SwipeDir::Up && swipe != MappedInputManager::SwipeDir::Down) return false;
+  const int perPage = rowsPerPage();
+  const int page = nav.selected / perPage + (swipe == MappedInputManager::SwipeDir::Up ? 1 : -1);
+  if (page >= 0 && page * perPage < listCount()) moveSelectionTo(page * perPage);
+  return true;
 }
 
 void SetkaListActivity::buildScreen(UiScreen& screen) {
@@ -49,8 +60,10 @@ void SetkaListActivity::buildScreen(UiScreen& screen) {
     return;
   }
   const int selected = nav.selected;
-  for (int i = 0; i < count; ++i) {
-    const int top = listTop + i * (kRowHeight + kRowGap);
+  const int perPage = rowsPerPage();
+  const int first = selected / perPage * perPage;
+  for (int i = first; i < std::min(count, first + perPage); ++i) {
+    const int top = listTop + (i - first) * (kRowHeight + kRowGap);
     const bool focused = i == selected;
     if (focused) drawSelectionBar(renderer, kSelectionBarX, top, kRowHeight);
     int x = kRowTextX;

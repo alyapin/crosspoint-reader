@@ -13,12 +13,14 @@
 #include "games/ui/DraughtsActivity.h"
 #include "games/ui/FifteenActivity.h"
 #include "games/ui/FiveLettersActivity.h"
+#include "games/ui/FreeCellActivity.h"
 #include "games/ui/Game2048Activity.h"
 #include "games/ui/HangmanActivity.h"
 #include "games/ui/KlondikeActivity.h"
 #include "games/ui/MinesweeperActivity.h"
 #include "games/ui/NonogramActivity.h"
 #include "games/ui/ReversiActivity.h"
+#include "games/ui/SpiderActivity.h"
 #include "games/ui/SudokuActivity.h"
 #include "games/ui/TicTacToeActivity.h"
 #include "games/ui/gameIcons.h"
@@ -55,6 +57,8 @@ constexpr Game kGames[] = {
     {StrId::STR_REVERSI, &icon_reversi_24, &openReversi, &reversiListStatus},
     {StrId::STR_DRAUGHTS, &icon_draughts_24, &openDraughts, &draughtsListStatus},
     {StrId::STR_NONOGRAM, &icon_nonogram_24, &openNonogram, &nonogramListStatus},
+    {StrId::STR_FREECELL, &icon_freecell_24, &openFreeCell, &freecellListStatus},
+    {StrId::STR_SPIDER, &icon_spider_24, &openSpider, &spiderListStatus},
     {},
 };
 constexpr int kGameCount = static_cast<int>(std::size(kGames)) - 1;

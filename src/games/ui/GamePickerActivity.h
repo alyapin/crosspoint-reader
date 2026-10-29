@@ -11,7 +11,7 @@ class GamePickerActivity final : public SetkaListActivity {
   struct Row {
     const char* label;
     const freeink::Icon* icon;
-    const char* status = nullptr;
+    const char* status = nullptr;  // right-aligned, e.g. the difficulty
   };
   static constexpr int MAX_ROWS = 8;
 

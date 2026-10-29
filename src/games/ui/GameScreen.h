@@ -43,7 +43,8 @@ class GameScreen : public Activity, protected UiAppHost {
   static constexpr int BAR_HEIGHT = games::ui::kActionBarHeight;  // the rule and the action bar, above the button hints
 
   // Filled triangle without the heap (GfxRenderer::fillPolygon allocates per call).
-  static void fillTriangle(const GfxRenderer& renderer, int x0, int y0, int x1, int y1, int x2, int y2);
+  static void fillTriangle(const GfxRenderer& renderer, int x0, int y0, int x1, int y1, int x2, int y2,
+                           bool black = true);
 
  protected:
   // Pending repaint, strongest wins: Entry = HALF, Update = cadence FAST,

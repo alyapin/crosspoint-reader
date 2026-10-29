@@ -1005,3 +1005,15 @@ STR_CODEWORD_CHECK: "Проверить"
 STR_CODEWORD_ERASE: "Стереть букву"
 STR_CODEWORD_NO_PACK: "Кейворды не найдены"
 STR_CODEWORD_NO_PACK_BODY: "Скопируйте папку codewords из набора в корень карты памяти."
+# FreeCell
+STR_FREECELL: "FreeCell"
+
+# Spider
+STR_SPIDER: "Паук"
+STR_SPIDER_ONE_SUIT: "1 масть"
+STR_SPIDER_TWO_SUITS: "2 масти"
+STR_SPIDER_FOUR_SUITS: "4 масти"
+STR_SPIDER_EASY: "легко"
+STR_SPIDER_MEDIUM: "средне"
+STR_SPIDER_HARD: "трудно"
+STR_SPIDER_EMPTY_COLUMN: "пустая колонка"

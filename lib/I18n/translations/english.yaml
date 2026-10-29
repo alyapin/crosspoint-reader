@@ -1005,3 +1005,15 @@ STR_CODEWORD_CHECK: "Check"
 STR_CODEWORD_ERASE: "Erase letter"
 STR_CODEWORD_NO_PACK: "No codewords found"
 STR_CODEWORD_NO_PACK_BODY: "Copy the codewords folder from the pack to the root of the SD card."
+# FreeCell
+STR_FREECELL: "FreeCell"
+
+# Spider
+STR_SPIDER: "Spider"
+STR_SPIDER_ONE_SUIT: "1 suit"
+STR_SPIDER_TWO_SUITS: "2 suits"
+STR_SPIDER_FOUR_SUITS: "4 suits"
+STR_SPIDER_EASY: "easy"
+STR_SPIDER_MEDIUM: "medium"
+STR_SPIDER_HARD: "hard"
+STR_SPIDER_EMPTY_COLUMN: "empty column"

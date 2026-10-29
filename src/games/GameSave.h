@@ -6,7 +6,8 @@
 // exists only while its game is in progress, so its presence is the "game in
 // progress" flag. Some games keep a second file that outlives the game: the
 // last finished tic-tac-toe and reversi games (for the score they carry), the
-// 15 puzzle best, the «5 букв» totals, the 2048 record and the nonogram record.
+// 15 puzzle best, the «5 букв» totals, the 2048 record, the nonogram record,
+// the solved codewords and the FreeCell and Spider bests.
 
 namespace sudoku {
 class Game;
@@ -49,6 +50,15 @@ namespace codeword {
 class Game;
 class Solved;
 }  // namespace codeword
+namespace freecell {
+class Game;
+}
+namespace spider {
+class Game;
+}
+namespace cards {
+struct Best;
+}
 
 namespace gamesave {
 
@@ -65,6 +75,8 @@ enum class Kind {
   Nonogram,
   Draughts,
   Codeword,
+  FreeCell,
+  Spider,
 };
 
 bool hasGameInProgress(Kind kind);
@@ -85,6 +97,8 @@ bool save(const reversi::Game& game);
 bool save(const nonogram::Game& game);
 bool save(const draughts::Game& game);
 bool save(const codeword::Game& game);
+bool save(const freecell::Game& game);
+bool save(const spider::Game& game);
 
 // Restore the saved game, paused. False on failure; a file that reads but does
 // not parse is removed. One that cannot be read is kept: until a load reads it,
@@ -104,6 +118,8 @@ bool load(nonogram::Game& game);
 bool load(draughts::Game& game);
 // The puzzle is not attached: see codeword::Game::attach().
 bool load(codeword::Game& game);
+bool load(freecell::Game& game);
+bool load(spider::Game& game);
 
 // Records outlive their games. A missing or corrupt one loads empty; one that
 // cannot be read loads false (2048: 0) and is not written until a load reads it.
@@ -127,5 +143,8 @@ void saveBest2048(uint32_t score);
 // The solved codewords.
 bool save(const codeword::Solved& solved);
 bool load(codeword::Solved& solved);
+// The fewest moves of FreeCell or Spider (one per number of suits).
+bool saveBest(Kind kind, const cards::Best& best);
+bool loadBest(Kind kind, cards::Best& best);
 
 }  // namespace gamesave

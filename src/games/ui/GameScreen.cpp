@@ -361,7 +361,7 @@ uint16_t GameScreen::shellInput() const {
 }
 
 void GameScreen::fillTriangle(const GfxRenderer& renderer, const int x0, const int y0, const int x1, const int y1,
-                              const int x2, const int y2) {
+                              const int x2, const int y2, const bool black) {
   const int xs[3] = {x0, x1, x2};
   const int ys[3] = {y0, y1, y2};
   const int top = std::min({y0, y1, y2});
@@ -378,6 +378,6 @@ void GameScreen::fillTriangle(const GfxRenderer& renderer, const int x0, const i
       left = std::min({left, x, ya == yb ? xs[j] : x});
       right = std::max({right, x, ya == yb ? xs[j] : x});
     }
-    if (left <= right) renderer.fillRect(left, y, right - left + 1, 1, true);
+    if (left <= right) renderer.fillRect(left, y, right - left + 1, 1, black);
   }
 }
