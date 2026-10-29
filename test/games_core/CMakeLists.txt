@@ -5,10 +5,11 @@ set(GAMES_SOURCES
   ${GAMES_DIR}/Sudoku.cpp
   ${GAMES_DIR}/Minesweeper.cpp
   ${GAMES_DIR}/Klondike.cpp
+  ${GAMES_DIR}/Game2048.cpp
   KlondikeSolver.cpp
 )
 
-add_executable(GamesCoreTest SudokuTest.cpp MinesweeperTest.cpp KlondikeTest.cpp ElapsedTextTest.cpp ${GAMES_SOURCES})
+add_executable(GamesCoreTest SudokuTest.cpp MinesweeperTest.cpp KlondikeTest.cpp Game2048Test.cpp ElapsedTextTest.cpp ${GAMES_SOURCES})
 target_include_directories(GamesCoreTest PRIVATE ${GAMES_DIR})
 target_link_libraries(GamesCoreTest PRIVATE crosspoint_test_common GTest::gtest_main)
 gtest_discover_tests(GamesCoreTest DISCOVERY_TIMEOUT 60)
