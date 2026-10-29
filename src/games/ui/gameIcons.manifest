@@ -36,3 +36,6 @@ nonogram = grid-2x2-check
 pictures = image
 random = dices
 bar-cross = x
+# Шашки: games list, «Сдаться» in the menu
+draughts = disc-2
+surrender = hand

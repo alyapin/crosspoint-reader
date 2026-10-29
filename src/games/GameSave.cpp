@@ -1,5 +1,6 @@
 #include "GameSave.h"
 
+#include <Draughts.h>
 #include <Fifteen.h>
 #include <FiveLetters.h>
 #include <Game2048.h>
@@ -47,6 +48,8 @@ Paths pathsOf(const Kind kind) {
       return {"/.crosspoint/games/reversi.json", "/.crosspoint/games/reversi.json.tmp"};
     case Kind::Nonogram:
       return {"/.crosspoint/games/nonogram.json", "/.crosspoint/games/nonogram.json.tmp"};
+    case Kind::Draughts:
+      return {"/.crosspoint/games/draughts.json", "/.crosspoint/games/draughts.json.tmp"};
     case Kind::Klondike:
       break;
   }
@@ -205,6 +208,7 @@ bool save(const reversi::Game& game) {
   return !reversiDone.unread && writeTo(reversiDone.paths, game, reversi::SAVE_MAX) && clear(Kind::Reversi);
 }
 bool save(const nonogram::Game& game) { return write(Kind::Nonogram, game, nonogram::SAVE_MAX); }
+bool save(const draughts::Game& game) { return write(Kind::Draughts, game, draughts::SAVE_MAX); }
 
 bool load(sudoku::Game& game) { return read(Kind::Sudoku, game, sudoku::SAVE_MAX); }
 bool load(minesweeper::Game& game) { return read(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
@@ -221,6 +225,7 @@ bool load(reversi::Game& game) {
   return read(Kind::Reversi, game, reversi::SAVE_MAX) || readRecord(reversiDone, game, reversi::SAVE_MAX) == Read::Ok;
 }
 bool load(nonogram::Game& game) { return read(Kind::Nonogram, game, nonogram::SAVE_MAX); }
+bool load(draughts::Game& game) { return read(Kind::Draughts, game, draughts::SAVE_MAX); }
 
 bool save(const fifteen::Best& best) {
   char text[48];

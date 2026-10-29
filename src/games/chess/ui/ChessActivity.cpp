@@ -146,24 +146,6 @@ void drawFitted(const GfxRenderer& renderer, const int font, const int x, const 
   renderer.drawText(font, x, y, renderer.truncatedText(font, text, maxWidth, style).c_str(), true, style);
 }
 
-// Last move marker: 2 px dashes inset 2 px, one dash in each corner.
-void drawDashedFrame(const GfxRenderer& renderer, const int x, const int y) {
-  constexpr int kInset = 2;
-  constexpr int kWidth = 2;
-  constexpr int kDash = 8;
-  constexpr int kGap = 4;
-  constexpr int kLength = kSquare - 2 * kInset;
-  const int left = x + kInset;
-  const int top = y + kInset;
-  for (int d = 0; d < kLength; d += kDash + kGap) {
-    const int n = std::min(kDash, kLength - d);
-    renderer.fillRect(left + d, top, n, kWidth, true);
-    renderer.fillRect(left + d, top + kLength - kWidth, n, kWidth, true);
-    renderer.fillRect(left, top + d, kWidth, n, true);
-    renderer.fillRect(left + kLength - kWidth, top + d, kWidth, n, true);
-  }
-}
-
 // Russian piece letters for the Russian UI, English SAN otherwise.
 const chess::Notation& notation() {
   return I18N.getLanguage() == Language::RU ? chess::NOTATION_RU : chess::NOTATION_EN;
@@ -1243,7 +1225,7 @@ void ChessActivity::drawBoard() const {
   if (game.lastMove(last)) {
     for (const chess::Square square : {last.from, last.to}) {
       squareOrigin(square, flip, x, y);
-      drawDashedFrame(renderer, x, y);
+      drawDashedFrame(renderer, x, y, kSquare);
     }
   }
   if (selected != kNoSquare) {

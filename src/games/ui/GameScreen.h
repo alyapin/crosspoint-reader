@@ -86,17 +86,18 @@ class GameScreen : public Activity, protected UiAppHost {
   virtual int32_t shownMinutes() const { return -1; }
   // Board hits carry InputLongPress (event.longPress on a held tap).
   virtual bool wantsLongPress() const { return false; }
-  // Rows the game puts above Новая игра in its menu (at most MENU_EXTRAS);
-  // menuExtraChosen() gets the index of the one chosen.
-  static constexpr int MENU_EXTRAS = GamePickerActivity::MAX_ROWS - 2;
-  virtual int menuExtras(GamePickerActivity::Row (&)[MENU_EXTRAS]) const { return 0; }
-  virtual void menuExtraChosen(int) {}
+  // The game's own menu rows (at most MENU_ROWS) and the choice of one, by its
+  // index there: in the touch Меню and in the pause menu, before Новая игра.
+  static constexpr int MENU_ROWS = 3;
+  virtual int menuRows(GamePickerActivity::Row (&/*rows*/)[MENU_ROWS]) const { return 0; }
+  virtual void menuChosen(int /*row*/) {}
 
   void openPicker(const char* title, const GamePickerActivity::Row* rows, int count, int selected, int toggleRow = -1,
                   bool toggleOn = false);
-  // The menu of a game in progress: the game's own rows, Новая игра, or
-  // Завершить, which after a confirmation drops the save and leaves.
-  void openGameMenu();
+  // The menu of a game in progress: the game's own rows (after Новая игра with
+  // rowsAfterNewGame), Новая игра, or Завершить, which after a confirmation
+  // drops the save and leaves.
+  void openGameMenu(bool rowsAfterNewGame = false);
   void requestRepaint(Repaint kind);
   // Touch boards: "‹ Выйти" and the action bar; button boards play by keys alone.
   bool hasBar() const;
@@ -126,12 +127,15 @@ class GameScreen : public Activity, protected UiAppHost {
   static void screenFn(UiScreen& screen, void* user);
   void confirmFinish();
   void openPauseMenu();
+  void addMenuRow(GamePickerActivity::Row* rows, int& count, int8_t id, const GamePickerActivity::Row& row);
+  void addOwnRows(GamePickerActivity::Row* rows, int& count);
+  void showMenu(const char* title, const GamePickerActivity::Row* rows, int count);
   void runBarSlot(int slot);
   int newGameSlot() const;
 
   StrId title;
   mutable BarItem shownBar[BAR_SLOTS];  // the last drawBar(), for the pause menu
-  int8_t pauseRows[GamePickerActivity::MAX_ROWS] = {};
+  int8_t menuIds[GamePickerActivity::MAX_ROWS] = {};  // the open menu's rows (GameScreen.cpp MenuRow)
   setka::RefreshCadence cadence;  // render task only
   std::atomic<uint8_t> repaint{RepaintEntry};
   int32_t clockShown = -1;

@@ -23,8 +23,8 @@ using namespace setka;
 
 namespace {
 constexpr int kCursorArm = 14;
-// Pause menu rows other than a bar slot.
-enum PauseRow : int8_t { kPauseContinue = -1, kPauseNewGame = -2, kPauseFinish = -3, kPauseLeave = -4 };
+// Menu rows other than a bar slot (0..BAR_SLOTS-1); a game's own row is kRowOwn + its index.
+enum MenuRow : int8_t { kRowContinue = -1, kRowNewGame = -2, kRowFinish = -3, kRowLeave = -4, kRowOwn = 16 };
 }  // namespace
 
 GameScreen::GameScreen(const char* name, const StrId title, GfxRenderer& renderer, MappedInputManager& mappedInput)
@@ -91,80 +91,74 @@ void GameScreen::openPicker(const char* title, const GamePickerActivity::Row* ro
   });
 }
 
-void GameScreen::openGameMenu() {
-  GamePickerActivity::Row extras[MENU_EXTRAS];
-  const int extraCount = std::clamp(menuExtras(extras), 0, MENU_EXTRAS);
+void GameScreen::openGameMenu(const bool rowsAfterNewGame) {
   GamePickerActivity::Row rows[GamePickerActivity::MAX_ROWS];
-  std::copy(extras, extras + extraCount, rows);
-  rows[extraCount] = {tr(STR_GAMES_NEW_GAME), &icon_bar_new_game_24};
-  rows[extraCount + 1] = {tr(STR_GAMES_FINISH), &icon_resign_24};
-  auto menu = makeUniqueNoThrow<GamePickerActivity>(renderer, mappedInput, tr(STR_GAMES_MENU), rows, extraCount + 2, 0);
+  int count = 0;
+  if (!rowsAfterNewGame) addOwnRows(rows, count);
+  addMenuRow(rows, count, kRowNewGame, {tr(STR_GAMES_NEW_GAME), &icon_bar_new_game_24});
+  if (rowsAfterNewGame) addOwnRows(rows, count);
+  addMenuRow(rows, count, kRowFinish, {tr(STR_GAMES_FINISH), &icon_resign_24});
+  showMenu(tr(STR_GAMES_MENU), rows, count);
+}
+
+void GameScreen::openPauseMenu() {
+  GamePickerActivity::Row rows[GamePickerActivity::MAX_ROWS];
+  int count = 0;
+  addMenuRow(rows, count, kRowContinue, {tr(STR_GAMES_CONTINUE), &icon_start_24});
+  for (int i = 0; i < BAR_SLOTS; ++i) {
+    const BarItem& item = shownBar[i];
+    if (item.label == nullptr || item.kind == BarItem::Menu || item.kind == BarItem::NewGame) continue;
+    const char* status = item.kind != BarItem::Mode ? nullptr : item.active ? tr(STR_GAMES_ON) : tr(STR_GAMES_OFF);
+    addMenuRow(rows, count, static_cast<int8_t>(i), {item.label, item.icon, status});
+  }
+  addOwnRows(rows, count);
+  addMenuRow(rows, count, kRowNewGame, {tr(STR_GAMES_NEW_GAME), &icon_bar_new_game_24});
+  if (newGameSlot() < 0) addMenuRow(rows, count, kRowFinish, {tr(STR_GAMES_FINISH), &icon_resign_24});
+  addMenuRow(rows, count, kRowLeave, {tr(STR_GAMES_LEAVE), &icon_exit_24});
+  showMenu(I18N.get(title), rows, count);
+}
+
+void GameScreen::addMenuRow(GamePickerActivity::Row* rows, int& count, const int8_t id,
+                            const GamePickerActivity::Row& row) {
+  if (count >= GamePickerActivity::MAX_ROWS) return;
+  menuIds[count] = id;
+  rows[count++] = row;
+}
+
+void GameScreen::addOwnRows(GamePickerActivity::Row* rows, int& count) {
+  GamePickerActivity::Row own[MENU_ROWS];
+  const int ownCount = std::clamp(menuRows(own), 0, MENU_ROWS);
+  for (int i = 0; i < ownCount; ++i) addMenuRow(rows, count, static_cast<int8_t>(kRowOwn + i), own[i]);
+}
+
+void GameScreen::showMenu(const char* title, const GamePickerActivity::Row* rows, const int count) {
+  auto menu = makeUniqueNoThrow<GamePickerActivity>(renderer, mappedInput, title, rows, count, 0);
   if (!menu) {
     LOG_ERR("GAMES", "OOM: %u bytes for the menu", static_cast<unsigned>(sizeof(GamePickerActivity)));
     return;
   }
   app.clearTapFlash();
   pauseGame();
-  startActivityForResult(std::move(menu), [this, extraCount](const ActivityResult& result) {
+  startActivityForResult(std::move(menu), [this, count](const ActivityResult& result) {
     RenderLock lock(*this);
     const auto* choice = std::get_if<MenuResult>(&result.data);
-    const int action = !result.isCancelled && choice != nullptr ? choice->action : -1;
-    if (action == extraCount + 1) {
+    const bool chosen = !result.isCancelled && choice != nullptr && choice->action >= 0 && choice->action < count;
+    const int row = chosen ? menuIds[choice->action] : kRowContinue;
+    if (row == kRowFinish) {
       confirmFinish();
       return;
     }
     resumeGame();
-    clockShown = shownMinutes();
-    requestRepaint(RepaintEntry);
-    if (action == extraCount) {
-      openNewGame();
-    } else if (action >= 0) {
-      menuExtraChosen(action);
-    }
-  });
-}
-
-void GameScreen::openPauseMenu() {
-  GamePickerActivity::Row rows[GamePickerActivity::MAX_ROWS];
-  int count = 0;
-  auto add = [&](const int8_t row, const GamePickerActivity::Row& shown) {
-    pauseRows[count] = row;
-    rows[count++] = shown;
-  };
-  add(kPauseContinue, {tr(STR_GAMES_CONTINUE), &icon_start_24});
-  for (int i = 0; i < BAR_SLOTS; ++i) {
-    const BarItem& item = shownBar[i];
-    if (item.label == nullptr || item.kind == BarItem::Menu || item.kind == BarItem::NewGame) continue;
-    const char* status = item.kind != BarItem::Mode ? nullptr : item.active ? tr(STR_GAMES_ON) : tr(STR_GAMES_OFF);
-    add(static_cast<int8_t>(i), {item.label, item.icon, status});
-  }
-  add(kPauseNewGame, {tr(STR_GAMES_NEW_GAME), &icon_bar_new_game_24});
-  if (newGameSlot() < 0) add(kPauseFinish, {tr(STR_GAMES_FINISH), &icon_resign_24});
-  add(kPauseLeave, {tr(STR_GAMES_LEAVE), &icon_exit_24});
-
-  auto menu = makeUniqueNoThrow<GamePickerActivity>(renderer, mappedInput, I18N.get(title), rows, count, 0);
-  if (!menu) {
-    LOG_ERR("GAMES", "OOM: %u bytes for the pause menu", static_cast<unsigned>(sizeof(GamePickerActivity)));
-    return;
-  }
-  pauseGame();
-  startActivityForResult(std::move(menu), [this](const ActivityResult& result) {
-    RenderLock lock(*this);
-    const auto* choice = std::get_if<MenuResult>(&result.data);
-    const int row = !result.isCancelled && choice != nullptr ? pauseRows[choice->action] : kPauseContinue;
-    if (row == kPauseFinish) {
-      confirmFinish();
-      return;
-    }
-    resumeGame();
-    if (row == kPauseLeave) {
+    if (row == kRowLeave) {
       leave();
       return;
     }
     clockShown = shownMinutes();
     requestRepaint(RepaintEntry);
-    if (row == kPauseNewGame) {
+    if (row == kRowNewGame) {
       openNewGame();
+    } else if (row >= kRowOwn) {
+      menuChosen(row - kRowOwn);
     } else if (row >= 0) {
       runBarSlot(row);
     }

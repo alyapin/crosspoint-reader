@@ -175,18 +175,18 @@ bool NonogramActivity::loadPicture(const int side) {
   return readPack(load, &pick) && pick.loaded;
 }
 
-int NonogramActivity::menuExtras(GamePickerActivity::Row (&rows)[MENU_EXTRAS]) const {
+int NonogramActivity::menuRows(GamePickerActivity::Row (&rows)[MENU_ROWS]) const {
   if (!boardShown() || !game.inProgress()) return 0;
   rows[0] = {tr(STR_NONOGRAM_CHECK), &icon_circle_check_24};
   rows[1] = {tr(STR_NONOGRAM_RESTART), &icon_bar_restart_24};
   return 2;
 }
 
-void NonogramActivity::menuExtraChosen(const int index) {
-  if (index == 0) {
+void NonogramActivity::menuChosen(const int row) {
+  if (row == 0) {
     checkShown = true;
     requestRepaint(RepaintUpdate);
-  } else if (index == 1) {
+  } else if (row == 1) {
     game.restart();
     checkShown = false;
     markChanged();

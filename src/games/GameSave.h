@@ -42,6 +42,9 @@ namespace nonogram {
 class Game;
 struct Record;
 }  // namespace nonogram
+namespace draughts {
+class Game;
+}
 
 namespace gamesave {
 
@@ -56,6 +59,7 @@ enum class Kind {
   Hangman,
   Reversi,
   Nonogram,
+  Draughts,
 };
 
 bool hasGameInProgress(Kind kind);
@@ -74,6 +78,7 @@ bool save(const g2048::Game& game);
 bool save(const hangman::Game& game);
 bool save(const reversi::Game& game);
 bool save(const nonogram::Game& game);
+bool save(const draughts::Game& game);
 
 // Restore the saved game, paused. False on failure; a file that reads but does
 // not parse is removed. One that cannot be read is kept: until a load reads it,
@@ -90,6 +95,7 @@ bool load(hangman::Game& game);
 // The game in progress, else the last finished one.
 bool load(reversi::Game& game);
 bool load(nonogram::Game& game);
+bool load(draughts::Game& game);
 
 // Records outlive their games. A missing or corrupt one loads empty; one that
 // cannot be read loads false (2048: 0) and is not written until a load reads it.
