@@ -326,6 +326,9 @@ void ReaderToolbarUi::buildPanel(UiScreen& screen) {
   nav_.followOnBuild = nav_.selected >= 0;
   nav_.followPending = false;
   nav_.syncToProps(listRect, listProps_.rowHeight, rowGap, count, listProps_);
+  if (nav_.selected < 0 && model_.currentIndex >= 0 && model_.currentIndex < count) {
+    listProps_.selectedIndex = static_cast<int16_t>(model_.currentIndex);
+  }
 
   // Materialise only the visible window of rows.
   const int windowCount = std::min({nav_.visibleRows, count - nav_.top, kMaxWindow});

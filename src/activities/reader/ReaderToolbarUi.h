@@ -40,6 +40,7 @@ class ReaderToolbarUi : public UiAppHost {
     std::function<std::string(int)> rowValue;
     void (*rowCheckbox)(void* ctx, int index, freeink::ui::ListItem& item) = nullptr;
     void* rowCheckboxContext = nullptr;
+    int currentIndex = -1;  // row marked as the current one while no cursor is shown
     // Tile row: the tool in focus (toolbar) / the open panel (panel). 0..2.
     int activeTool = 0;
     // Button boards keep the theme's denser list row height (as every other
