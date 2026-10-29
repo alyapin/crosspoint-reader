@@ -25,7 +25,6 @@ constexpr int kTileRule = 2;
 constexpr int kFrameInset = 4;
 constexpr int kBoard = fifteen::SIDE * kTile + (fifteen::SIDE - 1) * kTileGap;
 constexpr int kResultTop = GameScreen::BOARD_TOP + kBoard + 36;
-constexpr int kResultGap = 10;
 constexpr int kLastSlot = GameScreen::BAR_SLOTS - 1;
 
 // "37 ходов": Russian picks the form by the number; English uses the last two the same.
@@ -57,7 +56,7 @@ FifteenActivity::FifteenActivity(GfxRenderer& renderer, MappedInputManager& mapp
 bool FifteenActivity::restore() {
   gamesave::load(best);
   if (gamesave::load(game)) {
-    cursor = mappedInput.hasTouch() ? -1 : game.gap();
+    cursor = -1;
   } else {
     startGame();
   }
@@ -78,7 +77,7 @@ void FifteenActivity::startGame() {
   game.newGame(esp_random());
   newBest = false;
   barFocus = -1;
-  cursor = mappedInput.hasTouch() ? -1 : game.gap();
+  cursor = -1;
 }
 
 void FifteenActivity::openNewGame() {
@@ -90,7 +89,10 @@ void FifteenActivity::openNewGame() {
 // --- input -------------------------------------------------------------------
 
 void FifteenActivity::slideAt(const int cell) {
-  if (!game.slide(cell)) return;
+  if (game.slide(cell)) afterSlide();
+}
+
+void FifteenActivity::afterSlide() {
   if (game.isSolved()) {
     newBest = best.record(game.moveCount(), game.elapsedMs());
     if (newBest) bestPending = true;
@@ -130,6 +132,9 @@ void FifteenActivity::onKey(const int dx, const int dy, const bool confirm) {
     }
   } else if (game.isSolved()) {
     if (hasBar()) barFocus = kLastSlot;
+  } else if (!hasBar()) {
+    // Button boards: an arrow slides the tile beside the gap that way.
+    if (game.slideToward(dx, dy)) afterSlide();
   } else if (cursor < 0) {
     cursor = game.gap();
   } else {
@@ -177,7 +182,6 @@ int FifteenActivity::cellAt(const int x, const int y) const {
 // --- render task -------------------------------------------------------------
 
 void FifteenActivity::build(UiScreen& screen) {
-  const int width = renderer.getScreenWidth();
   char clock[24];
   formatElapsed(game.elapsedMs(), clock, sizeof(clock));
   char moves[24];
@@ -193,15 +197,15 @@ void FifteenActivity::build(UiScreen& screen) {
   if (game.isSolved()) {
     char line[80];
     snprintf(line, sizeof(line), tr(STR_FIFTEEN_SOLVED), moves, clock);
-    drawCentered(kText12Font, 0, width, kResultTop, line, kSemiBold);
+    char record[80];
     if (newBest) {
-      snprintf(line, sizeof(line), "%s", tr(STR_FIFTEEN_NEW_BEST));
+      snprintf(record, sizeof(record), "%s", tr(STR_FIFTEEN_NEW_BEST));
     } else {
       movesText(best.moves, moves, sizeof(moves));
       formatElapsed(best.ms, clock, sizeof(clock));
-      snprintf(line, sizeof(line), tr(STR_FIFTEEN_BEST), moves, clock);
+      snprintf(record, sizeof(record), tr(STR_FIFTEEN_BEST), moves, clock);
     }
-    drawCentered(kText10Font, 0, width, kResultTop + renderer.getLineHeight(kText12Font) + kResultGap, line);
+    drawResult(kResultTop, line, record);
   }
 
   BarItem items[BAR_SLOTS];
@@ -219,9 +223,7 @@ void FifteenActivity::drawTile(const int cell, const int left) const {
     renderer.drawRect(x, y, kTile, kTile, kTileRule, true);
     char text[4];
     snprintf(text, sizeof(text), "%d", tile);
-    const int cap = heroCapHeight(renderer, kDigitsFont);
-    renderer.drawText(kDigitsFont, x + (kTile - renderer.getTextWidth(kDigitsFont, text, kSemiBold)) / 2,
-                      y + (kTile + cap) / 2 - renderer.getFontAscenderSize(kDigitsFont), text, true, kSemiBold);
+    drawCentered(kText12Font, x, kTile, y + (kTile - renderer.getLineHeight(kText12Font)) / 2, text, kSemiBold);
   }
   if (cell == cursor && barFocus < 0 && !game.isSolved()) {
     drawCellFrame(renderer, x + kFrameInset, y + kFrameInset, kTile - 2 * kFrameInset, kTile - 2 * kFrameInset);

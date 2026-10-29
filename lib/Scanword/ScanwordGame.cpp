@@ -1,5 +1,7 @@
 #include "ScanwordGame.h"
 
+#include <KeyboardGames.h>
+#if SOVA_KEYBOARD_GAMES
 #include <cstring>
 
 namespace scanword {
@@ -495,3 +497,5 @@ bool Game::deserialize(const char* text, const size_t len) {
 }
 
 }  // namespace scanword
+
+#endif  // SOVA_KEYBOARD_GAMES

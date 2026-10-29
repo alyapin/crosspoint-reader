@@ -1,5 +1,7 @@
 #include "ScanwordStore.h"
 
+#include <KeyboardGames.h>
+#if SOVA_KEYBOARD_GAMES
 #include <HalStorage.h>
 #include <Logging.h>
 #include <Memory.h>
@@ -241,3 +243,5 @@ bool saveShelf(const scanword::Shelf& shelf) {
 bool hasPuzzleInProgress() { return Storage.exists(IN_PROGRESS_PATH); }
 
 }  // namespace scanwordstore
+
+#endif  // SOVA_KEYBOARD_GAMES

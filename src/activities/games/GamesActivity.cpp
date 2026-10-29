@@ -7,17 +7,21 @@
 
 #include "games/chess/ui/ChessActivity.h"
 #include "games/chess/ui/chessIcons.h"
-#include "games/scanword/ui/ScanwordActivity.h"
-#include "games/scanword/ui/scanwordIcons.h"
+#include "games/ui/DraughtsActivity.h"
 #include "games/ui/FifteenActivity.h"
-#include "games/ui/FiveLettersActivity.h"
 #include "games/ui/Game2048Activity.h"
-#include "games/ui/HangmanActivity.h"
 #include "games/ui/KlondikeActivity.h"
 #include "games/ui/MinesweeperActivity.h"
+#include "games/ui/NonogramActivity.h"
+#include "games/ui/ReversiActivity.h"
 #include "games/ui/SudokuActivity.h"
-#include "games/ui/TicTacToeActivity.h"
 #include "games/ui/gameIcons.h"
+#if SOVA_KEYBOARD_GAMES
+#include "games/scanword/ui/ScanwordActivity.h"
+#include "games/scanword/ui/scanwordIcons.h"
+#include "games/ui/FiveLettersActivity.h"
+#include "games/ui/HangmanActivity.h"
+#endif
 
 namespace {
 struct Game {
@@ -41,12 +45,18 @@ constexpr Game kGames[] = {
     {StrId::STR_SUDOKU, &icon_grid_24, &openSudoku, &sudokuListStatus},
     {StrId::STR_MINESWEEPER, &icon_bomb_24, &openMinesweeper, &minesweeperListStatus},
     {StrId::STR_KLONDIKE, &icon_spade_24, &openKlondike, &klondikeListStatus},
+#if SOVA_KEYBOARD_GAMES
     {StrId::STR_SCANWORDS, &icon_scanword_24, &openScanwords, &scanwordListStatus},
-    {StrId::STR_TICTACTOE, &icon_tictactoe_24, &openTicTacToe, &tictactoeListStatus},
+#endif
     {StrId::STR_2048, &icon_tiles_24, &openGame2048, &game2048ListStatus},
     {StrId::STR_FIFTEEN, &icon_fifteen_24, &openFifteen, &fifteenListStatus},
+#if SOVA_KEYBOARD_GAMES
     {StrId::STR_HANGMAN, &icon_hangman_24, &openHangman, &hangmanListStatus},
     {StrId::STR_FIVE_LETTERS, &icon_five_letters_24, &openFiveLetters, &fiveLettersListStatus},
+#endif
+    {StrId::STR_REVERSI, &icon_reversi_24, &openReversi, &reversiListStatus},
+    {StrId::STR_DRAUGHTS, &icon_draughts_24, &openDraughts, &draughtsListStatus},
+    {StrId::STR_NONOGRAM, &icon_nonogram_24, &openNonogram, &nonogramListStatus},
     {},
 };
 constexpr int kGameCount = static_cast<int>(std::size(kGames)) - 1;

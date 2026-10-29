@@ -1,5 +1,7 @@
 #include "ScanwordPuzzle.h"
 
+#include <KeyboardGames.h>
+
 #include <cstring>
 
 namespace scanword {
@@ -10,6 +12,7 @@ constexpr uint32_t CP_A_LOWER = 0x430;
 constexpr uint32_t CP_YO = 0x401;
 constexpr uint32_t CP_YO_LOWER = 0x451;
 
+#if SOVA_KEYBOARD_GAMES
 bool isLine(const char* text, const size_t len, const char* expected) {
   return len == strlen(expected) && memcmp(text, expected, len) == 0;
 }
@@ -35,6 +38,7 @@ bool skipSpace(const char* text, const size_t len, size_t& pos) {
 }
 
 uint32_t fnv(uint32_t h, const uint8_t byte) { return (h ^ byte) * 16777619u; }
+#endif
 
 }  // namespace
 
@@ -58,6 +62,8 @@ uint32_t letterCodepoint(const uint8_t letter) {
   return CP_A + letter - (letter > LETTER_YO ? 2 : 1);
 }
 
+// The rest is the game itself (SOVA_KEYBOARD_GAMES); the letter helpers above serve the clue layout too.
+#if SOVA_KEYBOARD_GAMES
 std::string_view Puzzle::clue(const uint8_t index) const {
   const Word& w = list[index];
   return {pool + w.textOffset, w.textLength};
@@ -367,5 +373,7 @@ bool IndexParser::line(const char* text, const size_t len) {
   halted = !fn(context, entry);
   return true;
 }
+
+#endif  // SOVA_KEYBOARD_GAMES
 
 }  // namespace scanword

@@ -1,5 +1,7 @@
 #include "FiveLetters.h"
 
+#include <KeyboardGames.h>
+#if SOVA_KEYBOARD_GAMES
 #include <cstring>
 
 #include "FiveLettersWords.h"
@@ -245,3 +247,5 @@ bool Game::deserialize(const char* text, const size_t len) {
 }
 
 }  // namespace fiveletters
+
+#endif  // SOVA_KEYBOARD_GAMES

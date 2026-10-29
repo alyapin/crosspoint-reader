@@ -13,8 +13,8 @@
 // label with an optional status on the right; the focused row carries the
 // left selection bar and a SemiBold label. Rows are drawn directly and
 // registered as ACTION_ROW hits, so the UiListActivity loop (touch, buttons,
-// back gesture, header back tap) drives the screen unchanged. Lists are
-// expected to fit one screen.
+// back gesture, header back tap) drives the screen unchanged. A list longer
+// than one screen shows the page of the selected row; a vertical swipe turns it.
 class SetkaListActivity : public UiListActivity {
  public:
   void onEnter() override;
@@ -37,6 +37,7 @@ class SetkaListActivity : public UiListActivity {
  private:
   bool handleCustomInput() override;
   void buildScreen(UiScreen& screen) override;
+  int rowsPerPage() const;
 
   setka::RefreshCadence cadence;  // render task only
   std::atomic<bool> entryRefresh{true};

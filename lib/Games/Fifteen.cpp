@@ -92,6 +92,13 @@ bool Game::canSlide(const int cell) const {
   return cell / SIDE == gapCell / SIDE || cell % SIDE == gapCell % SIDE;
 }
 
+bool Game::slideToward(const int dx, const int dy) {
+  const int x = gapCell % SIDE - dx;
+  const int y = gapCell / SIDE - dy;
+  if ((dx == 0) == (dy == 0) || x < 0 || x >= SIDE || y < 0 || y >= SIDE) return false;
+  return slide(y * SIDE + x);
+}
+
 bool Game::slide(const int cell) {
   if (!canSlide(cell)) return false;
   const int step = cell / SIDE == gapCell / SIDE ? (cell > gapCell ? 1 : -1) : (cell > gapCell ? SIDE : -SIDE);

@@ -12,10 +12,10 @@ fifteen = blocks
 card = rectangle-vertical
 cards = layers
 circle-check = circle-check
-tictactoe = hash
 tiles = layout-grid
 hangman = baseline
 hangman-rude = flame
+reversi = contrast
 # action bar (games/ui/ActionBar.h)
 bar-notes = pencil
 bar-erase = eraser
@@ -24,9 +24,17 @@ bar-flag = flag
 bar-restart = rotate-ccw
 bar-new-game = plus
 bar-hint = lightbulb
-# pause menu (button boards)
+# game menu: Завершить and Сдаться; Выйти (button boards)
+finish = circle-x
 exit = log-out
 # «5 букв»: games list, keyboard
 five-letters = spell-check
 key-delete = delete
 key-enter = corner-down-left
+# Японские кроссворды: games list, picker, bar
+nonogram = grid-2x2-check
+pictures = image
+random = dices
+bar-cross = x
+# Шашки: games list
+draughts = disc-2

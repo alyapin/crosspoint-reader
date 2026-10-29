@@ -1,19 +1,24 @@
 #include "GameSave.h"
 
+#include <Draughts.h>
 #include <Fifteen.h>
-#include <FiveLetters.h>
 #include <Game2048.h>
 #include <HalStorage.h>
-#include <Hangman.h>
+#include <KeyboardGames.h>
 #include <Klondike.h>
 #include <Logging.h>
 #include <Memory.h>
 #include <Minesweeper.h>
+#include <Nonogram.h>
+#include <Reversi.h>
 #include <Sudoku.h>
-#include <TicTacToe.h>
 
 #include <cstdio>
 #include <string>
+#if SOVA_KEYBOARD_GAMES
+#include <FiveLetters.h>
+#include <Hangman.h>
+#endif
 
 namespace gamesave {
 namespace {
@@ -31,8 +36,6 @@ Paths pathsOf(const Kind kind) {
       return {"/.crosspoint/games/sudoku.json", "/.crosspoint/games/sudoku.json.tmp"};
     case Kind::Minesweeper:
       return {"/.crosspoint/games/minesweeper.json", "/.crosspoint/games/minesweeper.json.tmp"};
-    case Kind::TicTacToe:
-      return {"/.crosspoint/games/tictactoe.json", "/.crosspoint/games/tictactoe.json.tmp"};
     case Kind::Fifteen:
       return {"/.crosspoint/games/fifteen.json", "/.crosspoint/games/fifteen.json.tmp"};
     case Kind::FiveLetters:
@@ -41,6 +44,12 @@ Paths pathsOf(const Kind kind) {
       return {"/.crosspoint/games/2048.json", "/.crosspoint/games/2048.json.tmp"};
     case Kind::Hangman:
       return {"/.crosspoint/games/hangman.json", "/.crosspoint/games/hangman.json.tmp"};
+    case Kind::Reversi:
+      return {"/.crosspoint/games/reversi.json", "/.crosspoint/games/reversi.json.tmp"};
+    case Kind::Nonogram:
+      return {"/.crosspoint/games/nonogram.json", "/.crosspoint/games/nonogram.json.tmp"};
+    case Kind::Draughts:
+      return {"/.crosspoint/games/draughts.json", "/.crosspoint/games/draughts.json.tmp"};
     case Kind::Klondike:
       break;
   }
@@ -57,10 +66,13 @@ uint16_t unreadGames = 0;  // a bit per Kind
 
 uint16_t bitOf(const Kind kind) { return static_cast<uint16_t>(1u << static_cast<unsigned>(kind)); }
 
-Record tictactoeDone{{"/.crosspoint/games/tictactoe-done.json", "/.crosspoint/games/tictactoe-done.json.tmp"}};
+Record reversiDone{{"/.crosspoint/games/reversi-done.json", "/.crosspoint/games/reversi-done.json.tmp"}};
 Record fifteenBest{{"/.crosspoint/games/fifteen-best.json", "/.crosspoint/games/fifteen-best.json.tmp"}};
+#if SOVA_KEYBOARD_GAMES
 Record fiveLettersStats{{"/.crosspoint/games/fiveletters-stats.json", "/.crosspoint/games/fiveletters-stats.json.tmp"}};
+#endif
 Record best2048{{"/.crosspoint/games/2048-best.txt", "/.crosspoint/games/2048-best.txt.tmp"}};
+Record nonogramRecord{{"/.crosspoint/games/nonogram-best.json", "/.crosspoint/games/nonogram-best.json.tmp"}};
 
 enum class Read : uint8_t { Ok, Missing, Failed };
 
@@ -184,26 +196,37 @@ bool clear(const Kind kind) {
 bool save(const sudoku::Game& game) { return write(Kind::Sudoku, game, sudoku::SAVE_MAX); }
 bool save(const minesweeper::Game& game) { return write(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
 bool save(const klondike::Game& game) { return write(Kind::Klondike, game, klondike::SAVE_MAX); }
-bool save(const tictactoe::Game& game) {
-  if (game.inProgress()) return write(Kind::TicTacToe, game, tictactoe::SAVE_MAX);
-  return !tictactoeDone.unread && writeTo(tictactoeDone.paths, game, tictactoe::SAVE_MAX) && clear(Kind::TicTacToe);
-}
 bool save(const fifteen::Game& game) { return write(Kind::Fifteen, game, fifteen::SAVE_MAX); }
+#if SOVA_KEYBOARD_GAMES
 bool save(const fiveletters::Game& game) { return write(Kind::FiveLetters, game, fiveletters::SAVE_MAX); }
+#endif
 bool save(const g2048::Game& game) { return write(Kind::Game2048, game, g2048::SAVE_MAX); }
+#if SOVA_KEYBOARD_GAMES
 bool save(const hangman::Game& game) { return write(Kind::Hangman, game, hangman::SAVE_MAX); }
+#endif
+bool save(const reversi::Game& game) {
+  if (game.inProgress()) return !reversiDone.unread && write(Kind::Reversi, game, reversi::SAVE_MAX);
+  return !reversiDone.unread && writeTo(reversiDone.paths, game, reversi::SAVE_MAX) && clear(Kind::Reversi);
+}
+bool save(const nonogram::Game& game) { return write(Kind::Nonogram, game, nonogram::SAVE_MAX); }
+bool save(const draughts::Game& game) { return write(Kind::Draughts, game, draughts::SAVE_MAX); }
 
 bool load(sudoku::Game& game) { return read(Kind::Sudoku, game, sudoku::SAVE_MAX); }
 bool load(minesweeper::Game& game) { return read(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
 bool load(klondike::Game& game) { return read(Kind::Klondike, game, klondike::SAVE_MAX); }
-bool load(tictactoe::Game& game) {
-  return read(Kind::TicTacToe, game, tictactoe::SAVE_MAX) ||
-         readRecord(tictactoeDone, game, tictactoe::SAVE_MAX) == Read::Ok;
-}
 bool load(fifteen::Game& game) { return read(Kind::Fifteen, game, fifteen::SAVE_MAX); }
+#if SOVA_KEYBOARD_GAMES
 bool load(fiveletters::Game& game) { return read(Kind::FiveLetters, game, fiveletters::SAVE_MAX); }
+#endif
 bool load(g2048::Game& game) { return read(Kind::Game2048, game, g2048::SAVE_MAX); }
+#if SOVA_KEYBOARD_GAMES
 bool load(hangman::Game& game) { return read(Kind::Hangman, game, hangman::SAVE_MAX); }
+#endif
+bool load(reversi::Game& game) {
+  return read(Kind::Reversi, game, reversi::SAVE_MAX) || readRecord(reversiDone, game, reversi::SAVE_MAX) == Read::Ok;
+}
+bool load(nonogram::Game& game) { return read(Kind::Nonogram, game, nonogram::SAVE_MAX); }
+bool load(draughts::Game& game) { return read(Kind::Draughts, game, draughts::SAVE_MAX); }
 
 bool save(const fifteen::Best& best) {
   char text[48];
@@ -211,12 +234,20 @@ bool save(const fifteen::Best& best) {
 }
 bool load(fifteen::Best& best) { return loadRecord(fifteenBest, best, 48); }
 
+#if SOVA_KEYBOARD_GAMES
 bool saveStats(const fiveletters::Stats& stats) {
   char text[fiveletters::STATS_MAX];
   return saveRecord(fiveLettersStats, text, stats.serialize(text, sizeof(text)));
 }
 
 bool loadStats(fiveletters::Stats& stats) { return loadRecord(fiveLettersStats, stats, fiveletters::STATS_MAX); }
+#endif
+
+bool save(const nonogram::Record& record) {
+  char text[nonogram::RECORD_MAX];
+  return saveRecord(nonogramRecord, text, record.serialize(text, sizeof(text)));
+}
+bool load(nonogram::Record& record) { return loadRecord(nonogramRecord, record, nonogram::RECORD_MAX); }
 
 uint32_t loadBest2048() {
   std::string text;

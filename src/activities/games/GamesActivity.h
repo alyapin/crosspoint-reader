@@ -1,5 +1,7 @@
 #pragma once
 
+#include <KeyboardGames.h>
+
 #include "activities/SetkaListActivity.h"
 
 // "Игры" under "Ещё": one row per entry of the game registry in

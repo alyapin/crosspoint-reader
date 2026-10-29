@@ -118,6 +118,32 @@ TEST(Fifteen, SlidesOnlyAlongTheGapRowOrColumn) {
   EXPECT_EQ(g.moveCount(), 3);
 }
 
+TEST(Fifteen, SlideTowardMovesTheGapNeighbourOneCell) {
+  const uint8_t start[CELLS] = {1, 2, 3, 4, 5, 0, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  Game g(&fakeMillis);
+  ASSERT_TRUE(g.newGame(start));
+  EXPECT_FALSE(g.slideToward(0, 0));
+  EXPECT_FALSE(g.slideToward(1, 1));
+  ASSERT_TRUE(g.slideToward(-1, 0));  // 6 moves left
+  EXPECT_EQ(g.gap(), 6);
+  EXPECT_EQ(g.tile(5), 6);
+  ASSERT_TRUE(g.slideToward(0, -1));  // 10 moves up
+  EXPECT_EQ(g.gap(), 10);
+  EXPECT_EQ(g.tile(6), 10);
+  ASSERT_TRUE(g.slideToward(1, 0));  // 9 moves right
+  EXPECT_EQ(g.gap(), 9);
+  ASSERT_TRUE(g.slideToward(0, 1));  // 5 moves down
+  EXPECT_EQ(g.gap(), 5);
+  EXPECT_EQ(g.moveCount(), 4);
+
+  // Nothing beside the gap on that side.
+  const uint8_t corner[CELLS] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 14};
+  ASSERT_TRUE(g.newGame(corner));
+  EXPECT_FALSE(g.slideToward(1, 0));
+  EXPECT_FALSE(g.slideToward(0, 1));
+  EXPECT_EQ(g.moveCount(), 0);
+}
+
 TEST(Fifteen, LastSlideWinsAndStopsTheClock) {
   const uint8_t tiles[CELLS] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 13, 14, 15};
   Game g(&fakeMillis);

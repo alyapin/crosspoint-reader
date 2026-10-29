@@ -35,6 +35,10 @@ class MinesweeperActivity final : public GameScreen {
   bool onBack() override;
   int32_t shownMinutes() const override;
   bool wantsLongPress() const override { return true; }
+  // Button boards: a held Confirm flags (the bar's Флажок mode is touch only).
+  bool holdsConfirm() const override { return !hasBar() && barFocus < 0 && cursor >= 0 && !game.isOver(); }
+  void onConfirmHold() override { act(cursor % game.columns(), cursor / game.columns(), true); }
+  const char* confirmHint() const override { return barFocus < 0 && cursor >= 0 ? tr(STR_GAMES_DIG) : nullptr; }
 
   void runAction(Action action);
   bool barShown(int slot) const;

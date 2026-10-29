@@ -1,5 +1,7 @@
 #include "ScanwordActivity.h"
 
+#include <KeyboardGames.h>
+#if SOVA_KEYBOARD_GAMES
 #include <FreeInkUIIcon.h>
 #include <GfxRenderer.h>
 #include <I18n.h>
@@ -1241,3 +1243,5 @@ void ScanwordActivity::drawBand(UiScreen& screen) const {
   const int rightTop = textTop + renderer.getFontAscenderSize(kText12Font) - renderer.getFontAscenderSize(kText10Font);
   drawRightAligned(renderer, kText10Font, width - kSidePadding, rightTop, right);
 }
+
+#endif  // SOVA_KEYBOARD_GAMES

@@ -18,7 +18,8 @@ namespace fui = freeink::ui;
 using namespace setka;
 
 namespace {
-constexpr int kBoardGap = 8;  // between the board and the bar rule
+constexpr int kBoardGap = 8;    // between the board and the bar rule
+constexpr int kResultGap = 12;  // between the board and the result
 constexpr minesweeper::Config kFields[] = {minesweeper::BEGINNER, minesweeper::PORTRAIT};
 
 // A pennant on a pole, sized to the cell.
@@ -136,8 +137,8 @@ void MinesweeperActivity::onTouch(const fui::ActionEvent& event, const int x, co
 }
 
 bool MinesweeperActivity::barShown(const int slot) const {
-  // Флажок while playing, Заново once there is something to deal again, Меню (Новая игра once over) always.
-  if (slot == 0) return !game.isOver();
+  // Флажок while playing on touch, Заново once there is something to deal again, Меню (Новая игра once over) always.
+  if (slot == 0) return hasBar() && !game.isOver();
   if (slot == 1) return game.status() != minesweeper::Status::Ready;
   return slot == 2;
 }
@@ -199,7 +200,8 @@ bool MinesweeperActivity::onBack() {
 }
 
 int MinesweeperActivity::cellSize() const {
-  return std::min(renderer.getScreenWidth() / game.columns(), (barTop() - kBoardGap - BOARD_TOP) / game.rows());
+  const int room = barTop() - kBoardGap - kResultGap - resultHeight(false) - BOARD_TOP;
+  return std::min(renderer.getScreenWidth() / game.columns(), room / game.rows());
 }
 
 int MinesweeperActivity::boardLeft() const { return (renderer.getScreenWidth() - cellSize() * game.columns()) / 2; }
@@ -210,18 +212,9 @@ void MinesweeperActivity::build(UiScreen& screen) {
   char clock[24];
   formatElapsed(game.elapsedMs(), clock, sizeof(clock));
   char value[40];
-  const char* label;
-  if (game.status() == minesweeper::Status::Won) {
-    label = tr(STR_MINES_WON);
-    snprintf(value, sizeof(value), "%s", clock);
-  } else if (game.status() == minesweeper::Status::Lost) {
-    label = tr(STR_MINES_LOST);
-    snprintf(value, sizeof(value), "%s", clock);
-  } else {
-    label = tr(STR_MINES_LEFT);
-    snprintf(value, sizeof(value), "%d \xC2\xB7 %s", game.minesLeft(), clock);
-  }
-  drawTopLine(screen, label, value, false);
+  const bool over = game.isOver();
+  snprintf(value, sizeof(value), "%d \xC2\xB7 %s", game.minesLeft(), clock);
+  drawTopLine(screen, over ? nullptr : tr(STR_MINES_LEFT), over ? clock : value, false);
 
   const int size = cellSize();
   const int left = boardLeft();
@@ -239,9 +232,12 @@ void MinesweeperActivity::build(UiScreen& screen) {
   }
   screen.frame().hit(fui::makeRect(left, BOARD_TOP, width, height), ACTION_BOARD, 0,
                      static_cast<uint16_t>(fui::InputTouch | fui::InputLongPress));
+  if (over) {
+    drawResult(BOARD_TOP + height + kResultGap,
+               game.status() == minesweeper::Status::Won ? tr(STR_GAMES_WON) : tr(STR_MINES_LOST));
+  }
 
   BarItem items[BAR_SLOTS];
-  const bool over = game.isOver();
   const char* labels[BAR_SLOTS] = {tr(STR_MINES_FLAG), tr(STR_MINES_NEW),
                                    over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU)};
   const freeink::Icon* icons[BAR_SLOTS] = {&icon_bar_flag_24, &icon_bar_restart_24,

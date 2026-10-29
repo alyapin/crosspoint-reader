@@ -17,9 +17,10 @@ Games, under More → Games, with touch on the X4 Pro and buttons on the X4, sav
 - Chess against the computer (levels 1 to 5) or a friend, with clocks and four piece sets.
 - Sudoku, Minesweeper and Klondike solitaire.
 - Scanwords. Puzzles are files in `/scanwords/` on the card, made with `tools/scanword` (samples in `tools/scanword/samples`).
-- Tic-tac-toe against the computer or a friend, 2048, the 15 puzzle.
+- 2048 and the 15 puzzle.
 - Hangman and 5 letters (a Russian Wordle) on built-in word lists; hangman has a separate mode with crude words.
 - More games are in progress on separate branches.
+- The X4 build leaves out the keyboard games (scanwords, hangman, 5 letters): they take too many key presses.
 
 Books and screens:
 

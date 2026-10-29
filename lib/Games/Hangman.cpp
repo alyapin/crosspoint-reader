@@ -1,5 +1,7 @@
 #include "Hangman.h"
 
+#include <KeyboardGames.h>
+#if SOVA_KEYBOARD_GAMES
 #include <algorithm>
 #include <cstring>
 
@@ -269,3 +271,5 @@ bool Game::deserialize(const char* text, const size_t textLen) {
 }
 
 }  // namespace hangman
+
+#endif  // SOVA_KEYBOARD_GAMES

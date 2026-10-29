@@ -10,11 +10,12 @@
 #include "activities/Activity.h"
 #include "components/UiAppHost.h"
 #include "components/setka/SetkaStyle.h"
+#include "games/ui/BoardKeys.h"
 #include "util/ButtonNavigator.h"
 
 // Games list hook for the "Шахматы" row: chessListStatus() is the row's second
 // line ("партия идёт" while a saved game exists) or nullptr, and openChess()
-// builds the screen, which resumes the saved game or opens "Новая партия".
+// builds the screen, which resumes the saved game or opens "Новая игра".
 const char* chessListStatus();
 std::unique_ptr<Activity> openChess(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
@@ -53,6 +54,7 @@ class ChessActivity final : public Activity, private UiAppHost {
     NewGame,
     Flip,
     Undo,
+    Continue,
     Exit
   };
   // Pending repaint, strongest wins: Entry = HALF, Update = cadence FAST,
@@ -85,7 +87,7 @@ class ChessActivity final : public Activity, private UiAppHost {
   void drawStatusPanel() const;
   void drawMoveList(int top, int bottom) const;
   void drawPromotion(UiScreen& screen) const;
-  void drawGameOver(UiScreen& screen) const;
+  void drawGameOver() const;
   void drawActions(UiScreen& screen) const;
 
   int listRows(Row* out) const;
@@ -99,7 +101,8 @@ class ChessActivity final : public Activity, private UiAppHost {
   int currentOption(Row row) const;
 
   void handleAction(const freeink::ui::ActionEvent& event, int x, int y);
-  void handleGameKeys();
+  bool applyGameKeys();
+  void gameKey(int dx, int dy, bool confirm);
   int gameActions(GameAction* out) const;
   GameAction focusedAction() const;
   void runAction(GameAction action);
@@ -142,6 +145,7 @@ class ChessActivity final : public Activity, private UiAppHost {
   bool manualFlip = false;
   int focus = 0;
   Row pickerRow = Row::Opponent;
+  Row lastMenuRow = Row::Continue;
   View pickerReturn = View::Setup;
   uint8_t customBase = 0;  // indices into the custom time steps
   uint8_t customIncrement = 0;
@@ -156,6 +160,7 @@ class ChessActivity final : public Activity, private UiAppHost {
   bool savePending = false;
 
   ButtonNavigator buttonNavigator;
+  games::ui::BoardKeys keys;      // the board cursor, loop task only
   setka::RefreshCadence cadence;  // render task only
   std::atomic<uint8_t> repaint{RepaintEntry};
 };

@@ -22,9 +22,9 @@ namespace {
 constexpr int kTile = 104;
 constexpr int kGap = 8;
 constexpr int kGridSize = g2048::SIZE * kTile + (g2048::SIZE - 1) * kGap;
-constexpr int kGridTop = GameScreen::BOARD_TOP + 30;
+constexpr int kGridTop = GameScreen::BOARD_TOP;
 constexpr int kFooterGap = 18;
-constexpr int kDigitsInset = 10;
+constexpr int kTileRule = 2;        // as the 15 puzzle's tiles
 constexpr uint8_t kThickFrom = 4;   // 16
 constexpr uint8_t kFilledFrom = 7;  // 128
 constexpr int kMenuSlot = 2;
@@ -41,16 +41,6 @@ void formatScore(const uint32_t value, char* out, const size_t cap) {
   out[len] = '\0';
 }
 
-// The largest face that fits `digits` wide digits, three at least, so tiles up to 512 share one size.
-int tileFont(const GfxRenderer& renderer, const int digits) {
-  constexpr int kFonts[] = {kDigitsFont, kDigitsSmallFont, kDigitsMiniFont};
-  char sample[8] = "0000000";
-  sample[std::clamp(digits, 3, 7)] = '\0';
-  for (const int font : kFonts) {
-    if (renderer.getTextWidth(font, sample, kSemiBold) <= kTile - 2 * kDigitsInset) return font;
-  }
-  return kText10Font;
-}
 }  // namespace
 
 const char* game2048ListStatus() {
@@ -144,7 +134,11 @@ void Game2048Activity::onKey(const int dx, const int dy, const bool confirm) {
   const int before = barFocus;
   if (barFocus < 0) {
     if (confirm) {
-      if (hasBar()) barFocus = nextBarSlot(BAR_SLOTS - 1, 1);
+      if (hasBar()) {
+        barFocus = nextBarSlot(BAR_SLOTS - 1, 1);
+      } else if (game.undo()) {
+        markChanged();  // button boards: Confirm undoes
+      }
     } else if (dx != 0) {
       slide(dx < 0 ? Dir::Left : Dir::Right);
     } else if (dy != 0) {
@@ -183,11 +177,6 @@ void Game2048Activity::build(UiScreen& screen) {
   }
 
   int y = kGridTop + kGridSize + kFooterGap;
-  const char* message = game.isOver() ? tr(STR_2048_NO_MOVES) : game.justWon() ? tr(STR_2048_WON) : nullptr;
-  if (message != nullptr) {
-    renderer.drawText(kText12Font, left, y, message, true, kSemiBold);
-    y += renderer.getLineHeight(kText12Font) + kFooterGap / 2;
-  }
   char footer[96] = "";
   int len = 0;
   const uint32_t record = std::max(best, game.score());
@@ -196,13 +185,22 @@ void Game2048Activity::build(UiScreen& screen) {
     formatScore(record, digits, sizeof(digits));
     len = std::max(0, snprintf(footer, sizeof(footer), "%s %s", tr(STR_2048_BEST), digits));
   }
-  if (mappedInput.hasTouch() && len < static_cast<int>(sizeof(footer))) {
-    snprintf(footer + len, sizeof(footer) - len, "%s%s", len > 0 ? "  \xC2\xB7  " : "", tr(STR_2048_SWIPE_HINT));
+  if (game.isOver()) {
+    drawResult(y, tr(STR_2048_NO_MOVES), footer);
+  } else {
+    if (game.justWon()) {
+      renderer.drawText(kText12Font, kSidePadding, y, tr(STR_2048_WON), true, kSemiBold);
+      y += renderer.getLineHeight(kText12Font) + kFooterGap / 2;
+    }
+    if (len < static_cast<int>(sizeof(footer))) {
+      snprintf(footer + len, sizeof(footer) - len, "%s%s", len > 0 ? "  \xC2\xB7  " : "",
+               mappedInput.hasTouch() ? tr(STR_2048_SWIPE_HINT) : tr(STR_2048_SIDE_HINT));
+    }
+    renderer.drawText(kCaptionFont, kSidePadding, y, footer);
   }
-  renderer.drawText(kCaptionFont, left, y, footer);
 
   BarItem items[BAR_SLOTS];
-  if (barShown(0)) items[0] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false};
+  if (barShown(0)) items[0] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false, BarItem::Repeat};
   items[kMenuSlot] = game.isOver() ? BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame}
                                    : BarItem{&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
   drawBar(screen, items, barFocus);
@@ -213,14 +211,12 @@ void Game2048Activity::drawTile(const int x, const int y, const uint8_t exponent
   if (filled) {
     renderer.fillRect(x, y, kTile, kTile, true);
   } else {
-    renderer.drawRect(x, y, kTile, kTile, exponent >= kThickFrom ? kCellFrameWidth : 1, true);
+    renderer.drawRect(x, y, kTile, kTile, exponent >= kThickFrom ? kCellFrameWidth : kTileRule, true);
   }
   if (exponent == 0) return;
   char text[12];
-  const int digits = snprintf(text, sizeof(text), "%lu", 1ul << exponent);
-  const int font = tileFont(renderer, digits);
-  const int capHeight = heroCapHeight(renderer, font);
-  const int textX = x + (kTile - renderer.getTextWidth(font, text, kSemiBold)) / 2;
-  const int baseTop = y + (kTile - capHeight) / 2 + capHeight - renderer.getFontAscenderSize(font);
-  renderer.drawText(font, textX, baseTop, text, !filled, kSemiBold);
+  snprintf(text, sizeof(text), "%lu", 1ul << exponent);
+  const int textY = y + (kTile - renderer.getLineHeight(kText12Font)) / 2;
+  renderer.drawText(kText12Font, x + (kTile - renderer.getTextWidth(kText12Font, text, kSemiBold)) / 2, textY, text,
+                    !filled, kSemiBold);
 }
