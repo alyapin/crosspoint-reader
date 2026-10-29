@@ -1,0 +1,11 @@
+# Lucide icons for the flashcard screens — regenerate from the repository root with:
+#   python3 freeink-sdk/libs/assets/Icons/tools/gen_icons.py \
+#     --manifest src/activities/cards/cardsIcons.manifest \
+#     --svgdir freeink-sdk/libs/assets/Icons/lucide/icons \
+#     --sizes 24 --out src/activities/cards/cardsIcons.h
+# layers, undo-2, rotate-ccw and plus come from games/ui/gameIcons.h, sliders from setkaIcons.h,
+# smartphone and wifi from components/icons/listIcons.h.
+play = play
+show = eye
+good = check
+easy = check-check
