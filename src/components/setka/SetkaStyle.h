@@ -17,7 +17,7 @@ namespace setka {
 
 constexpr int kText10Font = UI_10_FONT_ID;
 constexpr int kText12Font = UI_12_FONT_ID;
-#if FREEINK_DEVICE_X4PRO
+#if SOVA_UNBOUNDED_UI
 constexpr int kDenseFont = GOLOS_8_FONT_ID;             // narrow face for dense game text (scanword clue cells)
 constexpr int kHeroFont = UNBOUNDED_61_FONT_ID;         // ~96 px digits: the screen's one big number
 constexpr int kHeroSmallFont = UNBOUNDED_31_FONT_ID;    // ~48 px digits: a secondary number

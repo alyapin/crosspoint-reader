@@ -22,7 +22,7 @@
 #include <builtinFonts/ubuntu_12_regular.h>
 #include <builtinFonts/ubuntu_8_regular.h>
 
-#if FREEINK_DEVICE_X4PRO
+#if FREEINK_DEVICE_X4PRO || FREEINK_DEVICE_X4  // SOVA_UNBOUNDED_UI in src/fontIds.h
 #include <builtinFonts/golostext_8_regular.h>
 #include <builtinFonts/unbounded_11_digits.h>
 #include <builtinFonts/unbounded_11_regular.h>

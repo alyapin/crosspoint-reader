@@ -62,7 +62,7 @@ constexpr int kCursorArm = 14;  // key cursor: corner brackets on the focused sq
 // Key focus ring in the game view: the 64 board cells (visual order), then the actions.
 constexpr int kCells = 64;
 constexpr int kStartCursor = 6 * 8 + 4;  // the near side's e-pawn
-#if FREEINK_DEVICE_X4PRO
+#if SOVA_UNBOUNDED_UI
 constexpr int kHeroCapTarget = 0;  // the Unbounded hero face at its own size
 #else
 constexpr int kHeroCapTarget = 64;  // no hero face here: the UI digits are scaled up

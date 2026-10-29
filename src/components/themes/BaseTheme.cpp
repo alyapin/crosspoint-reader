@@ -187,8 +187,12 @@ void BaseTheme::drawProgressBar(const GfxRenderer& renderer, Rect rect, const si
 
 // Centre hint labels by text height on one line. A label too wide for its box
 // needs shorter copy; meanwhile it is cut with an ellipsis, never broken mid-word.
-void BaseTheme::drawHintLabel(const GfxRenderer& renderer, const int fontId, const char* label, const int x,
+void BaseTheme::drawHintLabel(const GfxRenderer& renderer, int fontId, const char* label, const int x,
                               const int boxWidth, const int boxTop, const int boxHeight) {
+#if SOVA_UNBOUNDED_UI
+  // Unbounded runs too wide for the fixed hint boxes: their labels take the narrow Golos face.
+  fontId = GOLOS_8_FONT_ID;
+#endif
   constexpr int textPadding = 4;  // keeps the label off the button's border
   const std::string text = renderer.truncatedText(fontId, label, boxWidth - textPadding * 2);
   const int textWidth = renderer.getTextWidth(fontId, text.c_str());
