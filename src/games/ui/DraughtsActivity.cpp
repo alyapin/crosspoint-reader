@@ -7,6 +7,7 @@
 #include <esp_random.h>
 
 #include <algorithm>
+#include <climits>
 #include <cstdio>
 #include <cstdlib>
 #include <iterator>
@@ -391,6 +392,22 @@ void DraughtsActivity::onKey(const int dx, const int dy, const bool confirm) {
       barFocus = dx > 0 ? firstSlot : lastSlot;
     } else {
       cursor = items[(next + count) % count];
+    }
+  } else if (dy != 0 && !hasBar()) {
+    // Button boards: Up/Down jump to the nearest item on a row above or below.
+    int cx = 0;
+    int cy = 0;
+    cellOrigin(cursor, cx, cy);
+    int best = INT_MAX;
+    for (int i = 0; i < count; ++i) {
+      int x = 0;
+      int y = 0;
+      cellOrigin(items[i], x, y);
+      const int score = (y - cy) * dy > 0 ? (y - cy) * dy * kBoardSize + std::abs(x - cx) : INT_MAX;
+      if (score < best) {
+        best = score;
+        cursor = items[i];
+      }
     }
   } else if (dy > 0 && hasBar()) {
     barFocus = firstSlot;

@@ -7,7 +7,9 @@
 #include <esp_random.h>
 
 #include <algorithm>
+#include <climits>
 #include <cstdio>
+#include <cstdlib>
 #include <iterator>
 
 #include "gameIcons.h"
@@ -179,6 +181,18 @@ void ReversiActivity::onKey(const int dx, const int dy, const bool confirm) {
     if (barFocus >= 0 && !barShown(barFocus)) barFocus = kMenuSlot;
   } else if (confirm && cursor >= 0 && playerToMove()) {
     play(cursor);
+  } else if (dy != 0 && dx == 0 && !hasBar() && cursor >= 0) {
+    // Button boards: Up/Down jump to the nearest move on a row above or below.
+    const uint64_t moves = playerToMove() ? game.moves() : 0;
+    int best = INT_MAX;
+    for (int s = 0; s < CELLS; ++s) {
+      const int rows = (s / SIZE - cursor / SIZE) * dy;
+      const int score = (moves >> s & 1) && rows > 0 ? rows * SIZE + std::abs(s % SIZE - cursor % SIZE) : INT_MAX;
+      if (score < best) {
+        best = score;
+        cursor = s;
+      }
+    }
   } else if (dx != 0 || dy != 0) {
     stepFocus(dx != 0 ? dx : dy);
   }
