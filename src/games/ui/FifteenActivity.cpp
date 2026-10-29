@@ -56,7 +56,7 @@ FifteenActivity::FifteenActivity(GfxRenderer& renderer, MappedInputManager& mapp
 bool FifteenActivity::restore() {
   gamesave::load(best);
   if (gamesave::load(game)) {
-    cursor = mappedInput.hasTouch() ? -1 : game.gap();
+    cursor = -1;
   } else {
     startGame();
   }
@@ -77,7 +77,7 @@ void FifteenActivity::startGame() {
   game.newGame(esp_random());
   newBest = false;
   barFocus = -1;
-  cursor = mappedInput.hasTouch() ? -1 : game.gap();
+  cursor = -1;
 }
 
 void FifteenActivity::openNewGame() {
@@ -89,7 +89,10 @@ void FifteenActivity::openNewGame() {
 // --- input -------------------------------------------------------------------
 
 void FifteenActivity::slideAt(const int cell) {
-  if (!game.slide(cell)) return;
+  if (game.slide(cell)) afterSlide();
+}
+
+void FifteenActivity::afterSlide() {
   if (game.isSolved()) {
     newBest = best.record(game.moveCount(), game.elapsedMs());
     if (newBest) bestPending = true;
@@ -129,6 +132,9 @@ void FifteenActivity::onKey(const int dx, const int dy, const bool confirm) {
     }
   } else if (game.isSolved()) {
     if (hasBar()) barFocus = kLastSlot;
+  } else if (!hasBar()) {
+    // Button boards: an arrow slides the tile beside the gap that way.
+    if (game.slideToward(dx, dy)) afterSlide();
   } else if (cursor < 0) {
     cursor = game.gap();
   } else {

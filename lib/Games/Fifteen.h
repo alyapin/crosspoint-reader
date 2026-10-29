@@ -39,6 +39,8 @@ class Game {
 
   bool canSlide(int cell) const;
   bool slide(int cell);
+  // Slides the tile beside the gap one cell in direction (dx, dy): (-1, 0) moves the gap's right neighbour left.
+  bool slideToward(int dx, int dy);
 
   uint32_t elapsedMs() const { return clock.elapsed(now()); }
   void pause();
