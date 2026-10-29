@@ -11,6 +11,7 @@
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "components/icons/readerToolbarIcons.h"
+#include "components/setka/SetkaStyle.h"
 
 namespace fui = freeink::ui;
 
@@ -28,8 +29,8 @@ constexpr fui::ActionId ACTION_ROW = 6;      // panel list row, value = row inde
 constexpr int16_t kScrubButton = 36;  // chapter step buttons (square)
 constexpr int16_t kScrubKnob = 16;    // round knob on the 2px progress track
 constexpr int16_t kScrubGap = 12;     // air between the buttons and the track
-// Tool row: a 24px glyph centred in each slot, the active slot in an outline
-// pill. The whole slot is the tap target; the row height sets its size.
+// Tool row: a 24px glyph centred in each slot, the active slot in the Setka
+// 4 px inset frame. The whole slot is the tap target; the row height sets its size.
 constexpr int16_t kToolRowH = 80;
 constexpr int16_t kToolPillInset = 10;
 constexpr int kToolCount = 3;
@@ -103,11 +104,10 @@ void ReaderToolbarUi::screenFn(UiScreen& screen, void* user) {
 }
 
 // The Contents / Text / More row: three equal slots, an icon centred in each,
-// the active one inside an outline pill (the theme's control radius). Each
+// the active one inside the Setka 4 px inset frame. Each
 // slot is registered as one tap target, so the row stays light (no filled
 // tiles, no labels -- the glyphs carry the meaning).
 void ReaderToolbarUi::buildToolRow(UiScreen& screen, const fui::LayoutAnchor anchor, const int16_t sideInset) {
-  const auto& tokens = screen.theme();
   const fui::BitmapRef icons[kToolCount] = {fui::bitmapFromIcon(icon_reader_contents_24),
                                             fui::bitmapFromIcon(icon_reader_text_24),
                                             fui::bitmapFromIcon(icon_reader_more_24)};
@@ -117,14 +117,11 @@ void ReaderToolbarUi::buildToolRow(UiScreen& screen, const fui::LayoutAnchor anc
   // the toolbar for a panel.
   const fui::Rect row = screen.take(anchor, kToolRowH).inset(fui::Insets{0, sideInset, 0, sideInset});
   const int16_t slotW = static_cast<int16_t>(row.width / kToolCount);
-  // Theme radius as-is (the frontlight panel pattern); the fill clamps to
-  // the shape's own height so round themes cannot overshoot.
-  const uint8_t pillRadius = tokens.controlRadius;
   for (int i = 0; i < kToolCount; ++i) {
     const fui::Rect slot{static_cast<int16_t>(row.x + slotW * i), row.y, slotW, row.height};
     if (i == model_.activeTool) {
       screen.target().stroke(slot.inset(fui::Insets{4, kToolPillInset, 4, kToolPillInset}),
-                             fui::Paint::solid(fui::Color::Black), 2, pillRadius);
+                             fui::Paint::solid(fui::Color::Black), setka::kCellFrameWidth, 0);
     }
     const fui::Rect iconRect{static_cast<int16_t>(slot.x + (slot.width - 24) / 2),
                              static_cast<int16_t>(slot.y + (slot.height - 24) / 2), 24, 24};
