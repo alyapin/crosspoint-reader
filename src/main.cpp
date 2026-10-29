@@ -132,7 +132,7 @@ EpdFont ui12RegularFont(&ubuntu_12_regular);
 EpdFont ui12BoldFont(&ubuntu_12_bold);
 EpdFontFamily ui12FontFamily(12, &ui12RegularFont, &ui12BoldFont);
 
-#if FREEINK_DEVICE_X4PRO
+#if SOVA_UNBOUNDED_UI
 // UI text faces behind the UI_10 / UI_12 / SMALL roles (fontIds.h): SemiBold
 // fills the bold slot.
 EpdFont unboundedUi9RegularFont(&unbounded_9_regular);
@@ -622,7 +622,7 @@ void setupDisplayAndFonts(bool seamless = false) {
   renderer.insertFont(UBUNTU_10_FONT_ID, ui10FontFamily);
   renderer.insertFont(UBUNTU_12_FONT_ID, ui12FontFamily);
   renderer.insertFont(UBUNTU_8_FONT_ID, smallFontFamily);
-#if FREEINK_DEVICE_X4PRO
+#if SOVA_UNBOUNDED_UI
   renderer.insertFont(UNBOUNDED_UI_9_FONT_ID, unboundedUi9FontFamily);
   renderer.insertFont(UNBOUNDED_UI_11_FONT_ID, unboundedUi11FontFamily);
   renderer.insertFont(UNBOUNDED_LIGHT_7_FONT_ID, unboundedLight7FontFamily);

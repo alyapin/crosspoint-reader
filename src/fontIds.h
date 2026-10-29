@@ -18,10 +18,11 @@
 #define UNBOUNDED_14_FONT_ID (-2012058546)
 #define UNBOUNDED_11_FONT_ID (455991686)
 
-// UI font roles. The X4 Pro draws its UI in Unbounded, one size below Ubuntu
-// since it runs wide, with Ubuntu as the fallback for scripts it lacks
-// (src/main.cpp). Other boards use Ubuntu.
-#if FREEINK_DEVICE_X4PRO
+// UI font roles. The X4 Pro and the X4 draw their UI in Unbounded, one size
+// below Ubuntu since it runs wide, with Ubuntu as the fallback for scripts it
+// lacks (src/main.cpp). Other boards use Ubuntu.
+#define SOVA_UNBOUNDED_UI (FREEINK_DEVICE_X4PRO || FREEINK_DEVICE_X4)
+#if SOVA_UNBOUNDED_UI
 #define UI_10_FONT_ID UNBOUNDED_UI_9_FONT_ID
 #define UI_12_FONT_ID UNBOUNDED_UI_11_FONT_ID
 #define SMALL_FONT_ID UNBOUNDED_LIGHT_7_FONT_ID
