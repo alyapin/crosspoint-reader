@@ -297,6 +297,7 @@ void EpubReaderBookmarksActivity::render(RenderLock&&) {
   renderer.clearScreen();
   drawChrome();
   renderUi();
+  rebuildWhileFollowing([this] { drawChrome(); });
 
   if (confirmPopup.processRender(renderer, mappedInput)) return;
 
