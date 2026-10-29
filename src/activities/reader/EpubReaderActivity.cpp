@@ -2739,6 +2739,7 @@ void EpubReaderActivity::openOverlay(Overlay target) {
     case Overlay::Contents: {
       RenderLock lock;
       panelIndex = currentTocIndex();
+      contentsCurrentIndex = panelIndex;
       // Fresh viewport opening on the current chapter, cursor shown or not.
       toolbarUi->nav().reset(panelIndex);
       toolbarUi->nav().top = panelIndex;
@@ -2861,7 +2862,7 @@ void EpubReaderActivity::renderOverlay() {
   if (overlay == Overlay::Contents) {
     model.panelTitle = tr(STR_TOOL_CONTENTS);
     model.itemCount = epub->getTocItemsCount();
-    model.currentIndex = currentTocIndex();
+    model.currentIndex = contentsCurrentIndex;
     model.rowText = [this](int i) {
       const auto item = epub->getTocItem(i);
       const int depth = item.level > 1 ? (item.level - 1) * 2 : 0;
