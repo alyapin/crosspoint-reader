@@ -48,10 +48,18 @@ Paths pathsOf(const Kind kind) {
 }
 
 constexpr Paths TICTACTOE_DONE{"/.crosspoint/games/tictactoe-done.json", "/.crosspoint/games/tictactoe-done.json.tmp"};
-constexpr Paths FIFTEEN_BEST{"/.crosspoint/games/fifteen-best.json", "/.crosspoint/games/fifteen-best.json.tmp"};
-constexpr Paths FIVE_LETTERS_STATS{"/.crosspoint/games/fiveletters-stats.json",
-                                   "/.crosspoint/games/fiveletters-stats.json.tmp"};
-constexpr Paths BEST_2048{"/.crosspoint/games/2048-best.txt", "/.crosspoint/games/2048-best.txt.tmp"};
+
+// A record that is there but cannot be read is not written over until it reads.
+struct Record {
+  Paths paths;
+  bool unread = false;
+};
+
+Record fifteenBest{{"/.crosspoint/games/fifteen-best.json", "/.crosspoint/games/fifteen-best.json.tmp"}};
+Record fiveLettersStats{{"/.crosspoint/games/fiveletters-stats.json", "/.crosspoint/games/fiveletters-stats.json.tmp"}};
+Record best2048{{"/.crosspoint/games/2048-best.txt", "/.crosspoint/games/2048-best.txt.tmp"}};
+
+enum class Read : uint8_t { Ok, Missing, Failed };
 
 // Crash-safe: tmp file + rename.
 bool writeText(const Paths& p, const char* text, const size_t len) {
@@ -62,10 +70,15 @@ bool writeText(const Paths& p, const char* text, const size_t len) {
   HalFile file;
   if (!Storage.openFileForWrite("GAMES", p.tmp, file)) return false;
   const size_t written = file.write(text, len);
-  file.close();
-  if (written != len || !Storage.replaceFile(p.tmp, p.path)) {
+  if (!file.close() || written != len) {
     LOG_ERR("GAMES", "Save failed (%u of %u bytes)", static_cast<unsigned>(written), static_cast<unsigned>(len));
     Storage.remove(p.tmp);
+    return false;
+  }
+  if (!Storage.replaceFile(p.tmp, p.path)) {
+    LOG_ERR("GAMES", "Cannot replace %s", p.path);
+    // replaceFile removes the old file first: if it is gone, the tmp is the only copy.
+    if (Storage.exists(p.path)) Storage.remove(p.tmp);
     return false;
   }
   return true;
@@ -91,41 +104,72 @@ bool write(const Kind kind, const GameT& game, const size_t cap) {
   return writeTo(pathsOf(kind), game, cap);
 }
 
-// A read error may be transient: the file is kept.
-bool readText(const Paths& p, const size_t cap, std::string& text) {
-  if (!Storage.exists(p.path)) return false;
-  if (!Storage.readFileToString("GAMES", p.path, cap, text)) {
-    LOG_ERR("GAMES", "Cannot read %s", p.path);
+// A power cut inside replaceFile, after the old file is removed, leaves only
+// the tmp; one cut short in its own write is empty.
+bool present(const Paths& p) {
+  if (Storage.exists(p.path)) return true;
+  if (!Storage.exists(p.tmp)) return false;
+  HalFile file;
+  const bool empty = Storage.openFileForRead("GAMES", p.tmp, file) && file.fileSize() == 0;
+  file.close();
+  if (empty) {
+    Storage.remove(p.tmp);
     return false;
   }
+  LOG_INF("GAMES", "Recovering %s", p.path);
+  if (!Storage.rename(p.tmp, p.path)) LOG_ERR("GAMES", "Cannot recover %s", p.path);
   return true;
+}
+
+// A read error may be transient: the file is kept.
+Read readText(const Paths& p, const size_t cap, std::string& text) {
+  if (!present(p)) return Read::Missing;
+  if (!Storage.readFileToString("GAMES", p.path, cap, text)) {
+    LOG_ERR("GAMES", "Cannot read %s", p.path);
+    return Read::Failed;
+  }
+  return Read::Ok;
 }
 
 // Only content that fails to parse is dropped.
 template <typename T>
-bool readFrom(const Paths& p, T& value, const size_t cap) {
+Read readFrom(const Paths& p, T& value, const size_t cap) {
   std::string text;
-  if (!readText(p, cap, text)) return false;
+  const Read result = readText(p, cap, text);
+  if (result != Read::Ok) return result;
   if (!value.deserialize(text.data(), text.size())) {
     LOG_ERR("GAMES", "Discarding corrupt %s", p.path);
     Storage.remove(p.path);
-    return false;
+    return Read::Missing;
   }
-  return true;
+  return Read::Ok;
 }
 
 template <typename GameT>
 bool read(const Kind kind, GameT& game, const size_t cap) {
-  return readFrom(pathsOf(kind), game, cap);
+  return readFrom(pathsOf(kind), game, cap) == Read::Ok;
+}
+
+template <typename T>
+bool loadRecord(Record& record, T& value, const size_t cap) {
+  value = T{};
+  record.unread = readFrom(record.paths, value, cap) == Read::Failed;
+  return !record.unread;
+}
+
+bool saveRecord(const Record& record, const char* text, const size_t len) {
+  return !record.unread && writeText(record.paths, text, len);
 }
 
 }  // namespace
 
-bool hasGameInProgress(const Kind kind) { return Storage.exists(pathsOf(kind).path); }
+bool hasGameInProgress(const Kind kind) { return present(pathsOf(kind)); }
 
 void clear(const Kind kind) {
-  const char* path = pathsOf(kind).path;
-  if (Storage.exists(path)) Storage.remove(path);
+  const Paths p = pathsOf(kind);
+  for (const char* path : {p.path, p.tmp}) {
+    if (Storage.exists(path)) Storage.remove(path);
+  }
 }
 
 bool save(const sudoku::Game& game) { return write(Kind::Sudoku, game, sudoku::SAVE_MAX); }
@@ -146,7 +190,8 @@ bool load(sudoku::Game& game) { return read(Kind::Sudoku, game, sudoku::SAVE_MAX
 bool load(minesweeper::Game& game) { return read(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
 bool load(klondike::Game& game) { return read(Kind::Klondike, game, klondike::SAVE_MAX); }
 bool load(tictactoe::Game& game) {
-  return read(Kind::TicTacToe, game, tictactoe::SAVE_MAX) || readFrom(TICTACTOE_DONE, game, tictactoe::SAVE_MAX);
+  return read(Kind::TicTacToe, game, tictactoe::SAVE_MAX) ||
+         readFrom(TICTACTOE_DONE, game, tictactoe::SAVE_MAX) == Read::Ok;
 }
 bool load(fifteen::Game& game) { return read(Kind::Fifteen, game, fifteen::SAVE_MAX); }
 bool load(fiveletters::Game& game) { return read(Kind::FiveLetters, game, fiveletters::SAVE_MAX); }
@@ -155,30 +200,29 @@ bool load(hangman::Game& game) { return read(Kind::Hangman, game, hangman::SAVE_
 
 bool save(const fifteen::Best& best) {
   char text[48];
-  return writeText(FIFTEEN_BEST, text, best.serialize(text, sizeof(text)));
+  return saveRecord(fifteenBest, text, best.serialize(text, sizeof(text)));
 }
-bool load(fifteen::Best& best) { return readFrom(FIFTEEN_BEST, best, 48); }
+bool load(fifteen::Best& best) { return loadRecord(fifteenBest, best, 48); }
 
 bool saveStats(const fiveletters::Stats& stats) {
   char text[fiveletters::STATS_MAX];
-  return writeText(FIVE_LETTERS_STATS, text, stats.serialize(text, sizeof(text)));
+  return saveRecord(fiveLettersStats, text, stats.serialize(text, sizeof(text)));
 }
 
-bool loadStats(fiveletters::Stats& stats) {
-  stats = fiveletters::Stats{};
-  return !Storage.exists(FIVE_LETTERS_STATS.path) || readFrom(FIVE_LETTERS_STATS, stats, fiveletters::STATS_MAX);
-}
+bool loadStats(fiveletters::Stats& stats) { return loadRecord(fiveLettersStats, stats, fiveletters::STATS_MAX); }
 
 uint32_t loadBest2048() {
   std::string text;
   unsigned long best = 0;
-  if (!readText(BEST_2048, 16, text) || sscanf(text.c_str(), "%lu", &best) != 1) return 0;
+  const Read result = readText(best2048.paths, 16, text);
+  best2048.unread = result == Read::Failed;
+  if (result != Read::Ok || sscanf(text.c_str(), "%lu", &best) != 1) return 0;
   return static_cast<uint32_t>(best);
 }
 
 void saveBest2048(const uint32_t score) {
   char text[16];
-  writeText(BEST_2048, text, snprintf(text, sizeof(text), "%lu", static_cast<unsigned long>(score)));
+  saveRecord(best2048, text, snprintf(text, sizeof(text), "%lu", static_cast<unsigned long>(score)));
 }
 
 }  // namespace gamesave
