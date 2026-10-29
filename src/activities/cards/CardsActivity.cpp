@@ -1043,7 +1043,7 @@ void CardsActivity::buildCard(UiScreen& screen) {
     const char* caption;
   };
   Slot slots[3] = {};
-  char captions[3][24] = {};
+  char captions[3][40] = {};
   if (!back) {
     if (touch) {
       const char* hint = tr(STR_CARDS_TAP_TO_SHOW);
@@ -1089,7 +1089,7 @@ void CardsActivity::buildCard(UiScreen& screen) {
     }
     if (!touch) {
       // "Good: tomorrow · Again: today · …" in the order of the keys under it.
-      char parts[3][40];
+      char parts[3][64];
       for (int i = 0; i < 3; i++) snprintf(parts[i], sizeof(parts[i]), "%s: %s", slots[i].label, captions[i]);
       const auto keys = mappedInput.mapLabels("", parts[1], parts[0], parts[2]);
       const char* order[4] = {};
