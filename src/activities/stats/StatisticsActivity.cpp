@@ -41,28 +41,33 @@ void StatisticsActivity::loop() {
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) finish();
 }
 
-int StatisticsActivity::drawStat(const int x, const int capTop, const int width, const unsigned value,
-                                 const char* label, const bool labelFirst) const {
-  char number[8];
-  snprintf(number, sizeof(number), "%u", value);
+int StatisticsActivity::drawStreaks(const int capTop) const {
+  constexpr int kNumberGap = 10;  // between a number and its words
   const int baseline = capTop + heroCapHeight(renderer, kDigitsFont);
-  constexpr int kLabelGap = 10;
-  const int ascender = renderer.getFontAscenderSize(kText10Font);
-  if (labelFirst) {
-    renderer.drawText(kText10Font, x, baseline - ascender, label);
-    drawHeroNumber(renderer, kDigitsFont, x + renderer.getTextWidth(kText10Font, label) + kLabelGap, capTop, number);
-    return baseline;
+  const int textTop = baseline - renderer.getFontAscenderSize(kText10Font);
+  const int space = renderer.getSpaceWidth(kText10Font);
+  int x = kSidePadding;
+  const auto text = [&](const char* s) {
+    renderer.drawText(kText10Font, x, textTop, s);
+    x += renderer.getTextWidth(kText10Font, s);
+  };
+  const unsigned values[2] = {summary.currentStreak, summary.bestStreak};
+  const StrId labels[2] = {StrId::STR_STATS_STREAK, StrId::STR_STATS_RECORD};
+  for (int i = 0; i < 2; ++i) {
+    if (i > 0) {
+      x += space;
+      text("\xC2\xB7");
+      x += space;
+    }
+    text(I18N.get(labels[i]));
+    // Numbers in the digits face, so they do not compete with the hero.
+    char number[8];
+    snprintf(number, sizeof(number), "%u", values[i]);
+    x += kNumberGap + drawHeroNumber(renderer, kDigitsFont, x + kNumberGap, capTop, number) + kNumberGap;
+    text(I18N.get(statsui::plural(values[i], StrId::STR_STATS_DAYS_ONE, StrId::STR_STATS_DAYS_FEW,
+                                  StrId::STR_STATS_DAYS_MANY)));
   }
-  // A secondary number in the digits face, so it does not compete with the hero.
-  const int numberWidth = drawHeroNumber(renderer, kDigitsFont, x, capTop, number);
-  // One line on the number's baseline; under it when a wide number leaves too little room.
-  if (renderer.getTextWidth(kText10Font, label) <= width - numberWidth - kLabelGap) {
-    renderer.drawText(kText10Font, x + numberWidth + kLabelGap, baseline - ascender, label);
-    return baseline;
-  }
-  const int top = baseline + kLabelGap;
-  renderer.drawText(kText10Font, x, top, renderer.truncatedText(kText10Font, label, width).c_str());
-  return top + renderer.getLineHeight(kText10Font);
+  return baseline;
 }
 
 void StatisticsActivity::drawCalendar(const int top, const int width) const {
@@ -110,14 +115,7 @@ void StatisticsActivity::render(RenderLock&&) {
   drawProgressBar(renderer, kSidePadding, y, width - 2 * kSidePadding, percent);
   y += kProgressHeight + kGap + 4;
 
-  const int statWidth = width / 2 - kSidePadding * 3 / 2;
-  const int streakBottom =
-      drawStat(kSidePadding, y, statWidth, summary.currentStreak,
-               I18N.get(statsui::plural(summary.currentStreak, StrId::STR_STATS_STREAK_ONE, StrId::STR_STATS_STREAK_FEW,
-                                        StrId::STR_STATS_STREAK_MANY)));
-  const int recordBottom =
-      drawStat(width / 2 + kSidePadding / 2, y, statWidth, summary.bestStreak, tr(STR_STATS_RECORD), true);
-  y = std::max(streakBottom, recordBottom) + kGap;
+  y = drawStreaks(y) + kGap;
 
   drawRule(renderer, 0, y, width);
   y += kRuleWidth + 20;
