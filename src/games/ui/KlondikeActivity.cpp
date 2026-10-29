@@ -300,8 +300,11 @@ int KlondikeActivity::cardAt(const int pile, const int y) const {
 void KlondikeActivity::build(UiScreen& screen) {
   char value[16];
   snprintf(value, sizeof(value), "%d", game.moveCount());
-  const char* label = noMoves && !game.isWon() ? tr(STR_KLONDIKE_NO_MOVES) : tr(STR_KLONDIKE_MOVES);
-  drawTopLine(screen, label, noMoves && !game.isWon() ? "" : value, false);
+  if (noMoves && !game.isWon()) {
+    drawTopLine(screen, {{tr(STR_KLONDIKE_NO_MOVES), nullptr}}, false);
+  } else {
+    drawTopLine(screen, {{tr(STR_GAMES_MOVES), value}}, false);
+  }
 
   for (int pile = 0; pile < PILES; ++pile) {
     drawPile(pile);

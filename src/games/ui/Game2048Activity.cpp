@@ -168,7 +168,7 @@ bool Game2048Activity::onBack() {
 void Game2048Activity::build(UiScreen& screen) {
   char score[16];
   formatScore(game.score(), score, sizeof(score));
-  drawTopLine(screen, tr(STR_2048_SCORE), score, false);
+  drawTopLine(screen, {{tr(STR_2048_SCORE), score}}, false);
 
   const int left = (renderer.getScreenWidth() - kGridSize) / 2;
   for (int cell = 0; cell < g2048::CELLS; ++cell) {

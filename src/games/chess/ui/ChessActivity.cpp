@@ -1200,29 +1200,35 @@ void ChessActivity::drawTopLine(UiScreen& screen) const {
     screen.frame().hit(fui::makeRect(0, 0, exitWidth, kBoardTop), ACTION_BACK, 0, fui::InputTouch);
   }
 
-  // The far side of the board: the computer, or between friends the side not to move.
+  // The far side of the board: the computer, or between friends the side not to move; its clock when timed.
   const chess::Color far = chess::opposite(heroSide());
-  char label[48] = "";
-  if (match->settings().mode == chess::Mode::VsComputer) {
-    snprintf(label, sizeof(label), tr(STR_CHESS_COMPUTER_LEVEL), match->settings().level);
-  } else if (match->timed()) {
-    snprintf(label, sizeof(label), "%s", far == chess::WHITE ? tr(STR_CHESS_WHITE) : tr(STR_CHESS_BLACK));
-  }
-  int right = width - kSidePadding;
-  if (match->timed()) {
+  const bool timed = match->timed();
+  char level[12];
+  snprintf(level, sizeof(level), "%u", static_cast<unsigned>(match->settings().level));
+  char clock[24] = "";
+  if (timed) {
     const chess::ui::ClockText time = chess::ui::clockText(match->remainingMs(far));
-    char clock[24];
     if (time.minutes) {
       snprintf(clock, sizeof(clock), "%s %s", time.text, tr(STR_CHESS_MIN));
     } else {
       snprintf(clock, sizeof(clock), "%s", time.text);
     }
-    drawRightAligned(renderer, kText12Font, right, kHeaderTop, clock, kSemiBold);
-    right -= renderer.getTextWidth(kText12Font, clock, kSemiBold) + kTurnLineGap;
   }
-  if (label[0] == '\0') return;
-  const int x = std::max(exitWidth, right - renderer.getTextWidth(kText12Font, label));
-  drawFitted(renderer, kText12Font, x, kHeaderTop, label, right - x);
+  games::ui::StatusItem status[2];
+  int count = 0;
+  if (match->settings().mode == chess::Mode::VsComputer) {
+    status[count++] = {tr(STR_GAMES_VS_LEVEL), level};
+  } else if (timed) {
+    status[count++] = {far == chess::WHITE ? tr(STR_CHESS_WHITE) : tr(STR_CHESS_BLACK), nullptr};
+  }
+  if (timed) status[count++] = {nullptr, clock};
+  // Too long beside "‹ Выйти": the clock alone.
+  const int room = width - kSidePadding - exitWidth;
+  if (timed && games::ui::statusWidth(renderer, status, count) > room) {
+    status[0] = status[count - 1];
+    count = 1;
+  }
+  if (count > 0) games::ui::drawStatus(renderer, width - kSidePadding, kHeaderTop, status, count);
 }
 
 void ChessActivity::drawBoard() const {

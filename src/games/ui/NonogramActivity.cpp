@@ -411,7 +411,7 @@ NonogramActivity::Layout NonogramActivity::layout() const {
 
 void NonogramActivity::build(UiScreen& screen) {
   if (!boardShown()) {
-    drawTopLine(screen, nullptr, nullptr, false);
+    drawTopLine(screen, {}, false);
     const int width = renderer.getScreenWidth();
     char text[96];
     if (notice == Notice::NoSize) {
@@ -427,10 +427,10 @@ void NonogramActivity::build(UiScreen& screen) {
     }
   } else {
     char size[16];
-    snprintf(size, sizeof(size), "%d\xC3\x97%d \xC2\xB7", game.side(), game.side());
+    snprintf(size, sizeof(size), "%d\xC3\x97%d", game.side(), game.side());
     char clock[24];
     formatElapsed(game.elapsedMs(), clock, sizeof(clock));
-    drawTopLine(screen, size, clock, false);
+    drawTopLine(screen, {{size, nullptr}, {nullptr, clock}}, false);
 
     const Layout l = layout();
     drawClues(l);

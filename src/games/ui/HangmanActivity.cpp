@@ -232,8 +232,8 @@ HangmanActivity::Layout HangmanActivity::layout() const {
 
 void HangmanActivity::build(UiScreen& screen) {
   char value[32];
-  snprintf(value, sizeof(value), tr(STR_HANGMAN_OF), game.mistakes(), hangman::MAX_MISTAKES);
-  drawTopLine(screen, tr(STR_HANGMAN_MISTAKES), value, false);
+  snprintf(value, sizeof(value), tr(STR_GAMES_OF), game.mistakes(), hangman::MAX_MISTAKES);
+  drawTopLine(screen, {{tr(STR_HANGMAN_MISTAKES), value}}, false);
 
   const Layout l = layout();
   drawGallows(l.gallowsTop, l.gallowsBottom);

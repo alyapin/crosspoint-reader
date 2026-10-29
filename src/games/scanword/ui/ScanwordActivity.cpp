@@ -905,10 +905,11 @@ void ScanwordActivity::drawTopLine(UiScreen& screen) const {
     const int exitWidth = renderer.getTextWidth(kText12Font, exitLabel) + 2 * kSidePadding;
     screen.frame().hit(fui::makeRect(0, 0, exitWidth, kGridTop), ACTION_BACK, 0, kTap);
   }
-  char count[16];
-  snprintf(count, sizeof(count), "%u/%u", static_cast<unsigned>(game->filledCount()),
-           static_cast<unsigned>(puzzle->letterCount()));
-  drawRightAligned(renderer, kText12Font, width - kSidePadding, kHeaderTop, count, kSemiBold);
+  char count[24];
+  snprintf(count, sizeof(count), tr(STR_GAMES_OF), static_cast<int>(game->filledCount()),
+           static_cast<int>(puzzle->letterCount()));
+  const games::ui::StatusItem status[] = {{tr(STR_SCANWORD_FILLED), count}};
+  games::ui::drawStatus(renderer, width - kSidePadding, kHeaderTop, status, 1);
 }
 
 // Letters are the text face's glyphs scaled to a cap height, so no large font is needed.

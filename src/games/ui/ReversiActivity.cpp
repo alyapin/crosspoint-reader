@@ -211,10 +211,14 @@ bool ReversiActivity::onBack() {
 // --- render task -------------------------------------------------------------
 
 void ReversiActivity::build(UiScreen& screen) {
-  char level[40];
+  char level[12];
   const bool vs = game.vsComputer();
-  if (vs) snprintf(level, sizeof(level), tr(STR_REVERSI_VS_LEVEL), static_cast<int>(game.mode()) + 1);
-  drawTopLine(screen, nullptr, vs ? level : tr(STR_GAMES_TWO_PLAYERS), false);
+  snprintf(level, sizeof(level), "%d", static_cast<int>(game.mode()) + 1);
+  if (vs) {
+    drawTopLine(screen, {{tr(STR_GAMES_VS_LEVEL), level}}, false);
+  } else {
+    drawTopLine(screen, {{tr(STR_GAMES_TWO_PLAYERS), nullptr}}, false);
+  }
 
   const int width = renderer.getScreenWidth();
   const int cell = width / SIZE;

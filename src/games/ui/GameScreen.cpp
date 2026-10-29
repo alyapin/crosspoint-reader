@@ -317,8 +317,8 @@ void GameScreen::screenFn(UiScreen& screen, void* user) {
   if (self->hasGame) self->build(screen);
 }
 
-void GameScreen::drawTopLine(UiScreen& screen, const char* label, const char* value, const bool tappable,
-                             const bool focused) const {
+void GameScreen::drawTopLine(UiScreen& screen, const std::initializer_list<games::ui::StatusItem> status,
+                             const bool tappable, const bool focused) const {
   const int width = renderer.getScreenWidth();
   drawStatusLine(renderer);
 
@@ -330,15 +330,9 @@ void GameScreen::drawTopLine(UiScreen& screen, const char* label, const char* va
     screen.frame().hit(fui::makeRect(0, 0, exitWidth, BOARD_TOP), ACTION_EXIT, 0, shellInput());
   }
 
-  int left = width - kSidePadding;
-  if (value != nullptr && *value != '\0') {
-    left -= renderer.getTextWidth(kText12Font, value, kSemiBold);
-    renderer.drawText(kText12Font, left, TOP_LINE_Y, value, true, kSemiBold);
-  }
-  if (label != nullptr && *label != '\0') {
-    left -= renderer.getTextWidth(kText12Font, label) + renderer.getSpaceWidth(kText12Font);
-    renderer.drawText(kText12Font, left, TOP_LINE_Y, label);
-  }
+  const auto count = static_cast<int>(status.size());
+  const int left = width - kSidePadding - games::ui::statusWidth(renderer, status.begin(), count);
+  games::ui::drawStatus(renderer, width - kSidePadding, TOP_LINE_Y, status.begin(), count);
   if (focused) {
     constexpr int kPadX = 8;
     constexpr int kPadY = 3;  // clear of the clock/battery line above

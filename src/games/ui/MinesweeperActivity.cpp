@@ -211,10 +211,14 @@ int MinesweeperActivity::boardLeft() const { return (renderer.getScreenWidth() -
 void MinesweeperActivity::build(UiScreen& screen) {
   char clock[24];
   formatElapsed(game.elapsedMs(), clock, sizeof(clock));
-  char value[40];
+  char mines[12];
   const bool over = game.isOver();
-  snprintf(value, sizeof(value), "%d \xC2\xB7 %s", game.minesLeft(), clock);
-  drawTopLine(screen, over ? nullptr : tr(STR_MINES_LEFT), over ? clock : value, false);
+  snprintf(mines, sizeof(mines), "%d", game.minesLeft());
+  if (over) {
+    drawTopLine(screen, {{nullptr, clock}}, false);
+  } else {
+    drawTopLine(screen, {{tr(STR_MINES_LEFT), mines}, {nullptr, clock}}, false);
+  }
 
   const int size = cellSize();
   const int left = boardLeft();

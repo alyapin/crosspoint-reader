@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 
 #include "ActionBar.h"
 #include "BoardKeys.h"
@@ -122,8 +123,9 @@ class GameScreen : public Activity, protected UiAppHost {
   }
   void leave();
 
-  // `focused` frames the status for key focus.
-  void drawTopLine(UiScreen& screen, const char* label, const char* value, bool tappable, bool focused = false) const;
+  // The status parts as games::ui::drawStatus; `focused` frames the status for key focus.
+  void drawTopLine(UiScreen& screen, std::initializer_list<games::ui::StatusItem> status, bool tappable,
+                   bool focused = false) const;
   template <size_t N>
   void drawBar(UiScreen& screen, const BarItem (&items)[N], const int focused) const {
     static_assert(N <= MAX_BAR_SLOTS, "the bar holds four slots at most");

@@ -291,7 +291,7 @@ int SudokuActivity::cellAt(const int x, const int y) const {
 void SudokuActivity::build(UiScreen& screen) {
   char clock[24];
   formatElapsed(game.elapsedMs(), clock, sizeof(clock));
-  drawTopLine(screen, levelStatus(game.level()), clock, false);
+  drawTopLine(screen, {{levelStatus(game.level()), nullptr}, {nullptr, clock}}, false);
 
   drawGrid();
   const int left = (renderer.getScreenWidth() - kGridSize) / 2;

@@ -463,13 +463,13 @@ void DraughtsActivity::cellOrigin(const int square, int& x, int& y) const {
 // --- render task -------------------------------------------------------------
 
 void DraughtsActivity::build(UiScreen& screen) {
-  char mode[32];
-  const char* value = tr(STR_GAMES_TWO_PLAYERS);
+  char level[12];
+  snprintf(level, sizeof(level), "%d", static_cast<int>(game.mode()) + 1);
   if (game.vsComputer()) {
-    snprintf(mode, sizeof(mode), tr(STR_CHESS_COMPUTER_LEVEL), static_cast<int>(game.mode()) + 1);
-    value = mode;
+    drawTopLine(screen, {{tr(STR_GAMES_VS_LEVEL), level}}, false);
+  } else {
+    drawTopLine(screen, {{tr(STR_GAMES_TWO_PLAYERS), nullptr}}, false);
   }
-  drawTopLine(screen, nullptr, value, false);
   drawBoard();
   screen.frame().hit(fui::makeRect((renderer.getScreenWidth() - kBoardSize) / 2, kBoardTop, kBoardSize, kBoardSize),
                      ACTION_BOARD, 0, shellInput());
