@@ -84,6 +84,9 @@ bool generateThumb(RecentBook& book, const int height) {
   }
   return false;
 }
+
+// The tab last opened with Confirm, for this boot; -1 = the books.
+int rememberedTab = -1;
 }  // namespace
 
 void SetkaHomeActivity::onEnter() {
@@ -92,7 +95,7 @@ void SetkaHomeActivity::onEnter() {
   RenderLock lock(*this);
   Activity::onEnter();
   loadBooks();
-  focus = 0;
+  focus = rememberedTab >= 0 ? bookFocusCount() + rememberedTab : 0;
   entryRefresh = true;
   thumbsChecked = false;
   resetUi();
@@ -145,6 +148,7 @@ void SetkaHomeActivity::onOpenLibrary(const fui::ActionEvent&, void* user) {
 
 void SetkaHomeActivity::openBook(const int index) {
   if (index < 0 || index >= slotCount) return;
+  rememberedTab = -1;
   app.clearTapFlash();
   activityManager.goToReader(slots[index].book.path);
 }
@@ -182,8 +186,9 @@ void SetkaHomeActivity::moveFocus(const int delta) {
 
 void SetkaHomeActivity::activateFocus() {
   const int index = focus;
-  if (index >= bookFocusCount()) {
-    openTab(index - bookFocusCount());
+  rememberedTab = index >= bookFocusCount() ? index - bookFocusCount() : -1;
+  if (rememberedTab >= 0) {
+    openTab(rememberedTab);
   } else if (slotCount == 0) {
     openAllBooks();
   } else {
