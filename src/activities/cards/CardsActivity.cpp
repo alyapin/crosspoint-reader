@@ -544,6 +544,7 @@ bool CardsActivity::findDeckFile(const uint32_t id, std::string& out) const {
 
 void CardsActivity::loadList() {
   deckTitle[0] = '\0';
+  cards::restoreReplacedDecks();
   const char* folder = cards::deckDir();
   if (!Storage.exists(folder)) Storage.mkdir(folder);
   if (!decks) decks = makeUniqueNoThrow<DeckRow[]>(MAX_DECKS);

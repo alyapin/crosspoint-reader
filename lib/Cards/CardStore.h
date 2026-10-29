@@ -36,6 +36,16 @@ inline constexpr uint8_t AGAIN_GAP = 3;  // other cards before an «Снова»
 // DECK_DIR, or DECK_DIR_LOWER when only that one exists.
 const char* deckDir();
 
+// A deck received again (LocalSend) arrives as <name>DECK_PARTIAL_SUFFIX; the
+// old deck waits as <name>DECK_OLD_SUFFIX until the new one is in place.
+inline constexpr char DECK_PARTIAL_SUFFIX[] = ".localsend";
+inline constexpr char DECK_OLD_SUFFIX[] = ".localsend-old";
+// Settles a replace cut short, in one pass over deckDir(): the old deck comes
+// back while the new one is still a partial, and is dropped once the deck is in
+// place or when neither is left (the deck was deleted or renamed). Run it
+// before partials are cleared.
+void restoreReplacedDecks();
+
 struct Summary {
   uint16_t cards = 0;
   uint16_t fresh = 0;

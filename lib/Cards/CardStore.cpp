@@ -284,6 +284,47 @@ struct DeckStore::Header {
 
 uint32_t deckId(const char* fileName) { return fnv1a(fileName, strlen(fileName)); }
 
+void restoreReplacedDecks() {
+  constexpr int SLOTS = 4;
+  constexpr size_t NAME_BYTES = 256;
+  constexpr size_t PATH_BYTES = NAME_BYTES + 48;
+  constexpr size_t OLD_LEN = sizeof(DECK_OLD_SUFFIX) - 1;
+  const char* folder = deckDir();
+  // Names found, then the scan buffer, then three paths.
+  auto buf = makeUniqueNoThrow<char[]>(SLOTS * NAME_BYTES + NAME_BYTES + 3 * PATH_BYTES);
+  if (!buf) return;
+  char* name = buf.get() + SLOTS * NAME_BYTES;
+  int found = 0;
+  {
+    HalFile dir = Storage.open(folder);
+    if (!dir || !dir.isDirectory()) return;
+    for (HalFile entry = dir.openNextFile(); entry && found < SLOTS; entry = dir.openNextFile()) {
+      entry.getName(name, NAME_BYTES);
+      const bool isDir = entry.isDirectory();
+      entry.close();
+      const size_t len = strlen(name);
+      if (isDir || len <= OLD_LEN || strcmp(name + len - OLD_LEN, DECK_OLD_SUFFIX) != 0) continue;
+      memcpy(buf.get() + found * NAME_BYTES, name, len + 1);
+      found++;
+    }
+  }
+  char* old = name + NAME_BYTES;
+  char* deck = old + PATH_BYTES;
+  char* partial = deck + PATH_BYTES;
+  for (int i = 0; i < found; i++) {
+    const char* oldName = buf.get() + i * NAME_BYTES;
+    const int stem = static_cast<int>(strlen(oldName) - OLD_LEN);
+    snprintf(old, PATH_BYTES, "%s/%s", folder, oldName);
+    snprintf(deck, PATH_BYTES, "%s/%.*s", folder, stem, oldName);
+    snprintf(partial, PATH_BYTES, "%s%s", deck, DECK_PARTIAL_SUFFIX);
+    if (!Storage.exists(deck) && Storage.exists(partial)) {
+      if (Storage.rename(old, deck)) LOG_INF("CARD", "Restored %s", deck);
+    } else if (Storage.remove(old)) {
+      LOG_INF("CARD", "Removed %s", old);
+    }
+  }
+}
+
 const char* deckDir() {
   return !Storage.exists(DECK_DIR) && Storage.exists(DECK_DIR_LOWER) ? DECK_DIR_LOWER : DECK_DIR;
 }

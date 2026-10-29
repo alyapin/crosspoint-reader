@@ -488,3 +488,26 @@ TEST(CardStore, MergeOutOfMemoryIsReported) {
   EXPECT_EQ(store.startSession(0), Status::Ok);
   EXPECT_EQ(store.length(), 2);
 }
+
+TEST(CardStore, ReplacedDecksAreSettled) {
+  fake::reset();
+  // Cut before the new deck landed: the old one comes back.
+  fake::add("/Карточки/a.tsv.localsend-old", "old a");
+  fake::add("/Карточки/a.tsv.localsend", "new a, partial");
+  // Cut after the new deck landed: the old copy goes.
+  fake::add("/Карточки/b.tsv", "new b");
+  fake::add("/Карточки/b.tsv.localsend-old", "old b");
+  // The deck was deleted since: nothing comes back.
+  fake::add("/Карточки/c.tsv.localsend-old", "old c");
+  fake::add("/Книги/d.tsv.localsend-old", "not a deck folder");
+  restoreReplacedDecks();
+  EXPECT_EQ(
+      std::string(fake::files.at("/Карточки/a.tsv")->bytes.begin(), fake::files.at("/Карточки/a.tsv")->bytes.end()),
+      "old a");
+  EXPECT_FALSE(Storage.exists("/Карточки/a.tsv.localsend-old"));
+  EXPECT_TRUE(Storage.exists("/Карточки/b.tsv"));
+  EXPECT_FALSE(Storage.exists("/Карточки/b.tsv.localsend-old"));
+  EXPECT_FALSE(Storage.exists("/Карточки/c.tsv"));
+  EXPECT_FALSE(Storage.exists("/Карточки/c.tsv.localsend-old"));
+  EXPECT_TRUE(Storage.exists("/Книги/d.tsv.localsend-old"));
+}

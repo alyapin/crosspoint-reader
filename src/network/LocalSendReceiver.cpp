@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "CardDeck.h"
@@ -29,8 +30,7 @@ constexpr uint32_t REPLY_INTERVAL_MS = 500;
 constexpr int DATAGRAMS_PER_LOOP = 4;
 // Not a book extension, so no received file ends with it; .part belongs to web uploads.
 constexpr char PART_SUFFIX[] = ".localsend";
-// A deck being replaced waits under this name until the new one is in place.
-constexpr char OLD_SUFFIX[] = ".localsend-old";
+static_assert(std::string_view(PART_SUFFIX) == cards::DECK_PARTIAL_SUFFIX);
 
 bool endsWith(const char* name, const char* suffix) {
   const size_t len = strlen(name);
@@ -38,20 +38,24 @@ bool endsWith(const char* name, const char* suffix) {
   return len > n && strcmp(name + len - n, suffix) == 0;
 }
 
-// Moves `tmp` over `path` keeping the old file until the new one is in: a
-// failure or a cut at any step leaves one complete copy.
-bool replaceKeepingOld(const char* tmp, const char* path) {
-  if (!Storage.exists(path)) return Storage.rename(tmp, path);
+enum class Replace : uint8_t { Done, Failed, PartialKept };
+
+// Moves `tmp` over `path` keeping the old deck aside until the new one is in;
+// cards::restoreReplacedDecks() settles a replace cut at any step.
+Replace replaceKeepingOld(const char* tmp, const char* path) {
+  if (!Storage.exists(path)) return Storage.rename(tmp, path) ? Replace::Done : Replace::Failed;
   char old[224];
-  snprintf(old, sizeof(old), "%s%s", path, OLD_SUFFIX);
-  if (Storage.exists(old) && !Storage.remove(old)) return false;
-  if (!Storage.rename(path, old)) return false;
+  snprintf(old, sizeof(old), "%s%s", path, cards::DECK_OLD_SUFFIX);
+  if (Storage.exists(old) && !Storage.remove(old)) return Replace::Failed;
+  if (!Storage.rename(path, old)) return Replace::Failed;
   if (!Storage.rename(tmp, path)) {
-    if (!Storage.rename(old, path)) LOG_ERR("LSND", "cannot restore %s", path);
-    return false;
+    if (Storage.rename(old, path)) return Replace::Failed;
+    // Neither copy is at `path`: keep the partial, so the next start restores the old deck.
+    LOG_ERR("LSND", "cannot restore %s", path);
+    return Replace::PartialKept;
   }
   if (!Storage.remove(old)) LOG_ERR("LSND", "cannot remove %s", old);
-  return true;
+  return Replace::Done;
 }
 
 uint32_t hardwareRandom() { return esp_random(); }
@@ -96,6 +100,7 @@ bool LocalSendReceiver::start(const Config& config) {
     LOG_ERR("LSND", "mkdir %s failed, using SD root", store.dir);
     store.dir[0] = 0;
   }
+  cards::restoreReplacedDecks();
   store.reclaimPartials(store.dir);
   if (Storage.exists(cards::deckDir())) store.reclaimPartials(cards::deckDir());
   store.forgetFreeSpace();
@@ -284,8 +289,12 @@ int LocalSendReceiver::Store::commit(const localsend::FileEntry& entry) {
       snprintf(finalPath, sizeof(finalPath), "%.*s", static_cast<int>(strlen(partial) - strlen(PART_SUFFIX)), partial);
     }
   }
-  if (!(deck ? replaceKeepingOld(tmpPath, finalPath) : Storage.rename(tmpPath, finalPath))) {
+  const Replace placed = deck                                 ? replaceKeepingOld(tmpPath, finalPath)
+                         : Storage.rename(tmpPath, finalPath) ? Replace::Done
+                                                              : Replace::Failed;
+  if (placed != Replace::Done) {
     LOG_ERR("LSND", "rename failed: %s", finalPath);
+    if (placed == Replace::PartialKept) tmpPath[0] = 0;
     abort();
     return 500;
   }
@@ -306,12 +315,9 @@ void LocalSendReceiver::Store::abort() {
   tmpPath[0] = 0;
 }
 
-// A transfer cut by a reset leaves its partial, which would count against the
-// free space; a deck replace cut short leaves the old deck aside, which comes
-// back when the new one did not arrive.
+// A transfer cut by a reset leaves its partial, which would count against the free space.
 void LocalSendReceiver::Store::reclaimPartials(const char* folder) {
   std::vector<std::string> stale;
-  std::vector<std::string> old;
   {
     HalFile root = Storage.open(folder[0] ? folder : "/");
     if (!root || !root.isDirectory()) return;
@@ -321,21 +327,11 @@ void LocalSendReceiver::Store::reclaimPartials(const char* folder) {
       if (entry.isDirectory()) continue;
       entry.getName(name, sizeof(name));
       if (endsWith(name, PART_SUFFIX)) stale.emplace_back(name);
-      if (endsWith(name, OLD_SUFFIX)) old.emplace_back(name);
     }
   }
   for (const std::string& name : stale) {
     const std::string path = std::string(folder) + "/" + name;
     if (Storage.remove(path.c_str())) LOG_INF("LSND", "removed partial %s", path.c_str());
-  }
-  for (const std::string& name : old) {
-    const std::string path = std::string(folder) + "/" + name;
-    const std::string original = path.substr(0, path.size() - (sizeof(OLD_SUFFIX) - 1));
-    if (!Storage.exists(original.c_str())) {
-      if (Storage.rename(path.c_str(), original.c_str())) LOG_INF("LSND", "restored %s", original.c_str());
-    } else if (Storage.remove(path.c_str())) {
-      LOG_INF("LSND", "removed replaced %s", path.c_str());
-    }
   }
 }
 
