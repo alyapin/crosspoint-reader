@@ -43,6 +43,7 @@ class NonogramActivity final : public GameScreen {
   void clearSave() override;
   int menuRows(GamePickerActivity::Row (&rows)[MENU_ROWS]) const override;
   void menuChosen(int row) override;
+  void confirmRestart();
   void build(UiScreen& screen) override;
   void onTouch(const freeink::ui::ActionEvent& event, int x, int y) override;
   void onKey(int dx, int dy, bool confirm) override;

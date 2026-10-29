@@ -12,6 +12,7 @@
 #include <iterator>
 
 #include "ElapsedText.h"
+#include "activities/util/ConfirmationActivity.h"
 #include "gameIcons.h"
 #include "games/GameSave.h"
 #include "games/chess/ui/chessIcons.h"
@@ -168,10 +169,28 @@ void NonogramActivity::menuChosen(const int row) {
     checkShown = true;
     requestRepaint(RepaintUpdate);
   } else if (row == 1) {
-    game.restart();
-    checkShown = false;
-    markChanged();
+    confirmRestart();
   }
+}
+
+void NonogramActivity::confirmRestart() {
+  auto confirm =
+      makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_NONOGRAM_RESTART_CONFIRM),
+                                              tr(STR_NONOGRAM_RESTART_BODY), tr(STR_CANCEL), tr(STR_NONOGRAM_RESTART));
+  if (!confirm) return;
+  app.clearTapFlash();
+  pauseGame();
+  startActivityForResult(std::move(confirm), [this](const ActivityResult& result) {
+    RenderLock lock(*this);
+    if (!result.isCancelled) {
+      game.restart();
+      checkShown = false;
+      stroking = false;
+      markChanged();
+    }
+    resumeGame();
+    requestRepaint(RepaintEntry);
+  });
 }
 
 // --- input -------------------------------------------------------------------
@@ -418,7 +437,7 @@ void NonogramActivity::build(UiScreen& screen) {
 
   BarItem items[BAR_SLOTS];
   if (barShown(0)) items[0] = {&icon_bar_cross_24, tr(STR_NONOGRAM_CROSS), crossMode, BarItem::Mode};
-  if (barShown(1)) items[1] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false};
+  if (barShown(1)) items[1] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false, BarItem::Repeat};
   items[2] = boardShown() && game.inProgress()
                  ? BarItem{&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu}
                  : BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame};
