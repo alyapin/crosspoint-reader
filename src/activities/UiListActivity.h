@@ -106,6 +106,9 @@ class UiListActivity : public Activity, protected UiAppHost {
   // The page line («2 из 3», right-aligned above the hints) on button boards;
   // screens with their own position readout turn it off.
   virtual bool showsPageLine() const { return true; }
+  // Top of the page line: the caption line over the hints, or a screen's own
+  // footer line.
+  virtual int pageLineTop() const;
 
   // --- shared state ----------------------------------------------------------
   // Selection + viewport (selected/top/visibleRows/followOnBuild). Access via
@@ -119,8 +122,6 @@ class UiListActivity : public Activity, protected UiAppHost {
   // Named apart from UiAppHost::routeTouch so the host overload stays visible
   // (not name-hidden) to subclasses with extra touch surfaces.
   bool routeListTouch();
-  // Top of the page line, on the caption line over the hints.
-  int pageLineTop() const;
   // After the screen build: the pager's layout feedback, then the page line.
   void finishPage();
   // Render task only.
