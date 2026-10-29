@@ -835,9 +835,10 @@ void CardsActivity::buildList(UiScreen& screen) {
   const int height = safe.y + safe.height;
   const int captionLine = renderer.getLineHeight(kCaptionFont);
   // The formats wrap once when a language runs long.
-  const auto formats =
-      renderer.wrappedText(kCaptionFont, tr(STR_CARDS_LIST_FORMATS), renderer.getScreenWidth() - 2 * kSidePadding, 2);
-  const int noteTop = hintCaptionTop(renderer, kCaptionFont, height) - static_cast<int>(formats.size()) * captionLine;
+  const char* formats = tr(STR_CARDS_LIST_FORMATS);
+  const int noteWidth = renderer.getScreenWidth() - 2 * kSidePadding;
+  const int formatLines = textLines(renderer, kCaptionFont, formats, noteWidth, 2);
+  const int noteTop = hintCaptionTop(renderer, kCaptionFont, height) - formatLines * captionLine;
   const int first = headerBottom() + 14;
   const int rows = std::max(1, (noteTop - 8 - first) / kRowHeight);
   if (focus < listTop) listTop = focus;
@@ -846,12 +847,8 @@ void CardsActivity::buildList(UiScreen& screen) {
     drawRow(screen, first + (i - listTop) * kRowHeight, &icon_cards_24, decks[i].name, i == focus, nullptr,
             decks[i].caption, i);
   }
-  int y = noteTop;
-  renderer.drawText(kCaptionFont, kSidePadding, y, tr(STR_CARDS_LIST_NOTE));
-  for (const auto& line : formats) {
-    y += captionLine;
-    renderer.drawText(kCaptionFont, kSidePadding, y, line.c_str());
-  }
+  renderer.drawText(kCaptionFont, kSidePadding, noteTop, tr(STR_CARDS_LIST_NOTE));
+  drawTextLines(renderer, kCaptionFont, kSidePadding, noteTop + captionLine, formats, noteWidth, 2);
 }
 void CardsActivity::buildEmpty(UiScreen& screen) {
   const int width = renderer.getScreenWidth();

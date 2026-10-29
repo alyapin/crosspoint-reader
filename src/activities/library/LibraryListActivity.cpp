@@ -1083,13 +1083,11 @@ void LibraryListActivity::drawHoldHelp() const {
   const Rect area = UITheme::getContentArea(renderer);
   const int left = std::max(area.x, bottomCornerClearance()) + SIDE_PADDING;
   // Whole words on up to two lines, the last one level with the readout.
-  const auto lines = renderer.wrappedText(SMALL_FONT_ID, help, holdHelpWidth(), 2);
-  int y = setka::hintCaptionTop(renderer, SMALL_FONT_ID, area.y + area.height - metrics.buttonHintsHeight) -
-          (static_cast<int>(lines.size()) - 1) * lineHeight;
-  for (const auto& line : lines) {
-    renderer.drawText(SMALL_FONT_ID, left, y, line.c_str());
-    y += lineHeight;
-  }
+  const int width = holdHelpWidth();
+  const int lines = setka::textLines(renderer, SMALL_FONT_ID, help, width, 2);
+  const int y = setka::hintCaptionTop(renderer, SMALL_FONT_ID, area.y + area.height - metrics.buttonHintsHeight) -
+                (lines - 1) * lineHeight;
+  setka::drawTextLines(renderer, SMALL_FONT_ID, left, y, help, width, 2);
 }
 
 // OptionPopup is a self-contained modal: it owns the whole frame (hints

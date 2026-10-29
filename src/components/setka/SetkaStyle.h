@@ -141,6 +141,30 @@ inline void drawProgressBarVertical(const GfxRenderer& renderer, const int x, co
   renderer.fillRectDither(x + 1, y + 1, width - 2, inner - filled, Color::LightGray);
 }
 
+// Lines `text` takes at `width`, at most maxLines. A text that fits one line
+// is measured, not wrapped, so the common case allocates nothing.
+inline int textLines(const GfxRenderer& renderer, const int fontId, const char* text, const int width,
+                     const int maxLines) {
+  if (renderer.getTextWidth(fontId, text) <= width) return 1;
+  return static_cast<int>(renderer.wrappedText(fontId, text, width, maxLines).size());
+}
+
+// Draws `text` from (x, y) in whole words on up to maxLines lines, wrapping
+// only when it does not fit one; returns the y under it.
+inline int drawTextLines(const GfxRenderer& renderer, const int fontId, const int x, int y, const char* text,
+                         const int width, const int maxLines) {
+  const int line = renderer.getLineHeight(fontId);
+  if (renderer.getTextWidth(fontId, text) <= width) {
+    renderer.drawText(fontId, x, y, text);
+    return y + line;
+  }
+  for (const auto& part : renderer.wrappedText(fontId, text, width, maxLines)) {
+    renderer.drawText(fontId, x, y, part.c_str());
+    y += line;
+  }
+  return y;
+}
+
 // Top of the last caption line above the hint band that starts at hintsTop.
 inline int hintCaptionTop(const GfxRenderer& renderer, const int fontId, const int hintsTop) {
   return hintsTop - kHintCaptionGap - renderer.getFontAscenderSize(fontId);

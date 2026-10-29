@@ -241,10 +241,9 @@ void IntervalSelectionActivity::drawKeyDialog() const {
   // The steps are a key hint: the dense face, one line where it fits.
   char steps[96];
   formatSteps(steps, sizeof(steps));
-  const auto stepLines = renderer.wrappedText(kDenseFont, steps, textWidth, 2);
-  const int stepLine = renderer.getLineHeight(kDenseFont);
+  const int stepHeight = textLines(renderer, kDenseFont, steps, textWidth, 2) * renderer.getLineHeight(kDenseFont);
   const int cardHeight = kPadding + titleLine + kGap + valueHeight + 2 * kGap + captionLine + 4 + kProgressHeight +
-                         kGap + static_cast<int>(stepLines.size()) * stepLine + kPadding;
+                         kGap + stepHeight + kPadding;
   const int cardY = (renderer.getScreenHeight() - cardHeight) / 2;
 
   drawRule(renderer, 0, cardY - kBandMargin - kRuleWidth, width);
@@ -270,10 +269,7 @@ void IntervalSelectionActivity::drawKeyDialog() const {
   y += kProgressHeight + kGap;
 
   // Front buttons do the small step, side buttons the large step.
-  for (const auto& line : stepLines) {
-    renderer.drawText(kDenseFont, textX, y, line.c_str());
-    y += stepLine;
-  }
+  drawTextLines(renderer, kDenseFont, textX, y, steps, textWidth, 2);
 }
 
 void IntervalSelectionActivity::render(RenderLock&&) {
