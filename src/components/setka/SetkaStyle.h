@@ -140,6 +140,11 @@ inline void drawProgressBarVertical(const GfxRenderer& renderer, const int x, co
   renderer.fillRectDither(x + 1, y + 1, width - 2, inner - filled, Color::LightGray);
 }
 
+// Top of the last caption line above the button hints that start at hintsTop.
+inline int hintCaptionTop(const GfxRenderer& renderer, const int fontId, const int hintsTop) {
+  return hintsTop - kHintCaptionGap - renderer.getFontAscenderSize(fontId);
+}
+
 // Height of the hero digits above the baseline. Unbounded's line box carries
 // a tall empty ascender, so lay hero numbers out by this, not getLineHeight().
 inline int heroCapHeight(const GfxRenderer& renderer, const int fontId) {

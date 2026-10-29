@@ -833,7 +833,7 @@ void CardsActivity::drawStats(const int y, const uint16_t (&numbers)[3], const S
 void CardsActivity::buildList(UiScreen& screen) {
   const int height = renderer.getScreenHeight() - UITheme::getInstance().getMetrics().buttonHintsHeight;
   const int captionLine = renderer.getLineHeight(kCaptionFont);
-  const int noteTop = height - 2 * captionLine - 24;
+  const int noteTop = hintCaptionTop(renderer, kCaptionFont, height) - captionLine;
   const int first = headerBottom() + 14;
   const int rows = std::max(1, (noteTop - 8 - first) / kRowHeight);
   if (focus < listTop) listTop = focus;
@@ -1024,7 +1024,7 @@ void CardsActivity::buildCard(UiScreen& screen) {
   // above the hints, in a line that wraps once when the intervals run long.
   const int hintsTop = height - UITheme::getInstance().getMetrics().buttonHintsHeight;
   const int noteLine = renderer.getLineHeight(kDenseFont);
-  const int noteTop = hintsTop - kNoteGap - noteLine;
+  const int noteTop = hintCaptionTop(renderer, kDenseFont, hintsTop);
   const int barTop = touch ? hintsTop - kGradeBarHeight : noteTop - noteLine - kNoteGap;
   const int frontBottom = touch ? kFrontBottomTouch : kFrontBottomButtons;
 

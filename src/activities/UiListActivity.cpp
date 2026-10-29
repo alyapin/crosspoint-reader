@@ -286,7 +286,7 @@ void UiListActivity::drawPageLine() {
   char text[24];
   snprintf(text, sizeof(text), tr(STR_LIST_PAGE), current, pages);
   const int x = pageLine_.right() - setka::kSidePadding - renderer.getTextWidth(SMALL_FONT_ID, text);
-  renderer.drawText(SMALL_FONT_ID, x, pageLine_.y, text);
+  renderer.drawText(SMALL_FONT_ID, x, setka::hintCaptionTop(renderer, SMALL_FONT_ID, pageLine_.bottom()), text);
 }
 
 void UiListActivity::drawFooter() {
