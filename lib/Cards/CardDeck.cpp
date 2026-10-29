@@ -3,6 +3,8 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "CardWork.h"
+
 namespace cards {
 namespace {
 
@@ -45,12 +47,15 @@ size_t skipBom(const uint8_t* p, const size_t len) {
   return len >= 3 && p[0] == 0xEF && p[1] == 0xBB && p[2] == 0xBF ? 3 : 0;
 }
 
-// A sequence cut by the end of a full probe buffer still counts as valid.
-bool validUtf8(const uint8_t* p, const size_t len, const bool cutOk) {
+// CP1251 when some byte is not UTF-8 and no UTF-8 letter was seen. A sequence
+// cut by the end of a full probe buffer is not a broken one.
+bool looksCp1251(const uint8_t* p, const size_t len, const bool cutOk) {
+  bool multibyte = false;
+  bool broken = false;
   size_t i = 0;
   while (i < len) {
     const uint8_t c = p[i];
-    size_t extra;
+    size_t extra = 0;
     if (c < 0x80) {
       i++;
       continue;
@@ -60,16 +65,73 @@ bool validUtf8(const uint8_t* p, const size_t len, const bool cutOk) {
       extra = 2;
     } else if (c >= 0xF0 && c <= 0xF4) {
       extra = 3;
+    }
+    bool ok = extra > 0;
+    if (ok && i + extra >= len) {
+      broken = broken || !cutOk;
+      break;
+    }
+    for (size_t k = 1; ok && k <= extra; k++) ok = (p[i + k] & 0xC0) == 0x80;
+    if (ok) {
+      multibyte = true;
+      i += extra + 1;
     } else {
-      return false;
+      broken = true;
+      i++;
     }
-    if (i + extra >= len) return cutOk;
-    for (size_t k = 1; k <= extra; k++) {
-      if ((p[i + k] & 0xC0) != 0x80) return false;
-    }
-    i += extra + 1;
+  }
+  return broken && !multibyte;
+}
+
+bool sameLower(std::string_view a, const char* b) {
+  if (a.size() != strlen(b)) return false;
+  for (size_t i = 0; i < a.size(); i++) {
+    char c = a[i];
+    if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+    if (c != b[i]) return false;
   }
   return true;
+}
+
+bool containsLower(const uint8_t* p, const size_t len, const char* needle) {
+  const size_t n = strlen(needle);
+  for (size_t i = 0; i + n <= len; i++) {
+    if (sameLower(std::string_view(reinterpret_cast<const char*>(p + i), n), needle)) return true;
+  }
+  return false;
+}
+
+// {{c1::answer::hint}}: the front hides each deletion as «[…]», the back shows its answer.
+void cloze(char* text, const bool reveal) {
+  static constexpr char HIDDEN[] = "[\xE2\x80\xA6]";
+  const std::string_view all(text);
+  size_t r = 0;
+  size_t w = 0;
+  while (r < all.size()) {
+    if (all.compare(r, 3, "{{c") == 0) {
+      const size_t colon = all.find("::", r + 3);
+      const size_t close = all.find("}}", r + 3);
+      size_t digits = r + 3;
+      while (digits < all.size() && all[digits] >= '0' && all[digits] <= '9') digits++;
+      if (colon != std::string_view::npos && close != std::string_view::npos && colon < close && digits == colon &&
+          digits > r + 3) {
+        const size_t from = colon + 2;
+        const size_t hint = all.find("::", from);
+        const size_t to = hint != std::string_view::npos && hint < close ? hint : close;
+        if (reveal) {
+          memmove(text + w, text + from, to - from);
+          w += to - from;
+        } else {
+          memcpy(text + w, HIDDEN, sizeof(HIDDEN) - 1);
+          w += sizeof(HIDDEN) - 1;
+        }
+        r = close + 2;
+        continue;
+      }
+    }
+    text[w++] = text[r++];
+  }
+  text[w] = '\0';
 }
 
 bool isAlpha(const uint8_t c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
@@ -97,27 +159,28 @@ void hideColumn(Format& f, const int column) {
   if (column >= 0 && column < 16) f.hiddenColumns |= static_cast<uint16_t>(1u << column);
 }
 
-void readHeader(Format& f, std::string_view key, std::string_view value, bool& sawSeparator) {
+void readHeader(Format& f, std::string_view key, std::string_view value, bool& sawSeparator, bool& sawHtml) {
   key = trimmed(key);
   value = trimmed(value);
   if (key == "separator") {
     sawSeparator = true;
-    if (value == "tab" || value == "Tab")
+    if (sameLower(value, "tab"))
       f.separator = '\t';
-    else if (value == "comma" || value == "Comma")
+    else if (sameLower(value, "comma"))
       f.separator = ',';
-    else if (value == "semicolon" || value == "Semicolon")
+    else if (sameLower(value, "semicolon"))
       f.separator = ';';
-    else if (value == "pipe" || value == "Pipe")
+    else if (sameLower(value, "pipe"))
       f.separator = '|';
-    else if (value == "space" || value == "Space")
+    else if (sameLower(value, "space"))
       f.separator = ' ';
     else if (value.size() == 1)
       f.separator = value[0];
     else
       sawSeparator = false;
   } else if (key == "html") {
-    f.html = value != "false";
+    sawHtml = true;
+    f.html = sameLower(value, "true");
   } else if (key == "guid column") {
     f.guidColumn = static_cast<int8_t>(columnNumber(value));
     hideColumn(f, f.guidColumn);
@@ -198,28 +261,43 @@ bool hasAnkiHeader(const uint8_t* head, const size_t len) {
 
 Format probe(const uint8_t* head, const size_t len, const bool csv) {
   Format f;
+  if (len >= 2 && ((head[0] == 0xFF && head[1] == 0xFE) || (head[0] == 0xFE && head[1] == 0xFF))) {
+    f.utf16 = true;
+    return f;
+  }
   size_t at = skipBom(head, len);
-  f.cp1251 = !validUtf8(head + at, len - at, len >= PROBE_BYTES);
+  f.cp1251 = looksCp1251(head + at, len - at, len >= PROBE_BYTES);
   bool sawSeparator = false;
+  bool sawHtml = false;
   while (at < len && head[at] == '#') {
     const auto* end = static_cast<const uint8_t*>(memchr(head + at, '\n', len - at));
     if (end == nullptr) break;
     const std::string_view line(reinterpret_cast<const char*>(head + at + 1), static_cast<size_t>(end - head - at - 1));
     const size_t colon = line.find(':');
     if (colon == std::string_view::npos) break;
-    readHeader(f, line.substr(0, colon), line.substr(colon + 1), sawSeparator);
+    readHeader(f, line.substr(0, colon), line.substr(colon + 1), sawSeparator, sawHtml);
     at = static_cast<size_t>(end - head) + 1;
   }
   f.dataStart = static_cast<uint32_t>(at);
+  if (!sawHtml) {
+    const uint8_t* data = head + at;
+    const size_t n = len - at;
+    f.html = containsLower(data, n, "<br") || containsLower(data, n, "<div") || containsLower(data, n, "&nbsp;") ||
+             containsLower(data, n, "</");
+  }
   if (!sawSeparator && csv) f.separator = guessSeparator(head + at, len - at);
   return f;
 }
 
-uint32_t cardKey(const Fields& fields, const bool hasGuid, const uint32_t guidHash) {
-  if (hasGuid) return guidHash;
+uint32_t cardKey(const Fields& fields, const uint32_t guidHash) {
+  if (guidHash != 0) return guidHash;
   if (fields.text[0][0] != '\0') return fnv1a(fields.text[0], strlen(fields.text[0]));
   // A front that is only a picture: told apart by its answer.
   return fnv1a(fields.text[1], strlen(fields.text[1]), fnv1a("\1", 1));
+}
+
+uint32_t cardAltKey(const Fields& fields) {
+  return fnv1a(fields.text[1], strlen(fields.text[1]), fnv1a(fields.text[0], strlen(fields.text[0]), fnv1a("\2", 1)));
 }
 
 RecordReader::RecordReader(ByteSource& source, const Format& format, const uint32_t offset)
@@ -237,6 +315,7 @@ int RecordReader::get() {
 int RecordReader::peek() {
   if (bufPos >= bufLen) {
     if (error) return -1;
+    serviceWork(work);
     const int n = source.read(buf, sizeof(buf));
     if (n < 0) error = true;
     if (n <= 0) return -1;
@@ -254,12 +333,14 @@ bool RecordReader::next(Fields& out, uint32_t& offset, uint32_t& guidHash) {
       out.media[i] = NoMedia;
     }
     guid = 2166136261u;
+    guidLen = 0;
     offset = pos;
     column = 0;
     beginColumn(out);
     bool any = false;
     bool atStart = true;
     bool quoted = false;
+    size_t quotedBytes = 0;
     while (true) {
       const int c = get();
       if (c < 0) break;
@@ -268,10 +349,14 @@ bool RecordReader::next(Fields& out, uint32_t& offset, uint32_t& guidHash) {
         atStart = false;
         if (c == '"') {
           quoted = true;
+          quotedBytes = 0;
           continue;
         }
       }
+      // A quote left open would swallow the rest of the file.
+      if (quoted && c == '\n' && quotedBytes > FIELD_MAX) break;
       if (quoted) {
+        quotedBytes++;
         if (c == '"') {
           if (peek() == '"') {
             get();
@@ -297,10 +382,19 @@ bool RecordReader::next(Fields& out, uint32_t& offset, uint32_t& guidHash) {
     }
     endColumn();
     if (error || !any) return false;
-    guidHash = guid;
+    guidHash = guidLen > 0 ? guid : 0;
     bool blank = true;
     for (int i = 0; i < FIELDS && blank; i++) blank = out.text[i][0] == '\0' && out.media[i] == NoMedia;
-    if (!blank) return true;
+    if (blank) continue;
+    if (strstr(out.text[0], "{{c") != nullptr) {
+      memcpy(out.text[2], out.text[1], FIELD_CAP);
+      out.media[2] = out.media[1];
+      memcpy(out.text[1], out.text[0], FIELD_CAP);
+      out.media[1] = out.media[0];
+      cloze(out.text[0], false);
+      cloze(out.text[1], true);
+    }
+    return true;
   }
 }
 
@@ -319,12 +413,14 @@ void RecordReader::beginColumn(Fields& out) {
   text = target >= 0 ? out.text[target] : nullptr;
   len = 0;
   full = false;
-  pendingSpace = pendingBreak = pendingLt = inTag = inEntity = false;
+  pendingSpace = pendingBreak = pendingLt = inTag = inEntity = inComment = false;
+  commentDashes = 0;
 }
 
 void RecordReader::put(const uint8_t b) {
   if (target == -2) {
     guid = fnv1a(&b, 1, guid);
+    guidLen++;
     return;
   }
   if (target < 0) return;
@@ -355,7 +451,22 @@ void RecordReader::emitCodepoint(const uint32_t cp) {
 }
 
 void RecordReader::emit(const uint8_t b) {
+  if (inComment) {
+    if (b == '>' && commentDashes >= 2) inComment = false;
+    commentDashes = b == '-' ? commentDashes + 1 : 0;
+    return;
+  }
   if (inTag) {
+    // "<!--" opens a comment, skipped whole.
+    if (commentDashes > 0) {
+      if (b == '-' && ++commentDashes == 3) {
+        inTag = false;
+        inComment = true;
+        commentDashes = 0;
+        return;
+      }
+      if (b != '-') commentDashes = 0;
+    }
     if (b == '>') {
       inTag = false;
       endTag();
@@ -385,6 +496,7 @@ void RecordReader::emit(const uint8_t b) {
     if (isAlpha(b) || b == '/' || b == '!') {
       inTag = true;
       tagNameOpen = b != '!';
+      commentDashes = b == '!' ? 1 : 0;
       tagLen = 0;
       if (tagNameOpen) tag[tagLen++] = static_cast<char>(b >= 'A' && b <= 'Z' ? b - 'A' + 'a' : b);
       return;
@@ -427,7 +539,7 @@ void RecordReader::endEntity() {
     known = end != digits && *end == '\0' && cp < 0x110000;
   } else {
     for (const NamedEntity& e : ENTITIES) {
-      if (equals(entity, entityLen, e.name)) {
+      if (sameLower(std::string_view(entity, entityLen), e.name)) {
         cp = e.cp;
         known = true;
         break;

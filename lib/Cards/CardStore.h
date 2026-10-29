@@ -33,6 +33,9 @@ inline constexpr uint16_t LOG_MERGE_AT = 256;
 inline constexpr uint16_t QUEUE_CAP = 320;
 inline constexpr uint8_t AGAIN_GAP = 3;  // other cards before an «Снова» card returns
 
+// DECK_DIR, or DECK_DIR_LOWER when only that one exists.
+const char* deckDir();
+
 struct Summary {
   uint16_t cards = 0;
   uint16_t fresh = 0;
@@ -43,15 +46,18 @@ struct Summary {
   uint16_t tomorrow = 0;  // reviews due by tomorrow
   uint16_t week = 0;      // reviews due within a week
   uint16_t skipped = 0;   // lines without a front
+  uint16_t dropped = 0;   // repeated cards (same front and answer)
   uint16_t rows = 0;      // cards in the file, past MAX_CARDS too
   uint8_t newPerDay = DEFAULT_NEW_PER_DAY;
   bool dateUnknown = false;
   uint16_t dueToday() const { return reviews + newCards; }
 };
 
-enum class Status : uint8_t { Ok, Missing, TooLarge, NoMemory, Failed };
+enum class Status : uint8_t { Ok, Missing, TooLarge, NoMemory, Failed, Unsupported, Changed };
+enum class Reindex : uint8_t { Never, IfChanged, Always };
 
 uint32_t deckId(const char* fileName);
+struct LogEntry;
 // Cards due today over all decks, for «Ещё»; false when not saved for `day`.
 bool loadDueTotal(uint16_t day, uint16_t& total);
 void saveDueTotal(uint16_t day, uint16_t total);
@@ -63,16 +69,19 @@ class DeckStore {
   DeckStore(const DeckStore&) = delete;
   DeckStore& operator=(const DeckStore&) = delete;
 
-  // Opens DECK_DIR/<fileName> on `realDay` (NO_DAY when the clock is unknown):
-  // merges logged answers and re-indexes a deck that changed or was never
-  // indexed. With reindex false a changed deck keeps its old index.
-  Status open(const char* fileName, uint16_t realDay, bool reindex = true);
+  // Opens deckDir()/<fileName> on `realDay` (NO_DAY when the clock is unknown):
+  // merges logged answers and re-indexes a deck that changed (size or time) or
+  // was never indexed. Never keeps the old index of a changed deck; Always
+  // re-indexes, for an edit that kept both.
+  Status open(const char* fileName, uint16_t realDay, Reindex reindex = Reindex::IfChanged);
   void close();
   bool isOpen() const { return opened; }
   bool summarize(Summary& out);
   bool setNewPerDay(uint8_t count);
   uint8_t newPerDay() const;
   uint16_t day() const { return today; }
+  // The realDay the deck was opened on.
+  uint16_t openedOn() const { return openDay; }
 
   // A session: due reviews, most overdue first, then new cards in file order.
   Status startSession(uint16_t extraNew);
@@ -80,14 +89,17 @@ class DeckStore {
   uint16_t position() const { return pos; }
   uint16_t length() const { return queueLen; }
   bool finished() const { return pos >= queueLen; }
-  // The current card's text; false on a read error.
-  bool loadCard(Fields& out);
+  // The current card's text. Changed when the line at the stored offset is
+  // another card (an edit that kept the file's size and time): reopen with Always.
+  Status loadCard(Fields& out);
   CardState currentState() const;
   // Logs the answer to the current card and moves on; false when it could not be stored.
   bool grade(Grade g);
   bool canUndo() const { return undoValid; }
   bool undo();
   uint16_t graded(Grade g) const { return counts[static_cast<int>(g)]; }
+  // Merges the log, keeping the session (and its undo) open.
+  bool flush();
   // Merges the log; the progress stays on disk either way.
   void endSession();
 
@@ -102,15 +114,18 @@ class DeckStore {
 
   bool readRecord(uint16_t index, uint32_t& offset, uint32_t& key);
   bool appendLog(uint32_t key, const CardState& state, uint8_t flags);
+  static uint8_t answerKind(const CardState& before);
   bool merge(int32_t shift, bool force = false);
+  bool mergeChunk(LogEntry* entries, uint16_t n, int32_t shift);
   Status rebuild(bool keepOld, uint32_t size, uint32_t time);
-  void countAnswer(bool wasNew, int delta);
+  void countAnswer(uint8_t kind, int delta);
 
   std::unique_ptr<Header> head;
   bool opened = false;
   char datPath[48] = {};
   char logPath[48] = {};
   uint16_t today = NO_DAY;
+  uint16_t openDay = NO_DAY;
   bool clockKnown = false;
   uint32_t nextSeq = 1;
   uint32_t sessionSeq = 1;  // answers from here on are already in the day counters
@@ -129,6 +144,7 @@ class DeckStore {
     int16_t againAt;  // the «Снова» copy, -1 for none
     Grade grade;
     uint32_t key;
+    uint8_t kind;
   } last = {};
   bool undoValid = false;
 };

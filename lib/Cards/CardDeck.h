@@ -14,6 +14,8 @@
 namespace cards {
 
 inline constexpr char DECK_DIR[] = "/Карточки";
+// The same folder made on a PC in lower case (FAT folds only ASCII case).
+inline constexpr char DECK_DIR_LOWER[] = "/карточки";
 inline constexpr size_t FIELD_MAX = 1024;
 inline constexpr size_t FIELD_CAP = FIELD_MAX + 4;  // room for the "…"
 inline constexpr int FIELDS = 3;
@@ -30,14 +32,16 @@ uint32_t fnv1a(const void* data, size_t len, uint32_t hash = 2166136261u);
 
 struct Format {
   char separator = '\t';
-  bool html = true;
+  bool html = false;  // #html:true, or markup seen in the probe
   bool cp1251 = false;
+  bool utf16 = false;  // not readable: Excel's «Unicode text»
   int8_t guidColumn = -1;
   uint16_t hiddenColumns = 0;  // a bit per column: guid, notetype, deck, tags
   uint32_t dataStart = 0;
 };
 
 // The format read from the first PROBE_BYTES of a deck; csv guesses the separator.
+// Bytes that are not UTF-8 mean CP1251, unless valid UTF-8 letters were seen.
 Format probe(const uint8_t* head, size_t len, bool csv);
 
 enum Media : uint8_t { NoMedia = 0, HasImage = 1, HasSound = 2 };
@@ -62,6 +66,8 @@ class RecordReader {
   RecordReader(ByteSource& source, const Format& format, uint32_t offset);
   // The next record that has any text or media; false at the end or on a read
   // error (failed()). `offset` is where the record starts.
+  // An Anki cloze note becomes «[…]» on the front and the revealed text on the back.
+  // guidHash is 0 without a guid.
   bool next(Fields& out, uint32_t& offset, uint32_t& guidHash);
   bool failed() const { return error; }
 
@@ -80,15 +86,17 @@ class RecordReader {
   ByteSource& source;
   const Format format;
   uint32_t pos;
-  uint8_t buf[256];
+  uint8_t buf[128];
   uint16_t bufLen = 0;
   uint16_t bufPos = 0;
   bool error = false;
+  uint32_t work = 0;
 
   Fields* fields = nullptr;
   int column = 0;
   int target = -1;  // field index, -1 dropped, -2 the guid
   uint32_t guid = 0;
+  uint16_t guidLen = 0;
   char* text = nullptr;
   size_t len = 0;
   bool full = false;
@@ -98,14 +106,18 @@ class RecordReader {
   bool inTag = false;
   bool tagNameOpen = false;
   bool inEntity = false;
+  bool inComment = false;
+  uint8_t commentDashes = 0;  // "<!-" seen, then "-->" counted
   uint8_t tagLen = 0;
   uint8_t entityLen = 0;
   char tag[8];
   char entity[12];
 };
 
-// The card's identity: the guid when the export has one, else its front.
-uint32_t cardKey(const Fields& fields, bool hasGuid, uint32_t guidHash);
+// The card's identity: its guid, else its front; a second card with the same
+// front is told apart by its answer (cardAltKey).
+uint32_t cardKey(const Fields& fields, uint32_t guidHash);
+uint32_t cardAltKey(const Fields& fields);
 inline bool hasFront(const Fields& fields) { return fields.text[0][0] != '\0' || fields.media[0] != NoMedia; }
 
 }  // namespace cards

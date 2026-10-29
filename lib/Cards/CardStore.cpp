@@ -1,6 +1,5 @@
 #include "CardStore.h"
 
-#include <Arduino.h>
 #include <HalStorage.h>
 #include <Logging.h>
 #include <Memory.h>
@@ -10,11 +9,18 @@
 #include <cstring>
 #include <string_view>
 
-#if defined(ARDUINO_ARCH_ESP32)
-#include <esp_task_wdt.h>
-#endif
+#include "CardWork.h"
 
 namespace cards {
+
+struct LogEntry {
+  uint32_t key = 0;
+  uint32_t seq = 0;
+  CardState state;
+  uint16_t day = NO_DAY;
+  uint8_t flags = 0;
+};
+
 namespace {
 
 constexpr char MAGIC[4] = {'C', 'R', 'D', '1'};
@@ -25,22 +31,14 @@ constexpr size_t RECORD = 12;
 constexpr size_t LOG_RECORD = 16;
 constexpr uint16_t LOG_CHUNK = 256;
 constexpr uint16_t LOG_HARD_MAX = 4096;
-constexpr size_t IO_RECORDS = 32;
+constexpr size_t IO_RECORDS = 16;
 constexpr uint8_t LOG_UNDO = 1;
 constexpr uint8_t LOG_WAS_NEW = 2;
+constexpr uint8_t LOG_RELEARN = 4;  // an answer to a «Снова» copy: counts toward no limit
 constexpr uint8_t FLAG_VIRTUAL = 1;
 constexpr uint8_t FLAG_HTML = 2;
 constexpr uint8_t FLAG_CP1251 = 4;
 constexpr char DUE_PATH[] = "/.crosspoint/cards/due.bin";
-
-// Long passes (a 4 MB deck) keep the task watchdog and the idle task fed.
-void service(uint32_t& units) {
-  if ((++units & 0x3Fu) != 0) return;
-#if defined(ARDUINO_ARCH_ESP32)
-  if (esp_task_wdt_status(nullptr) == ESP_OK) esp_task_wdt_reset();
-#endif
-  delay(1);
-}
 
 uint32_t crc32(uint32_t crc, const void* data, const size_t len) {
   static constexpr uint32_t TABLE[16] = {0x00000000, 0x1DB71064, 0x3B6E20C8, 0x26D930AC, 0x76DC4190, 0x6B6B51F4,
@@ -91,14 +89,6 @@ Record decodeRecord(const uint8_t* p) {
   r.state.lapses = p[11];
   return r;
 }
-
-struct LogEntry {
-  uint32_t key = 0;
-  uint32_t seq = 0;
-  CardState state;
-  uint16_t day = NO_DAY;
-  uint8_t flags = 0;
-};
 
 void encodeLog(uint8_t (&p)[LOG_RECORD], const LogEntry& e) {
   put32(p, e.key);
@@ -193,7 +183,7 @@ class FileSource final : public ByteSource {
   HalFile& file;
 };
 
-void deckPathOf(const char* name, char* out, const size_t cap) { snprintf(out, cap, "%s/%s", DECK_DIR, name); }
+void deckPathOf(const char* name, char* out, const size_t cap) { snprintf(out, cap, "%s/%s", deckDir(), name); }
 
 }  // namespace
 
@@ -210,6 +200,7 @@ struct DeckStore::Header {
   uint16_t counterDay = NO_DAY;
   uint16_t newDone = 0;
   uint16_t reviewsDone = 0;
+  uint16_t dropped = 0;
   uint32_t applied = 0;
   uint8_t nameLen = 0;
   char name[DECK_NAME_MAX + 1] = "";
@@ -238,6 +229,7 @@ struct DeckStore::Header {
     put16(p + 32, counterDay);
     put16(p + 34, newDone);
     put16(p + 36, reviewsDone);
+    put16(p + 38, dropped);
     put32(p + 40, applied);
     memcpy(p + FIXED, name, nameLen);
     put32(p + FIXED + nameLen, crc32(0, p, FIXED + nameLen));
@@ -269,6 +261,7 @@ struct DeckStore::Header {
     counterDay = get16(p + 32);
     newDone = get16(p + 34);
     reviewsDone = get16(p + 36);
+    dropped = get16(p + 38);
     applied = get32(p + 40);
     memcpy(name, p + FIXED, len);
     name[len] = '\0';
@@ -277,6 +270,10 @@ struct DeckStore::Header {
 };
 
 uint32_t deckId(const char* fileName) { return fnv1a(fileName, strlen(fileName)); }
+
+const char* deckDir() {
+  return !Storage.exists(DECK_DIR) && Storage.exists(DECK_DIR_LOWER) ? DECK_DIR_LOWER : DECK_DIR;
+}
 
 bool loadDueTotal(const uint16_t day, uint16_t& total) {
   HalFile f;
@@ -309,7 +306,7 @@ void DeckStore::close() {
   opened = false;
 }
 
-Status DeckStore::open(const char* fileName, const uint16_t realDay, const bool reindex) {
+Status DeckStore::open(const char* fileName, const uint16_t realDay, const Reindex reindex) {
   close();
   const size_t nameLen = strlen(fileName);
   if (nameLen == 0 || nameLen > DECK_NAME_MAX) return Status::Missing;
@@ -340,7 +337,7 @@ Status DeckStore::open(const char* fileName, const uint16_t realDay, const bool 
       uint8_t buf[IO_RECORDS * RECORD];
       uint32_t units = 0;
       for (uint16_t i = 0; valid && i < head->count; i += IO_RECORDS) {
-        service(units);
+        serviceWork(units);
         const size_t n = std::min<size_t>(IO_RECORDS, head->count - i) * RECORD;
         valid = readAll(f, buf, n);
         crc = crc32(crc, buf, n);
@@ -355,7 +352,8 @@ Status DeckStore::open(const char* fileName, const uint16_t realDay, const bool 
   }
   head->nameLen = static_cast<uint8_t>(nameLen);
   memcpy(head->name, fileName, nameLen + 1);
-  if (!valid || (reindex && (head->deckSize != size || head->deckTime != time))) {
+  const bool changed = head->deckSize != size || head->deckTime != time;
+  if (!valid || reindex == Reindex::Always || (reindex == Reindex::IfChanged && changed)) {
     const Status built = rebuild(valid, size, time);
     if (built != Status::Ok) return built;
   }
@@ -383,6 +381,7 @@ Status DeckStore::open(const char* fileName, const uint16_t realDay, const bool 
   DeckDays days{head->lastDay, head->virtualDays};
   int32_t shift = 0;
   today = studyDay(realDay, days, shift);
+  openDay = realDay;
   clockKnown = realDay != NO_DAY;
   head->virtualDays = days.virtualDays;
   if ((logCount > 0 || shift != 0) && !merge(shift)) return Status::Failed;
@@ -423,14 +422,20 @@ Status DeckStore::rebuild(const bool keepOld, const uint32_t size, const uint32_
     const int got = deck.read(probeBuf.get(), PROBE_BYTES);
     if (got < 0) return Status::Failed;
     head->format = probe(probeBuf.get(), static_cast<size_t>(got), isCsvName(head->name));
+    if (head->format.utf16) return Status::Unsupported;
   }
-  auto keys = makeUniqueNoThrow<uint32_t[]>(MAX_CARDS);
+  // Every card's key and its front+answer key, sorted: a repeated front is
+  // told apart by its answer, a repeated card is dropped.
+  auto keys = makeUniqueNoThrow<uint32_t[]>(2 * MAX_CARDS);
   auto fields = makeUniqueNoThrow<Fields>();
-  if (!keys || !fields) return Status::NoMemory;
+  FileSource source(deck);
+  auto reader = makeUniqueNoThrow<RecordReader>(source, head->format, head->format.dataStart);
+  if (!keys || !fields || !reader) return Status::NoMemory;
   if (!deck.seekSet(head->format.dataStart)) return Status::Failed;
 
   head->count = 0;
   head->skipped = 0;
+  head->dropped = 0;
   head->rows = 0;
   head->deckSize = size;
   head->deckTime = time;
@@ -441,27 +446,37 @@ Status DeckStore::rebuild(const bool keepOld, const uint32_t size, const uint32_
   const size_t headSize = head->encode(headBuf);
   bool ok = writeAll(out, headBuf, headSize);
 
-  FileSource source(deck);
-  RecordReader reader(source, head->format, head->format.dataStart);
   uint8_t buf[IO_RECORDS * RECORD];
   size_t buffered = 0;
+  uint16_t keyCount = 0;
+  const auto has = [&](const uint32_t k) { return std::binary_search(keys.get(), keys.get() + keyCount, k); };
+  const auto add = [&](const uint32_t k) {
+    uint32_t* end = keys.get() + keyCount;
+    uint32_t* at = std::lower_bound(keys.get(), end, k);
+    if (at != end && *at == k) return;
+    memmove(at + 1, at, static_cast<size_t>(end - at) * sizeof(uint32_t));
+    *at = k;
+    keyCount++;
+  };
   uint32_t crc = 0;
   uint32_t offset = 0;
   uint32_t guidHash = 0;
-  const bool hasGuid = head->format.guidColumn >= 0;
-  while (ok && reader.next(*fields, offset, guidHash)) {
-    service(units);
+  while (ok && reader->next(*fields, offset, guidHash)) {
+    serviceWork(units);
     if (!hasFront(*fields)) {
       if (head->skipped < UINT16_MAX) head->skipped++;
       continue;
     }
-    const uint32_t key = cardKey(*fields, hasGuid, guidHash);
+    uint32_t key = cardKey(*fields, guidHash);
     if (head->count < MAX_CARDS) {
-      uint32_t* end = keys.get() + head->count;
-      uint32_t* at = std::lower_bound(keys.get(), end, key);
-      if (at != end && *at == key) continue;
-      memmove(at + 1, at, static_cast<size_t>(end - at) * sizeof(uint32_t));
-      *at = key;
+      const uint32_t alt = cardAltKey(*fields);
+      if (has(alt) || (has(key) && guidHash != 0)) {
+        if (head->dropped < UINT16_MAX) head->dropped++;
+        continue;
+      }
+      if (has(key)) key = alt;
+      add(key);
+      add(alt);
       Record r;
       r.offset = offset;
       r.key = key;
@@ -480,7 +495,7 @@ Status DeckStore::rebuild(const bool keepOld, const uint32_t size, const uint32_
     if (head->rows < UINT16_MAX) head->rows++;
   }
   deck.close();
-  if (reader.failed()) ok = false;
+  if (reader->failed()) ok = false;
   crc = crc32(crc, buf, buffered);
   ok = ok && writeAll(out, buf, buffered);
   uint8_t crcBytes[4];
@@ -496,7 +511,10 @@ Status DeckStore::rebuild(const bool keepOld, const uint32_t size, const uint32_
 
 bool DeckStore::merge(const int32_t shift, bool force) {
   auto entries = makeUniqueNoThrow<LogEntry[]>(LOG_CHUNK);
-  if (!entries) return false;
+  // The header as on disk: a chunk that does not commit leaves it, and its
+  // answers stay in the log for the next merge.
+  auto saved = makeUniqueNoThrow<Header>();
+  if (!entries || !saved) return false;
   HalFile log;
   const bool haveLog = Storage.exists(logPath) && Storage.openFileForRead("CARD", logPath, log);
   int32_t pendingShift = shift;
@@ -510,67 +528,11 @@ bool DeckStore::merge(const int32_t shift, bool force) {
     }
     more = n == LOG_CHUNK;
     if (n == 0 && pendingShift == 0 && !force) break;
-    for (uint16_t i = 0; i < n; i++) {
-      const LogEntry& e = entries[i];
-      head->applied = std::max(head->applied, e.seq);
-      // This open's answers were counted as they were given.
-      if (e.seq >= sessionSeq) continue;
-      head->lastDay = std::max(head->lastDay, e.day);
-      if (e.day > head->counterDay) {
-        head->counterDay = e.day;
-        head->newDone = head->reviewsDone = 0;
-      }
-      if (e.day != head->counterDay) continue;
-      uint16_t& counter = (e.flags & LOG_WAS_NEW) ? head->newDone : head->reviewsDone;
-      if (!(e.flags & LOG_UNDO))
-        counter++;
-      else if (counter > 0)
-        counter--;
+    *saved = *head;
+    if (!mergeChunk(entries.get(), n, pendingShift)) {
+      *head = *saved;
+      return false;
     }
-    insertionSort(entries.get(), n,
-                  [](const LogEntry& a, const LogEntry& b) { return a.key != b.key ? a.key < b.key : a.seq < b.seq; });
-    if (pendingShift != 0) {
-      if (head->lastDay != NO_DAY) head->lastDay = static_cast<uint16_t>(head->lastDay + pendingShift);
-      if (head->counterDay != NO_DAY) head->counterDay = static_cast<uint16_t>(head->counterDay + pendingShift);
-    }
-
-    HalFile in;
-    if (!Storage.openFileForRead("CARD", datPath, in) || !in.seekSet(head->size())) return false;
-    const TmpPath tmp(datPath);
-    HalFile out;
-    if (!Storage.openFileForWrite("CARD", tmp.c_str(), out)) return false;
-    uint8_t headBuf[FIXED + DECK_NAME_MAX + 4];
-    bool ok = writeAll(out, headBuf, head->encode(headBuf));
-    uint8_t buf[IO_RECORDS * RECORD];
-    uint32_t crcIn = 0;
-    uint32_t crcOut = 0;
-    uint32_t units = 0;
-    for (uint16_t i = 0; ok && i < head->count; i += IO_RECORDS) {
-      service(units);
-      const size_t k = std::min<size_t>(IO_RECORDS, head->count - i);
-      ok = readAll(in, buf, k * RECORD);
-      crcIn = crc32(crcIn, buf, k * RECORD);
-      for (size_t j = 0; ok && j < k; j++) {
-        Record r = decodeRecord(buf + j * RECORD);
-        const LogEntry* begin = entries.get();
-        const LogEntry* end = begin + n;
-        const LogEntry* last =
-            std::upper_bound(begin, end, r.key, [](const uint32_t key, const LogEntry& e) { return key < e.key; });
-        if (last != begin && (last - 1)->key == r.key) r.state = (last - 1)->state;
-        if (pendingShift != 0 && r.state.box != 0) {
-          r.state.due = static_cast<uint16_t>(std::clamp<int32_t>(r.state.due + pendingShift, 1, UINT16_MAX));
-        }
-        encodeRecord(buf + j * RECORD, r);
-      }
-      crcOut = crc32(crcOut, buf, k * RECORD);
-      ok = ok && writeAll(out, buf, k * RECORD);
-    }
-    uint8_t crcBytes[4];
-    ok = ok && readAll(in, crcBytes, 4) && get32(crcBytes) == crcIn;
-    in.close();
-    put32(crcBytes, crcOut);
-    ok = ok && writeAll(out, crcBytes, sizeof(crcBytes));
-    if (!commit(out, datPath, ok)) return false;
     pendingShift = 0;
     force = false;
   }
@@ -580,11 +542,72 @@ bool DeckStore::merge(const int32_t shift, bool force) {
   return true;
 }
 
+bool DeckStore::mergeChunk(LogEntry* entries, const uint16_t n, const int32_t shift) {
+  for (uint16_t i = 0; i < n; i++) {
+    const LogEntry& e = entries[i];
+    head->applied = std::max(head->applied, e.seq);
+    // This open's answers were counted as they were given.
+    if (e.seq >= sessionSeq) continue;
+    head->lastDay = std::max(head->lastDay, e.day);
+    if (e.day > head->counterDay) {
+      head->counterDay = e.day;
+      head->newDone = head->reviewsDone = 0;
+    }
+    if (e.day == head->counterDay) countAnswer(e.flags & (LOG_WAS_NEW | LOG_RELEARN), (e.flags & LOG_UNDO) ? -1 : 1);
+  }
+  insertionSort(entries, n,
+                [](const LogEntry& a, const LogEntry& b) { return a.key != b.key ? a.key < b.key : a.seq < b.seq; });
+  if (shift != 0) {
+    if (head->lastDay != NO_DAY) head->lastDay = static_cast<uint16_t>(head->lastDay + shift);
+    if (head->counterDay != NO_DAY) head->counterDay = static_cast<uint16_t>(head->counterDay + shift);
+  }
+
+  HalFile in;
+  if (!Storage.openFileForRead("CARD", datPath, in) || !in.seekSet(head->size())) return false;
+  const TmpPath tmp(datPath);
+  HalFile out;
+  if (!Storage.openFileForWrite("CARD", tmp.c_str(), out)) return false;
+  uint8_t headBuf[FIXED + DECK_NAME_MAX + 4];
+  bool ok = writeAll(out, headBuf, head->encode(headBuf));
+  uint8_t buf[IO_RECORDS * RECORD];
+  uint32_t crcIn = 0;
+  uint32_t crcOut = 0;
+  uint32_t units = 0;
+  const LogEntry* end = entries + n;
+  for (uint16_t i = 0; ok && i < head->count; i += IO_RECORDS) {
+    serviceWork(units);
+    const size_t k = std::min<size_t>(IO_RECORDS, head->count - i);
+    ok = readAll(in, buf, k * RECORD);
+    crcIn = crc32(crcIn, buf, k * RECORD);
+    for (size_t j = 0; ok && j < k; j++) {
+      Record r = decodeRecord(buf + j * RECORD);
+      const LogEntry* last = std::upper_bound(static_cast<const LogEntry*>(entries), end, r.key,
+                                              [](const uint32_t key, const LogEntry& e) { return key < e.key; });
+      if (last != entries && (last - 1)->key == r.key) r.state = (last - 1)->state;
+      if (shift != 0 && r.state.box != 0) {
+        r.state.due = static_cast<uint16_t>(std::clamp<int32_t>(r.state.due + shift, 1, UINT16_MAX));
+      }
+      encodeRecord(buf + j * RECORD, r);
+    }
+    crcOut = crc32(crcOut, buf, k * RECORD);
+    ok = ok && writeAll(out, buf, k * RECORD);
+  }
+  uint8_t crcBytes[4];
+  ok = ok && readAll(in, crcBytes, 4) && get32(crcBytes) == crcIn;
+  in.close();
+  put32(crcBytes, crcOut);
+  ok = ok && writeAll(out, crcBytes, sizeof(crcBytes));
+  return commit(out, datPath, ok);
+}
+
 bool DeckStore::summarize(Summary& out) {
   out = Summary{};
   if (!opened) return false;
+  // Answers a failed merge left in the log are not in the .dat yet.
+  if (logCount > 0 && !inSession()) merge(0);
   out.newPerDay = head->newPerDay;
   out.skipped = head->skipped;
+  out.dropped = head->dropped;
   out.rows = head->rows;
   out.dateUnknown = !clockKnown;
   HalFile f;
@@ -593,7 +616,7 @@ bool DeckStore::summarize(Summary& out) {
   uint16_t due = 0;
   uint32_t units = 0;
   for (uint16_t i = 0; i < head->count; i += IO_RECORDS) {
-    service(units);
+    serviceWork(units);
     const size_t k = std::min<size_t>(IO_RECORDS, head->count - i);
     if (!readAll(f, buf, k * RECORD)) return false;
     for (size_t j = 0; j < k; j++) {
@@ -632,6 +655,8 @@ bool DeckStore::setNewPerDay(const uint8_t count) {
 Status DeckStore::startSession(const uint16_t extraNew) {
   if (!opened) return Status::Failed;
   if (inSession()) endSession();
+  // The queue is read from the .dat: it must hold every answer given.
+  if (logCount > 0 && !merge(0)) return Status::Failed;
   queue = makeUniqueNoThrow<Item[]>(QUEUE_CAP);
   if (!queue) return Status::NoMemory;
   queueLen = 0;
@@ -657,7 +682,7 @@ Status DeckStore::startSession(const uint16_t extraNew) {
   uint8_t buf[IO_RECORDS * RECORD];
   uint32_t units = 0;
   for (uint16_t i = 0; i < head->count; i += IO_RECORDS) {
-    service(units);
+    serviceWork(units);
     const size_t k = std::min<size_t>(IO_RECORDS, head->count - i);
     if (!readAll(f, buf, k * RECORD)) {
       queue.reset();
@@ -701,22 +726,28 @@ bool DeckStore::readRecord(const uint16_t index, uint32_t& offset, uint32_t& key
   return true;
 }
 
-bool DeckStore::loadCard(Fields& out) {
-  if (!inSession() || finished()) return false;
+Status DeckStore::loadCard(Fields& out) {
+  if (!inSession() || finished()) return Status::Failed;
   const uint16_t index = queue[pos].index;
-  if (!readRecord(index, currentOffset, currentKey)) return false;
-  loadedIndex = index;
+  if (!readRecord(index, currentOffset, currentKey)) return Status::Failed;
   char deckPath[DECK_NAME_MAX + 32];
   deckPathOf(head->name, deckPath, sizeof(deckPath));
   HalFile deck;
-  if (!Storage.openFileForRead("CARD", deckPath, deck) || !deck.seekSet(currentOffset)) return false;
+  if (!Storage.openFileForRead("CARD", deckPath, deck) || !deck.seekSet(currentOffset)) return Status::Failed;
   FileSource source(deck);
-  RecordReader reader(source, head->format, currentOffset);
+  auto reader = makeUniqueNoThrow<RecordReader>(source, head->format, currentOffset);
+  if (!reader) return Status::NoMemory;
   uint32_t offset = 0;
   uint32_t guid = 0;
-  const bool ok = reader.next(out, offset, guid);
+  const bool ok = reader->next(out, offset, guid);
   deck.close();
-  return ok;
+  if (!ok) return Status::Changed;
+  if (cardKey(out, guid) != currentKey && cardAltKey(out) != currentKey) {
+    LOG_INF("CARD", "%s changed in place", head->name);
+    return Status::Changed;
+  }
+  loadedIndex = index;
+  return Status::Ok;
 }
 
 CardState DeckStore::currentState() const {
@@ -747,8 +778,14 @@ bool DeckStore::appendLog(const uint32_t key, const CardState& state, const uint
   return true;
 }
 
-void DeckStore::countAnswer(const bool wasNew, const int delta) {
-  uint16_t& counter = wasNew ? head->newDone : head->reviewsDone;
+uint8_t DeckStore::answerKind(const CardState& before) {
+  if (isNew(before)) return LOG_WAS_NEW;
+  return (before.box & AGAIN_FLAG) ? LOG_RELEARN : 0;
+}
+
+void DeckStore::countAnswer(const uint8_t kind, const int delta) {
+  if (kind & LOG_RELEARN) return;
+  uint16_t& counter = (kind & LOG_WAS_NEW) ? head->newDone : head->reviewsDone;
   counter = static_cast<uint16_t>(std::max(0, counter + delta));
 }
 
@@ -758,11 +795,11 @@ bool DeckStore::grade(const Grade g) {
   if (loadedIndex != item.index && !readRecord(item.index, currentOffset, currentKey)) return false;
   const CardState before{item.due, item.box, item.lapses};
   const CardState after = answer(before, g, currentKey, today);
-  const bool wasNew = isNew(before);
-  if (!appendLog(currentKey, after, wasNew ? LOG_WAS_NEW : 0)) return false;
-  last = {pos, item, -1, g, currentKey};
+  const uint8_t kind = answerKind(before);
+  if (!appendLog(currentKey, after, kind)) return false;
+  last = {pos, item, -1, g, currentKey, kind};
   undoValid = true;
-  countAnswer(wasNew, 1);
+  countAnswer(kind, 1);
   head->lastDay = today;
   counts[static_cast<int>(g)]++;
   item.due = after.due;
@@ -784,20 +821,21 @@ bool DeckStore::grade(const Grade g) {
 bool DeckStore::undo() {
   if (!undoValid || !inSession()) return false;
   const CardState before{last.item.due, last.item.box, last.item.lapses};
-  const bool wasNew = isNew(before);
-  if (!appendLog(last.key, before, static_cast<uint8_t>(LOG_UNDO | (wasNew ? LOG_WAS_NEW : 0)))) return false;
+  if (!appendLog(last.key, before, static_cast<uint8_t>(LOG_UNDO | last.kind))) return false;
   if (last.againAt >= 0) {
     memmove(&queue[last.againAt], &queue[last.againAt + 1], (queueLen - last.againAt - 1) * sizeof(Item));
     queueLen--;
   }
   pos = last.pos;
   queue[pos] = last.item;
-  countAnswer(wasNew, -1);
+  countAnswer(last.kind, -1);
   if (counts[static_cast<int>(last.grade)] > 0) counts[static_cast<int>(last.grade)]--;
   undoValid = false;
   loadedIndex = -1;
   return true;
 }
+
+bool DeckStore::flush() { return logCount == 0 || merge(0); }
 
 void DeckStore::endSession() {
   queue.reset();

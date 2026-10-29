@@ -124,6 +124,14 @@ TEST(CardDeck, Cp1251Fallback) {
   EXPECT_EQ(cards[1].back, "ёлка");
   const std::string utf8 = "Привет;мир\n";
   EXPECT_FALSE(probe(reinterpret_cast<const uint8_t*>(utf8.data()), utf8.size(), true).cp1251);
+  // One stray byte in a UTF-8 file is not CP1251.
+  const std::string stray = "Привет;мир\xFF\n";
+  EXPECT_FALSE(probe(reinterpret_cast<const uint8_t*>(stray.data()), stray.size(), true).cp1251);
+  const std::string utf16(
+      "\xFF\xFE"
+      "a\0;\0",
+      6);
+  EXPECT_TRUE(probe(reinterpret_cast<const uint8_t*>(utf16.data()), utf16.size(), true).utf16);
   // A sequence cut by the end of a full probe is not a reason to switch.
   std::string cut(PROBE_BYTES - 1, 'a');
   cut += "\xD0";
@@ -148,12 +156,35 @@ TEST(CardDeck, HtmlIsStripped) {
 }
 
 TEST(CardDeck, EntitiesAndLiteralAngles) {
-  const auto cards = parse("&amp; &lt;tag&gt; &#1078;&#x436; &mdash; &bogus; a < b\tx\n");
+  const auto cards = parse("#html:true\n&amp; &lt;tag&gt; &#1078;&#x436; &MDASH; &bogus; a < b<!-- <br>note -->\tx\n");
   ASSERT_EQ(cards.size(), 1u);
   EXPECT_EQ(cards[0].front, "& <tag> жж — &bogus; a < b");
-  const auto plain = parse("#html:false\n<b>&amp;</b>\tx\n");
+  const auto plain = parse("#html:False\n<b>&amp;</b>\tx\n");
   ASSERT_EQ(plain.size(), 1u);
   EXPECT_EQ(plain[0].front, "<b>&amp;</b>");
+  // Without a header, markup is read only when the file shows some.
+  const auto code = parse("vector<int>\t&amp; <b>\n", true);
+  ASSERT_EQ(code.size(), 1u);
+  EXPECT_EQ(code[0].front, "vector<int>");
+  EXPECT_EQ(code[0].back, "&amp; <b>");
+  const auto sniffed = parse("a<br>b\t&nbsp;c\n", true);
+  ASSERT_EQ(sniffed.size(), 1u);
+  EXPECT_EQ(sniffed[0].front, "a\nb");
+}
+
+TEST(CardDeck, Cloze) {
+  const auto cards = parse("#separator:tab\n#html:true\n{{c1::Москва}} — столица {{c2::России::страна}}\tгород\n");
+  ASSERT_EQ(cards.size(), 1u);
+  EXPECT_EQ(cards[0].front, "[…] — столица […]");
+  EXPECT_EQ(cards[0].back, "Москва — столица России");
+  EXPECT_EQ(cards[0].extra, "город");
+}
+
+TEST(CardDeck, OpenQuoteDoesNotSwallowTheFile) {
+  const auto cards = parse("\"" + std::string(FIELD_MAX + 10, 'a') + "\nnext\tcard\n");
+  ASSERT_EQ(cards.size(), 2u);
+  EXPECT_EQ(cards[1].front, "next");
+  EXPECT_EQ(cards[1].back, "card");
 }
 
 TEST(CardDeck, FieldLimit) {
@@ -180,11 +211,18 @@ TEST(CardDeck, BomCrlfBlankLinesAndMissingFront) {
 
 TEST(CardDeck, KeysPreferTheGuid) {
   Fields f{{"front", "back", ""}, {0, 0, 0}};
-  EXPECT_EQ(cardKey(f, false, 7), fnv1a("front", 5));
-  EXPECT_EQ(cardKey(f, true, 7), 7u);
+  EXPECT_EQ(cardKey(f, 0), fnv1a("front", 5));
+  EXPECT_EQ(cardKey(f, 7), 7u);
   Fields picture{{"", "a", ""}, {HasImage, 0, 0}};
   Fields picture2{{"", "b", ""}, {HasImage, 0, 0}};
-  EXPECT_NE(cardKey(picture, false, 0), cardKey(picture2, false, 0));
+  EXPECT_NE(cardKey(picture, 0), cardKey(picture2, 0));
+  Fields bank2{{"front", "other", ""}, {0, 0, 0}};
+  EXPECT_NE(cardAltKey(f), cardAltKey(bank2));
+  // An empty guid falls back to the front.
+  const auto cards = parse("#separator:tab\n#guid column:1\n\tfront\tback\nG\tfront2\tback\n");
+  ASSERT_EQ(cards.size(), 2u);
+  EXPECT_EQ(cards[0].guid, 0u);
+  EXPECT_EQ(cards[1].guid, fnv1a("G", 1));
 }
 
 namespace {

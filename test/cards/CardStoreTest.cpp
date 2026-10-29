@@ -36,7 +36,7 @@ std::map<std::string, std::shared_ptr<fake::Node>> snapshot() {
 
 std::string front(DeckStore& store) {
   auto fields = std::make_unique<Fields>();
-  EXPECT_TRUE(store.loadCard(*fields));
+  EXPECT_EQ(store.loadCard(*fields), Status::Ok);
   return fields->text[0];
 }
 
@@ -52,12 +52,13 @@ void addDeck(const std::string& text, const uint32_t time = 1) { fake::add(DECK,
 
 TEST(CardStore, IndexesAndSummarizes) {
   fake::reset();
-  addDeck(deckText(15) + "front 3\tduplicate\n\tno front\n");
+  addDeck(deckText(15) + "front 3\tanother answer\nfront 4\tback 4\n\tno front\n");
   DeckStore store;
   ASSERT_EQ(store.open("es.txt", DAY), Status::Ok);
   const Summary s = summary(store);
-  EXPECT_EQ(s.cards, 15);
-  EXPECT_EQ(s.fresh, 15);
+  EXPECT_EQ(s.cards, 16);
+  EXPECT_EQ(s.fresh, 16);
+  EXPECT_EQ(s.dropped, 1);
   EXPECT_EQ(s.newCards, DEFAULT_NEW_PER_DAY);
   EXPECT_EQ(s.reviews, 0);
   EXPECT_EQ(s.skipped, 1);
@@ -292,4 +293,103 @@ TEST(CardStore, FailedAllocationIsReported) {
   fake::failAlloc = 1;  // the index buffers
   EXPECT_EQ(store.open("es.txt", DAY), Status::NoMemory);
   EXPECT_EQ(store.open("es.txt", DAY), Status::Ok);
+}
+
+TEST(CardStore, FailedMergeRetriesInTheSameOpen) {
+  fake::reset();
+  addDeck(deckText(4));
+  DeckStore store;
+  ASSERT_EQ(store.open("es.txt", DAY), Status::Ok);
+  ASSERT_EQ(store.startSession(0), Status::Ok);
+  ASSERT_TRUE(store.grade(Grade::Good));
+  fake::failClosePath = pathOf("dat") + ".tmp";
+  store.endSession();
+  ASSERT_TRUE(fake::failureTriggered);
+  // «Начать» again: the queue must not offer the answered card a second time.
+  ASSERT_EQ(store.startSession(0), Status::Ok);
+  EXPECT_EQ(store.length(), 3);
+  EXPECT_EQ(front(store), "front 1");
+  store.endSession();
+  EXPECT_FALSE(Storage.exists(pathOf("log").c_str()));
+  const Summary s = summary(store);
+  EXPECT_EQ(s.learning, 1);
+  EXPECT_EQ(s.newCards, 3);
+}
+
+TEST(CardStore, SameSizeEditIsCaughtOnLoad) {
+  fake::reset();
+  addDeck("A\ta\nB\tb\n", 5);
+  {
+    DeckStore store;
+    ASSERT_EQ(store.open("es.txt", DAY), Status::Ok);
+    ASSERT_EQ(store.startSession(0), Status::Ok);
+    ASSERT_TRUE(store.grade(Grade::Easy));  // A
+  }
+  addDeck("B\tb\nA\ta\n", 5);  // same size, same time
+  DeckStore store;
+  ASSERT_EQ(store.open("es.txt", DAY), Status::Ok);
+  ASSERT_EQ(store.startSession(0), Status::Ok);
+  auto fields = std::make_unique<Fields>();
+  EXPECT_EQ(store.loadCard(*fields), Status::Changed);
+  ASSERT_EQ(store.open("es.txt", DAY, Reindex::Always), Status::Ok);
+  ASSERT_EQ(store.startSession(0), Status::Ok);
+  ASSERT_EQ(store.length(), 1);
+  EXPECT_EQ(front(store), "B");
+  EXPECT_EQ(summary(store).learning, 1);
+}
+
+TEST(CardStore, RepeatedFrontsKeepBothCards) {
+  fake::reset();
+  addDeck("bank\tбанк\nbank\tберег\nbank\tбанк\n");
+  DeckStore store;
+  ASSERT_EQ(store.open("es.txt", DAY), Status::Ok);
+  const Summary s = summary(store);
+  EXPECT_EQ(s.cards, 2);
+  EXPECT_EQ(s.dropped, 1);
+  ASSERT_EQ(store.startSession(0), Status::Ok);
+  ASSERT_TRUE(store.grade(Grade::Good));
+  auto fields = std::make_unique<Fields>();
+  ASSERT_EQ(store.loadCard(*fields), Status::Ok);
+  EXPECT_STREQ(fields->text[1], "берег");
+}
+
+TEST(CardStore, AgainCopiesCountTowardNoLimit) {
+  fake::reset();
+  addDeck(deckText(3));
+  {
+    DeckStore store;
+    ASSERT_EQ(store.open("es.txt", DAY), Status::Ok);
+    ASSERT_EQ(store.startSession(0), Status::Ok);
+    while (!store.finished()) ASSERT_TRUE(store.grade(Grade::Good));
+  }
+  {
+    DeckStore store;
+    ASSERT_EQ(store.open("es.txt", DAY + 1), Status::Ok);
+    ASSERT_EQ(store.startSession(0), Status::Ok);
+    ASSERT_TRUE(store.grade(Grade::Again));  // a review
+    ASSERT_TRUE(store.grade(Grade::Good));
+    ASSERT_TRUE(store.grade(Grade::Good));
+    ASSERT_TRUE(store.grade(Grade::Good));  // the «Снова» copy: not a review
+    EXPECT_TRUE(store.finished());
+  }
+  DeckStore store;
+  ASSERT_EQ(store.open("es.txt", DAY + 1), Status::Ok);
+  ASSERT_TRUE(Storage.exists(pathOf("dat").c_str()));
+  // Three reviews counted, from the crash-free merge: 200 - 3 left.
+  ASSERT_EQ(store.startSession(0), Status::Ok);
+  EXPECT_EQ(store.length(), 0);
+}
+
+TEST(CardStore, LowerCaseFolderAndUtf16) {
+  fake::reset();
+  fake::add("/карточки/es.txt", deckText(2));
+  EXPECT_STREQ(deckDir(), DECK_DIR_LOWER);
+  DeckStore store;
+  ASSERT_EQ(store.open("es.txt", DAY), Status::Ok);
+  EXPECT_EQ(summary(store).cards, 2);
+  fake::add("/Карточки/u.csv", std::string("\xFF\xFE"
+                                           "a\0;\0b\0",
+                                           8));
+  EXPECT_STREQ(deckDir(), DECK_DIR);
+  EXPECT_EQ(store.open("u.csv", DAY), Status::Unsupported);
 }
