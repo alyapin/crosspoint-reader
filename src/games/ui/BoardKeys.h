@@ -63,6 +63,7 @@ class BoardKeys {
   void reset() {
     queue.clear();
     holdOff = true;
+    confirmHeld = true;
   }
 
  private:
@@ -74,7 +75,8 @@ class BoardKeys {
   ButtonNavigator repeat{kRepeatMs, kRepeatStartMs};
   KeyQueue queue;
   unsigned long confirmDownMs = 0;
-  bool confirmHeld = false;  // the held Confirm already queued; its release is not a Confirm
+  // The held Confirm already queued, or one pressed before this screen: its release is not a Confirm.
+  bool confirmHeld = true;
   bool holdOff = false;
 };
 
