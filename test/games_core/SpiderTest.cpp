@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "SpiderSolver.h"
@@ -152,6 +153,43 @@ TEST(Spider, UndoReplaysAndWinEndsTheGame) {
   EXPECT_FALSE(g.hint(step));
 }
 
+TEST(Spider, FullHistoryTakesNoMoreMoves) {
+  Game g;
+  g.newGame(solvableSeed(1, 0), 1, false);
+  std::vector<Step> line;
+  ASSERT_TRUE(solve(g.board(), 300000, line));
+  // Play until a single card can shuttle between its column and an empty one.
+  int empty = -1;
+  int single = -1;
+  for (size_t i = 0; i < line.size() && (empty < 0 || single < 0); ++i) {
+    const Step& s = line[i];
+    ASSERT_TRUE(s.from == STOCK ? g.deal() : g.move(s.from, s.to, s.count));
+    empty = single = -1;
+    for (int c = 0; c < COLUMNS; ++c) {
+      if (g.column(c).count == 0) empty = c;
+      if (g.column(c).count == 1) single = c;
+    }
+  }
+  ASSERT_GE(empty, 0);
+  ASSERT_GE(single, 0);
+  while (g.moveCount() < HISTORY) {
+    ASSERT_TRUE(g.move(single, empty, 1));
+    std::swap(single, empty);
+  }
+  EXPECT_TRUE(g.historyFull());
+  EXPECT_FALSE(g.move(single, empty, 1));
+  EXPECT_FALSE(g.deal());
+  Step step;
+  EXPECT_FALSE(g.hint(step));
+  const std::string text = save(g);
+  Game loaded;
+  ASSERT_TRUE(loaded.deserialize(text.data(), text.size()));
+  EXPECT_TRUE(loaded.historyFull());
+  ASSERT_TRUE(g.undo());
+  EXPECT_FALSE(g.historyFull());
+  EXPECT_TRUE(g.move(empty, single, 1));
+}
+
 TEST(Spider, SolvableBankDealsAreWonThroughTheGame) {
   const auto t0 = std::chrono::steady_clock::now();
   int solved = 0;
@@ -202,6 +240,9 @@ TEST(Spider, HintsPlayAndSaveRoundTrips) {
 
   std::string bad = text;
   bad.replace(bad.find("\"suits\":2"), 9, "\"suits\":3");
+  EXPECT_FALSE(loaded.deserialize(bad.data(), bad.size()));
+  bad = text;
+  bad.replace(bad.find("\"v\":2"), 5, "\"v\":1");
   EXPECT_FALSE(loaded.deserialize(bad.data(), bad.size()));
   bad = text;
   bad[bad.find("\"moves\":\"") + 9] = 'b';  // from past the stock

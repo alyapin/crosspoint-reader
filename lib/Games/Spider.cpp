@@ -10,7 +10,8 @@ namespace {
 
 using namespace cards;
 
-constexpr uint32_t SAVE_VERSION = 1;
+// A save is replayed through the rules: bump this whenever they change.
+constexpr uint32_t SAVE_VERSION = 2;
 
 uint8_t faceUp(const uint8_t card) { return static_cast<uint8_t>(card | FACE_UP); }
 
@@ -144,7 +145,7 @@ const Pile& Game::column(const int index) const {
 }
 
 bool Game::play(const Step& step) {
-  if (won || historyCount >= HISTORY || !spider::play(state, step)) return false;
+  if (won || historyFull() || !spider::play(state, step)) return false;
   history[historyCount++] = step;
   won = spider::isWon(state);
   return true;
@@ -189,7 +190,7 @@ int Game::autoTarget(const int from, const int count) const {
 }
 
 bool Game::hint(Step& out) const {
-  if (won) return false;
+  if (won || historyFull()) return false;
   int best = -1;
   for (int from = 0; from < COLUMNS; ++from) {
     const Pile& p = state.column[from];

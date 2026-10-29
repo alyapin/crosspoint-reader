@@ -184,7 +184,7 @@ void FreeCellActivity::onTouch(const fui::ActionEvent& event, int, const int y) 
 
 bool FreeCellActivity::barShown(const int slot) const {
   if (slot == 0) return game.canUndo();
-  if (slot == 1) return !game.isWon();
+  if (slot == 1) return !game.isWon() && !game.historyFull();
   return slot == 2;
 }
 
@@ -267,8 +267,12 @@ void FreeCellActivity::build(UiScreen& screen) {
   const bool won = game.isWon();
   char value[16];
   snprintf(value, sizeof(value), "%d", game.moveCount());
-  const char* label = won ? tr(STR_KLONDIKE_WON) : noMoves ? tr(STR_KLONDIKE_NO_MOVES) : tr(STR_KLONDIKE_MOVES);
-  drawTopLine(screen, label, noMoves ? "" : value, false);
+  const bool full = !won && game.historyFull();
+  const char* label = won       ? tr(STR_KLONDIKE_WON)
+                      : full    ? tr(STR_FREECELL_MOVE_LIMIT)
+                      : noMoves ? tr(STR_KLONDIKE_NO_MOVES)
+                                : tr(STR_KLONDIKE_MOVES);
+  drawTopLine(screen, label, noMoves || full ? "" : value, false);
 
   for (int place = 0; place < PLACES; ++place) {
     drawPlace(place);
@@ -322,6 +326,8 @@ void FreeCellActivity::drawPlace(const int place) const {
   const Pile& p = game.pile(place);
   const int x = placeX(place);
   if (p.count == 0) {
+    // A won board leaves the columns blank under the result line.
+    if (isColumn(place) && game.isWon()) return;
     const int y = isColumn(place) ? kTableauTop : BOARD_TOP;
     games::ui::drawDashedRect(renderer, x, y, kCardWidth, kCardHeight);
     if (isFoundation(place)) {

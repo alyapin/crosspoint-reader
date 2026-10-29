@@ -79,6 +79,8 @@ class Game {
   bool deal();
   bool canUndo() const { return historyCount > 0 && !won; }
   bool undo();
+  // HISTORY moves are kept; past them no move is taken until one is undone.
+  bool historyFull() const { return historyCount >= HISTORY; }
 
   // Where `count` cards from `from` go on a second tap: a card of the same
   // suit, any card, an empty column. -1 when nowhere.

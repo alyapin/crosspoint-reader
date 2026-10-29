@@ -121,7 +121,7 @@ void SpiderActivity::dealStock() {
     return;
   }
   // The stock waits while a column is empty.
-  stockBlocked = game.board().stockCount > 0;
+  stockBlocked = !game.historyFull() && game.board().stockCount > 0;
   requestRepaint(RepaintUpdate);
 }
 
@@ -202,7 +202,7 @@ void SpiderActivity::onTouch(const fui::ActionEvent& event, int, const int y) {
 
 bool SpiderActivity::barShown(const int slot) const {
   if (slot == 0) return game.canUndo();
-  if (slot == 1) return !game.isWon();
+  if (slot == 1) return !game.isWon() && !game.historyFull();
   return slot == 2;
 }
 
@@ -294,11 +294,13 @@ void SpiderActivity::build(UiScreen& screen) {
   const bool won = game.isWon();
   char value[16];
   snprintf(value, sizeof(value), "%d", game.moveCount());
+  const bool full = !won && game.historyFull();
   const char* label = won            ? tr(STR_KLONDIKE_WON)
+                      : full         ? tr(STR_FREECELL_MOVE_LIMIT)
                       : noMoves      ? tr(STR_KLONDIKE_NO_MOVES)
                       : stockBlocked ? tr(STR_SPIDER_EMPTY_COLUMN)
                                      : tr(STR_KLONDIKE_MOVES);
-  drawTopLine(screen, label, noMoves || stockBlocked ? "" : value, false);
+  drawTopLine(screen, label, noMoves || stockBlocked || full ? "" : value, false);
 
   drawTop();
   if (game.board().stockCount > 0) {
@@ -322,7 +324,7 @@ void SpiderActivity::build(UiScreen& screen) {
     games::ui::drawDashedRect(renderer, columnX(hintPlace == STOCK ? 0 : hintPlace) - pad, top - pad,
                               kCardWidth + 2 * pad, kCardHeight + 2 * pad);
   }
-  if (focus != kNone && focus < kBarFocus) {
+  if (focus != kNone && focus < kBarFocus && !won) {
     const int count = focus == STOCK ? 0 : game.column(focus).count;
     drawCursor(columnX(focus == STOCK ? 0 : focus), focus == STOCK ? BOARD_TOP : cardY(focus, std::max(0, count - 1)),
                kCardWidth, kCardHeight);
@@ -373,7 +375,8 @@ void SpiderActivity::drawColumn(const int column) const {
   const Pile& p = game.column(column);
   const int x = columnX(column);
   if (p.count == 0) {
-    games::ui::drawDashedRect(renderer, x, kTableauTop, kCardWidth, kCardHeight);
+    // A won board leaves the columns blank under the result line.
+    if (!game.isWon()) games::ui::drawDashedRect(renderer, x, kTableauTop, kCardWidth, kCardHeight);
     return;
   }
   for (int i = 0; i < p.count; ++i) {

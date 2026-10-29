@@ -73,6 +73,8 @@ class Game {
   bool move(int from, int to, int count);
   bool canUndo() const { return historyCount > 0 && !won; }
   bool undo();
+  // HISTORY moves are kept; past them no move is taken until one is undone.
+  bool historyFull() const { return historyCount >= HISTORY; }
 
   // Where `count` cards from `from` go on a second tap: a foundation, a
   // column, an empty column, a free cell. -1 when nowhere.

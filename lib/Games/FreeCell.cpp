@@ -7,7 +7,8 @@ namespace {
 
 using namespace cards;
 
-constexpr uint32_t SAVE_VERSION = 1;
+// A save is replayed through the rules: bump this whenever they change.
+constexpr uint32_t SAVE_VERSION = 2;
 
 bool parentOf(const uint8_t lower, const uint8_t upper) {
   return isRed(lower) != isRed(upper) && rankOf(lower) == rankOf(upper) + 1;
@@ -146,7 +147,7 @@ const Pile& Game::pile(const int place) const {
 }
 
 bool Game::move(const int from, const int to, const int count) {
-  if (won || historyCount >= HISTORY) return false;
+  if (won || historyFull()) return false;
   for (int n = count; n > 0; --n) {
     if (!applyMove(state, from, to, n)) continue;
     history[historyCount++] = Step{static_cast<uint8_t>(from), static_cast<uint8_t>(to), static_cast<uint8_t>(n)};
@@ -187,7 +188,7 @@ int Game::autoTarget(const int from, const int count) const {
 }
 
 bool Game::hint(Step& out) const {
-  if (won) return false;
+  if (won || historyFull()) return false;
   auto suggest = [&](const int from, const int to, const int count) {
     out = Step{static_cast<uint8_t>(from), static_cast<uint8_t>(to), static_cast<uint8_t>(count)};
     return true;

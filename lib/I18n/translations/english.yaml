@@ -1011,6 +1011,7 @@ STR_CODEWORD_NEXT_KEY: "Select: the next codeword"
 # FreeCell
 STR_FREECELL: "FreeCell"
 STR_FREECELL_DEAL: "Deal %u"
+STR_FREECELL_MOVE_LIMIT: "no more moves"
 
 # Spider
 STR_SPIDER: "Spider"

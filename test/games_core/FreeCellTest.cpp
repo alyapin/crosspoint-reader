@@ -5,6 +5,7 @@
 #include <cstring>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "src/games/GameSave.h"
@@ -197,6 +198,29 @@ TEST(FreeCell, UndoRestoresAndWinEndsTheGame) {
   EXPECT_FALSE(g.hint(step));
 }
 
+TEST(FreeCell, FullHistoryTakesNoMoreMoves) {
+  Game g;
+  g.newGame(1);
+  ASSERT_TRUE(g.move(COLUMN, CELL, 1));
+  int from = CELL;
+  int to = CELL + 1;
+  while (g.moveCount() < HISTORY) {
+    ASSERT_TRUE(g.move(from, to, 1));
+    std::swap(from, to);
+  }
+  EXPECT_TRUE(g.historyFull());
+  EXPECT_FALSE(g.move(from, to, 1));
+  Step step;
+  EXPECT_FALSE(g.hint(step));
+  const std::string text = save(g);
+  Game loaded;
+  ASSERT_TRUE(loaded.deserialize(text.data(), text.size()));
+  EXPECT_TRUE(loaded.historyFull());
+  ASSERT_TRUE(g.undo());
+  EXPECT_FALSE(g.historyFull());
+  EXPECT_TRUE(g.hint(step));
+}
+
 TEST(FreeCell, SaveRoundTripAndTamperedSaves) {
   Game g;
   g.newGame(617);
@@ -215,6 +239,9 @@ TEST(FreeCell, SaveRoundTripAndTamperedSaves) {
   EXPECT_FALSE(loaded.deserialize(bad.data(), bad.size()));
   bad[moves] = 'z';
   EXPECT_FALSE(loaded.deserialize(bad.data(), bad.size()));
+  std::string older = text;
+  older.replace(older.find("\"v\":2"), 5, "\"v\":1");
+  EXPECT_FALSE(loaded.deserialize(older.data(), older.size()));
   std::string zero = text;
   zero.replace(zero.find("\"deal\":617"), 10, "\"deal\":0");
   EXPECT_FALSE(loaded.deserialize(zero.data(), zero.size()));
