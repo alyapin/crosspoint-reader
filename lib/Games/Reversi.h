@@ -3,7 +3,7 @@
 // A reversi (Othello) session: the surface a reversi screen drives.
 //   newGame(mode, seed)   black moves first; against the computer the player is black
 //   play(square)          the move of the side to move; a side without a move passes by itself
-//   undo()                takes back the last move, or the player's move and the answers
+//   undo()                takes back the last move, or the player's move and the answers; not once over
 //   at(), toMove(), moves(), status(), lastMove(), passed(), score()  for drawing
 //   serialize() / deserialize()
 // The computer's move comes from Engine, run in slices by the screen. Squares
@@ -143,7 +143,7 @@ class Game {
  private:
   void place(int square);
   void rebuild(int count);
-  void tally(int delta);
+  void tally();
 
   Mode gameMode = Mode::Easy;
   Status state = Status::Playing;

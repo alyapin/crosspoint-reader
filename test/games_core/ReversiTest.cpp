@@ -194,7 +194,7 @@ TEST(Reversi, TwoPlayersUndoOneMove) {
   EXPECT_EQ(g.at(18), Disc::None);
 }
 
-TEST(Reversi, FinishedGameCountsAndUndoTakesItBack) {
+TEST(Reversi, FinishedGameCountsAndCannotBeUndone) {
   Game g;
   g.newGame(Mode::TwoPlayers, 5);
   games::Rng rng(5);
@@ -203,9 +203,10 @@ TEST(Reversi, FinishedGameCountsAndUndoTakesItBack) {
   const Score s = g.score();
   EXPECT_EQ(s.won + s.lost + s.draws, 1);
   EXPECT_FALSE(g.play(0));
-  ASSERT_TRUE(g.undo());
-  EXPECT_FALSE(g.isOver());
-  EXPECT_EQ(g.score().won + g.score().lost + g.score().draws, 0);
+  EXPECT_FALSE(g.canUndo());
+  EXPECT_FALSE(g.undo());
+  EXPECT_TRUE(g.isOver());
+  EXPECT_EQ(g.score().won + g.score().lost + g.score().draws, 1);
 }
 
 TEST(Reversi, ComputerPicksALegalMoveOnEveryLevel) {

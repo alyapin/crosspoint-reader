@@ -327,24 +327,23 @@ void Game::rebuild(const int count) {
   for (int i = 0; i < count; ++i) place(history[i]);
 }
 
-void Game::tally(const int delta) {
+void Game::tally() {
   Score& s = scores[static_cast<int>(gameMode)];
   uint16_t& n = state == Status::BlackWon ? s.won : state == Status::WhiteWon ? s.lost : s.draws;
-  if (delta > 0 || n > 0) n = static_cast<uint16_t>(n + delta);
+  ++n;
 }
 
 bool Game::play(const int square) {
   if (square < 0 || square >= CELLS || (moves() >> square & 1) == 0) return false;
   place(square);
-  if (isOver()) tally(1);
+  if (isOver()) tally();
   return true;
 }
 
-bool Game::canUndo() const { return moveCount > 0; }
+bool Game::canUndo() const { return !isOver() && moveCount > 0; }
 
 bool Game::undo() {
   if (!canUndo()) return false;
-  if (isOver()) tally(-1);
   int n = moveCount - 1;
   if (vsComputer()) {
     while (n > 0 && (whiteMoves >> n & 1)) --n;
