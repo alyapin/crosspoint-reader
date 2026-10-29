@@ -36,9 +36,8 @@ constexpr fui::ActionId ACTION_EXIT = 2;
 constexpr fui::ActionId ACTION_CARD = 3;
 constexpr fui::ActionId ACTION_SLOT = 4;
 
-constexpr int kRowHeight = kNavRowHeight;
+constexpr int kRowHeight = kListPitch;
 constexpr int kIconSize = 24;
-constexpr int kIconGap = 16;
 constexpr int kNoteGap = 12;
 constexpr int kCardWidth = 440;
 constexpr int kFrontBottomTouch = 400;
@@ -790,30 +789,30 @@ void CardsActivity::build(UiScreen& screen) {
 void CardsActivity::drawRow(UiScreen& screen, const int top, const freeink::Icon* icon, const char* label,
                             const bool focused, const char* status, const char* caption, const int value) {
   const int width = renderer.getScreenWidth();
-  if (focused) drawSelectionBar(renderer, kSelectionBarX, top, kRowHeight);
-  int x = kRowTextX;
+  if (focused) drawSelectionBar(renderer, kListBarX, top, kRowHeight);
+  int x = kListTextX;
   if (icon != nullptr) {
-    screen.target().bitmap(fui::makeRect(x, top + (kRowHeight - kIconSize) / 2, kIconSize, kIconSize),
+    screen.target().bitmap(fui::makeRect(kListIconX, top + (kRowHeight - kIconSize) / 2, kIconSize, kIconSize),
                            fui::bitmapFromIcon(*icon), fui::BitmapMode::Center);
-    x += kIconSize + kIconGap;
+    x = kListIconX + kIconSize + kListIconGap;
   }
   const EpdFontFamily::Style style = focused ? kSemiBold : EpdFontFamily::REGULAR;
-  const int line12 = renderer.getLineHeight(kText12Font);
+  const int labelLine = renderer.getLineHeight(kListFont);
   int statusWidth = 0;
   if (status != nullptr && *status) statusWidth = renderer.getTextWidth(kText10Font, status) + kSidePadding;
-  const std::string fitted = renderer.truncatedText(kText12Font, label, width - kSidePadding - x - statusWidth, style);
-  int textTop = top + (kRowHeight - line12) / 2;
+  const std::string fitted = renderer.truncatedText(kListFont, label, width - kListValueInset - x - statusWidth, style);
+  int textTop = top + (kRowHeight - labelLine) / 2;
   if (caption != nullptr && *caption) {
     const int captionLine = renderer.getLineHeight(kCaptionFont);
-    textTop = top + (kRowHeight - line12 - captionLine) / 2;
-    const std::string cut = renderer.truncatedText(kCaptionFont, caption, width - kSidePadding - x);
-    renderer.drawText(kCaptionFont, x, textTop + line12, cut.c_str());
+    textTop = top + (kRowHeight - labelLine - captionLine) / 2;
+    const std::string cut = renderer.truncatedText(kCaptionFont, caption, width - kListValueInset - x);
+    renderer.drawText(kCaptionFont, x, textTop + labelLine, cut.c_str());
   }
-  renderer.drawText(kText12Font, x, textTop, fitted.c_str(), true, style);
+  renderer.drawText(kListFont, x, textTop, fitted.c_str(), true, style);
   if (statusWidth > 0) {
     const int statusTop =
-        textTop + renderer.getFontAscenderSize(kText12Font) - renderer.getFontAscenderSize(kText10Font);
-    renderer.drawText(kText10Font, width - kSidePadding - renderer.getTextWidth(kText10Font, status), statusTop,
+        textTop + renderer.getFontAscenderSize(kListFont) - renderer.getFontAscenderSize(kText10Font);
+    renderer.drawText(kText10Font, width - kListValueInset - renderer.getTextWidth(kText10Font, status), statusTop,
                       status);
   }
   screen.frame().hit(fui::makeRect(0, top, width, kRowHeight), ACTION_ROW, static_cast<int16_t>(value),

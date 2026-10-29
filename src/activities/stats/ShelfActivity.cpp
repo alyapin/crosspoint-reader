@@ -32,7 +32,7 @@ constexpr int kCoverHeight = 184;
 constexpr int kCaptionGap = 8;
 constexpr int kGridGap = 20;
 constexpr int kFocusRing = 6;  // the focus frame sits this far outside a cover
-constexpr int kPickerRowHeight = kNavRowHeight;
+constexpr int kPickerRowHeight = kListPitch;
 // Books listed at most, the most recently read first: each holds its path and title.
 constexpr size_t kMaxBooks = FREEINK_MCU_C3 ? 80 : 200;
 }  // namespace
@@ -359,8 +359,8 @@ void ShelfActivity::drawPicker(UiScreen& screen, const int areaTop, const int bo
   const int last = std::min(static_cast<int>(candidates.size()), top + visible);
   for (int i = top; i < last; ++i) {
     const int rowTop = areaTop + (i - top) * kPickerRowHeight;
-    statsui::drawIconRow(renderer, screen.target(), &icon_book_24, candidates[i].title.c_str(), nullptr, kRowTextX,
-                         rowTop, width - kRowTextX - kSidePadding, kPickerRowHeight, buttonsUsed && i == focus);
+    statsui::drawIconRow(renderer, screen.target(), &icon_book_24, candidates[i].title.c_str(), nullptr, kListIconX,
+                         rowTop, width - kListIconX - kListValueInset, kPickerRowHeight, buttonsUsed && i == focus);
     screen.frame().hit(fui::makeRect(0, rowTop, width, kPickerRowHeight), ACTION_PICK, static_cast<int16_t>(i),
                        fui::InputTouch);
   }

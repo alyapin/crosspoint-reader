@@ -11,11 +11,9 @@
 namespace fui = freeink::ui;
 
 namespace {
-// Setka navigation row pitch.
-constexpr int kRowHeight = setka::kNavRowHeight;
+constexpr int kRowHeight = setka::kListPitch;
 constexpr int kRowGap = 0;
 constexpr int kIconSize = 24;
-constexpr int kIconGap = 16;
 }  // namespace
 
 SetkaListActivity::SetkaListActivity(const char* name, GfxRenderer& renderer, MappedInputManager& mappedInput)
@@ -64,7 +62,7 @@ void SetkaListActivity::buildScreen(UiScreen& screen) {
   using namespace setka;
   const auto& metrics = UITheme::getInstance().getMetrics();
   const int width = renderer.getScreenWidth();
-  const int lineHeight = renderer.getLineHeight(kText12Font);
+  const int lineHeight = renderer.getLineHeight(kListFont);
   const int listTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
 
   const int count = listCount();
@@ -81,27 +79,27 @@ void SetkaListActivity::buildScreen(UiScreen& screen) {
   for (int i = first; i < std::min(count, first + perPage); ++i) {
     const int top = listTop + (i - first) * (pitch + kRowGap);
     const bool focused = i == selected;
-    if (focused) drawSelectionBar(renderer, kSelectionBarX, top, pitch);
-    int x = kRowTextX;
+    if (focused) drawSelectionBar(renderer, kListBarX, top, pitch);
+    int x = kListTextX;
     if (const freeink::Icon* icon = rowIcon(i)) {
-      screen.target().bitmap(fui::makeRect(x, top + (pitch - kIconSize) / 2, kIconSize, kIconSize),
+      screen.target().bitmap(fui::makeRect(kListIconX, top + (pitch - kIconSize) / 2, kIconSize, kIconSize),
                              fui::bitmapFromIcon(*icon), fui::BitmapMode::Center);
-      x += kIconSize + kIconGap;
+      x = kListIconX + kIconSize + kListIconGap;
     }
     const int textTop = top + (pitch - lineHeight) / 2;
-    renderer.drawText(kText12Font, x, textTop, rowLabel(i), true, focused ? kSemiBold : EpdFontFamily::REGULAR);
+    renderer.drawText(kListFont, x, textTop, rowLabel(i), true, focused ? kSemiBold : EpdFontFamily::REGULAR);
     if (const char* status = rowStatus(i); status && *status) {
       // Shares the label's baseline.
       const int statusTop =
-          textTop + renderer.getFontAscenderSize(kText12Font) - renderer.getFontAscenderSize(kText10Font);
-      renderer.drawText(kText10Font, width - kSidePadding - renderer.getTextWidth(kText10Font, status), statusTop,
+          textTop + renderer.getFontAscenderSize(kListFont) - renderer.getFontAscenderSize(kText10Font);
+      renderer.drawText(kText10Font, width - kListValueInset - renderer.getTextWidth(kText10Font, status), statusTop,
                         status);
     }
     if (const int check = rowCheck(i); check >= 0) {
       // As the settings lists draw it: a 22 px box, a filled square inside when checked.
       constexpr int kBox = 22;
       constexpr int kInset = kBox / 4;
-      const int boxX = width - kSidePadding - kBox;
+      const int boxX = width - kListValueInset - kBox;
       const int boxY = top + (pitch - kBox) / 2;
       renderer.drawRoundedRect(boxX, boxY, kBox, kBox, 2, 2, true);
       if (check > 0)

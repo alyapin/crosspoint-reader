@@ -14,7 +14,6 @@ namespace fui = freeink::ui;
 
 namespace {
 constexpr int kIconSize = 24;
-constexpr int kIconGap = 16;
 }  // namespace
 
 ValuePickerActivity::ValuePickerActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string title,
@@ -106,19 +105,19 @@ void ValuePickerActivity::buildScreen(UiScreen& screen) {
   first = std::clamp(first, 0, std::max(0, count - 1) / rows * rows);
   pageTop = first;
 
-  const int lineHeight = renderer.getLineHeight(kText12Font);
-  const int textX = kRowTextX + kIconSize + kIconGap;
+  const int lineHeight = renderer.getLineHeight(kListFont);
+  const int textX = kListIconX + kIconSize + kListIconGap;
   for (int i = first; i < std::min(count, first + rows); ++i) {
     const int top = listTop + (i - first) * kListRowHeight;
     const bool focused = i == selected;
-    if (focused) drawSelectionBar(renderer, kSelectionBarX, top, kListRowHeight);
-    screen.target().bitmap(fui::makeRect(kRowTextX, top + (kListRowHeight - kIconSize) / 2, kIconSize, kIconSize),
+    if (focused) drawSelectionBar(renderer, kListBarX, top, kListRowHeight);
+    screen.target().bitmap(fui::makeRect(kListIconX, top + (kListRowHeight - kIconSize) / 2, kIconSize, kIconSize),
                            fui::bitmapFromIcon(i == current ? icon_radio_on_24 : icon_radio_24),
                            fui::BitmapMode::Center);
     const auto style = focused ? kSemiBold : EpdFontFamily::REGULAR;
     renderer.drawText(
-        kText12Font, textX, top + (kListRowHeight - lineHeight) / 2,
-        renderer.truncatedText(kText12Font, labels[i].c_str(), width - kSidePadding - textX, style).c_str(), true,
+        kListFont, textX, top + (kListRowHeight - lineHeight) / 2,
+        renderer.truncatedText(kListFont, labels[i].c_str(), width - kListValueInset - textX, style).c_str(), true,
         style);
     screen.frame().hit(fui::makeRect(0, top, width, kListRowHeight), ACTION_ROW, static_cast<int16_t>(i),
                        fui::InputTouch);
