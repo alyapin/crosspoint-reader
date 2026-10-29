@@ -1,10 +1,10 @@
 #pragma once
 
 // Escape hatches for a build that cannot reach Settings -> SD firmware update:
-// Left + Right held for 3 s at boot (already held on a deep-sleep wake, pressed up to
+// a combo held for 3 s at boot (already held on a deep-sleep wake, pressed up to
 // 1.5 s into any other boot), or three crash resets in a row, restart
-// into the other OTA slot when it holds a usable app. X4 Pro only; elsewhere
-// and in the simulator these are no-ops.
+// into the other OTA slot when it holds a usable app. The combo is Left + Right on the
+// X4 Pro and Back + Down on the X4 and X3. Elsewhere and in the simulator these are no-ops.
 namespace bootrescue {
 
 // Call first in setup(), right after the power rails are latched, before any

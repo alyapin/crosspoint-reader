@@ -2,11 +2,15 @@
 
 #include <BoardConfig.h>
 
-#if FREEINK_DEVICE_X4PRO && !defined(SIMULATOR)
+#if (FREEINK_DEVICE_X4PRO || FREEINK_DEVICE_X4) && !defined(SIMULATOR)
 #include <Arduino.h>
 #include <Logging.h>
 #include <esp_ota_ops.h>
 #include <esp_system.h>
+
+#if !FREEINK_DEVICE_X4PRO
+#include <InputManager.h>
+#endif
 
 #include "network/OtaBootSwitch.h"
 #include "util/BootRescuePolicy.h"
@@ -27,11 +31,39 @@ void storeCrashCount(const uint32_t count) {
   crashCountMagic = CRASH_COUNT_MAGIC;
 }
 
+#if FREEINK_DEVICE_X4PRO
 // X4 Pro Left is GPIO0 (profile "up") and Right is GPIO7 ("down"): plain active-low
 // inputs that need neither the touch controller nor a power rail.
+void prepareCombo() {
+  pinMode(BoardConfig::ACTIVE.input.up, INPUT_PULLUP);
+  pinMode(BoardConfig::ACTIVE.input.down, INPUT_PULLUP);
+  delay(1);  // pull-up settling before the first sample
+}
+
 bool comboHeld() {
   return digitalRead(BoardConfig::ACTIVE.input.up) == LOW && digitalRead(BoardConfig::ACTIVE.input.down) == LOW;
 }
+#else
+// X4 and X3 read their keys from two resistor ladders. Back is on the GPIO1 one and Down
+// on the GPIO2 one, so the pair reads at once; Up and Down share a ladder and cannot.
+InputManager& ladders() {
+  static InputManager probe;
+  return probe;
+}
+
+void prepareCombo() {
+  pinMode(InputManager::BUTTON_ADC_PIN_1, INPUT);
+  pinMode(InputManager::BUTTON_ADC_PIN_2, INPUT);
+  analogSetAttenuation(ADC_11db);
+}
+
+bool comboHeld() {
+  InputManager::ButtonAdcSample front{};
+  InputManager::ButtonAdcSample side{};
+  ladders().readButtonAdc(front, side);
+  return front.button == InputManager::BTN_BACK && side.button == InputManager::BTN_DOWN;
+}
+#endif
 
 // The bootloader already rolls a PENDING_VERIFY image back if it crashes or resets, and a
 // switch made from it would leave its entry for the bootloader to ABORT on the next boot.
@@ -103,9 +135,7 @@ void runAtBoot(const bool silentRestart) {
   // Rescue only from a confirmed image: this also keeps a just-switched-to image from
   // switching straight back while the combo is still held.
   if (runningPendingVerify()) return;
-  pinMode(BoardConfig::ACTIVE.input.up, INPUT_PULLUP);
-  pinMode(BoardConfig::ACTIVE.input.down, INPUT_PULLUP);
-  delay(1);  // pull-up settling before the first sample
+  prepareCombo();
   if (shouldRollBack(count)) {
     if (const esp_partition_t* other = usableOtherSlot()) restartInto(other, "Crash loop");
   }
