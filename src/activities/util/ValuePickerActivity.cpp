@@ -40,6 +40,9 @@ void ValuePickerActivity::open(Activity& host, GfxRenderer& renderer, MappedInpu
 }
 
 void ValuePickerActivity::onEnter() {
+  // The render task may run once UiListActivity::onEnter() asks for an update;
+  // keep it out until the page and the selection below are set.
+  RenderLock lock(*this);
   UiListActivity::onEnter();
   pageTop = 0;
   pageShift = 0;
