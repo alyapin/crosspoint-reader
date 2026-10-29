@@ -1,5 +1,7 @@
 #include "FiveLettersActivity.h"
 
+#include <KeyboardGames.h>
+#if SOVA_KEYBOARD_GAMES
 #include <FreeInkUIIcon.h>
 #include <GfxRenderer.h>
 #include <I18n.h>
@@ -353,3 +355,5 @@ void FiveLettersActivity::drawLetter(const uint8_t letter, const int x, const in
   renderer.drawScaledCodepoint(kText12Font, cp, style, x + (width - glyphWidth) / 2, y + (height + capHeight) / 2,
                                scale, black);
 }
+
+#endif  // SOVA_KEYBOARD_GAMES

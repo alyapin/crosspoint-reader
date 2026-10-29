@@ -2,10 +2,9 @@
 
 #include <Draughts.h>
 #include <Fifteen.h>
-#include <FiveLetters.h>
 #include <Game2048.h>
 #include <HalStorage.h>
-#include <Hangman.h>
+#include <KeyboardGames.h>
 #include <Klondike.h>
 #include <Logging.h>
 #include <Memory.h>
@@ -16,6 +15,10 @@
 
 #include <cstdio>
 #include <string>
+#if SOVA_KEYBOARD_GAMES
+#include <FiveLetters.h>
+#include <Hangman.h>
+#endif
 
 namespace gamesave {
 namespace {
@@ -65,7 +68,9 @@ uint16_t bitOf(const Kind kind) { return static_cast<uint16_t>(1u << static_cast
 
 Record reversiDone{{"/.crosspoint/games/reversi-done.json", "/.crosspoint/games/reversi-done.json.tmp"}};
 Record fifteenBest{{"/.crosspoint/games/fifteen-best.json", "/.crosspoint/games/fifteen-best.json.tmp"}};
+#if SOVA_KEYBOARD_GAMES
 Record fiveLettersStats{{"/.crosspoint/games/fiveletters-stats.json", "/.crosspoint/games/fiveletters-stats.json.tmp"}};
+#endif
 Record best2048{{"/.crosspoint/games/2048-best.txt", "/.crosspoint/games/2048-best.txt.tmp"}};
 Record nonogramRecord{{"/.crosspoint/games/nonogram-best.json", "/.crosspoint/games/nonogram-best.json.tmp"}};
 
@@ -192,9 +197,13 @@ bool save(const sudoku::Game& game) { return write(Kind::Sudoku, game, sudoku::S
 bool save(const minesweeper::Game& game) { return write(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
 bool save(const klondike::Game& game) { return write(Kind::Klondike, game, klondike::SAVE_MAX); }
 bool save(const fifteen::Game& game) { return write(Kind::Fifteen, game, fifteen::SAVE_MAX); }
+#if SOVA_KEYBOARD_GAMES
 bool save(const fiveletters::Game& game) { return write(Kind::FiveLetters, game, fiveletters::SAVE_MAX); }
+#endif
 bool save(const g2048::Game& game) { return write(Kind::Game2048, game, g2048::SAVE_MAX); }
+#if SOVA_KEYBOARD_GAMES
 bool save(const hangman::Game& game) { return write(Kind::Hangman, game, hangman::SAVE_MAX); }
+#endif
 bool save(const reversi::Game& game) {
   if (game.inProgress()) return !reversiDone.unread && write(Kind::Reversi, game, reversi::SAVE_MAX);
   return !reversiDone.unread && writeTo(reversiDone.paths, game, reversi::SAVE_MAX) && clear(Kind::Reversi);
@@ -206,9 +215,13 @@ bool load(sudoku::Game& game) { return read(Kind::Sudoku, game, sudoku::SAVE_MAX
 bool load(minesweeper::Game& game) { return read(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
 bool load(klondike::Game& game) { return read(Kind::Klondike, game, klondike::SAVE_MAX); }
 bool load(fifteen::Game& game) { return read(Kind::Fifteen, game, fifteen::SAVE_MAX); }
+#if SOVA_KEYBOARD_GAMES
 bool load(fiveletters::Game& game) { return read(Kind::FiveLetters, game, fiveletters::SAVE_MAX); }
+#endif
 bool load(g2048::Game& game) { return read(Kind::Game2048, game, g2048::SAVE_MAX); }
+#if SOVA_KEYBOARD_GAMES
 bool load(hangman::Game& game) { return read(Kind::Hangman, game, hangman::SAVE_MAX); }
+#endif
 bool load(reversi::Game& game) {
   return read(Kind::Reversi, game, reversi::SAVE_MAX) || readRecord(reversiDone, game, reversi::SAVE_MAX) == Read::Ok;
 }
@@ -221,12 +234,14 @@ bool save(const fifteen::Best& best) {
 }
 bool load(fifteen::Best& best) { return loadRecord(fifteenBest, best, 48); }
 
+#if SOVA_KEYBOARD_GAMES
 bool saveStats(const fiveletters::Stats& stats) {
   char text[fiveletters::STATS_MAX];
   return saveRecord(fiveLettersStats, text, stats.serialize(text, sizeof(text)));
 }
 
 bool loadStats(fiveletters::Stats& stats) { return loadRecord(fiveLettersStats, stats, fiveletters::STATS_MAX); }
+#endif
 
 bool save(const nonogram::Record& record) {
   char text[nonogram::RECORD_MAX];

@@ -1,5 +1,7 @@
 #include "HangmanActivity.h"
 
+#include <KeyboardGames.h>
+#if SOVA_KEYBOARD_GAMES
 #include <GfxRenderer.h>
 #include <HalStorage.h>
 #include <HangmanWords.h>
@@ -359,3 +361,5 @@ void HangmanActivity::drawKey(const int key, const int top) const {
   }
   if (key == cursor && barFocus < 0 && !game.isOver()) drawKeyCursor(x, y, kKeyWidth, kKeyHeight);
 }
+
+#endif  // SOVA_KEYBOARD_GAMES

@@ -1,5 +1,7 @@
 #include "ScanwordShelf.h"
 
+#include <KeyboardGames.h>
+#if SOVA_KEYBOARD_GAMES
 #include <cstdio>
 #include <cstring>
 
@@ -125,3 +127,5 @@ bool Shelf::parseLine(const char* text, const size_t len) {
 }
 
 }  // namespace scanword
+
+#endif  // SOVA_KEYBOARD_GAMES
