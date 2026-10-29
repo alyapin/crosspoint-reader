@@ -1341,7 +1341,7 @@ void PluginCatalogActivity::activateIndex(const int index) {
     const int pluginStart = showOpds ? 1 : 0;
     if (showPluginHubInstallRow && index == pluginStart) {
       static constexpr StrId OPTIONS[] = {StrId::STR_INSTALL, StrId::STR_HIDE, StrId::STR_CANCEL};
-      pluginHubPopup.show(StrId::STR_PLUGIN_HUB, OPTIONS, 3, 0, [this](const int selected) {
+      pluginHubPopup.show(StrId::STR_PLUGIN_HUB, OPTIONS, 3, OptionPopup::kMenu, [this](const int selected) {
         if (selected == 0) {
           auto installer = makeUniqueNoThrow<PluginHubInstallActivity>(renderer, mappedInput, false);
           if (!installer) {
@@ -1520,7 +1520,8 @@ void PluginCatalogActivity::showItemDetails(const int itemIndex) {
   addFact(item.status);
 
   const bool updateAvailable = item.status == tr(STR_UPDATE_AVAILABLE);
-  spec.actionLabel = updateAvailable ? tr(STR_UPDATE) : (manifest.tracksInstalls() ? tr(STR_INSTALL) : tr(STR_FETCH));
+  spec.actionLabel =
+      updateAvailable ? tr(STR_UPDATE_ACTION) : (manifest.tracksInstalls() ? tr(STR_INSTALL_ACTION) : tr(STR_FETCH));
 
   auto detailsActivity = makeUniqueNoThrow<DetailsActivity>(renderer, mappedInput, std::move(spec));
   if (!detailsActivity) {

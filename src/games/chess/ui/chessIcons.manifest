@@ -4,7 +4,8 @@
 #     --svgdir freeink-sdk/libs/assets/Icons/lucide/icons \
 #     --sizes 24 --out src/games/chess/ui/chessIcons.h
 # then clang-format the header.
-# chess: the games list row; undo-move and menu: the action bar; the rest: chess list rows.
+# chess: the games list row; undo-move, flip and menu: the action bar (flip also a menu row);
+# the rest: chess list rows.
 chess = chess-knight
 computer = cpu
 friend = users

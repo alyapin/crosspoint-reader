@@ -345,8 +345,9 @@ void ShelfActivity::draw(UiScreen& screen) {
   }
   drawGrid(screen, bands.contentTop, bands.contentBottom, bands.width);
   if (menuOpen && menuCell >= 0 && menuCell < static_cast<int>(books.size())) {
+    const int pitch = kCoverHeight + kCaptionGap + renderer.getLineHeight(kCaptionFont) + kGridGap;
     statsui::drawMenuBox(renderer, screen, books[menuCell].title.c_str(), 1, 0, buttonsUsed, &describeMenu, this,
-                         bands.contentTop, bands.contentBottom, bands.width, ACTION_MENU, ACTION_DISMISS);
+                         bands.contentTop, bands.contentBottom, bands.width, ACTION_MENU, ACTION_DISMISS, pitch);
   }
 }
 

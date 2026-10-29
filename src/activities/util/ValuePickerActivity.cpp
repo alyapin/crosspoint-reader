@@ -40,8 +40,8 @@ void ValuePickerActivity::open(Activity& host, GfxRenderer& renderer, MappedInpu
 }
 
 void ValuePickerActivity::onEnter() {
-  // The render task may run once UiListActivity::onEnter() asks for an update;
-  // keep it out until the page and the selection below are set.
+  // The render task may run as soon as ActivityManager drops its lock; keep it
+  // out until the state below is in place (same as SetkaHomeActivity).
   RenderLock lock(*this);
   UiListActivity::onEnter();
   pageTop = 0;

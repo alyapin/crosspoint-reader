@@ -183,11 +183,10 @@ void BaseTheme::drawProgressBar(const GfxRenderer& renderer, Rect rect, const si
   renderer.drawCenteredText(UI_10_FONT_ID, rect.y + rect.height + 15, percentText.c_str());
 }
 
-// Centre hint labels by text height, wrapping to at most two lines.
+// Centre hint labels by text height on one line. A label too wide for its box
+// needs shorter copy; meanwhile it is cut with an ellipsis, never broken mid-word.
 void BaseTheme::drawHintLabel(const GfxRenderer& renderer, const int fontId, const char* label, const int x,
                               const int boxWidth, const int boxTop, const int boxHeight) {
-  // One line: a label that does not fit needs shorter copy, so it is cut with
-  // an ellipsis rather than broken mid-word onto a second line.
   constexpr int textPadding = 4;  // keeps the label off the button's border
   const std::string text = renderer.truncatedText(fontId, label, boxWidth - textPadding * 2);
   const int textWidth = renderer.getTextWidth(fontId, text.c_str());

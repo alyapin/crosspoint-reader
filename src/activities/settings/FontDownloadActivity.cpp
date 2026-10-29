@@ -958,7 +958,7 @@ void FontDownloadActivity::render(RenderLock&&) {
     const bool hasVisibleFamilies = !filteredIndices_.empty();
     const char* confirmLabel = !hasVisibleFamilies            ? ""
                                : isSelectedFamilyDeletable()  ? tr(STR_DELETE)
-                               : isUpdateAllRow(nav.selected) ? tr(STR_UPDATE)
+                               : isUpdateAllRow(nav.selected) ? tr(STR_UPDATE_ACTION)
                                                               : tr(STR_DOWNLOAD);
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), confirmLabel, hasVisibleFamilies ? tr(STR_DIR_UP) : "",
                                               hasVisibleFamilies ? tr(STR_DIR_DOWN) : "");
