@@ -34,7 +34,8 @@ class EpubReaderBookmarksActivity final : public UiListActivity {
 
  private:
   int listCount() const override { return static_cast<int>(bookmarks.size()); }
-  const char* headerTitle() const override;
+  // The header clears the hint gutter in every orientation.
+  void drawChrome() override;
   void buildScreen(UiScreen& screen) override;
   void activateIndex(int index) override;
   void onRowLongPress(int index) override;

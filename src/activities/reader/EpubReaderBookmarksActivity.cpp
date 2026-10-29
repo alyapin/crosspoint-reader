@@ -244,7 +244,9 @@ void EpubReaderBookmarksActivity::deleteSelectedBookmark() {
   requestUpdate(true);
 }
 
-const char* EpubReaderBookmarksActivity::headerTitle() const { return tr(STR_BOOKMARKS); }
+void EpubReaderBookmarksActivity::drawChrome() {
+  GUI.drawHeader(renderer, UITheme::getInstance().getHeaderRect(renderer, true, false), tr(STR_BOOKMARKS));
+}
 
 void EpubReaderBookmarksActivity::buildScreen(UiScreen& screen) {
   const auto& metrics = UITheme::getInstance().getMetrics();
@@ -266,7 +268,7 @@ void EpubReaderBookmarksActivity::buildScreen(UiScreen& screen) {
     const int helpLineHeight = renderer.getLineHeight(SMALL_FONT_ID);
     const fui::Rect band = screen.takeBottom(static_cast<int16_t>(helpLineHeight + 2 * metrics.verticalSpacing));
     renderer.drawText(
-        SMALL_FONT_ID, metrics.contentSidePadding, band.y + metrics.verticalSpacing,
+        SMALL_FONT_ID, band.x + metrics.contentSidePadding, band.y + metrics.verticalSpacing,
         renderer
             .truncatedText(SMALL_FONT_ID, tr(STR_HOLD_OPEN_FOR_ACTIONS), band.width - 2 * metrics.contentSidePadding)
             .c_str());
