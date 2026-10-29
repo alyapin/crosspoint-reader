@@ -800,7 +800,8 @@ void LibraryListActivity::navigateButtons() {
   });
   buttonNavigator.onPreviousPress([this, count] {
     if ((!navigationStartedOnTabs || degraded) && count > 0) {
-      moveRingTo(ringPos() <= 1 ? count : ringPos() - 1);
+      // The first row steps up to the tab strip, as Back does.
+      moveRingTo(ringPos() > 1 ? ringPos() - 1 : ringPos() == 1 && !degraded ? 0 : count);
     }
   });
   // Search is an activation: defer it so holding Previous can still step tabs.

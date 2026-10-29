@@ -405,7 +405,16 @@ void LibraryShelvesActivity::loop() {
     return;
   }
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
-    finish();
+    if (focus < 0) {
+      finish();
+      return;
+    }
+    // From a row, Back first returns focus to the tab strip.
+    RenderLock lock(*this);
+    focus = -1;
+    top = 0;
+    thumbsChecked = false;
+    requestUpdate();
     return;
   }
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
