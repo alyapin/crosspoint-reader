@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdio>
 
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
@@ -211,7 +212,9 @@ void UiTabListActivity::buildTabBar(UiScreen& screen) {
 }
 
 // Setka tabs, as in the Library: labels from the left in the UI 9 text role,
-// the active one SemiBold with the 10 px bar before it, the rule below.
+// the active one SemiBold with the 10 px bar before it, the rule below. A
+// sort indicator follows its label as an arrow; key focus on the band (no
+// touch) frames the active label.
 void UiTabListActivity::buildSetkaTabStrip(UiScreen& screen, const int16_t tabBand) {
   constexpr int kBarGap = 6;  // the bar ends this far left of its label
   constexpr int kTabGap = 26;
@@ -226,11 +229,19 @@ void UiTabListActivity::buildSetkaTabStrip(UiScreen& screen, const int16_t tabBa
   fui::TextStyle active = regular;
   active.bold = true;
   const auto styleFor = [&](const int i) -> const fui::TextStyle& { return i == activeTab() ? active : regular; };
+  const auto labelFor = [this](const int i, char (&buf)[48]) -> const char* {
+    const fui::TabIndicator indicator = tabIndicator(i);
+    if (indicator == fui::TabIndicator::None) return tabLabel(i);
+    snprintf(buf, sizeof(buf), "%s %s", tabLabel(i),
+             indicator == fui::TabIndicator::Up ? "\xE2\x86\x91" : "\xE2\x86\x93");
+    return buf;
+  };
+  char buf[48];
 
   const int count = tabCount();
   const int firstX = band.x + setka::kSelectionBarX + setka::kSelectionBarWidth + kBarGap;
   int textWidth = 0;
-  for (int i = 0; i < count; ++i) textWidth += target.measureText(regular.font, tabLabel(i), styleFor(i)).width;
+  for (int i = 0; i < count; ++i) textWidth += target.measureText(regular.font, labelFor(i, buf), styleFor(i)).width;
   const int spare = band.right() - metrics.contentSidePadding - firstX - textWidth;
   const int gap = count > 1 ? std::clamp(spare / (count - 1), kTabGapMin, kTabGap) : kTabGap;
   const auto divider = static_cast<int16_t>(std::max(1, metrics.headerUnderlineSize));
@@ -240,11 +251,14 @@ void UiTabListActivity::buildSetkaTabStrip(UiScreen& screen, const int16_t tabBa
   const fui::Paint ink = fui::Paint::solid(fui::Color::Black);
   int x = firstX;
   for (int i = 0; i < count; ++i) {
-    const char* label = tabLabel(i);
+    const char* label = labelFor(i, buf);
     const auto labelWidth = static_cast<int16_t>(target.measureText(regular.font, label, styleFor(i)).width);
     if (i == activeTab()) {
       target.fill(
           fui::makeRect(x - kBarGap - setka::kSelectionBarWidth, textTop, setka::kSelectionBarWidth, lineHeight), ink);
+      if (ringPos() == 0 && !mappedInput.hasTouch()) {
+        target.stroke(fui::makeRect(x - 4, textTop - 4, labelWidth + 8, lineHeight + 8), ink, 2);
+      }
     }
     target.text(fui::makeRect(x, textTop, labelWidth, lineHeight), label, styleFor(i));
     const int hitLeft = std::max<int>(band.x, x - gap / 2);

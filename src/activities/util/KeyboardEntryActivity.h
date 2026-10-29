@@ -113,8 +113,9 @@ class KeyboardEntryActivity : public Activity {
   bool altSwallowConfirm = false;  // buttons: the hold that opened the strip is still down
   int altFocus = 1;
   int altCount = 0;
-  const char* altChoices[2] = {nullptr, nullptr};
-  freeink::ui::Rect altAnchor{};  // the long-pressed key
+  char altChoices[2][16] = {};
+  int16_t altValue = 0;                 // the long-pressed key
+  std::atomic<int16_t> altCenterX{-1};  // its centre, found by render() in the table it builds
   bool openAltStrip(int16_t value);
   void closeAltStrip();
   void handleAltStrip();

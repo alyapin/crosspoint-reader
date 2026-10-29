@@ -5,6 +5,7 @@
 #include <I18n.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 
 #include "HapticFeedback.h"
@@ -405,15 +406,11 @@ bool KeyboardEntryActivity::openAltStrip(const int16_t value) {
   const char* own = fui::keyboardOutputFor(layer, value);
   const char* alt = fui::keyboardAltOutputFor(layer, value);
   if (!own || !alt || std::strcmp(own, alt) == 0) return false;
-  const fui::Interaction* hits = interactions.publishedData();
-  const size_t count = interactions.publishedCount();
-  const auto* key = std::find_if(hits, hits + count, [value](const fui::Interaction& hit) {
-    return hit.action == ACTION_KEY && hit.value == value;
-  });
-  if (key == hits + count) return false;
-  altAnchor = key->rect;
-  altChoices[0] = own;
-  altChoices[1] = alt;
+  // Copies: a case-flipped alternate lives in a buffer the next lookup reuses.
+  snprintf(altChoices[0], sizeof(altChoices[0]), "%s", own);
+  snprintf(altChoices[1], sizeof(altChoices[1]), "%s", alt);
+  altValue = value;
+  altCenterX = -1;
   altCount = 2;
   altFocus = 1;
   altArmed = false;
@@ -478,20 +475,22 @@ void KeyboardEntryActivity::handleAltStrip() {
   }
 }
 
-// One square cell per character, at least a list row tall, just above the
+// One square cell per character, a list row on a side, just above the
 // keyboard's top rule (no key is covered) and centered over the long-pressed
-// key inside the side padding.
+// key inside the side padding. Empty until render() has placed the key.
 fui::Rect KeyboardEntryActivity::altCellRect(const int index) const {
   using namespace setka;
   constexpr int kGap = 12;  // air between the strip and the keyboard's rule
-  const int cell = std::max<int>(altAnchor.width, kListRowHeight);
+  const int centerX = altCenterX;
+  if (centerX < 0) return fui::Rect{};
+  const int cell = kListRowHeight;
   const fui::Rect kb = keyboardRect();
   const int keysHeight =
       keyboardKeysHeight(UITheme::getInstance().getMetrics(), currentLayout().rowCount, mappedInput.hasTouch());
   const int keysTop = kb.y + (kb.height - keysHeight) / 2;
   const int width = renderer.getScreenWidth();
   const int stripW = cell * altCount;
-  const int x = std::clamp(altAnchor.x + altAnchor.width / 2 - stripW / 2, kSidePadding, width - kSidePadding - stripW);
+  const int x = std::clamp(centerX - stripW / 2, kSidePadding, width - kSidePadding - stripW);
   return fui::Rect{static_cast<int16_t>(x + index * cell), static_cast<int16_t>(keysTop - kRuleWidth - kGap - cell),
                    static_cast<int16_t>(cell), static_cast<int16_t>(cell)};
 }
@@ -1176,6 +1175,14 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   props.bottomHitOverflow = static_cast<int16_t>(std::max(0, bottomEdge - keysRect.bottom()));
   fui::keyboard(frame, keysRect, props);
   drawKeyGrid(keysRect, layout.rowCount);
+  if (altOpen) {
+    const fui::Interaction* hits = interactions.data();
+    const fui::Interaction* end = hits + interactions.count();
+    const int16_t value = altValue;
+    const auto* key = std::find_if(
+        hits, end, [value](const fui::Interaction& hit) { return hit.action == ACTION_KEY && hit.value == value; });
+    altCenterX = static_cast<int16_t>(key != end ? key->rect.x + key->rect.width / 2 : keysRect.x + keysRect.width / 2);
+  }
   interactions.publish();
   interactionsReady = true;
   if (altOpen) drawAltStrip(keyLabelFont(keysRect.width));

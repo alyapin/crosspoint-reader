@@ -3154,21 +3154,32 @@ void EpubReaderActivity::openPanelPicker(const StrId title, std::vector<std::str
   if (!picker) return;
   const Overlay panel = overlay;
   const int row = panelIndex;
+  // The panel comes back on the page it was scrolled to (More runs to pages).
+  const int top = toolbarUi ? toolbarUi->nav().top : 0;
+  const int selected = toolbarUi ? toolbarUi->nav().selected.load() : 0;
   overlay = Overlay::None;
   discardOverlayPage();
   {
     RenderLock lock;  // the picker paints the framebuffer next
     settleOverlayRefresh();
   }
-  startActivityForResult(std::move(picker),
-                         [this, panel, row, onSelect = std::move(onSelect)](const ActivityResult& result) {
-                           overlay = panel;
-                           panelIndex = row;
-                           const auto* picked = std::get_if<IntervalResult>(&result.data);
-                           if (!result.isCancelled && picked) onSelect(static_cast<int>(picked->value));
-                           if (toolbarUi) toolbarUi->begin();  // the picker drew its own FUI screen
-                           requestUpdate();                    // re-render page + panel
-                         });
+  startActivityForResult(std::move(picker), [this, panel, row, top, selected, current,
+                                             onSelect = std::move(onSelect)](const ActivityResult& result) {
+    overlay = panel;
+    panelIndex = row;
+    const auto* picked = std::get_if<IntervalResult>(&result.data);
+    // Picking the current value changes nothing, so it must not re-paginate.
+    if (!result.isCancelled && picked && static_cast<int>(picked->value) != current) {
+      onSelect(static_cast<int>(picked->value));
+    }
+    if (toolbarUi) {
+      toolbarUi->begin();  // the picker drew its own FUI screen
+      RenderLock lock;
+      toolbarUi->nav().reset(selected);
+      toolbarUi->nav().top = top;
+    }
+    requestUpdate();  // re-render page + panel
+  });
 }
 
 void EpubReaderActivity::applyReaderTextSettings() {

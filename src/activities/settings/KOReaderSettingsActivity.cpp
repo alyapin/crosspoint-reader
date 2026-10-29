@@ -49,8 +49,10 @@ void truncateMiddle(Screen& screen, std::string& text, const int maxWidth) {
   };
   if (width(text) <= maxWidth) return;
   static constexpr char kEllipsis[] = "\xE2\x80\xA6";
-  std::string head = text.substr(0, text.size() / 2);
-  std::string tail = text.substr(text.size() / 2);
+  size_t mid = text.size() / 2;
+  while (mid > 0 && (static_cast<uint8_t>(text[mid]) & 0xC0) == 0x80) --mid;  // split on a character boundary
+  std::string head = text.substr(0, mid);
+  std::string tail = text.substr(mid);
   const auto dropLast = [](std::string& s) {
     size_t cut = s.size() - 1;
     while (cut > 0 && (static_cast<uint8_t>(s[cut]) & 0xC0) == 0x80) --cut;
@@ -201,8 +203,8 @@ void KOReaderSettingsActivity::buildScreen(UiScreen& screen) {
     } else if (i == IDX_PASSWORD) {
       rowValues_[i] = KOREADER_STORE.getPassword().empty() ? tr(STR_NOT_SET) : "******";
     } else if (i == IDX_SERVER_URL) {
-      // The host alone, cut in the middle so both ends stay readable; the
-      // built-in server reads "По умолчанию".
+      // The URL without its scheme, cut in the middle so both ends stay
+      // readable; the built-in server reads "По умолчанию".
       rowValues_[i] = KOREADER_STORE.getServerUrl();
       const auto schemeEnd = rowValues_[i].find("://");
       if (schemeEnd != std::string::npos) rowValues_[i].erase(0, schemeEnd + 3);

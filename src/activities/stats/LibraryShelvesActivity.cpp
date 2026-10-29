@@ -136,9 +136,11 @@ void LibraryShelvesActivity::reloadLocked() {
           const char* slash = std::strrchr(book.path, '/');
           row.title = book.title[0] ? book.title : slash ? slash + 1 : book.path;
           // Some books store the role in the creator field ("автор Николай Гоголь").
-          static constexpr char kAuthorRole[] = "автор ";
-          const bool hasRole = std::strncmp(book.author, kAuthorRole, sizeof(kAuthorRole) - 1) == 0;
-          snprintf(row.author, sizeof(row.author), "%s", book.author + (hasRole ? sizeof(kAuthorRole) - 1 : 0));
+          const char* author = book.author;
+          for (const char* role : {"автор ", "Автор "}) {
+            if (std::strncmp(author, role, std::strlen(role)) == 0) author += std::strlen(role);
+          }
+          snprintf(row.author, sizeof(row.author), "%s", author);
           const unsigned percent = (book.progressBp + 50) / 100;
           const uint32_t left = book.status == stats::BookStatus::Reading ? stats::estimateSecondsLeft(book) : 0;
           if (left > 0) {
