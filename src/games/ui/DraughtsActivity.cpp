@@ -34,7 +34,7 @@ constexpr int kDotSize = 16;
 constexpr int kCross = 7;  // half the × inside the inner ring
 constexpr int kCrossStroke = 3;
 constexpr int kCountDot = 14;
-constexpr int kStatusGap = 20;  // the rule under the board to the heading
+constexpr int kStatusGap = 22;  // the board to the heading
 constexpr int kLineGap = 6;
 constexpr int kFlipSlot = 1;
 constexpr int kNewGameSlot = 2;
@@ -580,9 +580,8 @@ void DraughtsActivity::drawPiece(const int x, const int y, const bool white, con
 
 void DraughtsActivity::drawStatus() const {
   const int width = renderer.getScreenWidth();
-  int y = kBoardTop + kBoardSize;
-  drawRule(renderer, 0, y, width);
-  y += kStatusGap;
+  // No rule under the board, as in Шахматы.
+  int y = kBoardTop + kBoardSize + kStatusGap;
 
   const char* heading = nullptr;
   const char* lines[3] = {};
