@@ -74,8 +74,12 @@ class OptionPopup {
   // book menu: always rows, title and rows on its side padding.
   void show(const char* titleStr, const char* const* options, const freeink::Icon* const* optionIcons, int optionCount,
             int currentIndex, std::function<void(int)> onSelect) {
-    show(titleStr, options, optionCount, currentIndex, std::move(onSelect));
+    // Filled before activate(): the render task may paint the popup as soon as it is active.
+    title = titleStr;
+    headline.clear();
     icons.assign(optionIcons, optionIcons + optionCount);
+    ownedStrings.assign(options, options + optionCount);
+    activate(currentIndex, std::move(onSelect));
   }
 
   // Message dialog: a wrapped body under the (optional) title, like the
