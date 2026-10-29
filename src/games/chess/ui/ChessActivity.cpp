@@ -1360,7 +1360,7 @@ void ChessActivity::drawClockPanel() const {
 }
 
 void ChessActivity::drawStatusPanel() const {
-  const int top = kPanelTop + 18;
+  const int top = games::ui::captionTop(renderer, kPanelTop, kText12Font);
   drawTurnLine(top);
   drawMoveList(top + renderer.getLineHeight(kText12Font) + 12, actionsTop() - 6);
 }
@@ -1428,7 +1428,7 @@ void ChessActivity::drawMoveList(const int top, const int bottom) const {
 
 void ChessActivity::drawPromotion(UiScreen& screen) const {
   const int width = renderer.getScreenWidth();
-  const int top = kPanelTop + 18;
+  const int top = games::ui::captionTop(renderer, kPanelTop, kText12Font);
   renderer.drawText(kText12Font, kSidePadding, top, tr(STR_CHESS_PROMOTE), true, kSemiBold);
   const int cellTop = top + renderer.getLineHeight(kText12Font) + 8;
   const int cellWidth = width / static_cast<int>(std::size(kPromotions));
@@ -1456,8 +1456,8 @@ void ChessActivity::drawGameOver() const {
   const bool draw = match->game().outcome() == chess::Outcome::Draw;
   const char* how = overTitle(match->game());
   const char* who = overSubtitle(*match);
-  games::ui::drawResult(renderer, kPanelTop + 18, draw ? how : who, draw ? who : how,
-                        hasBar() ? nullptr : tr(STR_GAMES_NEW_GAME_KEY));
+  games::ui::drawResult(renderer, games::ui::captionTop(renderer, kPanelTop, kText12Font), draw ? how : who,
+                        draw ? who : how, hasBar() ? nullptr : tr(STR_GAMES_NEW_GAME_KEY));
 }
 
 void ChessActivity::drawActions(UiScreen& screen) const {

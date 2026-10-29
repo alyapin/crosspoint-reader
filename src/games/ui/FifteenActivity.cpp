@@ -24,7 +24,6 @@ constexpr int kTileGap = 8;
 constexpr int kTileRule = 2;
 constexpr int kFrameInset = 4;
 constexpr int kBoard = fifteen::SIDE * kTile + (fifteen::SIDE - 1) * kTileGap;
-constexpr int kResultTop = GameScreen::BOARD_TOP + kBoard + 36;
 constexpr int kLastSlot = GameScreen::BAR_SLOTS - 1;
 
 // "37 ходов": Russian picks the form by the number; English uses the last two the same.
@@ -205,7 +204,7 @@ void FifteenActivity::build(UiScreen& screen) {
       formatElapsed(best.ms, clock, sizeof(clock));
       snprintf(record, sizeof(record), tr(STR_FIFTEEN_BEST), moves, clock);
     }
-    drawResult(kResultTop, line, record);
+    drawResult(games::ui::captionTop(renderer, BOARD_TOP + kBoard, kText12Font), line, record);
   }
 
   BarItem items[BAR_SLOTS];

@@ -82,6 +82,13 @@ void drawActionBar(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, con
   }
 }
 
+int captionTop(const GfxRenderer& renderer, const int edge, const int font) {
+  int32_t advance = 0;
+  int cap = 0;
+  if (!renderer.getCodepointMetrics(font, 0x41D, EpdFontFamily::REGULAR, advance, cap)) cap = 0;
+  return edge + kCaptionGap - (renderer.getFontAscenderSize(font) - cap);
+}
+
 int drawResult(const GfxRenderer& renderer, const int top, const char* result, const char* detail, const char* cue) {
   int y = top;
   renderer.drawText(kText12Font, kSidePadding, y, result, true, kSemiBold);

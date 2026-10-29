@@ -34,7 +34,6 @@ constexpr int kStroke = 4;
 constexpr int kFigureStroke = 3;
 constexpr int kClueGap = 28;
 constexpr int kClueLines = 4;
-constexpr int kResultGap = 16;  // the word to the result
 constexpr int kStartKey = games::ui::kKeyboardStartKey;
 
 // Обычные слова, and С крепкими словами: the same words with the rude ones after them.
@@ -220,7 +219,7 @@ bool HangmanActivity::onBack() {
 HangmanActivity::Layout HangmanActivity::layout() const {
   Layout l;
   l.keysTop = barTop() - games::ui::kKeyboardHeight;
-  const int band = kUnderline + kResultGap + resultHeight(false);
+  const int band = kUnderline + games::ui::kCaptionGap + resultHeight(false);
   const int room = l.keysTop - kRuleWidth - BOARD_TOP - kWordHeight - band;
   const int gallows = std::min(kGallowsMax, room - 3 * kGapMin);
   const int gap = (room - gallows) / 3;
@@ -245,7 +244,7 @@ void HangmanActivity::build(UiScreen& screen) {
   screen.frame().hit(fui::makeRect(0, l.keysTop, renderer.getScreenWidth(), games::ui::kKeyboardHeight), ACTION_BOARD,
                      0, shellInput());
   if (over) {
-    drawResult(l.wordBaseline + kUnderline + kResultGap,
+    drawResult(games::ui::captionTop(renderer, l.wordBaseline + kUnderline, kText12Font),
                game.status() == hangman::Status::Won ? tr(STR_HANGMAN_WON) : tr(STR_HANGMAN_LOST));
   }
 

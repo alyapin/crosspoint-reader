@@ -71,7 +71,8 @@ class NonogramActivity final : public GameScreen {
   int numberWidth(int font, const char* text, int numberCell) const;
   void drawClues(const Layout& l) const;
   void drawGrid(const Layout& l) const;
-  void drawCaption(int top) const;
+  // Under the grid's bottom `edge`.
+  void drawCaption(int edge) const;
 
   nonogram::Game game;
   nonogram::Record record;

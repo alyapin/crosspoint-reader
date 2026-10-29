@@ -176,7 +176,6 @@ void Game2048Activity::build(UiScreen& screen) {
              game.exponent(cell));
   }
 
-  int y = kGridTop + kGridSize + kFooterGap;
   char footer[48] = "";
   const uint32_t record = std::max(best, game.score());
   if (record > 0) {
@@ -184,9 +183,11 @@ void Game2048Activity::build(UiScreen& screen) {
     formatScore(record, digits, sizeof(digits));
     snprintf(footer, sizeof(footer), "%s %s", tr(STR_2048_BEST), digits);
   }
+  const int edge = kGridTop + kGridSize;
   if (game.isOver()) {
-    drawResult(y, tr(STR_2048_NO_MOVES), footer);
+    drawResult(games::ui::captionTop(renderer, edge, kText12Font), tr(STR_2048_NO_MOVES), footer);
   } else {
+    int y = games::ui::captionTop(renderer, edge, game.justWon() ? kText12Font : kText10Font);
     if (game.justWon()) {
       renderer.drawText(kText12Font, kSidePadding, y, tr(STR_2048_WON), true, kSemiBold);
       y += renderer.getLineHeight(kText12Font) + kFooterGap / 2;

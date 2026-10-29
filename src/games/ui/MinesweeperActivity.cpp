@@ -20,8 +20,7 @@ namespace fui = freeink::ui;
 using namespace setka;
 
 namespace {
-constexpr int kBoardGap = 8;    // between the board and the bar rule
-constexpr int kResultGap = 12;  // between the board and the result
+constexpr int kBoardGap = 8;  // between the board and the bar rule
 constexpr minesweeper::Config kFields[] = {minesweeper::BEGINNER, minesweeper::PORTRAIT};
 
 // A pennant on a pole, sized to the cell.
@@ -224,7 +223,7 @@ bool MinesweeperActivity::onBack() {
 }
 
 int MinesweeperActivity::cellSize() const {
-  const int room = barTop() - kBoardGap - kResultGap - resultHeight(false) - BOARD_TOP;
+  const int room = barTop() - kBoardGap - games::ui::kCaptionGap - resultHeight(false) - BOARD_TOP;
   return std::min(renderer.getScreenWidth() / game.columns(), room / game.rows());
 }
 
@@ -261,13 +260,14 @@ void MinesweeperActivity::build(UiScreen& screen) {
   screen.frame().hit(fui::makeRect(left, BOARD_TOP, width, height), ACTION_BOARD, 0,
                      static_cast<uint16_t>(fui::InputTouch | fui::InputLongPress));
   if (over) {
-    drawResult(BOARD_TOP + height + kResultGap,
+    drawResult(games::ui::captionTop(renderer, BOARD_TOP + height + 1, kText12Font),
                game.status() == minesweeper::Status::Won ? tr(STR_GAMES_WON) : tr(STR_MINES_LOST));
   } else if (!hasBar()) {
     // Button boards flag with a held Confirm (the bar's Флажок is touch only).
     char line[64];
     snprintf(line, sizeof(line), tr(STR_MINES_FLAG_HOLD), tr(STR_GAMES_DIG));
-    renderer.drawText(kText10Font, kSidePadding, BOARD_TOP + height + kResultGap, line);
+    renderer.drawText(kText10Font, kSidePadding, games::ui::captionTop(renderer, BOARD_TOP + height + 1, kText10Font),
+                      line);
   }
 
   BarItem items[BAR_SLOTS];

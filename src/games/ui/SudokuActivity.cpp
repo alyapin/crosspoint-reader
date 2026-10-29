@@ -301,7 +301,7 @@ void SudokuActivity::build(UiScreen& screen) {
   if (game.isSolved()) {
     char line[48];
     snprintf(line, sizeof(line), tr(STR_SUDOKU_SOLVED_IN), clock);
-    drawResult(kPadTop, line);
+    drawResult(games::ui::captionTop(renderer, BOARD_TOP + kGridSize, kText12Font), line);
   } else {
     drawPad(screen);
   }

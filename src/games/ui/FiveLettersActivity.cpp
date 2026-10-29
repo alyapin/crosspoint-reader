@@ -26,7 +26,6 @@ namespace {
 constexpr int kCellGap = 6;
 constexpr int kMaxCell = 64;
 constexpr int kResultBand = 88;  // between the grid and the keyboard: the result and the totals once over
-constexpr int kResultGap = 12;
 
 uint8_t letterOfKey(const int key) { return fiveletters::letterOf(games::ui::keyboardCodepoint(key)); }
 
@@ -253,7 +252,8 @@ void FiveLettersActivity::build(UiScreen& screen) {
     char totals[64];
     snprintf(totals, sizeof(totals), tr(STR_FIVE_STATS), static_cast<unsigned>(stats.played),
              static_cast<unsigned>(stats.wins), static_cast<unsigned>(stats.streak));
-    drawResult(BOARD_TOP + ATTEMPTS * size + (ATTEMPTS - 1) * kCellGap + kResultGap, value, totals);
+    drawResult(games::ui::captionTop(renderer, BOARD_TOP + ATTEMPTS * size + (ATTEMPTS - 1) * kCellGap, kText12Font),
+               value, totals);
   }
 
   BarItem items[BAR_SLOTS];

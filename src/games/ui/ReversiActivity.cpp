@@ -30,7 +30,6 @@ constexpr int kSliceMs = 20;
 constexpr int kDiscInset = 7;
 constexpr int kDot = 10;
 constexpr int kCursorInset = 4;
-constexpr int kStatusGap = 22;
 constexpr int kLineGap = 10;
 constexpr int kCountDisc = 14;  // as Шашки's count discs
 constexpr int kCountGap = 8;
@@ -254,7 +253,7 @@ void ReversiActivity::build(UiScreen& screen) {
   }
   screen.frame().hit(fui::makeRect(left, BOARD_TOP, side, side), ACTION_BOARD, 0, shellInput());
 
-  drawStatus(BOARD_TOP + side + kStatusGap);
+  drawStatus(games::ui::captionTop(renderer, BOARD_TOP + side, kText12Font));
 
   BarItem items[BAR_SLOTS];
   if (barShown(0)) items[0] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false, BarItem::Repeat};
