@@ -27,8 +27,8 @@ class NonogramActivity final : public GameScreen {
   enum class Notice : uint8_t { None, NoPack, NoSize, NoRandom };
   struct Layout {
     int font;
-    int pitch;  // clue line height
-    int gap;    // between row clue numbers
+    int pitch;       // clue line height
+    int numberCell;  // least width of a row clue number's cell, so "1 1" never reads as "11"
     int cell;
     int clueLeft;
     int clueTop;
@@ -66,7 +66,9 @@ class NonogramActivity final : public GameScreen {
   bool barShown(int slot) const;
   int nextBarSlot(int from, int step) const;
   Layout layout() const;
-  int rowClueWidth(const nonogram::Clue& clue, int font, int gap) const;
+  int rowClueWidth(const nonogram::Clue& clue, int font, int numberCell) const;
+  // A row clue number's cell: the least width, or the number and its padding when wider.
+  int numberWidth(int font, const char* text, int numberCell) const;
   void drawClues(const Layout& l) const;
   void drawGrid(const Layout& l) const;
   void drawCaption(int top) const;

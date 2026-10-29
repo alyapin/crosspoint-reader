@@ -26,6 +26,7 @@ constexpr const char* PACK_PATH = "/nonograms/pictures.txt";
 constexpr int kSmallCell = 38;  // 10x10
 constexpr int kLargeCell = 25;  // 15x15
 constexpr int kClueGap = 6;     // between the clues and the grid
+constexpr int kNumberPad = 6;   // a row clue number's cell beyond its widest digit
 constexpr int kEdge = 8;        // the board is full-bleed
 constexpr int kCaptionGap = 10;
 constexpr int kBoardGap = 8;  // above the bar rule
@@ -369,13 +370,17 @@ uint32_t NonogramActivity::idleSleepBudgetMs() const {
 
 // --- layout ------------------------------------------------------------------
 
-int NonogramActivity::rowClueWidth(const nonogram::Clue& clue, const int font, const int gap) const {
-  if (clue.count == 0) return renderer.getTextWidth(font, "0");
-  int width = (clue.count - 1) * gap;
+int NonogramActivity::numberWidth(const int font, const char* text, const int numberCell) const {
+  return std::max(numberCell, renderer.getTextWidth(font, text) + kNumberPad);
+}
+
+int NonogramActivity::rowClueWidth(const nonogram::Clue& clue, const int font, const int numberCell) const {
+  if (clue.count == 0) return numberWidth(font, "0", numberCell);
+  int width = 0;
   for (int i = 0; i < clue.count; ++i) {
     char text[4];
     snprintf(text, sizeof(text), "%u", clue.runs[i]);
-    width += renderer.getTextWidth(font, text);
+    width += numberWidth(font, text, numberCell);
   }
   return width;
 }
@@ -385,11 +390,14 @@ NonogramActivity::Layout NonogramActivity::layout() const {
   Layout l{};
   l.font = n <= 10 ? kText10Font : kDenseFont;
   l.pitch = renderer.getLineHeight(l.font);
-  l.gap = renderer.getSpaceWidth(l.font) + 3;
+  for (char digit = '0'; digit <= '9'; ++digit) {
+    const char text[2] = {digit, '\0'};
+    l.numberCell = std::max(l.numberCell, renderer.getTextWidth(l.font, text) + kNumberPad);
+  }
   int clueWidth = 0;
   int clueLines = 1;
   for (int i = 0; i < n; ++i) {
-    clueWidth = std::max(clueWidth, rowClueWidth(game.rowClue(i), l.font, l.gap));
+    clueWidth = std::max(clueWidth, rowClueWidth(game.rowClue(i), l.font, l.numberCell));
     clueLines = std::max<int>(clueLines, game.columnClue(i).count);
   }
   const int width = renderer.getScreenWidth();
@@ -460,10 +468,11 @@ void NonogramActivity::drawClues(const Layout& l) const {
     for (int i = std::max<int>(clue.count, 1) - 1; i >= 0; --i) {
       snprintf(text, sizeof(text), "%u", clue.count == 0 ? 0u : clue.runs[i]);
       const int w = renderer.getTextWidth(l.font, text);
-      x -= w;
-      renderer.drawText(l.font, x, y, text);
-      if (done & (1u << i)) renderer.fillRect(x - 2, y + strikeY, w + 4, kStroke, true);
-      x -= l.gap;
+      const int cell = numberWidth(l.font, text, l.numberCell);
+      x -= cell;
+      const int textX = x + (cell - w) / 2;
+      renderer.drawText(l.font, textX, y, text);
+      if (done & (1u << i)) renderer.fillRect(textX - 2, y + strikeY, w + 4, kStroke, true);
     }
   }
   for (int column = 0; column < n; ++column) {
