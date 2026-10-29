@@ -186,30 +186,13 @@ void BaseTheme::drawProgressBar(const GfxRenderer& renderer, Rect rect, const si
 // Centre hint labels by text height, wrapping to at most two lines.
 void BaseTheme::drawHintLabel(const GfxRenderer& renderer, const int fontId, const char* label, const int x,
                               const int boxWidth, const int boxTop, const int boxHeight) {
-  constexpr int textPadding = 4;  // keeps a wrapped label off the button's border
-  const int maxTextWidth = boxWidth - (textPadding * 2);
-
-  const int textHeight = renderer.getTextHeight(fontId);
-  const int textWidth = renderer.getTextWidth(fontId, label);
-  if (textWidth <= maxTextWidth) {
-    const int textY = boxTop + std::max(1, (boxHeight - textHeight) / 2);
-    renderer.drawText(fontId, x + (boxWidth - 1 - textWidth) / 2, textY, label);
-    return;
-  }
-
-  // Spaced by the glyph height, not getLineHeight() — that returns the font's
-  // full advanceY (leading included), which stacks two lines taller than the
-  // button and clips the second one.
-  constexpr int lineGap = 2;
-  const int step = textHeight + lineGap;
-  const auto lines = renderer.wrappedText(fontId, label, maxTextWidth, 2);
-  const int block = static_cast<int>(lines.size()) * step - lineGap;
-  int lineY = boxTop + std::max(1, (boxHeight - block) / 2);
-  for (const auto& line : lines) {
-    const int lineWidth = renderer.getTextWidth(fontId, line.c_str());
-    renderer.drawText(fontId, x + (boxWidth - 1 - lineWidth) / 2, lineY, line.c_str());
-    lineY += step;
-  }
+  // One line: a label that does not fit needs shorter copy, so it is cut with
+  // an ellipsis rather than broken mid-word onto a second line.
+  constexpr int textPadding = 4;  // keeps the label off the button's border
+  const std::string text = renderer.truncatedText(fontId, label, boxWidth - textPadding * 2);
+  const int textWidth = renderer.getTextWidth(fontId, text.c_str());
+  const int textY = boxTop + std::max(1, (boxHeight - renderer.getTextHeight(fontId)) / 2);
+  renderer.drawText(fontId, x + (boxWidth - 1 - textWidth) / 2, textY, text.c_str());
 }
 
 void BaseTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const char* btn2, const char* btn3,
