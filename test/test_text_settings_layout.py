@@ -105,7 +105,7 @@ struct UITheme {
 constexpr const char* STR_TEXT_SETTINGS = "Text Settings";
 constexpr const char* STR_PREVIEW = """ + english.split("STR_PREVIEW: ", 1)[1].splitlines()[0] + r""";
 constexpr int UI_10_FONT_ID = 0, TOUCH_TAB_BAR_HEIGHT = 50, ACTION_TAB = 1, ACTION_ROW = 2;
-namespace setka { constexpr int kSelectionBarWidth = 10, kSelectionBarX = 10; }
+namespace setka { constexpr int kSelectionBarWidth = 10, kSelectionBarX = 10, kTabUnderline = 2; }
 namespace textsettings {
   struct PreviewLayout {};
 """ + preview_caption + r"""

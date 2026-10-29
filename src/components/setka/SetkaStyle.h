@@ -39,6 +39,7 @@ constexpr EpdFontFamily::Style kSemiBold = EpdFontFamily::BOLD;
 constexpr int kSelectionBarWidth = 10;  // left bar on the selected list row or tab
 constexpr int kCellFrameWidth = 4;      // inset frame on the selected grid cell
 constexpr int kRuleWidth = 2;           // black rule between sections
+constexpr int kTabUnderline = 2;         // under the active tab while a list row has the focus
 constexpr int kSidePadding = 20;
 // The selection bar sits in the side padding, clear of the X4 Pro bezel; list
 // text starts past it, so a label does not shift when the selection moves.

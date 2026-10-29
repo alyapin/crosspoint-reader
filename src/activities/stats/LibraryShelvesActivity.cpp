@@ -476,13 +476,19 @@ int LibraryShelvesActivity::drawTabs(UiScreen& screen, const int stripTop, const
   const int lineHeight = renderer.getLineHeight(font);
   const int stripHeight = std::max(kMinTouch, lineHeight + 2 * kStripPad);
   const int textTop = stripTop + (stripHeight - lineHeight) / 2;
+  // The bar marks the focused element only: with a row focused, the active tab is underlined.
+  const bool listFocused = buttonsUsed && focus >= 0 && menu == Menu::None;
   int x = firstX;
   for (int i = 0; i < TabCount; ++i) {
     const bool active = i == tab;
     const auto style = active ? kSemiBold : EpdFontFamily::REGULAR;
     const char* label = I18N.get(kTabLabels[i]);
     const int labelWidth = renderer.getTextWidth(font, label, style);
-    if (active) drawSelectionBar(renderer, x - kTabBarGap - kSelectionBarWidth, textTop, lineHeight);
+    if (active && listFocused) {
+      renderer.fillRect(x, textTop + lineHeight, labelWidth, kTabUnderline, true);
+    } else if (active) {
+      drawSelectionBar(renderer, x - kTabBarGap - kSelectionBarWidth, textTop, lineHeight);
+    }
     renderer.drawText(font, x, textTop, label, true, style);
     screen.frame().hit(fui::makeRect(x - tabGap / 2, stripTop, labelWidth + tabGap, stripHeight), ACTION_TAB,
                        static_cast<int16_t>(i), fui::InputTouch);
