@@ -94,7 +94,7 @@ void FifteenActivity::slideAt(const int cell) {
   if (game.isSolved()) {
     newBest = best.record(game.moveCount(), game.elapsedMs());
     if (newBest) bestPending = true;
-    if (cursor >= 0) barFocus = kLastSlot;
+    if (cursor >= 0 && hasBar()) barFocus = kLastSlot;
   }
   markChanged();
 }
@@ -129,7 +129,7 @@ void FifteenActivity::onKey(const int dx, const int dy, const bool confirm) {
       barFocus = -1;
     }
   } else if (game.isSolved()) {
-    barFocus = kLastSlot;
+    if (hasBar()) barFocus = kLastSlot;
   } else if (cursor < 0) {
     cursor = game.gap();
   } else {
@@ -143,7 +143,7 @@ void FifteenActivity::onKey(const int dx, const int dy, const bool confirm) {
       cursor -= fifteen::SIDE;
     } else if (dy > 0 && y < fifteen::SIDE - 1) {
       cursor += fifteen::SIDE;
-    } else if (dy > 0) {
+    } else if (dy > 0 && hasBar()) {
       barFocus = kLastSlot;
     }
   }

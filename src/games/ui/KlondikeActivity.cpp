@@ -286,8 +286,10 @@ void KlondikeActivity::onKey(const int dx, const int dy, const bool confirm) {
     const int first = focus < TABLEAU ? STOCK : TABLEAU;
     const int count = focus < TABLEAU ? TABLEAU : TABLEAU_PILES;
     focus = first + (focus - first + dx + count) % count;
-  } else if (dy > 0) {
-    focus = focus < TABLEAU ? columnBelow(focus) : kBarFocus + nextBarSlot(BAR_SLOTS - 1, 1);
+  } else if (dy > 0 && focus < TABLEAU) {
+    focus = columnBelow(focus);
+  } else if (dy > 0 && hasBar()) {
+    focus = kBarFocus + nextBarSlot(BAR_SLOTS - 1, 1);
   } else if (dy < 0 && focus >= TABLEAU) {
     focus = pileAbove(focus);
   }

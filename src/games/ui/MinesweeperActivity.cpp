@@ -176,7 +176,7 @@ void MinesweeperActivity::onKey(const int dx, const int dy, const bool confirm) 
       cursor -= columns;
     } else if (dy > 0 && y < rows - 1) {
       cursor += columns;
-    } else if (dy > 0) {
+    } else if (dy > 0 && hasBar()) {
       barFocus = nextBarSlot(BAR_SLOTS - 1, 1);
     }
   }

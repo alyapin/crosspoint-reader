@@ -110,8 +110,6 @@ void Game2048Activity::loop() {
 
 void Game2048Activity::slide(const Dir dir) {
   if (!game.move(dir)) return;
-  // Button boards: the arrows have nothing left to do, Новая игра takes the focus.
-  if (game.isOver() && !mappedInput.hasTouch()) barFocus = kMenuSlot;
   markChanged();
 }
 
@@ -146,7 +144,7 @@ void Game2048Activity::onKey(const int dx, const int dy, const bool confirm) {
   const int before = barFocus;
   if (barFocus < 0) {
     if (confirm) {
-      barFocus = nextBarSlot(BAR_SLOTS - 1, 1);
+      if (hasBar()) barFocus = nextBarSlot(BAR_SLOTS - 1, 1);
     } else if (dx != 0) {
       slide(dx < 0 ? Dir::Left : Dir::Right);
     } else if (dy != 0) {

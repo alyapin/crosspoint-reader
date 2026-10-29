@@ -201,6 +201,7 @@ void SudokuActivity::onKey(const int dx, const int dy, const bool confirm) {
     if (padKeyShown(padFocus + 1)) area = Area::Pad;
   };
   auto toBar = [&] {
+    if (!hasBar()) return;
     area = Area::Bar;
     if (actions[barFocus] == Action::None) barFocus = nextSlot(barFocus, 1);
   };
@@ -223,7 +224,7 @@ void SudokuActivity::onKey(const int dx, const int dy, const bool confirm) {
       } else if (dy < 0) {
         if (row > 0) {
           selected -= sudoku::SIZE;
-        } else {
+        } else if (hasBar()) {
           area = Area::Status;
         }
       } else if (dy > 0 && row < sudoku::SIZE - 1) {

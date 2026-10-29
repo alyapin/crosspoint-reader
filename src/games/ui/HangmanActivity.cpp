@@ -139,8 +139,6 @@ void HangmanActivity::guessKey(const int key) {
   if (key < 0 || key >= kKeyCount) return;
   const hangman::Guess result = game.guess(static_cast<uint8_t>(key + 1));
   if (result != hangman::Guess::Hit && result != hangman::Guess::Miss) return;
-  // Buttons: the next word is one Confirm away.
-  if (game.isOver() && !mappedInput.hasTouch()) barFocus = static_cast<int>(Action::Menu);
   markChanged();
 }
 
@@ -199,7 +197,7 @@ void HangmanActivity::onKey(const int dx, const int dy, const bool confirm) {
       cursor -= kKeysPerRow;
     } else if (dy > 0 && row < kKeyRows - 1) {
       cursor += kKeysPerRow;
-    } else if (dy > 0) {
+    } else if (dy > 0 && hasBar()) {
       barFocus = nextBarSlot(BAR_SLOTS - 1, 1);
     }
   }

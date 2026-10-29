@@ -120,7 +120,7 @@ void FiveLettersActivity::press(const uint8_t key) {
       if (game.isOver()) {
         stats.record(game.status() == fiveletters::Status::Won);
         statsPending = true;
-        if (keyRow >= 0) barFocus = MENU_SLOT;
+        if (keyRow >= 0 && hasBar()) barFocus = MENU_SLOT;
       }
       markChanged();
       break;
@@ -181,7 +181,7 @@ void FiveLettersActivity::onKey(const int dx, const int dy, const bool confirm) 
     moveRow(-1);
   } else if (dy > 0 && keyRow < kKeyRows - 1) {
     moveRow(1);
-  } else if (dy > 0) {
+  } else if (dy > 0 && hasBar()) {
     barFocus = MENU_SLOT;
   }
   const int after[] = {keyRow, keyIndex, barFocus, unknownWord};

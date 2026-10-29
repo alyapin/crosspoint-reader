@@ -87,7 +87,6 @@ void TicTacToeActivity::pickerChosen(const int row, bool) {
 
 void TicTacToeActivity::play(const int cell) {
   if (!game.play(cell)) return;
-  if (game.isOver() && !mappedInput.hasTouch()) barFocus = kNewGameSlot;
   markChanged();
 }
 
@@ -150,7 +149,7 @@ void TicTacToeActivity::onKey(const int dx, const int dy, const bool confirm) {
     cursor -= 3;
   } else if (dy > 0 && cursor < 6) {
     cursor += 3;
-  } else if (dy > 0) {
+  } else if (dy > 0 && hasBar()) {
     barFocus = nextBarSlot(BAR_SLOTS - 1, 1);
   }
   const int after[] = {cursor, barFocus};
