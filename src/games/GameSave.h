@@ -65,15 +65,18 @@ bool load(fiveletters::Game& game);
 bool load(g2048::Game& game);
 bool load(hangman::Game& game);
 
+// Records outlive their games. A missing or corrupt one loads empty; one that
+// cannot be read loads false (2048: 0) and is not written until a load reads it.
+
 // The best finished 15 puzzle, kept apart from the save.
 bool save(const fifteen::Best& best);
 bool load(fifteen::Best& best);
 
-// «5 букв» totals, kept across games. A missing file is zero totals.
+// «5 букв» totals, kept across games.
 bool saveStats(const fiveletters::Stats& stats);
 bool loadStats(fiveletters::Stats& stats);
 
-// The 2048 record outlives its games; 0 when none.
+// The 2048 record; 0 when none.
 uint32_t loadBest2048();
 void saveBest2048(uint32_t score);
 

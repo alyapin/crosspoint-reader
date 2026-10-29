@@ -64,11 +64,13 @@ std::unique_ptr<Activity> openGame2048(GfxRenderer& renderer, MappedInputManager
 Game2048Activity::Game2048Activity(GfxRenderer& renderer, MappedInputManager& mappedInput)
     : GameScreen("2048", renderer, mappedInput) {}
 
+// Without a save a new game starts right away.
 bool Game2048Activity::restore() {
   best = gamesave::loadBest2048();
   savedBest = best;
   barFocus = -1;
-  return gamesave::load(game);
+  if (!gamesave::load(game)) game.newGame(esp_random());
+  return true;
 }
 
 void Game2048Activity::saveGame() {
@@ -85,7 +87,6 @@ void Game2048Activity::openNewGame() {
   best = std::max(best, game.score());
   game.newGame(esp_random());
   barFocus = -1;
-  hasGame = true;
   markChanged();
   requestRepaint(RepaintEntry);
 }

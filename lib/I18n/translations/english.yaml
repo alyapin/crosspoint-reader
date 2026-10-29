@@ -913,7 +913,6 @@ STR_TTT_O_WON: "O won"
 STR_TTT_DRAW: "Draw"
 
 STR_FIFTEEN: "15 puzzle"
-STR_FIFTEEN_MOVES: "moves"
 STR_FIFTEEN_MOVES_ONE: "%d move"
 STR_FIFTEEN_MOVES_FEW: "%d moves"
 STR_FIFTEEN_MOVES_MANY: "%d moves"

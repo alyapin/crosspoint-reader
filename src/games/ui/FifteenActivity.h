@@ -43,6 +43,7 @@ class FifteenActivity final : public GameScreen {
   fifteen::Game game;
   fifteen::Best best;
   bool newBest = false;
+  bool bestPending = false;
   int cursor = -1;  // key focus: board cell, -1 hidden
   int barFocus = -1;
 };
