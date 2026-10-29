@@ -307,6 +307,15 @@ TEST(LocalSendNames, PathTraversalAndReservedCharacters) {
   EXPECT_EQ(sanitized(""), "<rejected>");
 }
 
+TEST(LocalSendNames, DosDeviceNames) {
+  for (const char* bad : {"CON.epub", "con.fb2.zip", "Nul.txt", "aux .md", "PRN.x.epub", "COM1.epub", "lpt9.xtc"}) {
+    EXPECT_EQ(sanitized(bad), "<rejected>") << bad;
+  }
+  for (const char* ok : {"CONSOLE.epub", "icon.epub", "COM10.epub", "LPT.epub", "nul1.txt", "a.con.epub"}) {
+    EXPECT_EQ(sanitized(ok), ok);
+  }
+}
+
 TEST(LocalSendNames, TruncationKeepsExtensionAndUtf8) {
   const std::string longLatin = std::string(300, 'a') + ".epub";
   const std::string a = sanitized(longLatin.c_str());
@@ -426,8 +435,10 @@ TEST(LocalSendSession, AllRejectedIsForbiddenAndEmptyIsNoContent) {
 }
 
 TEST(LocalSendSession, MalformedBodies) {
-  for (const std::string& body : {std::string("{\"info\":{}}"), std::string("{\"files\":{\"a\":{\"fileName\":\"x"),
-                                  std::string("[1,2,3]"), std::string("")}) {
+  const std::string valid = prepareBody({{"a", "a.epub", "10"}});
+  for (const std::string& body :
+       {std::string("{\"info\":{}}"), std::string("{\"files\":{\"a\":{\"fileName\":\"x"), std::string("[1,2,3]"),
+        std::string(""), valid + "{}", valid + " \"x", valid + "1", valid + "tru", valid + "}"}) {
     Session s;
     s.configure("", false, &counterRng);
     ASSERT_EQ(s.checkPrepare("10.0.0.2", nullptr, 0), 0);
@@ -435,6 +446,12 @@ TEST(LocalSendSession, MalformedBodies) {
     EXPECT_EQ(s.finishPrepare(UINT64_MAX, 0), 400) << body;
     EXPECT_EQ(s.phase(), Phase::Idle);
   }
+  Session s;
+  s.configure("", false, &counterRng);
+  ASSERT_EQ(s.checkPrepare("10.0.0.2", nullptr, 0), 0);
+  const std::string spaced = valid + " \r\n\t";
+  s.feedPrepare(spaced.data(), spaced.size());
+  EXPECT_EQ(s.finishPrepare(UINT64_MAX, 0), 0);
 }
 
 TEST(LocalSendSession, IdFallbackDuplicatesAndControlBytes) {

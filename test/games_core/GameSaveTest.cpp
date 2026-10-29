@@ -123,3 +123,34 @@ TEST(GameSave, Unreadable2048RecordIsNotWritten) {
   EXPECT_EQ(contents(BEST_2048), "2048");
   EXPECT_EQ(gamesave::loadBest2048(), 2048u);
 }
+
+TEST(GameSave, UnreadableGameIsNotWrittenOrCleared) {
+  fake::reset();
+  fifteen::Game game(&fakeMillis);
+  game.newGame(7);
+  ASSERT_TRUE(gamesave::save(game));
+  const std::string before = contents(SAVE);
+  fake::failRead = 0;
+  fifteen::Game fresh(&fakeMillis);
+  EXPECT_FALSE(gamesave::load(fresh));
+  fresh.newGame(9);
+  EXPECT_FALSE(gamesave::save(fresh));
+  EXPECT_FALSE(gamesave::clear(gamesave::Kind::Fifteen));
+  EXPECT_EQ(contents(SAVE), before);
+  fifteen::Game loaded(&fakeMillis);
+  ASSERT_TRUE(gamesave::load(loaded));
+  EXPECT_EQ(loaded.gap(), game.gap());
+  EXPECT_TRUE(gamesave::save(fresh));
+}
+
+TEST(GameSave, FailedClearIsReported) {
+  fake::reset();
+  fifteen::Game game(&fakeMillis);
+  game.newGame(7);
+  ASSERT_TRUE(gamesave::save(game));
+  fake::failRemovePath = SAVE;
+  EXPECT_FALSE(gamesave::clear(gamesave::Kind::Fifteen));
+  EXPECT_TRUE(gamesave::hasGameInProgress(gamesave::Kind::Fifteen));
+  EXPECT_TRUE(gamesave::clear(gamesave::Kind::Fifteen));
+  EXPECT_FALSE(gamesave::hasGameInProgress(gamesave::Kind::Fifteen));
+}

@@ -131,8 +131,10 @@ class ScanwordActivity final : public Activity, private UiAppHost {
   uint32_t lastTickMs = 0;
   uint32_t carryMs = 0;
   bool savePending = false;
-  bool statsPending = false;  // a solve to add to the totals on the next save
-  bool dirty = false;         // letters or marks changed since the last save
+  bool dirty = false;           // letters or marks changed since the last save
+  bool solveUncounted = false;  // solved, the save that records it not yet written
+  bool shelfPending = false;
+  bool statsPending = false;
   uint32_t savedSeconds = 0;
 
   ButtonNavigator buttonNavigator;

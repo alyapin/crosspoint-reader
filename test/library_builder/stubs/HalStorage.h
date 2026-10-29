@@ -28,6 +28,7 @@ inline int failAlloc = -1;
 inline bool failDirectorySeek = false;
 inline std::string failClosePath;
 inline std::string failWritePath;
+inline std::string failRemovePath;
 inline unsigned parses = 0;
 inline unsigned reads = 0;
 inline unsigned seeks = 0;
@@ -59,6 +60,7 @@ inline void reset() {
   failDirectorySeek = false;
   failClosePath.clear();
   failWritePath.clear();
+  failRemovePath.clear();
   parses = 0;
   reads = 0;
   seeks = 0;
@@ -249,7 +251,14 @@ class HalStorage {
   bool replaceFile(const char* tmpPath, const char* path) {
     return (!exists(path) || remove(path)) && rename(tmpPath, path);
   }
-  bool remove(const char* path) { return fake::files.erase(path) != 0; }
+  bool remove(const char* path) {
+    if (!fake::failRemovePath.empty() && path == fake::failRemovePath) {
+      fake::failRemovePath.clear();
+      fake::failureTriggered = true;
+      return false;
+    }
+    return fake::files.erase(path) != 0;
+  }
   bool rename(const char* from, const char* to) {
     if (fake::fail(fake::failRename) || !exists(from) || exists(to)) return false;
     std::vector<std::pair<std::string, std::shared_ptr<fake::Node>>> moved;

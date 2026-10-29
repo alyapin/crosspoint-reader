@@ -67,6 +67,39 @@ std::unique_ptr<char[]> readSmall(const char* path, const size_t cap, size_t& le
   return text;
 }
 
+// A power cut inside replaceFile, after the old file is removed, leaves only
+// the tmp; one cut short in its own write is empty.
+bool present(const char* path, const char* tmpPath) {
+  if (Storage.exists(path)) return true;
+  if (!Storage.exists(tmpPath)) return false;
+  HalFile file;
+  const bool empty = Storage.openFileForRead("SCANW", tmpPath, file) && file.fileSize() == 0;
+  file.close();
+  if (empty) {
+    Storage.remove(tmpPath);
+    return false;
+  }
+  LOG_INF("SCANW", "Recovering %s", path);
+  if (!Storage.rename(tmpPath, path)) LOG_ERR("SCANW", "Cannot recover %s", path);
+  return true;
+}
+
+// Closes the tmp, written in full when `ok`, and moves it over `path`.
+bool commit(HalFile& file, const bool ok, const char* tmpPath, const char* path) {
+  if (!file.close() || !ok) {
+    LOG_ERR("SCANW", "Cannot write %s", tmpPath);
+    Storage.remove(tmpPath);
+    return false;
+  }
+  if (!Storage.replaceFile(tmpPath, path)) {
+    LOG_ERR("SCANW", "Cannot replace %s", path);
+    // replaceFile removes the old file first: if it is gone, the tmp is the only copy.
+    if (Storage.exists(path)) Storage.remove(tmpPath);
+    return false;
+  }
+  return true;
+}
+
 bool writeAtomic(const char* tmpPath, const char* path, const char* text, const size_t len) {
   if (!Storage.ensureDirectoryExists(SAVE_DIR)) {
     LOG_ERR("SCANW", "Cannot create %s", SAVE_DIR);
@@ -74,14 +107,8 @@ bool writeAtomic(const char* tmpPath, const char* path, const char* text, const 
   }
   HalFile file;
   if (!Storage.openFileForWrite("SCANW", tmpPath, file)) return false;
-  const size_t written = file.write(text, len);
-  file.close();
-  if (written != len || !Storage.replaceFile(tmpPath, path)) {
-    LOG_ERR("SCANW", "Save failed (%u of %u bytes)", static_cast<unsigned>(written), static_cast<unsigned>(len));
-    Storage.remove(tmpPath);
-    return false;
-  }
-  return true;
+  const bool ok = file.write(text, len) == len;
+  return commit(file, ok, tmpPath, path);
 }
 
 }  // namespace
@@ -114,7 +141,8 @@ bool loadPuzzle(const char* id, scanword::Puzzle& puzzle) {
 
 bool hasProgress(const char* id) {
   char path[PATH_MAX_LEN];
-  return savePath(id, ".json", path) && Storage.exists(path);
+  char tmp[PATH_MAX_LEN];
+  return savePath(id, ".json", path) && savePath(id, ".json.tmp", tmp) && present(path, tmp);
 }
 
 bool saveProgress(const char* id, const scanword::Game& game) {
@@ -133,7 +161,7 @@ bool saveProgress(const char* id, const scanword::Game& game) {
 
 bool loadProgress(const char* id, scanword::Game& game) {
   char path[PATH_MAX_LEN];
-  if (!savePath(id, ".json", path) || !Storage.exists(path)) return false;
+  if (!savePath(id, ".json", path) || !hasProgress(id)) return false;
   size_t len = 0;
   // A read error may be transient: keep the file. Only content that fails to parse is dropped.
   auto text = readSmall(path, scanword::SAVE_MAX, len);
@@ -151,12 +179,14 @@ bool loadProgress(const char* id, scanword::Game& game) {
 
 void clearProgress(const char* id) {
   char path[PATH_MAX_LEN];
-  if (savePath(id, ".json", path) && Storage.exists(path)) Storage.remove(path);
+  for (const char* suffix : {".json", ".json.tmp"}) {
+    if (savePath(id, suffix, path) && Storage.exists(path)) Storage.remove(path);
+  }
 }
 
 bool loadStats(scanword::Stats& stats) {
   stats = scanword::Stats{};
-  if (!Storage.exists(STATS_PATH)) return true;
+  if (!present(STATS_PATH, STATS_TMP)) return true;
   size_t len = 0;
   auto text = readSmall(STATS_PATH, scanword::STATS_MAX, len);
   return text && stats.deserialize(text.get(), len);
@@ -170,7 +200,7 @@ bool saveStats(const scanword::Stats& stats) {
 
 bool loadShelf(scanword::Shelf& shelf) {
   shelf.beginParse();
-  if (!Storage.exists(SHELF_PATH)) {
+  if (!present(SHELF_PATH, SHELF_TMP)) {
     shelf.clear();
     return true;
   }
@@ -199,21 +229,13 @@ bool saveShelf(const scanword::Shelf& shelf) {
     line[len] = '\n';
     ok = len > 0 && file.write(line, len + 1) == len + 1;
   }
-  file.close();
-  if (!ok || !Storage.replaceFile(SHELF_TMP, SHELF_PATH)) {
-    LOG_ERR("SCANW", "Cannot save %s", SHELF_PATH);
-    Storage.remove(SHELF_TMP);
-    return false;
-  }
+  if (!commit(file, ok, SHELF_TMP, SHELF_PATH)) return false;
+  const bool marked = Storage.exists(IN_PROGRESS_PATH);
   if (shelf.anyInProgress()) {
-    if (!Storage.exists(IN_PROGRESS_PATH)) {
-      HalFile marker;
-      if (Storage.openFileForWrite("SCANW", IN_PROGRESS_PATH, marker)) marker.close();
-    }
-  } else if (Storage.exists(IN_PROGRESS_PATH)) {
-    Storage.remove(IN_PROGRESS_PATH);
+    HalFile marker;
+    return marked || (Storage.openFileForWrite("SCANW", IN_PROGRESS_PATH, marker) && marker.close());
   }
-  return true;
+  return !marked || Storage.remove(IN_PROGRESS_PATH);
 }
 
 bool hasPuzzleInProgress() { return Storage.exists(IN_PROGRESS_PATH); }

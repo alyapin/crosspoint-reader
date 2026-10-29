@@ -1,6 +1,7 @@
 #include "LocalSendSession.h"
 
 #include <FsHelpers.h>
+#include <strings.h>
 
 #include <cstdio>
 #include <cstring>
@@ -183,6 +184,20 @@ const char* findKeyValue(const char* data, const size_t len, const char* quotedK
   }
   return nullptr;
 }
+
+// Windows opens a device for these names, whatever follows the first dot.
+bool isDosDevice(const char* name) {
+  size_t len = strcspn(name, ".");
+  while (len > 0 && name[len - 1] == ' ') len--;
+  if (len == 3) {
+    for (const char* device : {"CON", "PRN", "AUX", "NUL"}) {
+      if (strncasecmp(name, device, 3) == 0) return true;
+    }
+    return false;
+  }
+  return len == 4 && (strncasecmp(name, "COM", 3) == 0 || strncasecmp(name, "LPT", 3) == 0) && name[3] >= '1' &&
+         name[3] <= '9';
+}
 }  // namespace
 
 size_t writeInfoJson(const Identity& id, char* out, const size_t cap) {
@@ -237,7 +252,7 @@ bool sanitizeFileName(const char* in, char* out, const size_t cap) {
   memmove(out, out + lead, n);
   memcpy(out + n, ext, extLen);
   out[n + extLen] = 0;
-  return true;
+  return !isDosDevice(out);
 }
 
 bool makeCollisionName(const char* name, const int index, char* out, const size_t cap) {
@@ -319,18 +334,28 @@ int Session::checkPrepare(const char* clientIp, const char* pinParam, const uint
   keyValid = false;
   sawFiles = false;
   sawRoot = false;
+  rootClosed = false;
+  trailing = false;
   current = nullptr;
   touch(nowMs);
   return 0;
 }
 
 void Session::feedPrepare(const char* data, const size_t len) {
-  if (phaseValue == Phase::Preparing) parser.feed(data, len);
+  if (phaseValue != Phase::Preparing) return;
+  // A byte at a time: the parser does not report what follows the root object.
+  for (size_t i = 0; i < len; i++) {
+    if (!rootClosed) {
+      parser.feed(data + i, 1);
+    } else if (data[i] != ' ' && data[i] != '\t' && data[i] != '\r' && data[i] != '\n') {
+      trailing = true;
+    }
+  }
 }
 
 int Session::finishPrepare(const uint64_t freeBytes, const uint32_t nowMs) {
   if (phaseValue != Phase::Preparing) return 500;
-  if (parser.hasError() || !sawRoot || !sawFiles || depth != 0) {
+  if (parser.hasError() || !sawRoot || !sawFiles || depth != 0 || trailing) {
     reset();
     return 400;
   }
@@ -616,6 +641,7 @@ void Session::onObjectEnd(void* ctx) {
   if (s->depth == 0) return;
   if (s->top() == Ctx::File) s->finishFile();
   s->depth--;
+  s->rootClosed = s->depth == 0;
   s->keyValid = false;
 }
 
