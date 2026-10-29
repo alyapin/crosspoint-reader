@@ -28,7 +28,8 @@ class UsbDriveActivity final : public Activity, private UiAppHost {
 
   static void driveScreen(UiScreen& screen, void* user);
   void buildDriveScreen(UiScreen& screen) const;
-  void restartToHome();
+  // Lands on Ещё when opened from there, unless `home` (Power or the Home gesture).
+  void restartToHome(bool home = false);
 
   const bool toMore;
   State state = State::Unsupported;

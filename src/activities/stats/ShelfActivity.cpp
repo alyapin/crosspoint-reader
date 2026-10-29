@@ -352,8 +352,11 @@ void ShelfActivity::draw(UiScreen& screen) {
     anchor.pitch = kCoverHeight + kCaptionGap + renderer.getLineHeight(kCaptionFont) + kGridGap;
     anchor.gap = kGridGap;
     anchor.contentEnd = contentEnd;
+    // A book scrolled out of view (swipe, then a held Confirm) gets the box at the bottom.
+    const bool onScreen = anchor.row >= 0 && anchor.row < visibleRows;
     statsui::drawMenuBox(renderer, screen, books[menuCell].title.c_str(), 1, 0, buttonsUsed, &describeMenu, this,
-                         bands.contentTop, bands.contentBottom, bands.width, ACTION_MENU, ACTION_DISMISS, 0, &anchor);
+                         bands.contentTop, bands.contentBottom, bands.width, ACTION_MENU, ACTION_DISMISS, anchor.pitch,
+                         onScreen ? &anchor : nullptr);
   }
 }
 

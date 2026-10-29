@@ -91,9 +91,10 @@ void UsbDriveActivity::loop() {
   }
 
   const bool canExitWithInput = state == State::WaitingForHost || startFailed;
-  if (canExitWithInput && (mappedInput.wasPressed(MappedInputManager::Button::Back) ||
-                           mappedInput.wasPressed(MappedInputManager::Button::Power) || mappedInput.wasHomeGesture())) {
-    restartToHome();
+  const bool homeRequested =
+      mappedInput.wasPressed(MappedInputManager::Button::Power) || mappedInput.wasHomeGesture();
+  if (canExitWithInput && (mappedInput.wasPressed(MappedInputManager::Button::Back) || homeRequested)) {
+    restartToHome(homeRequested);
     return;
   }
 
@@ -183,10 +184,10 @@ void UsbDriveActivity::buildDriveScreen(UiScreen& screen) const {
   }
 }
 
-void UsbDriveActivity::restartToHome() {
+void UsbDriveActivity::restartToHome(const bool home) {
   if (restartRequested) return;
   restartRequested = true;
   Storage.endUsbDrive();
   delay(20);
-  toMore ? restartToMoreAfterStorageHandoff() : restartToHomeAfterStorageHandoff();
+  toMore && !home ? restartToMoreAfterStorageHandoff() : restartToHomeAfterStorageHandoff();
 }
