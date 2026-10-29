@@ -45,8 +45,9 @@ constexpr int kSidePadding = 20;
 // text starts past it, so a label does not shift when the selection moves.
 constexpr int kSelectionBarX = kSidePadding - kSelectionBarWidth;
 constexpr int kRowTextX = kSidePadding + 12;
-// Captions above the button hints: the last line's baseline sits this far above the hint frames.
-constexpr int kHintCaptionGap = 14;
+// Captions above the button hints: the last line's baseline sits this far
+// above the hint band, the safe area's bottom (14 px over the X4 hint frames).
+constexpr int kHintCaptionGap = 11;
 constexpr int kProgressHeight = 12;
 constexpr int kMinTouch = 44;
 // Row pitch, no gap between rows: a navigation row (icon + label) and a
@@ -140,7 +141,7 @@ inline void drawProgressBarVertical(const GfxRenderer& renderer, const int x, co
   renderer.fillRectDither(x + 1, y + 1, width - 2, inner - filled, Color::LightGray);
 }
 
-// Top of the last caption line above the button hints that start at hintsTop.
+// Top of the last caption line above the hint band that starts at hintsTop.
 inline int hintCaptionTop(const GfxRenderer& renderer, const int fontId, const int hintsTop) {
   return hintsTop - kHintCaptionGap - renderer.getFontAscenderSize(fontId);
 }

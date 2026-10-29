@@ -831,7 +831,8 @@ void CardsActivity::drawStats(const int y, const uint16_t (&numbers)[3], const S
 }
 
 void CardsActivity::buildList(UiScreen& screen) {
-  const int height = renderer.getScreenHeight() - UITheme::getInstance().getMetrics().buttonHintsHeight;
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+  const int height = safe.y + safe.height;
   const int captionLine = renderer.getLineHeight(kCaptionFont);
   // The formats wrap once when a language runs long.
   const auto formats =
@@ -1030,8 +1031,9 @@ void CardsActivity::buildCard(UiScreen& screen) {
   // Touch grades on the games' action bar with the intervals in a line over
   // it; button boards say what the keys do above the hints. The line wraps
   // once when the intervals run long.
-  const int hintsTop = height - UITheme::getInstance().getMetrics().buttonHintsHeight;
-  const int panelTop = touch ? hintsTop - games::ui::kActionBarHeight : hintsTop;
+  // The bar runs to the screen bottom; the key line keys to the hint band.
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+  const int panelTop = touch ? height - games::ui::kActionBarHeight : safe.y + safe.height;
   const int noteLine = renderer.getLineHeight(kDenseFont);
   const int noteTop = hintCaptionTop(renderer, kDenseFont, panelTop);
   const int zoneBottom = noteTop - noteLine - kNoteGap;
