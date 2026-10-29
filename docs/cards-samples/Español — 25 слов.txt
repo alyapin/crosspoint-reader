@@ -1,0 +1,31 @@
+#separator:tab
+#html:true
+#guid column:1
+#notetype column:2
+#deck column:3
+#tags column:7
+es000	Basic	Español	el perro	собака	El perro duerme en la casa.	palabras
+es001	Basic	Español	la casa	дом	Mi casa es pequeña.	palabras
+es002	Basic	Español	el desarrollo	развитие	El desarrollo del proyecto va bien.	palabras
+es003	Basic	Español	el agua	вода	Bebo agua fría.	palabras
+es004	Basic	Español	el libro	книга	Leo un libro cada semana.	palabras
+es005	Basic	Español	la ventana	окно	Abre la ventana, por favor.	palabras
+es006	Basic	Español	el árbol	дерево	El árbol es muy alto.	palabras
+es007	Basic	Español	la lluvia	дождь	Hoy hay mucha lluvia.	palabras
+es008	Basic	Español	el camino	дорога	El camino es largo.	palabras
+es009	Basic	Español	la ciudad	город	La ciudad duerme de noche.	palabras
+es010	Basic	Español	el tiempo	время; погода	No tengo tiempo.	palabras
+es011	Basic	Español	la mesa	стол	El pan está en la mesa.	palabras
+es012	Basic	Español	el pan	хлеб	Compro pan por la mañana.	palabras
+es013	Basic	Español	la llave	ключ	¿Dónde está la llave?	palabras
+es014	Basic	Español	el sueño	сон; мечта	Tengo sueño.	palabras
+es015	Basic	Español	la puerta	дверь	Cierra la puerta.	palabras
+es016	Basic	Español	el mar	море	Vivimos cerca del mar.	palabras
+es017	Basic	Español	la estrella	звезда	Veo una estrella.	palabras
+es018	Basic	Español	el viento	ветер	El viento es frío.	palabras
+es019	Basic	Español	la fuerza	сила	Tiene mucha fuerza.	palabras
+es020	Basic	Español	aprender	учить, учиться	Quiero aprender español.	palabras
+es021	Basic	Español	recordar	помнить	No recuerdo su nombre.	palabras
+es022	Basic	Español	olvidar	забывать	Nunca olvido una cara.	palabras
+es023	Basic	Español	despacio	медленно	Habla más despacio, por favor.	palabras
+es024	Basic	Español	todavía	ещё, всё ещё	Todavía no lo sé.	palabras
