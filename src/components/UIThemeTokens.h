@@ -39,6 +39,12 @@ inline freeink::ui::ThemeTokens uiThemeTokens(const freeink::ui::GfxRendererTarg
   // safeRect()). Adding the same inset here doubled the compensation and
   // floated the track a full bezel-width inside the visible edge.
   tokens.listScrollInset = 0;
+  // Button boards: a slim track inside the right side padding (x 467-470 on
+  // the X4), mirroring the selection bar in the left one.
+  if (!BoardConfig::hasTouch()) {
+    tokens.listScrollWidth = 3;
+    tokens.listScrollInset = 7;
+  }
   // Screen::header()/status() band height. Without this the SDK's
   // line-height-derived default applies and fui-drawn headers (OPDS) come out
   // a different height than every GUI.drawHeader band.
