@@ -17,6 +17,8 @@ Games, under More → Games, with touch on the X4 Pro and buttons on the X4, sav
 - Chess against the computer (levels 1 to 5) or a friend, with clocks and four piece sets.
 - Sudoku, Minesweeper and Klondike solitaire.
 - Scanwords. Puzzles are files in `/scanwords/` on the card, made with `tools/scanword` (samples in `tools/scanword/samples`).
+- Tic-tac-toe against the computer or a friend, 2048, the 15 puzzle.
+- Hangman and 5 letters (a Russian Wordle) on built-in word lists; hangman has a separate mode with crude words.
 - More games are in progress on separate branches.
 
 Books and screens:
@@ -89,7 +91,7 @@ More developer docs: [contributing](./docs/contributing/README.md), [touch and U
 - Code adapted from guloff/folio-firmware (MIT): the FB2 converter, the sleep image picker, the reading session model and the OTA rollback guard.
 - LocalSend HTTP code ported from [bigbag/papyrix-reader](https://github.com/bigbag/papyrix-reader), MIT.
 - Fonts in `lib/EpdFont/builtinFonts/source/`: Unbounded, Golos Text, Noto Sans, Noto Serif, Noto Sans Arabic, Noto Sans Hebrew and OpenDyslexic under the SIL Open Font License 1.1; Ubuntu under the Ubuntu Font Licence 1.0.
-- Scanword clues and answers are derived from the Russian Wiktionary (CC BY-SA 4.0), ranked with wordfreq (CC BY-SA 4.0) and pymorphy3 / OpenCorpora data. The puzzles are shared under CC BY-SA 4.0; see `tools/scanword/samples/ATTRIBUTION.txt`.
+- Scanword clues and answers are derived from the Russian Wiktionary (CC BY-SA 4.0), ranked with wordfreq (CC BY-SA 4.0) and pymorphy3 / OpenCorpora data. The puzzles are shared under CC BY-SA 4.0; see `tools/scanword/samples/ATTRIBUTION.txt`. The hangman and 5 letters word lists come from the same sources; see `tools/hangman/ATTRIBUTION.txt` and `tools/five-letters/ATTRIBUTION.txt`.
 
 The firmware is MIT-licensed; see [LICENSE](./LICENSE).
 
