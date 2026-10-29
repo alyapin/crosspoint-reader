@@ -177,7 +177,11 @@ void KeyboardEntryActivity::onEnter() {
   cursorPos = text.length();
   // URL layers are EN-arranged app tables; everything else opens on the UI
   // language's layout, or on an enabled one if the user switched that off.
-  layoutId = inputType == InputType::Url ? fui::KeyboardLayoutId::QwertyEn : keyboard_layouts::startingLayout();
+  if (inputType == InputType::Url) {
+    layoutId = fui::KeyboardLayoutId::QwertyEn;
+  } else {
+    layoutId = latinFirst ? keyboard_layouts::startingLatinLayout() : keyboard_layouts::startingLayout();
+  }
   // The key only earns its slot in the bottom row with somewhere to go.
   const uint16_t enabledLayouts = keyboard_layouts::enabled();
   showLangKey = (enabledLayouts & (enabledLayouts - 1)) != 0;

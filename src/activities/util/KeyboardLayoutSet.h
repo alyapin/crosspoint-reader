@@ -36,6 +36,8 @@ inline constexpr uint16_t LATIN_BITS = bitAt(0) | bitAt(1) | bitAt(2) | bitAt(3)
 
 uint16_t enabled();
 freeink::ui::KeyboardLayoutId startingLayout();
+// startingLayout() when it is Latin, else the first enabled Latin layout.
+freeink::ui::KeyboardLayoutId startingLatinLayout();
 freeink::ui::KeyboardLayoutId next(freeink::ui::KeyboardLayoutId current);
 
 }  // namespace keyboard_layouts

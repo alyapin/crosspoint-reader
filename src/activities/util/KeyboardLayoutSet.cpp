@@ -51,6 +51,17 @@ freeink::ui::KeyboardLayoutId startingLayout() {
   return next(preferred);
 }
 
+freeink::ui::KeyboardLayoutId startingLatinLayout() {
+  const freeink::ui::KeyboardLayoutId preferred = startingLayout();
+  if (layoutBit(preferred) & LATIN_BITS) return preferred;
+  // enabled() always keeps a Latin layout.
+  const uint16_t latin = enabled() & LATIN_BITS;
+  for (uint8_t i = 0; i < COUNT; ++i) {
+    if (latin & bitAt(i)) return ALL[i].id;
+  }
+  return freeink::ui::KeyboardLayoutId::QwertyEn;
+}
+
 freeink::ui::KeyboardLayoutId next(const freeink::ui::KeyboardLayoutId current) {
   const uint16_t mask = enabled();
   const uint8_t from = indexOf(current);
