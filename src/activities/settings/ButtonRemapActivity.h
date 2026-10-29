@@ -19,6 +19,8 @@ class ButtonRemapActivity final : public Activity, private UiAppHost {
 
   // Index of the logical role currently awaiting input.
   uint8_t currentStep = 0;
+  // Side Up asked once; a second Up resets, Down or a front press keeps remapping.
+  bool resetAsked = false;
   // Temporary mapping from logical role -> hardware button index.
   uint8_t tempMapping[4] = {0xFF, 0xFF, 0xFF, 0xFF};
   // Error banner timing (used when reassigning duplicate buttons).
