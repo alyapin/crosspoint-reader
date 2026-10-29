@@ -39,3 +39,5 @@ bar-cross = x
 # Шашки: games list, «Сдаться» in the menu
 draughts = disc-2
 surrender = hand
+# Кейворды: games list
+codeword = binary

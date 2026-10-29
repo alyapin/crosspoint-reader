@@ -45,6 +45,10 @@ struct Record;
 namespace draughts {
 class Game;
 }
+namespace codeword {
+class Game;
+class Solved;
+}  // namespace codeword
 
 namespace gamesave {
 
@@ -60,6 +64,7 @@ enum class Kind {
   Reversi,
   Nonogram,
   Draughts,
+  Codeword,
 };
 
 bool hasGameInProgress(Kind kind);
@@ -79,6 +84,7 @@ bool save(const hangman::Game& game);
 bool save(const reversi::Game& game);
 bool save(const nonogram::Game& game);
 bool save(const draughts::Game& game);
+bool save(const codeword::Game& game);
 
 // Restore the saved game, paused. False on failure; a file that reads but does
 // not parse is removed. One that cannot be read is kept: until a load reads it,
@@ -96,6 +102,8 @@ bool load(hangman::Game& game);
 bool load(reversi::Game& game);
 bool load(nonogram::Game& game);
 bool load(draughts::Game& game);
+// The puzzle is not attached: see codeword::Game::attach().
+bool load(codeword::Game& game);
 
 // Records outlive their games. A missing or corrupt one loads empty; one that
 // cannot be read loads false (2048: 0) and is not written until a load reads it.
@@ -115,5 +123,9 @@ bool load(nonogram::Record& record);
 // The 2048 record; 0 when none.
 uint32_t loadBest2048();
 void saveBest2048(uint32_t score);
+
+// The solved codewords.
+bool save(const codeword::Solved& solved);
+bool load(codeword::Solved& solved);
 
 }  // namespace gamesave
