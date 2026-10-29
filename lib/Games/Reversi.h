@@ -4,6 +4,7 @@
 //   newGame(mode, seed)   black moves first; against the computer the player is black
 //   play(square)          the move of the side to move; a side without a move passes by itself
 //   undo()                takes back the last move, or the player's move and the answers; not once over
+//   resign()              the player (between two, the side to move) gives up; the game counts as lost
 //   at(), toMove(), moves(), status(), lastMove(), passed(), score()  for drawing
 //   serialize() / deserialize()
 // The computer's move comes from Engine, run in slices by the screen. Squares
@@ -135,6 +136,9 @@ class Game {
   bool play(int square);
   bool canUndo() const;
   bool undo();
+  // False once over.
+  bool resign();
+  bool resigned() const { return resignedSide != Disc::None; }
 
   size_t serialize(char* out, size_t cap) const;
   // False (game unchanged) on bad input.
@@ -150,6 +154,7 @@ class Game {
   Disc side = Disc::Black;
   Disc lastBy = Disc::None;
   Disc passedSide = Disc::None;
+  Disc resignedSide = Disc::None;
   uint32_t seedValue = 0;
   uint64_t black = 0;
   uint64_t white = 0;

@@ -161,7 +161,7 @@ NonogramActivity::Notice NonogramActivity::loadPicture(const int side) {
 int NonogramActivity::menuRows(GamePickerActivity::Row (&rows)[MENU_ROWS]) const {
   if (!boardShown() || !game.inProgress()) return 0;
   rows[0] = {tr(STR_NONOGRAM_CHECK), &icon_circle_check_24};
-  rows[1] = {tr(STR_NONOGRAM_RESTART), &icon_bar_restart_24};
+  rows[1] = {tr(STR_GAMES_RESTART), &icon_bar_restart_24};
   return 2;
 }
 
@@ -177,7 +177,7 @@ void NonogramActivity::menuChosen(const int row) {
 void NonogramActivity::confirmRestart() {
   auto confirm =
       makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_NONOGRAM_RESTART_CONFIRM),
-                                              tr(STR_NONOGRAM_RESTART_BODY), tr(STR_CANCEL), tr(STR_NONOGRAM_RESTART));
+                                              tr(STR_NONOGRAM_RESTART_BODY), tr(STR_CANCEL), tr(STR_GAMES_RESTART));
   if (!confirm) {
     LOG_ERR("NONOGRAM", "OOM: restart confirmation, the board stays");
     return;

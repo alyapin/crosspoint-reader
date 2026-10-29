@@ -321,6 +321,7 @@ void Game::rebuild(const int count) {
   side = Disc::Black;
   lastBy = Disc::None;
   passedSide = Disc::None;
+  resignedSide = Disc::None;
   state = Status::Playing;
   whiteMoves = 0;
   moveCount = 0;
@@ -341,6 +342,14 @@ bool Game::play(const int square) {
 }
 
 bool Game::canUndo() const { return !isOver() && moveCount > 0; }
+
+bool Game::resign() {
+  if (isOver()) return false;
+  resignedSide = vsComputer() ? Disc::Black : side;
+  state = resignedSide == Disc::Black ? Status::WhiteWon : Status::BlackWon;
+  tally();
+  return true;
+}
 
 bool Game::undo() {
   if (!canUndo()) return false;
@@ -363,6 +372,7 @@ size_t Game::serialize(char* out, const size_t cap) const {
     w.put(static_cast<char>('1' + history[i] / SIZE));
   }
   w.endString();
+  if (resigned()) w.number("resign", static_cast<uint32_t>(resignedSide));
   for (int i = 0; i < MODE_COUNT; ++i) {
     w.number(SCORE_KEYS[i][0], scores[i].won);
     w.number(SCORE_KEYS[i][1], scores[i].lost);
@@ -398,6 +408,15 @@ bool Game::deserialize(const char* text, const size_t len) {
     const int square = row * SIZE + col;
     if (g.isOver() || (g.moves() >> square & 1) == 0) return false;
     g.place(square);
+  }
+  // A resigned game replays to a running position; the score already counts it.
+  uint32_t resign = 0;
+  if (r.number("resign", resign)) {
+    if (g.isOver() || (resign != static_cast<uint32_t>(Disc::Black) && resign != static_cast<uint32_t>(Disc::White))) {
+      return false;
+    }
+    g.resignedSide = static_cast<Disc>(resign);
+    g.state = g.resignedSide == Disc::Black ? Status::WhiteWon : Status::BlackWon;
   }
   *this = g;
   return true;

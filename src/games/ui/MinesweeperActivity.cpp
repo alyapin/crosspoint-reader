@@ -137,7 +137,8 @@ void MinesweeperActivity::onTouch(const fui::ActionEvent& event, const int x, co
 }
 
 bool MinesweeperActivity::barShown(const int slot) const {
-  // Флажок while playing on touch, Заново once there is something to deal again, Меню (Новая игра once over) always.
+  // Флажок while playing on touch, Начать заново once there is something to deal again,
+  // Меню (Новая игра once over) always.
   if (slot == 0) return hasBar() && !game.isOver();
   if (slot == 1) return game.status() != minesweeper::Status::Ready;
   return slot == 2;
@@ -247,7 +248,7 @@ void MinesweeperActivity::build(UiScreen& screen) {
   }
 
   BarItem items[BAR_SLOTS];
-  const char* labels[BAR_SLOTS] = {tr(STR_MINES_FLAG), tr(STR_MINES_NEW),
+  const char* labels[BAR_SLOTS] = {tr(STR_MINES_FLAG), tr(STR_GAMES_RESTART),
                                    over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU)};
   const freeink::Icon* icons[BAR_SLOTS] = {&icon_bar_flag_24, &icon_bar_restart_24,
                                            over ? &icon_bar_new_game_24 : &icon_menu_24};

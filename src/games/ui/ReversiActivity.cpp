@@ -200,6 +200,11 @@ void ReversiActivity::onKey(const int dx, const int dy, const bool confirm) {
   if (!std::equal(std::begin(before), std::end(before), std::begin(after))) requestRepaint(RepaintUpdate);
 }
 
+void ReversiActivity::resign() {
+  engine.cancel();
+  if (game.resign()) changed();
+}
+
 bool ReversiActivity::onBack() {
   if (barFocus < 0 || game.isOver()) return false;
   barFocus = -1;
@@ -287,14 +292,15 @@ void ReversiActivity::drawStatus(const int top) const {
     x -= kCountSpace;
   }
 
-  const char* lines[2] = {};
+  const char* lines[3] = {};
   char tally[64];
   if (game.isOver()) {
     const reversi::Score& score = game.score();
     snprintf(tally, sizeof(tally), vs ? tr(STR_GAMES_SCORE_VS) : tr(STR_REVERSI_SCORE_TWO), score.won, score.lost,
              score.draws);
-    lines[0] = tally;
-    if (!hasBar()) lines[1] = tr(STR_GAMES_NEW_GAME_KEY);
+    if (game.resigned()) lines[0] = tr(STR_CHESS_RESIGNATION);
+    lines[1] = tally;
+    if (!hasBar()) lines[2] = tr(STR_GAMES_NEW_GAME_KEY);
   } else {
     const Disc passed = game.passed();
     lines[0] = passed == Disc::Black   ? (vs ? tr(STR_REVERSI_PASS_YOU) : tr(STR_REVERSI_PASS_BLACK))

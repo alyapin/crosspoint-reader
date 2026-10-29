@@ -35,6 +35,8 @@ class ReversiActivity final : public GameScreen {
   void onTouch(const freeink::ui::ActionEvent& event, int x, int y) override;
   void onKey(int dx, int dy, bool confirm) override;
   bool onBack() override;
+  bool resigns() const override { return true; }
+  void resign() override;
 
   bool playerToMove() const;
   void syncFocus();

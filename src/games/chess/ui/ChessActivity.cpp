@@ -874,7 +874,7 @@ const char* ChessActivity::rowLabel(const Row row) const {
     case Row::Flip:
       return tr(STR_CHESS_FLIP);
     case Row::Undo:
-      return tr(STR_CHESS_UNDO);
+      return tr(STR_GAMES_UNDO);
     case Row::Exit:
       return tr(STR_GAMES_LEAVE);
   }
@@ -1448,7 +1448,7 @@ void ChessActivity::drawActions(UiScreen& screen) const {
   const GameAction focused = focusedAction();
   const bool over = match->game().isOver();
   games::ui::ActionSlot slots[] = {
-      {&icon_undo_move_24, tr(STR_CHESS_UNDO), false, ACTION_UNDO, 0},
+      {&icon_undo_move_24, tr(STR_GAMES_UNDO), false, ACTION_UNDO, 0},
       {&icon_flip_24, tr(STR_CHESS_FLIP_SHORT), false, ACTION_FLIP, 0},
       over ? games::ui::ActionSlot{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, ACTION_NEW_GAME, 0}
            : games::ui::ActionSlot{&icon_menu_24, tr(STR_CHESS_MENU), false, ACTION_MENU, 0},
