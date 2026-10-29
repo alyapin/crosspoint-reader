@@ -69,7 +69,8 @@ void drawIconRow(const GfxRenderer& renderer, freeink::ui::DrawTarget& target, c
 // Long-press menu: a framed box above `bottom` with a title (up to two lines)
 // and icon rows, on a cleared band. A tap outside fires dismissAction; a row
 // fires itemAction with its index. rowPitch: the height of the list rows that
-// start at areaTop, so the band starts on a row boundary (0: no rows).
+// start at areaTop, so the band starts on a row boundary with the box right
+// under it (0: no rows).
 using MenuEntryFn = void (*)(int index, const freeink::Icon*& icon, const char*& label, void* ctx);
 void drawMenuBox(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, const char* title, int count, int focus,
                  bool showFocus, MenuEntryFn entry, void* ctx, int areaTop, int bottom, int width,

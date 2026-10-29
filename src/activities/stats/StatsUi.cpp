@@ -161,7 +161,7 @@ void drawMenuBox(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, const
   const int shown = std::min(count, fit);
   const int first = std::clamp(focus - shown + 1, 0, std::max(0, count - shown));
   const int boxHeight = headHeight + shown * kMenuRowHeight + kPad / 2;
-  const int boxY = bottom - kPad - boxHeight;
+  int boxY = bottom - kPad - boxHeight;
 
   // Registered first: the rows registered after it win inside the box.
   screen.frame().hit(fui::makeRect(0, 0, width, renderer.getScreenHeight()), dismissAction, 0,
@@ -169,7 +169,11 @@ void drawMenuBox(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, const
   // The screen under the box is cleared full width down to `bottom`, from a
   // row boundary when the caller lists rows, so no row shows cut by the frame.
   int bandTop = std::max(areaTop, boxY - kBandMargin);
-  if (rowPitch > 0) bandTop = areaTop + (bandTop - areaTop) / rowPitch * rowPitch;
+  if (rowPitch > 0) {
+    bandTop = areaTop + (bandTop - areaTop) / rowPitch * rowPitch;
+    // The box moves up under the band's edge, so no blank row sits above it.
+    boxY = std::min(boxY, bandTop + kBandMargin);
+  }
   renderer.fillRect(0, bandTop, width, bottom - bandTop, false);
   if (bandTop > areaTop) drawRule(renderer, 0, bandTop - kRuleWidth, width);
   renderer.drawRect(boxX, boxY, boxWidth, boxHeight, kRuleWidth, true);
