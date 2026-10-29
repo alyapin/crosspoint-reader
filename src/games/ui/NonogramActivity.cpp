@@ -31,24 +31,33 @@ constexpr int kBoardGap = 8;  // above the bar rule
 constexpr int kClueFrame = 2;
 constexpr int kStroke = 2;
 
-bool readPack(const nonogram::PackParser::PictureFn onPicture, void* ctx) {
-  HalFile file;
-  if (!Storage.exists(PACK_PATH) || !Storage.openFileForRead("NONO", PACK_PATH, file)) return false;
-  auto parser = makeUniqueNoThrow<nonogram::PackParser>(onPicture, ctx);
-  if (!parser) {
-    LOG_ERR("NONO", "OOM: %u bytes for the pack parser", static_cast<unsigned>(sizeof(nonogram::PackParser)));
-    return false;
+// Ids run 1..255, so a valid pack of 15x15 pictures stays under 75 KB.
+constexpr size_t kPackMax = 96 * 1024;
+
+// One pass over the pack for one side: the first unsolved picture after
+// `after`, else the first unsolved, else the first after `after`, else the
+// first. It stops at the first picture of the best kind.
+struct PackScan {
+  int side = 0;
+  uint8_t after = 0;
+  const nonogram::Record* record = nullptr;
+  int rank = 4;  // 4: none found
+  nonogram::Picture pick;
+  nonogram::PackParser parser{&PackScan::onPicture, this};
+  char chunk[512];
+
+  static bool onPicture(void* ctx, const nonogram::Picture& p) {
+    auto* s = static_cast<PackScan*>(ctx);
+    if (p.side != s->side) return true;
+    const bool later = p.id > s->after;
+    const int rank = (s->record->isSolved(p.id) ? 2 : 0) + (later ? 0 : 1);
+    if (rank < s->rank) {
+      s->rank = rank;
+      s->pick = p;
+    }
+    return rank != 0;
   }
-  char chunk[128];
-  while (true) {
-    const int n = file.read(chunk, sizeof(chunk));
-    if (n < 0) return false;
-    if (n == 0 || !parser->feed(chunk, static_cast<size_t>(n))) break;
-  }
-  if (parser->finish()) return true;
-  LOG_ERR("NONO", "Bad pack %s", PACK_PATH);
-  return false;
-}
+};
 
 // Corner brackets or a full frame, in black or (on a filled cell) white.
 void frameCell(const GfxRenderer& renderer, const int x, const int y, const int size, const bool black,
@@ -96,7 +105,7 @@ void NonogramActivity::saveGame() {
 }
 
 void NonogramActivity::resumeGame() {
-  if (!noPictures) game.resume();
+  if (notice == Notice::None) game.resume();
 }
 
 void NonogramActivity::clearSave() { gamesave::clear(gamesave::Kind::Nonogram); }
@@ -115,11 +124,13 @@ void NonogramActivity::openNewGame() {
 
 void NonogramActivity::pickerChosen(const int row, bool) {
   const int side = row % 2 == 0 ? 10 : 15;
-  noPictures = false;
+  noticeSide = side;
   if (row < 2) {
-    noPictures = !loadPicture(side);
+    notice = loadPicture(side);
   } else {
-    for (int i = 0; i < 3 && !game.newRandom(side, esp_random()); ++i) {
+    notice = Notice::NoRandom;
+    for (int i = 0; i < 3 && notice != Notice::None; ++i) {
+      if (game.newRandom(side, esp_random())) notice = Notice::None;
     }
   }
   crossMode = false;
@@ -130,49 +141,35 @@ void NonogramActivity::pickerChosen(const int row, bool) {
   barFocus = keyCursor && !boardShown() && hasBar() ? BAR_SLOTS - 1 : -1;
 }
 
-// The next unsolved picture of that side after the current one, else the next one.
-bool NonogramActivity::loadPicture(const int side) {
-  struct Scan {
-    int side;
-    uint8_t after;
-    const nonogram::Record* record;
-    uint8_t first = 0;
-    uint8_t firstAfter = 0;
-    uint8_t unsolved = 0;
-    uint8_t unsolvedAfter = 0;
-  } scan{side, 0, &record};
+NonogramActivity::Notice NonogramActivity::loadPicture(const int side) {
+  HalFile file;
+  if (!Storage.exists(PACK_PATH) || !Storage.openFileForRead("NONO", PACK_PATH, file)) return Notice::NoPack;
+  if (file.fileSize() > kPackMax) {
+    LOG_ERR("NONO", "Pack too large: %u bytes", static_cast<unsigned>(file.fileSize()));
+    return Notice::NoPack;
+  }
+  auto scan = makeUniqueNoThrow<PackScan>();
+  if (!scan) {
+    LOG_ERR("NONO", "OOM: %u bytes for the pack scan", static_cast<unsigned>(sizeof(PackScan)));
+    return Notice::NoPack;
+  }
+  scan->side = side;
+  scan->record = &record;
   if (game.hasPuzzle() && game.source() == nonogram::Source::Picture && game.side() == side) {
-    scan.after = game.pictureId();
+    scan->after = game.pictureId();
   }
-  const auto collect = [](void* ctx, const nonogram::Picture& p) {
-    auto* s = static_cast<Scan*>(ctx);
-    if (p.side != s->side) return true;
-    const bool later = p.id > s->after;
-    const bool open = !s->record->isSolved(p.id);
-    if (s->first == 0) s->first = p.id;
-    if (later && s->firstAfter == 0) s->firstAfter = p.id;
-    if (open && s->unsolved == 0) s->unsolved = p.id;
-    if (open && later && s->unsolvedAfter == 0) s->unsolvedAfter = p.id;
-    return true;
-  };
-  if (!readPack(collect, &scan)) return false;
-  struct Pick {
-    nonogram::Game* game;
-    int side;
-    uint8_t id;
-    bool loaded = false;
-  } pick{&game, side, 0};
-  for (const uint8_t id : {scan.unsolvedAfter, scan.unsolved, scan.firstAfter, scan.first}) {
-    if (pick.id == 0) pick.id = id;
+  while (true) {
+    const int n = file.read(scan->chunk, sizeof(scan->chunk));
+    if (n < 0) return Notice::NoPack;
+    if (n == 0 || !scan->parser.feed(scan->chunk, static_cast<size_t>(n))) break;
   }
-  if (pick.id == 0) return false;
-  const auto load = [](void* ctx, const nonogram::Picture& p) {
-    auto* k = static_cast<Pick*>(ctx);
-    if (p.id != k->id || p.side != k->side) return true;
-    k->loaded = k->game->newPicture(p.side, p.bits, p.id, p.name);
-    return false;
-  };
-  return readPack(load, &pick) && pick.loaded;
+  if (!scan->parser.finish()) {
+    LOG_ERR("NONO", "Bad pack %s", PACK_PATH);
+    return Notice::NoPack;
+  }
+  if (scan->rank == 4) return Notice::NoSize;
+  const nonogram::Picture& p = scan->pick;
+  return game.newPicture(p.side, p.bits, p.id, p.name) ? Notice::None : Notice::NoPack;
 }
 
 int NonogramActivity::menuRows(GamePickerActivity::Row (&rows)[MENU_ROWS]) const {
@@ -368,9 +365,15 @@ void NonogramActivity::build(UiScreen& screen) {
   if (!boardShown()) {
     drawTopLine(screen, nullptr, nullptr, false);
     const int width = renderer.getScreenWidth();
+    char text[96];
+    if (notice == Notice::NoSize) {
+      snprintf(text, sizeof(text), tr(STR_NONOGRAM_NO_SIZE), noticeSide, noticeSide);
+    } else {
+      snprintf(text, sizeof(text), "%s",
+               notice == Notice::NoRandom ? tr(STR_NONOGRAM_NO_RANDOM) : tr(STR_NONOGRAM_NO_PACK));
+    }
     int y = BOARD_TOP + kCaptionGap;
-    for (const auto& line :
-         renderer.wrappedText(kText12Font, tr(STR_NONOGRAM_NO_PICTURES), width - 2 * kSidePadding, 8)) {
+    for (const auto& line : renderer.wrappedText(kText12Font, text, width - 2 * kSidePadding, 4)) {
       renderer.drawText(kText12Font, kSidePadding, y, line.c_str());
       y += renderer.getLineHeight(kText12Font);
     }
@@ -514,9 +517,5 @@ void NonogramActivity::drawCaption(const int top) const {
   const char* hint = mappedInput.hasTouch()
                          ? (crossMode ? tr(STR_NONOGRAM_CROSS_HINT) : tr(STR_NONOGRAM_TAP_HINT))
                          : (crossMode ? tr(STR_NONOGRAM_KEYS_CROSS_HINT) : tr(STR_NONOGRAM_KEYS_HINT));
-  int y = top;
-  for (const auto& text : renderer.wrappedText(kCaptionFont, hint, width - 2 * kSidePadding, 2)) {
-    renderer.drawText(kCaptionFont, kSidePadding, y, text.c_str());
-    y += renderer.getLineHeight(kCaptionFont);
-  }
+  renderer.drawText(kCaptionFont, kSidePadding, top, hint);
 }

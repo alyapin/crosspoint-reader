@@ -7,7 +7,7 @@
 //   rowClue(), columnClue(), rowDone(), columnDone()  for drawing; a done group is struck
 //   isSolved(), isWrong(cell)  the win check and «Проверить»
 //   pause() / resume()     play time; a restored game comes back paused
-//   serialize() / deserialize()
+//   serialize() / deserialize()   with the undo history
 // Cells are row-major. No heap.
 
 #include <cstddef>
@@ -24,7 +24,7 @@ constexpr int MAX_RUNS = (MAX_SIDE + 1) / 2;
 constexpr int MAX_NAME_BYTES = 40;
 constexpr int UNDO_DEPTH = 96;
 constexpr int GENERATE_ATTEMPTS = 200;
-constexpr size_t SAVE_MAX = 160 + MAX_NAME_BYTES + MAX_CELLS / 4 + 1 + MAX_CELLS;
+constexpr size_t SAVE_MAX = 176 + MAX_NAME_BYTES + MAX_CELLS / 4 + 1 + MAX_CELLS + 3 * UNDO_DEPTH;
 
 enum Mark : uint8_t { Empty, Filled, Crossed };
 enum class Source : uint8_t { Picture, Random };

@@ -255,29 +255,39 @@ bool Game::lineMatches(const Clue& clue, const int first, const int stride) cons
   return sameClue(clue, clueOf(cells + first, n, stride));
 }
 
-// The whole line when its filled runs equal the clue; otherwise the runs closed
-// by a cross or the edge, counted from either end up to the first empty cell.
+// The whole line when its filled runs equal the clue. Otherwise the runs
+// closed by a cross or the edge from the start, up to the first empty cell or
+// wrong run; then from the end, short of where the start scan stopped and of
+// the runs it took, so no run is struck twice.
 uint8_t Game::doneOf(const Clue& clue, const int first, const int stride) const {
   const int k = clue.count;
   if (lineMatches(clue, first, stride)) return k == 0 ? 1 : static_cast<uint8_t>((1u << k) - 1);
+  const auto at = [&](const int i) { return i < n ? cells[first + i * stride] : static_cast<uint8_t>(Crossed); };
   uint8_t done = 0;
-  for (int dir = 0; dir < 2; ++dir) {
-    int next = dir == 0 ? 0 : k - 1;
-    int run = 0;
-    for (int step = 0; step <= n; ++step) {
-      const int i = dir == 0 ? step : n - 1 - step;
-      const uint8_t m = step < n ? cells[first + i * stride] : static_cast<uint8_t>(Crossed);
-      if (m == Filled) {
-        ++run;
-        continue;
-      }
-      if (m == Empty) break;
-      if (run == 0) continue;
-      if (next < 0 || next >= k || clue.runs[next] != run) break;
-      done |= static_cast<uint8_t>(1u << next);
-      next += dir == 0 ? 1 : -1;
-      run = 0;
+  int next = 0;
+  int run = 0;
+  int stop = 0;
+  for (; stop <= n; ++stop) {
+    const uint8_t m = at(stop);
+    if (m == Filled) {
+      ++run;
+      continue;
     }
+    if (m == Empty || (run > 0 && (next >= k || clue.runs[next] != run))) break;
+    if (run > 0) done |= static_cast<uint8_t>(1u << next++);
+    run = 0;
+  }
+  int last = k - 1;
+  run = 0;
+  for (int i = n - 1; i >= stop && last >= next; --i) {
+    const uint8_t m = at(i);
+    if (m == Filled) {
+      ++run;
+      continue;
+    }
+    if (m == Empty || (run > 0 && clue.runs[last] != run)) break;
+    if (run > 0) done |= static_cast<uint8_t>(1u << last--);
+    run = 0;
   }
   return done;
 }
@@ -350,6 +360,15 @@ size_t Game::serialize(char* out, const size_t cap) const {
   w.beginString("cells");
   for (int i = 0; i < count; ++i) w.put(static_cast<char>('0' + cells[i]));
   w.endString();
+  // Oldest first: the cell in two hex digits, then the mark it had.
+  w.beginString("undo");
+  for (int i = 0; i < undoCount; ++i) {
+    const int slot = (undoTop + UNDO_DEPTH - undoCount + i) % UNDO_DEPTH;
+    w.put(games::hexDigit(undoCells[slot] >> 4));
+    w.put(games::hexDigit(undoCells[slot] & 0xF));
+    w.put(static_cast<char>('0' + undoMarks[slot]));
+  }
+  w.endString();
   return w.finish();
 }
 
@@ -380,12 +399,32 @@ bool Game::deserialize(const char* text, const size_t len) {
     if (nibble < 0 || marks[i] < '0' || marks[i] > '2') return false;
     bits[i] = static_cast<uint8_t>((nibble >> (i % 4)) & 1);
   }
+  // Older saves have no undo history.
+  const char* steps = nullptr;
+  size_t stepsLen = 0;
+  if (!r.string("undo", steps, stepsLen)) stepsLen = 0;
+  const int stepCount = static_cast<int>(stepsLen / 3);
+  if (stepsLen % 3 != 0 || stepCount > UNDO_DEPTH) return false;
+  uint8_t stepCells[UNDO_DEPTH];
+  uint8_t stepMarks[UNDO_DEPTH];
+  for (int i = 0; i < stepCount; ++i) {
+    const int high = games::hexValue(steps[3 * i]);
+    const int low = games::hexValue(steps[3 * i + 1]);
+    const char mark = steps[3 * i + 2];
+    if (high < 0 || low < 0 || (high << 4 | low) >= count || mark < '0' || mark > '2') return false;
+    stepCells[i] = static_cast<uint8_t>(high << 4 | low);
+    stepMarks[i] = static_cast<uint8_t>(mark - '0');
+  }
   char shown[MAX_NAME_BYTES + 1];
   memcpy(shown, name, nameLen);
   shown[nameLen] = '\0';
   std::copy(bits, bits + count, solution);
   start(static_cast<int>(side), static_cast<Source>(source), static_cast<uint8_t>(pictureId), shown);
   for (int i = 0; i < count; ++i) cells[i] = static_cast<uint8_t>(marks[i] - '0');
+  std::copy(stepCells, stepCells + stepCount, undoCells);
+  std::copy(stepMarks, stepMarks + stepCount, undoMarks);
+  undoTop = static_cast<uint8_t>(stepCount % UNDO_DEPTH);
+  undoCount = static_cast<uint8_t>(stepCount);
   settle();
   clock.reset(ms);
   return true;

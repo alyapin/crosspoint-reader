@@ -308,6 +308,33 @@ TEST(Nonogram, DoneRunsAreStruckFromEitherEnd) {
   EXPECT_TRUE(g.isSolved());
 }
 
+// A fully marked wrong line: the scan from the end must not take the run the
+// scan from the start already took.
+TEST(Nonogram, OneRunIsNeverStruckTwice) {
+  const auto bits = bitsOf(
+      "##.##....."
+      ".#.###...."
+      ".........."
+      ".........."
+      ".........."
+      ".........."
+      ".........."
+      ".........."
+      ".........."
+      "..........");
+  Game g(&fakeMillis);
+  ASSERT_TRUE(g.newPicture(10, bits.data(), 3, "x"));
+  const char* first = "XX##XXXXXX";
+  const char* second = "###XXXXXXX";
+  for (int x = 0; x < 10; ++x) {
+    g.set(x, first[x] == '#' ? Filled : Crossed);
+    g.set(10 + x, second[x] == '#' ? Filled : Crossed);
+  }
+  EXPECT_EQ(g.rowDone(0), 0b01);
+  EXPECT_EQ(g.rowDone(1), 0);
+  EXPECT_FALSE(g.isSolved());
+}
+
 TEST(Nonogram, SaveRoundTrip) {
   Game g(&fakeMillis);
   const auto cup = bitsOf(kCup);
@@ -333,6 +360,27 @@ TEST(Nonogram, SaveRoundTrip) {
     EXPECT_EQ(loaded.mark(i), g.mark(i));
     EXPECT_EQ(loaded.answer(i), cup[i] != 0);
   }
+  ASSERT_TRUE(loaded.undo());
+  EXPECT_EQ(loaded.mark(3), Empty);
+  ASSERT_TRUE(loaded.undo());
+  EXPECT_EQ(loaded.mark(0), Empty);
+  EXPECT_FALSE(loaded.undo());
+
+  // The largest save: 15x15, a 40-byte name, a full undo history.
+  games::Rng rng(9);
+  uint8_t large[MAX_CELLS];
+  ASSERT_GT(generate(15, rng, large), 0);
+  Game full(&fakeMillis);
+  ASSERT_TRUE(full.newPicture(15, large, 255, "СоваСоваСоваСоваСова"));
+  for (int i = 0; i < UNDO_DEPTH + 5; ++i) full.set(224, i % 2 == 0 ? Crossed : Empty);
+  const std::string fullText = save(full);
+  ASSERT_LE(fullText.size(), SAVE_MAX - 1);
+  Game fullBack(&fakeMillis);
+  ASSERT_TRUE(fullBack.deserialize(fullText.data(), fullText.size()));
+  int undone = 0;
+  while (fullBack.undo()) ++undone;
+  EXPECT_EQ(undone, UNDO_DEPTH);
+  EXPECT_EQ(fullBack.mark(224), Crossed);
 
   Game random(&fakeMillis);
   ASSERT_TRUE(random.newRandom(15, 42));

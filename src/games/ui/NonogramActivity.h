@@ -21,6 +21,8 @@ class NonogramActivity final : public GameScreen {
   uint32_t idleSleepBudgetMs() const override;
 
  private:
+  // What the screen shows instead of a board.
+  enum class Notice : uint8_t { None, NoPack, NoSize, NoRandom };
   struct Layout {
     int font;
     int pitch;  // clue line height
@@ -48,8 +50,8 @@ class NonogramActivity final : public GameScreen {
   int32_t shownMinutes() const override;
   bool wantsLongPress() const override { return true; }
 
-  bool loadPicture(int side);
-  bool boardShown() const { return game.hasPuzzle() && !noPictures; }
+  Notice loadPicture(int side);
+  bool boardShown() const { return game.hasPuzzle() && notice == Notice::None; }
   void apply(int cell, nonogram::Mark mark);
   void runBar(int slot);
   bool barShown(int slot) const;
@@ -67,7 +69,8 @@ class NonogramActivity final : public GameScreen {
   int barFocus = -1;
   bool crossMode = false;
   bool checkShown = false;
-  bool noPictures = false;
+  Notice notice = Notice::None;
+  int noticeSide = 0;
   bool newBest = false;
   bool recordPending = false;
 };
