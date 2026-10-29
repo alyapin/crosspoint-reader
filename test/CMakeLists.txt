@@ -102,6 +102,7 @@ add_subdirectory(chess_core)
 add_subdirectory(chess_clock_text)
 add_subdirectory(games_core)
 add_subdirectory(scanword_core)
+add_subdirectory(cards)
 add_subdirectory(light_sleep)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
