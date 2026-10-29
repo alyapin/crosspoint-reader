@@ -15,6 +15,7 @@
 
 #include "components/HeaderBackTapTarget.h"
 #include "components/UITheme.h"
+#include "games/chess/ui/chessIcons.h"
 #include "games/scanword/ScanwordStore.h"
 #include "games/ui/ActionBar.h"
 #include "scanwordIcons.h"
@@ -36,11 +37,12 @@ constexpr fui::ActionId ACTION_CHECK = 7;
 constexpr fui::ActionId ACTION_HINT = 8;
 constexpr fui::ActionId ACTION_DONE = 9;
 constexpr fui::ActionId ACTION_CHECK_ALL = 10;
+constexpr fui::ActionId ACTION_MENU = 11;
+constexpr fui::ActionId ACTION_TO_LIST = 12;
 
 constexpr int kHeaderTop = kGameTopLineY;  // board top line, under the status line
 constexpr int kGridTop = kGameBoardTop;
-constexpr int kBandMin = 90;    // below the grid on button boards: clue bar, letter strip
-constexpr int kBandTouch = 56;  // touch boards: only the check-all row (the keyboard overlays the grid)
+constexpr int kBandMin = 90;  // below the grid on button boards: clue bar, letter strip
 constexpr int kRowHeight = setka::kNavRowHeight;
 constexpr int kRowGap = 0;
 constexpr int kIconSize = 24;
@@ -399,11 +401,15 @@ bool ScanwordActivity::wordHasEntry() const {
 // Menu rows that do something right now.
 int ScanwordActivity::menuItems(MenuItem* out) const {
   int n = 0;
-  const bool hasEntry = wordHasEntry();
+  // Touch boards show the answer only with the keyboard open.
+  const bool word = !touchBoard() || keyboardOpen;
+  const bool hasEntry = word && wordHasEntry();
   if (hasEntry) out[n++] = MenuItem::CheckWord;
   if (game->filledCount() > 0) out[n++] = MenuItem::CheckAll;
-  out[n++] = MenuItem::RevealLetter;
-  out[n++] = MenuItem::RevealWord;
+  if (word) {
+    out[n++] = MenuItem::RevealLetter;
+    out[n++] = MenuItem::RevealWord;
+  }
   if (hasEntry) out[n++] = MenuItem::Erase;
   if (game->canUndo()) out[n++] = MenuItem::Undo;
   out[n++] = MenuItem::ToList;
@@ -559,6 +565,12 @@ void ScanwordActivity::handleAction(const fui::ActionEvent& event, const int x, 
     case ACTION_CHECK_ALL:
       if (board && !keyboardOpen && game->filledCount() > 0) showCheck(game->checkAll(), true);
       break;
+    case ACTION_MENU:
+      if (board && !game->solved()) setView(View::Menu);
+      break;
+    case ACTION_TO_LIST:
+      if (board && game->solved()) closePuzzle();
+      break;
     default:
       break;
   }
@@ -696,8 +708,15 @@ void ScanwordActivity::handleBoardKeys() {
 
 // --- geometry -------------------------------------------------------------------
 
-int ScanwordActivity::cellSize() const {
-  const int areaHeight = bottom() - (touchBoard() ? kBandTouch : kBandMin) - kGridTop;
+// Touch boards keep the full width for the clue text and give a little height to the bar below:
+// the cells may be a few pixels shorter than wide.
+int ScanwordActivity::cellWidth() const {
+  const int fit = renderer.getScreenWidth() / puzzle->width();
+  return touchBoard() ? fit : std::min(fit, cellHeight());
+}
+
+int ScanwordActivity::cellHeight() const {
+  const int areaHeight = bottom() - (touchBoard() ? kActionHeight : kBandMin) - kGridTop;
   return std::min(renderer.getScreenWidth() / puzzle->width(), areaHeight / puzzle->height());
 }
 
@@ -705,26 +724,24 @@ int ScanwordActivity::bottom() const {
   return renderer.getScreenHeight() - UITheme::getInstance().getMetrics().buttonHintsHeight;
 }
 
-int ScanwordActivity::gridLeft() const { return (renderer.getScreenWidth() - puzzle->width() * cellSize()) / 2; }
+int ScanwordActivity::gridLeft() const { return (renderer.getScreenWidth() - puzzle->width() * cellWidth()) / 2; }
 
-int ScanwordActivity::gridBottom() const { return kGridTop + puzzle->height() * cellSize(); }
+int ScanwordActivity::gridBottom() const { return kGridTop + puzzle->height() * cellHeight(); }
 
 int ScanwordActivity::keyboardTop() const {
   return renderer.getScreenHeight() - kStripHeight - kKeyRows * kKeyHeight - kActionHeight;
 }
 
 uint16_t ScanwordActivity::cellAt(const int x, const int y) const {
-  const int size = cellSize();
-  const int col = (x - gridLeft()) / size;
-  const int row = (y - kGridTop) / size;
+  const int col = (x - gridLeft()) / cellWidth();
+  const int row = (y - kGridTop) / cellHeight();
   if (x < gridLeft() || y < kGridTop || col >= puzzle->width() || row >= puzzle->height()) return scanword::MAX_CELLS;
   return static_cast<uint16_t>(row * puzzle->width() + col);
 }
 
 void ScanwordActivity::cellOrigin(const uint16_t cell, int& x, int& y) const {
-  const int size = cellSize();
-  x = gridLeft() + (cell % puzzle->width()) * size;
-  y = kGridTop + (cell / puzzle->width()) * size;
+  x = gridLeft() + (cell % puzzle->width()) * cellWidth();
+  y = kGridTop + (cell / puzzle->width()) * cellHeight();
 }
 
 // --- render task ------------------------------------------------------------------
@@ -899,17 +916,38 @@ void ScanwordActivity::buildBoard(UiScreen& screen) {
 void ScanwordActivity::drawTopLine(UiScreen& screen) const {
   const int width = renderer.getScreenWidth();
   drawStatusLine(renderer);
+  int exitWidth = 0;
   if (touchBoard()) {
     const char* exitLabel = tr(STR_SCANWORD_EXIT);
     renderer.drawText(kText12Font, kSidePadding, kHeaderTop, exitLabel);
-    const int exitWidth = renderer.getTextWidth(kText12Font, exitLabel) + 2 * kSidePadding;
+    exitWidth = renderer.getTextWidth(kText12Font, exitLabel) + 2 * kSidePadding;
     screen.frame().hit(fui::makeRect(0, 0, exitWidth, kGridTop), ACTION_BACK, 0, kTap);
   }
-  char count[24];
-  snprintf(count, sizeof(count), tr(STR_GAMES_OF), static_cast<int>(game->filledCount()),
-           static_cast<int>(puzzle->letterCount()));
-  const games::ui::StatusItem status[] = {{tr(STR_SCANWORD_FILLED), count}};
-  games::ui::drawStatus(renderer, width - kSidePadding, kHeaderTop, status, 1);
+  // Touch boards have no band under the grid: the solve and the whole-grid check show here.
+  char value[24];
+  char hints[8];
+  games::ui::StatusItem status[2];
+  int parts = 1;
+  if (touchBoard() && game->solved()) {
+    snprintf(value, sizeof(value), tr(STR_GAMES_MINUTES), static_cast<unsigned>(minutes(game->progress().seconds)));
+    status[0] = {tr(STR_SCANWORD_SOLVED_IN_LABEL), value};
+    if (game->progress().hints > 0) {
+      snprintf(hints, sizeof(hints), "%d", static_cast<int>(game->progress().hints));
+      status[1] = {tr(STR_SCANWORD_HINTS_LABEL), hints};
+      parts = 2;
+      if (games::ui::statusWidth(renderer, status, parts) > width - kSidePadding - exitWidth) parts = 1;
+    }
+  } else if (touchBoard() && checkedGrid && checkResult == 0) {
+    status[0] = {tr(STR_SCANWORD_ALL_RIGHT), nullptr};
+  } else if (touchBoard() && checkedGrid && checkResult > 0) {
+    snprintf(value, sizeof(value), "%d", static_cast<int>(checkResult));
+    status[0] = {tr(STR_SCANWORD_WRONG_LABEL), value};
+  } else {
+    snprintf(value, sizeof(value), tr(STR_GAMES_OF), static_cast<int>(game->filledCount()),
+             static_cast<int>(puzzle->letterCount()));
+    status[0] = {tr(STR_SCANWORD_FILLED), value};
+  }
+  games::ui::drawStatus(renderer, width - kSidePadding, kHeaderTop, status, parts);
 }
 
 // Letters are the text face's glyphs scaled to a cap height, so no large font is needed.
@@ -931,24 +969,25 @@ void ScanwordActivity::drawLetter(const uint8_t letter, const int x, const int y
 }
 
 void ScanwordActivity::drawGrid(UiScreen& screen, const int visibleBottom) const {
-  const int size = cellSize();
+  const int w = cellWidth();
+  const int h = cellHeight();
   const int left = gridLeft();
-  const int right = left + puzzle->width() * size;
+  const int right = left + puzzle->width() * w;
   // Whole rows only: a row cut by the keyboard reads as broken.
-  const int bottom = std::min(gridBottom(), kGridTop + (visibleBottom - kGridTop) / size * size);
+  const int bottom = std::min(gridBottom(), kGridTop + (visibleBottom - kGridTop) / h * h);
   for (uint16_t cell = 0; cell < puzzle->cellCount(); ++cell) {
     int x = 0;
     int y = 0;
     cellOrigin(cell, x, y);
-    if (y + size <= bottom) drawCell(cell, x, y);
+    if (y + h <= bottom) drawCell(cell, x, y);
   }
   const int lastX = std::min(right, renderer.getScreenWidth() - 1);
   for (int c = 0; c <= puzzle->width(); ++c) {
-    const int x = std::min(left + c * size, lastX);
+    const int x = std::min(left + c * w, lastX);
     renderer.drawLine(x, kGridTop, x, bottom);
   }
-  for (int r = 0; kGridTop + r * size <= bottom; ++r) {
-    renderer.drawLine(left, kGridTop + r * size, lastX, kGridTop + r * size);
+  for (int r = 0; kGridTop + r * h <= bottom; ++r) {
+    renderer.drawLine(left, kGridTop + r * h, lastX, kGridTop + r * h);
   }
   const bool showSelection = (!touchBoard() || keyboardOpen) && !game->solved();
   if (showSelection) drawSelection();
@@ -960,10 +999,11 @@ void ScanwordActivity::drawGrid(UiScreen& screen, const int visibleBottom) const
 }
 
 void ScanwordActivity::drawCell(const uint16_t cell, const int x, const int y) const {
-  const int size = cellSize();
+  const int w = cellWidth();
+  const int h = cellHeight();
   switch (puzzle->kind(cell)) {
     case CellKind::Blank:
-      renderer.fillRectDither(x + 1, y + 1, size - 1, size - 1, Color::LightGray);
+      renderer.fillRectDither(x + 1, y + 1, w - 1, h - 1, Color::LightGray);
       return;
     case CellKind::Clue:
       drawClueCell(cell, x, y);
@@ -971,20 +1011,20 @@ void ScanwordActivity::drawCell(const uint16_t cell, const int x, const int y) c
     case CellKind::Letter:
       break;
   }
-  if (const uint8_t entry = game->entry(cell)) drawLetter(entry, x, y, size, size, size / 2);
+  if (const uint8_t entry = game->entry(cell)) drawLetter(entry, x, y, w, h, h / 2);
   const uint8_t flags = game->flags(cell);
-  if (flags & scanword::FLAG_WRONG) renderer.drawLine(x + 6, y + size - 6, x + size - 6, y + 6, 2, true);
+  if (flags & scanword::FLAG_WRONG) renderer.drawLine(x + 6, y + h - 6, x + w - 6, y + 6, 2, true);
   if (flags & scanword::FLAG_REVEALED) {
-    renderer.fillRect(x + size - kMarkSize - 4, y + size - kMarkSize - 4, kMarkSize, kMarkSize, true);
+    renderer.fillRect(x + w - kMarkSize - 4, y + h - kMarkSize - 4, kMarkSize, kMarkSize, true);
   }
   drawArrows(cell, x, y);
 }
 
 void ScanwordActivity::drawClueCell(const uint16_t cell, const int x, const int y) const {
-  const int size = cellSize();
+  const int size = cellWidth();
   uint8_t ids[2];
   const uint8_t n = puzzle->cluesAt(cell, ids);
-  const int halfHeight = n == 2 ? size / 2 : size;
+  const int halfHeight = n == 2 ? cellHeight() / 2 : cellHeight();
   // Three lines in a cell at a pitch that fits, a fourth at a closer one when the clue needs it; two per half
   // of a two-clue cell.
   const int font = kDenseFont;
@@ -1014,35 +1054,36 @@ void ScanwordActivity::drawClueCell(const uint16_t cell, const int x, const int 
   const uint8_t selected = game->selectedWord();
   const bool shown = (!touchBoard() || keyboardOpen) && !game->solved();
   if (shown && selected != scanword::NO_WORD && puzzle->wordAt(selected).clueCell == cell) {
-    renderer.drawRect(x + 1, y + 1, size - 1, size - 1, kClueFrameWidth, true);
+    renderer.drawRect(x + 1, y + 1, size - 1, cellHeight() - 1, kClueFrameWidth, true);
   }
 }
 
 void ScanwordActivity::drawArrows(const uint16_t cell, const int x, const int y) const {
-  const int size = cellSize();
-  const int s = size / 7;
+  const int w = cellWidth();
+  const int h = cellHeight();
+  const int s = h / 7;
   for (uint8_t i = 0; i < puzzle->wordCount(); ++i) {
-    const Word& w = puzzle->wordAt(i);
-    if (w.start != cell) continue;
+    const Word& word = puzzle->wordAt(i);
+    if (word.start != cell) continue;
     uint8_t ids[2];
-    const bool split = puzzle->cluesAt(w.clueCell, ids) == 2;
-    switch (w.arrow) {
+    const bool split = puzzle->cluesAt(word.clueCell, ids) == 2;
+    switch (word.arrow) {
       case scanword::Arrow::Right: {
-        const int ay = y + (split ? (w.half == 0 ? size / 4 : 3 * size / 4) : size / 2);
+        const int ay = y + (split ? (word.half == 0 ? h / 4 : 3 * h / 4) : h / 2);
         const int xs[] = {x + 1, x + 1, x + s};
         const int ys[] = {ay - s / 2, ay + s / 2, ay};
         renderer.fillPolygon(xs, ys, 3);
         break;
       }
       case scanword::Arrow::Down: {
-        const int ax = x + size / 2;
+        const int ax = x + w / 2;
         const int xs[] = {ax - s / 2, ax + s / 2, ax};
         const int ys[] = {y + 1, y + 1, y + s};
         renderer.fillPolygon(xs, ys, 3);
         break;
       }
       case scanword::Arrow::DownRight: {
-        const int ax = x + size / 4;
+        const int ax = x + w / 4;
         renderer.drawLine(ax, y + 1, ax, y + s, 2, true);
         renderer.drawLine(ax, y + s, ax + s, y + s, 2, true);
         const int xs[] = {ax + s, ax + s, ax + s + s / 2};
@@ -1051,7 +1092,7 @@ void ScanwordActivity::drawArrows(const uint16_t cell, const int x, const int y)
         break;
       }
       case scanword::Arrow::RightDown: {
-        const int ay = y + (split ? (w.half == 0 ? size / 6 : size / 2) : size / 4);
+        const int ay = y + (split ? (word.half == 0 ? h / 6 : h / 2) : h / 4);
         renderer.drawLine(x + 1, ay, x + s, ay, 2, true);
         renderer.drawLine(x + s, ay, x + s, ay + s, 2, true);
         const int xs[] = {x + s - s / 2, x + s + s / 2, x + s};
@@ -1067,12 +1108,13 @@ void ScanwordActivity::drawSelection() const {
   const uint8_t selected = game->selectedWord();
   if (selected == scanword::NO_WORD) return;
   const Word& w = puzzle->wordAt(selected);
-  const int size = cellSize();
+  const int cw = cellWidth();
+  const int ch = cellHeight();
   int x = 0;
   int y = 0;
   cellOrigin(w.start, x, y);
-  const int width = w.dir == scanword::Dir::Across ? w.length * size : size;
-  const int height = w.dir == scanword::Dir::Across ? size : w.length * size;
+  const int width = w.dir == scanword::Dir::Across ? w.length * cw : cw;
+  const int height = w.dir == scanword::Dir::Across ? ch : w.length * ch;
   // Lines that leave the screen are dropped whole, so clamp the frame to it.
   const int x0 = std::max(0, x - 1);
   const int y0 = std::max(0, y - 1);
@@ -1080,7 +1122,7 @@ void ScanwordActivity::drawSelection() const {
   const int y1 = std::min(renderer.getScreenHeight(), y + height + 2);
   renderer.drawRect(x0, y0, x1 - x0, y1 - y0, kWordFrameWidth, true);
   cellOrigin(game->cursor(), x, y);
-  drawCellFrame(renderer, x + 1, y + 1, size - 1, size - 1);
+  drawCellFrame(renderer, x + 1, y + 1, cw - 1, ch - 1);
 }
 
 void ScanwordActivity::drawWordLine(const int top, const int height) const {
@@ -1189,6 +1231,20 @@ void ScanwordActivity::drawLetterStrip(const int top) const {
 }
 
 void ScanwordActivity::drawBand(UiScreen& screen) const {
+  if (touchBoard()) {
+    // Keyboard closed: Проверить всё once something is filled, and Меню (К списку once solved).
+    games::ui::ActionSlot acts[3];
+    if (!game->solved() && game->filledCount() > 0) {
+      acts[0] = {&icon_scanword_check_all_24, tr(STR_SCANWORD_CHECK_ALL), false, ACTION_CHECK_ALL, 0};
+    }
+    acts[2] = game->solved()
+                  ? games::ui::ActionSlot{&icon_scanword_to_list_24, tr(STR_SCANWORD_TO_LIST), false, ACTION_TO_LIST, 0}
+                  : games::ui::ActionSlot{&icon_menu_24, tr(STR_GAMES_MENU), false, ACTION_MENU, 0};
+    games::ui::drawActionBar(renderer, screen, bottom() - kActionHeight, acts, static_cast<int>(std::size(acts)), -1,
+                             kTap);
+    return;
+  }
+
   const int width = renderer.getScreenWidth();
   const int height = bottom();
   const int top = gridBottom();
@@ -1207,46 +1263,24 @@ void ScanwordActivity::drawBand(UiScreen& screen) const {
     return;
   }
 
-  if (!touchBoard()) {
-    drawWordLine(bandTop, kClueBarHeight);
-    const int stripTop = bandTop + kClueBarHeight;
-    renderer.drawLine(0, stripTop, width - 1, stripTop);
-    if (stripOpen) {
-      drawLetterStrip(stripTop + (height - stripTop - kPickerCell) / 2);
-    } else {
-      // The hint, or the result of checking the whole grid from the menu.
-      char line[48];
-      if (checkResult == 0 && checkedGrid) {
-        snprintf(line, sizeof(line), "%s", tr(STR_SCANWORD_ALL_RIGHT));
-      } else if (checkResult > 0 && checkedGrid) {
-        snprintf(line, sizeof(line), tr(STR_SCANWORD_ERRORS), checkResult);
-      } else {
-        snprintf(line, sizeof(line), "%s", tr(STR_SCANWORD_PICK_HINT));
-      }
-      const int textTop = stripTop + (height - stripTop - renderer.getLineHeight(kText10Font)) / 2;
-      renderer.drawText(kText10Font, kSidePadding, textTop, line);
-    }
-    return;
-  }
-
-  // Touch, keyboard closed: check the whole grid once something is filled, and its result.
-  if (game->filledCount() == 0) return;
-  const int rowHeight = height - bandTop;
-  const int textTop = bandTop + (rowHeight - renderer.getLineHeight(kText12Font)) / 2;
-  drawIcon(screen, icon_scanword_check_all_24, kSidePadding, bandTop + (rowHeight - kIconSize) / 2);
-  const char* label = tr(STR_SCANWORD_CHECK_ALL);
-  renderer.drawText(kText12Font, kSidePadding + kIconSize + 10, textTop, label);
-  const int labelRight = kSidePadding + kIconSize + 10 + renderer.getTextWidth(kText12Font, label);
-  screen.frame().hit(fui::makeRect(0, bandTop, labelRight + kSidePadding, rowHeight), ACTION_CHECK_ALL, 0, kTap);
-  if (checkResult < 0 || !checkedGrid) return;
-  char right[48];
-  if (checkResult == 0) {
-    snprintf(right, sizeof(right), "%s", tr(STR_SCANWORD_ALL_RIGHT));
+  drawWordLine(bandTop, kClueBarHeight);
+  const int stripTop = bandTop + kClueBarHeight;
+  renderer.drawLine(0, stripTop, width - 1, stripTop);
+  if (stripOpen) {
+    drawLetterStrip(stripTop + (height - stripTop - kPickerCell) / 2);
   } else {
-    snprintf(right, sizeof(right), tr(STR_SCANWORD_ERRORS), checkResult);
+    // The hint, or the result of checking the whole grid from the menu.
+    char line[48];
+    if (checkResult == 0 && checkedGrid) {
+      snprintf(line, sizeof(line), "%s", tr(STR_SCANWORD_ALL_RIGHT));
+    } else if (checkResult > 0 && checkedGrid) {
+      snprintf(line, sizeof(line), tr(STR_SCANWORD_ERRORS), checkResult);
+    } else {
+      snprintf(line, sizeof(line), "%s", tr(STR_SCANWORD_PICK_HINT));
+    }
+    const int textTop = stripTop + (height - stripTop - renderer.getLineHeight(kText10Font)) / 2;
+    renderer.drawText(kText10Font, kSidePadding, textTop, line);
   }
-  const int rightTop = textTop + renderer.getFontAscenderSize(kText12Font) - renderer.getFontAscenderSize(kText10Font);
-  drawRightAligned(renderer, kText10Font, width - kSidePadding, rightTop, right);
 }
 
 #endif  // SOVA_KEYBOARD_GAMES
