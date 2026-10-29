@@ -10,6 +10,7 @@
 #include <iterator>
 
 #include "CardRenderer.h"
+#include "ElapsedText.h"
 #include "gameIcons.h"
 #include "games/GameSave.h"
 #include "games/chess/ui/chessIcons.h"
@@ -243,6 +244,13 @@ void KlondikeActivity::onKey(const int dx, const int dy, const bool confirm) {
   if (focus != before) requestRepaint(RepaintUpdate);
 }
 
+int32_t KlondikeActivity::shownMinutes() const { return games::ui::shownMinute(!game.isWon(), game.elapsedMs()); }
+
+// GameScreen::loop() repaints the timer when its minute turns; a stopped clock never turns.
+uint32_t KlondikeActivity::idleSleepBudgetMs() const {
+  return hasGame && !game.paused() ? games::ui::msUntilNextMinute(game.elapsedMs()) : light_sleep::kNoDeadline;
+}
+
 bool KlondikeActivity::onBack() {
   if (pickPile != kNone || hintPile != kNone || noMoves) {
     clearPick();
@@ -296,10 +304,12 @@ int KlondikeActivity::cardAt(const int pile, const int y) const {
 void KlondikeActivity::build(UiScreen& screen) {
   char value[16];
   snprintf(value, sizeof(value), "%d", game.moveCount());
+  char clock[24];
+  formatElapsed(game.elapsedMs(), clock, sizeof(clock));
   if (noMoves && !game.isWon()) {
     drawTopLine(screen, {{tr(STR_KLONDIKE_NO_MOVES), nullptr}}, false);
   } else {
-    drawTopLine(screen, {{tr(STR_GAMES_MOVES), value}}, false);
+    drawTopLine(screen, {{tr(STR_GAMES_MOVES), value}, {nullptr, clock}}, false);
   }
 
   for (int pile = 0; pile < PILES; ++pile) {
