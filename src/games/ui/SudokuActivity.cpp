@@ -227,6 +227,10 @@ void SudokuActivity::onKey(const int dx, const int dy, const bool confirm) {
         area = Area::Grid;
       } else if (dx != 0) {
         padFocus = nextKey(padFocus, dx);
+      } else if (dy != 0 && !hasBar()) {
+        // Button boards: Up/Down step three keys with wrap, so any digit is two presses away; Back leaves.
+        padFocus = (padFocus + 3 * dy + sudoku::SIZE) % sudoku::SIZE;
+        if (!padKeyShown(padFocus + 1)) padFocus = nextKey(padFocus, dy);
       } else if (dy < 0) {
         area = Area::Grid;
       } else if (dy > 0) {
