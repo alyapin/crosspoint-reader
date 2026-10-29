@@ -2091,6 +2091,7 @@ void EpubReaderActivity::renderBook() {
     // The page just re-rendered under the overlay: refresh the snapshot that
     // backs panel->toolbar restores (any previous copy is stale).
     overlayPageStored = renderer.storeBwBuffer();
+    if (toolbarUi) toolbarUi->pageChanged();
     renderOverlay();
     // FAST, same as openOverlay: HALF's inverting pass flashes the sheet
     // (white, in night mode) on every repaint under an open panel. Any AA

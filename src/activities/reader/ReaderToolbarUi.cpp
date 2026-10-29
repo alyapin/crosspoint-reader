@@ -40,14 +40,19 @@ constexpr int kPanelHeightPercent = 62;
 constexpr int kPanelHeightMaxPercent = 72;
 // Landscape has less vertical room; leave a narrow page strip for tap-to-dismiss.
 constexpr int kLandscapePanelHeightPercent = 88;
+// How far the sheet's top edge may rise to a clear gap of the page, and the
+// clear air it keeps above its rule (as OptionPopup's band).
+constexpr int kSheetLiftMax = 40;
+constexpr int kSheetAir = 4;
 }  // namespace
 
-ReaderToolbarUi::ReaderToolbarUi(GfxRenderer& renderer) : UiAppHost(renderer) {}
+ReaderToolbarUi::ReaderToolbarUi(GfxRenderer& renderer) : UiAppHost(renderer), renderer_(renderer) {}
 
 void ReaderToolbarUi::begin() {
   resetUi();
   pending_ = Routed{};
   nav_.reset();
+  liftTop_ = -1;
   for (fui::ActionId id = ACTION_DISMISS; id <= ACTION_ROW; ++id) {
     app.on(id, &ReaderToolbarUi::onAction, this);
   }
@@ -128,6 +133,25 @@ void ReaderToolbarUi::buildToolRow(UiScreen& screen, const fui::LayoutAnchor anc
   }
 }
 
+int16_t ReaderToolbarUi::openSheet(UiScreen& screen, const fui::SheetProps& props, const int16_t height) {
+  const int top = std::min(screen.frame().device().screen().bottom(), screen.frame().safeRect().bottom()) - height;
+  // Repaints over the sheet keep the lift found on the bare page.
+  if (top != liftTop_) {
+    liftTop_ = top;
+    lift_ = 0;
+    for (int lift = 0; lift <= kSheetLiftMax && top - lift - kSheetAir >= 0; ++lift) {
+      int clear = 0;
+      while (clear < kSheetAir && renderer_.isRowClear(top - lift - kSheetAir + clear)) ++clear;
+      if (clear == kSheetAir) {
+        lift_ = static_cast<int16_t>(lift);
+        break;
+      }
+    }
+  }
+  screen.sheet(props, static_cast<int16_t>(height + lift_));
+  return lift_;
+}
+
 void ReaderToolbarUi::buildToolbar(UiScreen& screen) {
   const auto& tokens = screen.theme();
 
@@ -147,9 +171,9 @@ void ReaderToolbarUi::buildToolbar(UiScreen& screen) {
   sheetProps.grabberInset = static_cast<int16_t>(tokens.spaceLg + tokens.spaceMd);
   const int16_t grabberBand =
       static_cast<int16_t>(sheetProps.grabberMargin + sheetProps.grabberHeight + sheetProps.grabberInset);
-  screen.sheet(sheetProps, static_cast<int16_t>(contentH + grabberBand));
+  const int16_t lift = openSheet(screen, sheetProps, static_cast<int16_t>(contentH + grabberBand));
   screen.insetContent(fui::Insets{0, tokens.spaceLg, 0, tokens.spaceLg});
-  screen.spacer(tokens.spaceMd);
+  screen.spacer(static_cast<int16_t>(lift + tokens.spaceMd));
 
   // Scrub row: < [progress track + knob: tap/drag to jump] >
   {
@@ -246,7 +270,8 @@ void ReaderToolbarUi::buildPanel(UiScreen& screen) {
   if (static_cast<int16_t>(chrome + (sheetRows + 1) * rowStride - rowGap) <= cap) ++sheetRows;
   if (model_.itemCount > 0 && sheetRows > model_.itemCount) sheetRows = model_.itemCount;
   if (sheetRows < 1) sheetRows = 1;
-  screen.sheet(sheetProps, static_cast<int16_t>(chrome + sheetRows * rowStride - rowGap));
+  const int16_t lift = openSheet(screen, sheetProps, static_cast<int16_t>(chrome + sheetRows * rowStride - rowGap));
+  if (lift > 0) screen.spacer(lift);
   // No blanket side inset: Screen::list() draws in the content band, and the
   // scroll track must reach the sheet's edge like a full-screen list's does.
   // The title insets itself; the rows inset via rowInset below.

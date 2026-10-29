@@ -75,6 +75,9 @@ class ReaderToolbarUi : public UiAppHost {
   freeink::ui::ListNav& nav() { return nav_; }
   // Rows one page holds, measured after the first render.
   int visibleRows() const { return nav_.pageRows(); }
+  // The page under the sheet was drawn afresh: the next render looks for a
+  // clear gap for the sheet's top edge again.
+  void pageChanged() { liftTop_ = -1; }
 
  private:
   static void screenFn(UiScreen& screen, void* user);
@@ -82,6 +85,12 @@ class ReaderToolbarUi : public UiAppHost {
   void buildToolbar(UiScreen& screen);
   void buildPanel(UiScreen& screen);
   void buildToolRow(UiScreen& screen, freeink::ui::LayoutAnchor anchor, int16_t sideInset);
+  // Opens a bottom sheet of `height`, its top edge raised into the nearest
+  // clear gap of the page under it, so no line of the page shows cut; the
+  // content keeps its place. Returns the extra height at the top.
+  int16_t openSheet(UiScreen& screen, const freeink::ui::SheetProps& props, int16_t height);
+
+  const GfxRenderer& renderer_;
 
   Model model_;
   Routed pending_;
@@ -98,4 +107,7 @@ class ReaderToolbarUi : public UiAppHost {
   freeink::ui::ButtonProps stepProps_;
   freeink::ui::ListProps listProps_;
   freeink::ui::Rect pageIndicatorRect_{};
+  // Sheet top the lift was found for (-1: none yet) and the lift itself.
+  int liftTop_ = -1;
+  int16_t lift_ = 0;
 };
