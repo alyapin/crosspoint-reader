@@ -34,10 +34,14 @@ class Game;
 namespace hangman {
 class Game;
 }
+namespace codeword {
+class Game;
+class Solved;
+}  // namespace codeword
 
 namespace gamesave {
 
-enum class Kind { Sudoku, Minesweeper, Klondike, TicTacToe, Fifteen, FiveLetters, Game2048, Hangman };
+enum class Kind { Sudoku, Minesweeper, Klondike, TicTacToe, Fifteen, FiveLetters, Game2048, Hangman, Codeword };
 
 bool hasGameInProgress(Kind kind);
 void clear(Kind kind);
@@ -52,6 +56,7 @@ bool save(const fifteen::Game& game);
 bool save(const fiveletters::Game& game);
 bool save(const g2048::Game& game);
 bool save(const hangman::Game& game);
+bool save(const codeword::Game& game);
 
 // Restore the saved game, paused. False on failure; a file that reads but does
 // not parse is removed.
@@ -64,6 +69,8 @@ bool load(fifteen::Game& game);
 bool load(fiveletters::Game& game);
 bool load(g2048::Game& game);
 bool load(hangman::Game& game);
+// The puzzle is not attached: see codeword::Game::attach().
+bool load(codeword::Game& game);
 
 // Records outlive their games. A missing or corrupt one loads empty; one that
 // cannot be read loads false (2048: 0) and is not written until a load reads it.
@@ -79,5 +86,9 @@ bool loadStats(fiveletters::Stats& stats);
 // The 2048 record; 0 when none.
 uint32_t loadBest2048();
 void saveBest2048(uint32_t score);
+
+// The solved codewords.
+bool save(const codeword::Solved& solved);
+bool load(codeword::Solved& solved);
 
 }  // namespace gamesave

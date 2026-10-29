@@ -10,11 +10,13 @@ set(GAMES_SOURCES
   ${GAMES_DIR}/FiveLetters.cpp
   ${GAMES_DIR}/Game2048.cpp
   ${GAMES_DIR}/Hangman.cpp
+  ${GAMES_DIR}/Codeword.cpp
   KlondikeSolver.cpp
 )
 
 add_executable(GamesCoreTest SudokuTest.cpp MinesweeperTest.cpp KlondikeTest.cpp TicTacToeTest.cpp FifteenTest.cpp
                FiveLettersTest.cpp Game2048Test.cpp HangmanTest.cpp ElapsedTextTest.cpp GameSaveTest.cpp
+               CodewordTest.cpp
                ${REPO_ROOT}/src/games/GameSave.cpp ${GAMES_SOURCES})
 target_include_directories(GamesCoreTest PRIVATE ${GAMES_DIR} ../library_builder/stubs)
 target_link_libraries(GamesCoreTest PRIVATE crosspoint_test_common GTest::gtest_main)

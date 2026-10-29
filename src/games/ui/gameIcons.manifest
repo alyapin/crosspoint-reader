@@ -28,3 +28,5 @@ bar-hint = lightbulb
 five-letters = spell-check
 key-delete = delete
 key-enter = corner-down-left
+# Кейворды: games list
+codeword = binary

@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <climits>
 #include <cstdio>
-#include <iterator>
 #include <variant>
 
 #include "ElapsedText.h"
@@ -89,30 +88,35 @@ void GameScreen::openPicker(const char* title, const GamePickerActivity::Row* ro
   });
 }
 
-void GameScreen::openGameMenu() {
-  const GamePickerActivity::Row rows[] = {
-      {tr(STR_GAMES_NEW_GAME), &icon_bar_new_game_24},
-      {tr(STR_GAMES_FINISH), &icon_resign_24},
-  };
-  auto menu = makeUniqueNoThrow<GamePickerActivity>(renderer, mappedInput, tr(STR_GAMES_MENU), rows,
-                                                    static_cast<int>(std::size(rows)), 0);
+void GameScreen::openGameMenu(const GamePickerActivity::Row* own, const int ownCount) {
+  GamePickerActivity::Row rows[GamePickerActivity::MAX_ROWS];
+  const int first = std::clamp(ownCount, 0, GamePickerActivity::MAX_ROWS - 2);
+  std::copy(own, own + first, rows);
+  rows[first] = {tr(STR_GAMES_NEW_GAME), &icon_bar_new_game_24};
+  rows[first + 1] = {tr(STR_GAMES_FINISH), &icon_resign_24};
+  auto menu = makeUniqueNoThrow<GamePickerActivity>(renderer, mappedInput, tr(STR_GAMES_MENU), rows, first + 2, 0);
   if (!menu) {
     LOG_ERR("GAMES", "OOM: %u bytes for the menu", static_cast<unsigned>(sizeof(GamePickerActivity)));
     return;
   }
   app.clearTapFlash();
   pauseGame();
-  startActivityForResult(std::move(menu), [this](const ActivityResult& result) {
+  startActivityForResult(std::move(menu), [this, first](const ActivityResult& result) {
     RenderLock lock(*this);
     const auto* choice = std::get_if<MenuResult>(&result.data);
-    if (!result.isCancelled && choice != nullptr && choice->action == 1) {
+    const int row = !result.isCancelled && choice != nullptr ? choice->action : -1;
+    if (row == first + 1) {
       confirmFinish();
       return;
     }
     resumeGame();
     clockShown = shownMinutes();
     requestRepaint(RepaintEntry);
-    if (!result.isCancelled && choice != nullptr) openNewGame();
+    if (row == first) {
+      openNewGame();
+    } else if (row >= 0) {
+      menuChosen(row);
+    }
   });
 }
 

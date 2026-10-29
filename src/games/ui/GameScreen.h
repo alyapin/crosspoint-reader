@@ -81,9 +81,10 @@ class GameScreen : public Activity, protected UiAppHost {
 
   void openPicker(const char* title, const GamePickerActivity::Row* rows, int count, int selected, int toggleRow = -1,
                   bool toggleOn = false);
-  // The menu of a game in progress: Новая игра, or Завершить, which after a
-  // confirmation drops the save and leaves.
-  void openGameMenu();
+  // The menu of a game in progress: the game's own rows first (menuChosen()),
+  // then Новая игра, or Завершить, which after a confirmation drops the save and leaves.
+  void openGameMenu(const GamePickerActivity::Row* own = nullptr, int ownCount = 0);
+  virtual void menuChosen(int /*row*/) {}
   void requestRepaint(Repaint kind);
   int barTop() const;
   uint16_t shellInput() const;
