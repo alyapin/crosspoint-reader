@@ -8,13 +8,12 @@
 
 #include "TextSettingsPreview.h"
 #include "activities/UiTabListActivity.h"
-#include "components/OptionPopup.h"
 #include "components/themes/BaseTheme.h"
 
 // Reader text settings with a shared live preview pane: tab bar
 // (Font | Size | Layout | Style) is position 0 of the Up/Down nav ring, same
 // idiom as SettingsActivity. Family/Size rows apply on Confirm; Layout/Style
-// rows toggle or open an OptionPopup picker. (Tab::Family/Style are the enum
+// rows toggle or open the full-screen value picker. (Tab::Family/Style are the enum
 // names for the Font/Style tabs.)
 class TextSettingsActivity final : public UiTabListActivity {
  public:
@@ -24,7 +23,6 @@ class TextSettingsActivity final : public UiTabListActivity {
                        Tab initialTab = Tab::Family);
 
   void onEnter() override;
-  void render(RenderLock&&) override;
 
  private:
   // Row indices per tab. enum class (not plain enum) so a LayoutRow can't be
@@ -53,7 +51,6 @@ class TextSettingsActivity final : public UiTabListActivity {
   void drawChrome() override;
   void drawFooter() override;
   bool handleButtons() override;
-  bool handleCustomInput() override;
 
   void applyFamily(int listIndex);
   void applySize(int listIndex);
@@ -93,7 +90,6 @@ class TextSettingsActivity final : public UiTabListActivity {
   };
 
   const SdCardFontRegistry* registry_;
-  OptionPopup optionPopup_;
   std::vector<FontEntry> fonts_;
   std::vector<SizeEntry> sizes_;
   textsettings::PreviewLayout previewLayout_;  // cached preview line layout; relaid only on setting/geometry change

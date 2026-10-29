@@ -104,6 +104,7 @@ struct UITheme {
 constexpr const char* STR_TEXT_SETTINGS = "Text Settings";
 constexpr const char* STR_PREVIEW = """ + english.split("STR_PREVIEW: ", 1)[1].splitlines()[0] + r""";
 constexpr int UI_10_FONT_ID = 0, TOUCH_TAB_BAR_HEIGHT = 50, ACTION_TAB = 1, ACTION_ROW = 2;
+namespace setka { constexpr int kSelectionBarWidth = 10, kSelectionBarX = 10; }
 namespace textsettings {
   struct PreviewLayout {};
 """ + preview_caption + r"""
@@ -120,6 +121,7 @@ struct UiTabListActivity {
   fui::TabIndicator tabIndicator(int) const { return fui::TabIndicator::None; }
   int ringPos() const { return selected; }
   void buildTabBar(UiScreen&);
+  void buildSetkaTabStrip(UiScreen&, int16_t);
 };
 struct TextSettingsActivity : UiTabListActivity {
   enum class Tab { Family, Size, Layout, Style };
@@ -240,7 +242,7 @@ void checkLayout(const BoardConfig::BoardProfile& profile, GfxRenderer::Orientat
     activity.selected = focus;
     activity.drawChrome();
     const Rect caption = activity.renderer.caption;
-    assert(activity.renderer.captionText == "Preview \"Bitter, 12 pt\"");
+    assert(activity.renderer.captionText == "Preview \u00ABBitter, 12 pt\u00BB");
     assert(caption.x == preview.x + metrics.previewPadding);
     assert(caption.x + caption.width <= preview.x + preview.width - metrics.previewPadding);
     assert(caption.y == preview.y + preview.height - metrics.previewPadding -

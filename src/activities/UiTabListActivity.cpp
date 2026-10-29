@@ -7,6 +7,7 @@
 
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
+#include "components/setka/SetkaStyle.h"
 
 namespace fui = freeink::ui;
 
@@ -140,6 +141,10 @@ void UiTabListActivity::buildTabBar(UiScreen& screen) {
   const int16_t preferredTabHeight =
       mappedInput.hasTouch() ? TOUCH_TAB_BAR_HEIGHT : static_cast<int16_t>(metrics.tabBarHeight);
   const int16_t tabBand = preferredTabHeight > tabLineHeight + 10 ? preferredTabHeight : tabLineHeight + 10;
+  if (screen.theme().listSelectionStyle == fui::SelectionStyle::LeftBar) {
+    buildSetkaTabStrip(screen, tabBand);
+    return;
+  }
 
   if (tabPillMaxPad > 0) {
     // Cap each pill at its label plus this padding: the equal-width slots (and
@@ -159,17 +164,7 @@ void UiTabListActivity::buildTabBar(UiScreen& screen) {
   fui::StyleSet tabStyles;
   tabStyles.explicitlySet = true;
   tabStyles.normal.foreground = fui::Paint::solid(fui::Color::Black);
-  const bool setka = screen.theme().listSelectionStyle == fui::SelectionStyle::LeftBar;
-  if (setka) {
-    // No fills: a black underline marks the active tab, a frame shows key focus on the band.
-    tabStyles.selected.foreground = fui::Paint::solid(fui::Color::Black);
-    if (tabsFocused && !mappedInput.hasTouch()) {
-      tabStyles.selected.border = fui::Paint::solid(fui::Color::Black);
-      tabStyles.selected.borderWidth = 2;
-    }
-    tabProps.selectedUnderline = 4;
-    tabProps.tabInset = fui::Insets{2, 4, 0, 4};  // the underline stays on the divider in both states
-  } else if (tabsFocused) {
+  if (tabsFocused) {
     tabStyles.selected.background = fui::Paint::solid(fui::Color::Black);
     tabStyles.selected.foreground = fui::Paint::solid(fui::Color::White);
     tabStyles.selected.radius = screen.theme().listRowRadius;
@@ -198,7 +193,7 @@ void UiTabListActivity::buildTabBar(UiScreen& screen) {
                           contentTabRect.height};
   // Focused band wash is the Lyra treatment; legacy RoundedRaff keeps the
   // band plain in both states.
-  if (tabsFocused && !metrics.tabPillFullSlot && !setka) {
+  if (tabsFocused && !metrics.tabPillFullSlot) {
     screen.target().fill(tabRect, fui::Paint::dither(fui::Color::LightGray));
   }
   // Leave space on both sides of the tab labels and selection highlights.
@@ -212,5 +207,54 @@ void UiTabListActivity::buildTabBar(UiScreen& screen) {
   fui::tabBar(screen.frame(), slotsRect, tabProps);
   screen.target().fill(fui::Rect{tabRect.x, static_cast<int16_t>(tabRect.bottom() - divider), tabRect.width, divider},
                        fui::Paint::solid(fui::Color::Black));
+  screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
+}
+
+// Setka tabs, as in the Library: labels from the left in the UI 9 text role,
+// the active one SemiBold with the 10 px bar before it, the rule below.
+void UiTabListActivity::buildSetkaTabStrip(UiScreen& screen, const int16_t tabBand) {
+  constexpr int kBarGap = 6;  // the bar ends this far left of its label
+  constexpr int kTabGap = 26;
+  constexpr int kTabGapMin = setka::kSelectionBarWidth + 2 * kBarGap;  // still clears the bar
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  auto& target = screen.target();
+  const fui::Rect band = screen.takeTop(tabBand);
+  const fui::Rect frameRect = screen.frame().screen();
+  const fui::Rect safeRect = screen.frame().safeRect();
+  fui::TextStyle regular = screen.theme().smallText;
+  regular.maxLines = 1;
+  fui::TextStyle active = regular;
+  active.bold = true;
+  const auto styleFor = [&](const int i) -> const fui::TextStyle& { return i == activeTab() ? active : regular; };
+
+  const int count = tabCount();
+  const int firstX = band.x + setka::kSelectionBarX + setka::kSelectionBarWidth + kBarGap;
+  int textWidth = 0;
+  for (int i = 0; i < count; ++i) textWidth += target.measureText(regular.font, tabLabel(i), styleFor(i)).width;
+  const int spare = band.right() - metrics.contentSidePadding - firstX - textWidth;
+  const int gap = count > 1 ? std::clamp(spare / (count - 1), kTabGapMin, kTabGap) : kTabGap;
+  const auto divider = static_cast<int16_t>(std::max(1, metrics.headerUnderlineSize));
+  const int stripBottom = band.bottom() - divider;
+  const int16_t lineHeight = target.lineHeight(regular.font);
+  const auto textTop = static_cast<int16_t>(band.y + (stripBottom - band.y - lineHeight) / 2);
+  const fui::Paint ink = fui::Paint::solid(fui::Color::Black);
+  int x = firstX;
+  for (int i = 0; i < count; ++i) {
+    const char* label = tabLabel(i);
+    const auto labelWidth = static_cast<int16_t>(target.measureText(regular.font, label, styleFor(i)).width);
+    if (i == activeTab()) {
+      target.fill(
+          fui::makeRect(x - kBarGap - setka::kSelectionBarWidth, textTop, setka::kSelectionBarWidth, lineHeight), ink);
+    }
+    target.text(fui::makeRect(x, textTop, labelWidth, lineHeight), label, styleFor(i));
+    const int hitLeft = std::max<int>(band.x, x - gap / 2);
+    const int hitRight = std::min<int>(band.right(), x + labelWidth + gap / 2);
+    screen.frame().hit(fui::makeRect(hitLeft, band.y, hitRight - hitLeft, stripBottom - band.y), ACTION_TAB,
+                       static_cast<int16_t>(i), fui::InputTouch);
+    x += labelWidth + gap;
+  }
+  // The rule runs to the display edges, like the Lyra band's divider.
+  target.fill(fui::makeRect(band.x - safeRect.x, stripBottom, band.width + frameRect.width - safeRect.width, divider),
+              ink);
   screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
 }

@@ -336,6 +336,7 @@ void FrontlightPanelActivity::addSliderRow(UiScreen& screen, const char* label, 
   rowProps.decrement = stepAction;
   rowProps.increment = stepAction;
   rowProps.decrementValue = -BRIGHTNESS_STEP;
+  rowProps.decrementLabel = "\xE2\x88\x92";  // U+2212 minus: as wide as the "+" (a hyphen reads smaller)
   rowProps.incrementValue = BRIGHTNESS_STEP;
   if (showToggle) {
     // Lamp on/off after the +: the sliders set the level, this kills the light

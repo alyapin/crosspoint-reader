@@ -54,6 +54,7 @@
 #include "activities/ActivityManager.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/settings/TextSettingsActivity.h"
+#include "activities/util/ValuePickerActivity.h"
 #include "clippings/ClippingText.h"
 #include "clippings/ClippingsManager.h"
 #include "components/UITheme.h"
@@ -2091,8 +2092,6 @@ void EpubReaderActivity::renderBook() {
     // backs panel->toolbar restores (any previous copy is stale).
     overlayPageStored = renderer.storeBwBuffer();
     renderOverlay();
-    // An open option picker rides on top of the freshly drawn panel.
-    if (overlayPopup.isActive()) overlayPopup.render(renderer);
     // FAST, same as openOverlay: HALF's inverting pass flashes the sheet
     // (white, in night mode) on every repaint under an open panel. Any AA
     // residue a FAST differential leaves under the chrome has not shown in
@@ -2596,6 +2595,14 @@ constexpr StrId kAlignIds[] = {StrId::STR_JUSTIFY, StrId::STR_ALIGN_LEFT, StrId:
                                StrId::STR_BOOK_S_STYLE};
 constexpr int kTextRowCount = static_cast<int>(std::size(kTextRowNames));
 static_assert(std::size(kAlignIds) == CrossPointSettings::PARAGRAPH_ALIGNMENT_COUNT, "alignment labels");
+
+template <size_t N>
+std::vector<std::string> idLabels(const StrId (&ids)[N]) {
+  std::vector<std::string> labels;
+  labels.reserve(N);
+  for (const StrId id : ids) labels.emplace_back(I18N.get(id));
+  return labels;
+}
 }  // namespace
 
 bool EpubReaderActivity::usesToolbarMenu() const {
@@ -2658,7 +2665,7 @@ void EpubReaderActivity::showTextRowPopup(const int row) {
       for (size_t i = 0; i < sizes.size(); ++i) {
         if (sizes[i] == cur) curIdx = static_cast<int>(i);
       }
-      overlayPopup.show(StrId::STR_FONT_SIZE, labels, curIdx, [this, sizes](int idx) {
+      openPanelPicker(StrId::STR_FONT_SIZE, std::move(labels), curIdx, [this, sizes](const int idx) {
         if (idx < 0 || idx >= static_cast<int>(sizes.size())) return;
         SETTINGS.fontPointSize = sizes[idx];
         applyTextSettingLive();
@@ -2666,23 +2673,23 @@ void EpubReaderActivity::showTextRowPopup(const int row) {
       break;
     }
     case 2:
-      overlayPopup.show(StrId::STR_LINE_SPACING, LINE_SPACING_IDS, static_cast<int>(std::size(LINE_SPACING_IDS)),
-                        SETTINGS.lineSpacing % CrossPointSettings::LINE_COMPRESSION_COUNT, [this](int idx) {
-                          SETTINGS.lineSpacing = static_cast<uint8_t>(idx);
-                          applyTextSettingLive();
-                        });
+      openPanelPicker(StrId::STR_LINE_SPACING, idLabels(LINE_SPACING_IDS),
+                      SETTINGS.lineSpacing % CrossPointSettings::LINE_COMPRESSION_COUNT, [this](const int idx) {
+                        SETTINGS.lineSpacing = static_cast<uint8_t>(idx);
+                        applyTextSettingLive();
+                      });
       break;
     case 3:
-      overlayPopup.show(StrId::STR_PARA_ALIGNMENT, kAlignIds, static_cast<int>(std::size(kAlignIds)),
-                        SETTINGS.paragraphAlignment % CrossPointSettings::PARAGRAPH_ALIGNMENT_COUNT, [this](int idx) {
-                          SETTINGS.paragraphAlignment = static_cast<uint8_t>(idx);
-                          applyTextSettingLive();
-                        });
+      openPanelPicker(StrId::STR_PARA_ALIGNMENT, idLabels(kAlignIds),
+                      SETTINGS.paragraphAlignment % CrossPointSettings::PARAGRAPH_ALIGNMENT_COUNT,
+                      [this](const int idx) {
+                        SETTINGS.paragraphAlignment = static_cast<uint8_t>(idx);
+                        applyTextSettingLive();
+                      });
       break;
     default:
       return;
   }
-  paintOverlayPopup();
 }
 
 void EpubReaderActivity::discardOverlayPage() {
@@ -2790,8 +2797,7 @@ void EpubReaderActivity::openOverlay(Overlay target) {
 void EpubReaderActivity::closeOverlayToPage() {
   mappedInput.resetHomeButtonInput();
   overlay = Overlay::None;
-  overlayPopup.dismiss();  // an option picker cannot outlive its panel
-  toolbarUi.reset();       // ~1 KB of interaction table + props, only needed while open
+  toolbarUi.reset();  // ~1 KB of interaction table + props, only needed while open
   if (BoardConfig::isEegoA4()) pagesUntilFullRefresh = 1;
   if (!xteinkClassPanel() && overlayPageStored) {
     RenderLock lock;  // the render task shares the framebuffer
@@ -2880,28 +2886,6 @@ void EpubReaderActivity::renderOverlay() {
 void EpubReaderActivity::handleOverlayInput() {
   if (!toolbarUi) return;
 
-  // A modal option picker over the panel owns all input while open.
-  if (overlayPopup.isActive()) {
-    overlayPopup.handleInput(mappedInput, [this] {
-      if (overlayPopup.isActive()) {
-        paintOverlayPopup();  // highlight moved
-        return;
-      }
-      // Dismissed or selected: erase the dialog -- clean page back, then the
-      // panel over it (the dialog can overhang the sheet onto the page).
-      RenderLock lock;
-      settleOverlayRefresh();
-      if (overlayPageStored) {
-        renderer.restoreBwBuffer(/*resyncPanelBaseline=*/false);
-        overlayPageStored = renderer.storeBwBuffer();
-        renderOverlay();
-        pushOverlayRefresh();
-      } else {
-        requestUpdate();
-      }
-    });
-    return;
-  }
   const auto fastRedraw = [this] {
     RenderLock lock;  // the render task shares the framebuffer
     settleOverlayRefresh();
@@ -3000,7 +2984,6 @@ void EpubReaderActivity::handleOverlayInput() {
         // Full font picker (built-in + SD fonts, live preview) -- the same
         // screen Settings uses; a popup cannot scroll a long font list.
         overlay = Overlay::None;
-        overlayPopup.dismiss();
         discardOverlayPage();
         {
           RenderLock lock;  // the picker paints the framebuffer next
@@ -3161,14 +3144,31 @@ void EpubReaderActivity::handleOverlayInput() {
   }
 }
 
-// First paint of the option picker over the panel (and highlight repaints).
-// The dialog draws over the current framebuffer without clearing; erasing it
-// on dismissal is the popup gate's restore in handleOverlayInput().
-void EpubReaderActivity::paintOverlayPopup() {
-  RenderLock lock;
-  settleOverlayRefresh();
-  overlayPopup.render(renderer);
-  pushOverlayRefresh();
+// Enum rows of the Text and More panels pick their value on the full-screen
+// picker Settings uses; the panel comes back over the page afterwards, with
+// the choice applied (the font row does the same with the font screen).
+void EpubReaderActivity::openPanelPicker(const StrId title, std::vector<std::string> labels, const int current,
+                                         std::function<void(int)> onSelect) {
+  auto picker =
+      makeUniqueNoThrow<ValuePickerActivity>(renderer, mappedInput, I18N.get(title), std::move(labels), current);
+  if (!picker) return;
+  const Overlay panel = overlay;
+  const int row = panelIndex;
+  overlay = Overlay::None;
+  discardOverlayPage();
+  {
+    RenderLock lock;  // the picker paints the framebuffer next
+    settleOverlayRefresh();
+  }
+  startActivityForResult(std::move(picker),
+                         [this, panel, row, onSelect = std::move(onSelect)](const ActivityResult& result) {
+                           overlay = panel;
+                           panelIndex = row;
+                           const auto* picked = std::get_if<IntervalResult>(&result.data);
+                           if (!result.isCancelled && picked) onSelect(static_cast<int>(picked->value));
+                           if (toolbarUi) toolbarUi->begin();  // the picker drew its own FUI screen
+                           requestUpdate();                    // re-render page + panel
+                         });
 }
 
 void EpubReaderActivity::applyReaderTextSettings() {
@@ -3241,15 +3241,11 @@ void EpubReaderActivity::activateMoreRow(int row) {
       static constexpr StrId kOrientIds[] = {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW,
                                              StrId::STR_ORIENTATION_INVERTED, StrId::STR_LANDSCAPE_CCW};
       static_assert(std::size(kOrientIds) == CrossPointSettings::ORIENTATION_COUNT, "orientation options");
-      overlayPopup.show(StrId::STR_ORIENTATION, kOrientIds, static_cast<int>(std::size(kOrientIds)),
-                        SETTINGS.orientation % CrossPointSettings::ORIENTATION_COUNT, [this](int idx) {
-                          if (idx == SETTINGS.orientation) return;
-                          applyOrientation(static_cast<uint8_t>(idx));
-                          // The stored page is laid out for the old orientation.
-                          discardOverlayPage();
-                          requestUpdate();
-                        });
-      paintOverlayPopup();
+      openPanelPicker(StrId::STR_ORIENTATION, idLabels(kOrientIds),
+                      SETTINGS.orientation % CrossPointSettings::ORIENTATION_COUNT, [this](const int idx) {
+                        if (idx == SETTINGS.orientation) return;
+                        applyOrientation(static_cast<uint8_t>(idx));
+                      });
       return;
     }
     case MA::AUTO_PAGE_TURN: {
@@ -3257,11 +3253,10 @@ void EpubReaderActivity::activateMoreRow(int row) {
       labels.reserve(std::size(PAGE_TURN_RATES));
       labels.emplace_back(tr(STR_STATE_OFF));
       for (size_t i = 1; i < std::size(PAGE_TURN_RATES); ++i) labels.push_back(std::to_string(PAGE_TURN_RATES[i]));
-      overlayPopup.show(StrId::STR_AUTO_TURN_PAGES_PER_MIN, labels, autoTurnOption, [this](int idx) {
+      openPanelPicker(StrId::STR_AUTO_TURN_PAGES_PER_MIN, std::move(labels), autoTurnOption, [this](const int idx) {
         autoTurnOption = idx;
         toggleAutoPageTurn(static_cast<uint8_t>(idx));
       });
-      paintOverlayPopup();
       return;
     }
     case MA::BLUETOOTH:

@@ -1,5 +1,6 @@
 #include "OpdsServerListActivity.h"
 
+#include <FreeInkUIIcon.h>
 #include <GfxRenderer.h>
 #include <I18n.h>
 #include <Logging.h>
@@ -13,8 +14,12 @@
 #include "OpdsSettingsActivity.h"
 #include "activities/ActivityManager.h"
 #include "activities/browser/OpdsBookBrowserActivity.h"
+#include "activities/stats/statsIcons.h"
 #include "activities/util/KeyboardEntryActivity.h"
+#include "activities/util/ValuePickerActivity.h"
 #include "components/UITheme.h"
+#include "components/icons/listIcons.h"
+#include "components/setka/setkaIcons.h"
 #include "util/OpdsFilename.h"
 
 namespace fui = freeink::ui;
@@ -82,29 +87,30 @@ void OpdsServerListActivity::rebuildRowItems() {
     fui::ListItem item;
     item.label = servers[i].name.empty() ? servers[i].url.c_str() : servers[i].name.c_str();
     if (!servers[i].name.empty()) item.subtitle = servers[i].url.c_str();
+    item.icon = fui::bitmapFromIcon(icon_globe_24);
     item.actionValue = static_cast<int16_t>(i);
     rowItems_.push_back(item);
   }
+  // Every row carries an icon, like the networks and shelves lists.
   fui::ListItem addServer;
   addServer.label = tr(STR_ADD_SERVER);
+  addServer.icon = fui::bitmapFromIcon(icon_plus_24);
   addServer.actionValue = static_cast<int16_t>(serverCount);
   rowItems_.push_back(addServer);
 
   if (!pickerMode) {
     fui::ListItem folder;
     folder.label = tr(STR_OPDS_DOWNLOAD_FOLDER);
+    folder.icon = fui::bitmapFromIcon(icon_folder_24);
     folder.actionValue = static_cast<int16_t>(serverCount + 1);
     rowItems_.push_back(folder);  // subtitle refreshed per render below
 
     fui::ListItem format;
     format.label = tr(STR_OPDS_FILENAME_FORMAT);
+    format.icon = fui::bitmapFromIcon(icon_file_text_24);
     format.actionValue = static_cast<int16_t>(serverCount + 2);
     rowItems_.push_back(format);  // subtitle refreshed per render below
   }
-}
-
-bool OpdsServerListActivity::handleCustomInput() {
-  return optionPopup.handleInput(mappedInput, [this] { requestUpdate(); });
 }
 
 void OpdsServerListActivity::onBackButton() {
@@ -173,12 +179,12 @@ void OpdsServerListActivity::handleSelection() {
   if (nav.selected == serverCount + 2) {
     static constexpr StrId formatLabels[] = {StrId::STR_FMT_AUTHOR_TITLE, StrId::STR_FMT_TITLE_AUTHOR,
                                              StrId::STR_FMT_TITLE};
-    optionPopup.show(StrId::STR_OPDS_FILENAME_FORMAT, formatLabels, static_cast<int>(OpdsFilenameFormat::Count),
-                     SETTINGS.opdsFilenameFormat, [this](int idx) {
-                       SETTINGS.opdsFilenameFormat = static_cast<uint8_t>(idx);
-                       SETTINGS.saveToFile();
-                     });
-    requestUpdate();
+    ValuePickerActivity::open(*this, renderer, mappedInput, StrId::STR_OPDS_FILENAME_FORMAT, formatLabels,
+                              static_cast<int>(OpdsFilenameFormat::Count), SETTINGS.opdsFilenameFormat,
+                              [](const int idx) {
+                                SETTINGS.opdsFilenameFormat = static_cast<uint8_t>(idx);
+                                SETTINGS.saveToFile();
+                              });
     return;
   }
 
@@ -233,12 +239,4 @@ void OpdsServerListActivity::buildScreen(UiScreen& screen) {
   props.inputMask = fui::InputTouch;  // physical buttons stay in loop()
   syncListViewport(screen, props);
   screen.list(props);
-}
-
-void OpdsServerListActivity::render(RenderLock&& lock) {
-  if (optionPopup.processRender(renderer, mappedInput)) return;
-
-  // Header via GUI.drawHeader (already FreeInkUI-themed) for the battery
-  // indicator; the rest of the screen renders through the base skeleton.
-  UiListActivity::render(std::move(lock));
 }

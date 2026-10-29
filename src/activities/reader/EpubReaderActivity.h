@@ -6,8 +6,10 @@
 #include <Epub/Section.h>
 
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "BookFooter.h"
@@ -84,10 +86,6 @@ class EpubReaderActivity final : public ReaderActivity {
   // FreeInkUI chrome + tap targets for the overlay; created when it opens,
   // released when it closes.
   std::unique_ptr<ReaderToolbarUi> toolbarUi;
-  // Modal option picker over the panel (same component the Settings screens
-  // use), for enum rows: font size / line spacing / alignment / orientation /
-  // auto page turn. Toggle rows stay one-tap toggles, as in Settings.
-  OptionPopup overlayPopup;
   // True while a clean-page snapshot (renderer.storeBwBuffer) backs the open
   // overlay, letting panel->toolbar steps restore the page without a full
   // re-render. Discarded on close / whenever the page under the overlay changes.
@@ -208,7 +206,8 @@ class EpubReaderActivity final : public ReaderActivity {
   void showTextRowPopup(int row);
   // Persist + re-paginate + re-render under the open panel (live preview).
   void applyTextSettingLive();
-  void paintOverlayPopup();
+  // Full-screen value picker for an enum row of the open panel; see the .cpp.
+  void openPanelPicker(StrId title, std::vector<std::string> labels, int current, std::function<void(int)> onSelect);
   // Persist the reader text settings, (re)load the selected SD font, and
   // re-paginate the current chapter so changes apply without re-opening the book.
   void applyReaderTextSettings();

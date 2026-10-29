@@ -9,6 +9,7 @@
 #include "KOReaderCredentialStore.h"
 #include "MappedInputManager.h"
 #include "ReaderUtils.h"
+#include "activities/util/ValuePickerActivity.h"
 #include "components/UITheme.h"
 #include "util/PluginEvents.h"
 #include "util/SlideSwitch.h"
@@ -127,7 +128,6 @@ bool EpubReaderMenuActivity::handleHomeGesture() {
 }
 
 void EpubReaderMenuActivity::activateIndex(const int index) {
-  if (optionPopup.isActive()) return;
   // The activated row leaves this screen (popup or finish); a lingering flash
   // would gray an unrelated element on the next render.
   app.clearTapFlash();
@@ -135,27 +135,23 @@ void EpubReaderMenuActivity::activateIndex(const int index) {
 
   const auto selectedAction = menuItems[index].action;
   if (selectedAction == MenuAction::ROTATE_SCREEN) {
-    optionPopup.show(StrId::STR_ORIENTATION, orientationLabels.data(), static_cast<int>(orientationLabels.size()),
-                     pendingOrientation, [this](int idx) {
-                       pendingOrientation = idx;
-                       // Rotate the menu immediately. Only the renderer turns;
-                       // SETTINGS.orientation stays unchanged so the reader's
-                       // result handler still detects the change and reflows.
-                       ReaderUtils::applyOrientation(renderer, pendingOrientation);
-                       app.setDevice(uiTarget.deviceContext());  // hit rects follow the new frame
-                       requestUpdate(true);
-                     });
-    requestUpdate();
+    ValuePickerActivity::open(*this, renderer, mappedInput, StrId::STR_ORIENTATION, orientationLabels.data(),
+                              static_cast<int>(orientationLabels.size()), pendingOrientation, [this](const int idx) {
+                                pendingOrientation = idx;
+                                // Rotate the menu immediately. Only the renderer turns;
+                                // SETTINGS.orientation stays unchanged so the reader's
+                                // result handler still detects the change and reflows.
+                                ReaderUtils::applyOrientation(renderer, pendingOrientation);
+                                app.setDevice(uiTarget.deviceContext());  // hit rects follow the new frame
+                                requestUpdate(true);
+                              });
     return;
   }
 
   if (selectedAction == MenuAction::AUTO_PAGE_TURN) {
-    optionPopup.show(I18N.get(StrId::STR_AUTO_TURN_PAGES_PER_MIN), pageTurnLabels.data(),
-                     static_cast<int>(pageTurnLabels.size()), selectedPageTurnOption, [this](int idx) {
-                       selectedPageTurnOption = idx;
-                       requestUpdate();
-                     });
-    requestUpdate();
+    ValuePickerActivity::open(*this, renderer, mappedInput, tr(STR_AUTO_TURN_PAGES_PER_MIN),
+                              std::vector<std::string>(pageTurnLabels.begin(), pageTurnLabels.end()),
+                              selectedPageTurnOption, [this](const int idx) { selectedPageTurnOption = idx; });
     return;
   }
 
@@ -183,10 +179,6 @@ void EpubReaderMenuActivity::activateIndex(const int index) {
 
   setResult(MenuResult{static_cast<int>(selectedAction), pendingOrientation, selectedPageTurnOption});
   finish();
-}
-
-bool EpubReaderMenuActivity::handleCustomInput() {
-  return optionPopup.handleInput(mappedInput, [this] { requestUpdate(); });
 }
 
 bool EpubReaderMenuActivity::handleButtons() {
@@ -259,10 +251,4 @@ void EpubReaderMenuActivity::drawChrome() {
   // Header via GUI.drawHeader (already FreeInkUI-themed) for the battery
   // indicator; the rest of the screen renders through the app.
   GUI.drawHeader(renderer, UITheme::getInstance().getHeaderRect(renderer, true, false), title.c_str());
-}
-
-void EpubReaderMenuActivity::render(RenderLock&& lock) {
-  if (optionPopup.processRender(renderer, mappedInput)) return;
-
-  UiListActivity::render(std::move(lock));
 }

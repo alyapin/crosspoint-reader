@@ -12,6 +12,7 @@
 #include "KOReaderCredentialStore.h"
 #include "MappedInputManager.h"
 #include "activities/util/KeyboardEntryActivity.h"
+#include "activities/util/ValuePickerActivity.h"
 #include "components/UITheme.h"
 
 namespace fui = freeink::ui;
@@ -31,13 +32,45 @@ constexpr int IDX_SIGN_UP = 10;
 constexpr int IDX_AUTHENTICATE = 11;
 
 constexpr StrId menuNames[KOReaderSettingsActivity::MENU_ITEMS] = {
-    StrId::STR_USERNAME,        StrId::STR_PASSWORD,        StrId::STR_SYNC_SERVER_URL,   StrId::STR_SERVER_TYPE,
+    StrId::STR_USERNAME,        StrId::STR_PASSWORD,        StrId::STR_SYNC_SERVER,       StrId::STR_SERVER_TYPE,
     StrId::STR_CUSTOM_HEADER_1, StrId::STR_CUSTOM_HEADER_2, StrId::STR_DOCUMENT_MATCHING, StrId::STR_SEND_METADATA,
     StrId::STR_SYNC_BEHAVIOR,   StrId::STR_SYNC_CLIPPINGS,  StrId::STR_SIGN_UP,           StrId::STR_AUTHENTICATE};
 
 constexpr int SERVER_TYPE_ITEMS = 3;
 constexpr StrId serverTypeNames[SERVER_TYPE_ITEMS] = {StrId::STR_CROSSPOINT, StrId::STR_KOSYNC_SERVER,
                                                       StrId::STR_OTHER};
+// Shortens text to maxWidth in the list's value font by dropping characters
+// from the middle ("sync.exa…ple.com").
+template <typename Screen>
+void truncateMiddle(Screen& screen, std::string& text, const int maxWidth) {
+  const auto& style = screen.theme().smallText;
+  const auto width = [&](const std::string& s) {
+    return screen.target().measureText(style.font, s.c_str(), style).width;
+  };
+  if (width(text) <= maxWidth) return;
+  static constexpr char kEllipsis[] = "\xE2\x80\xA6";
+  std::string head = text.substr(0, text.size() / 2);
+  std::string tail = text.substr(text.size() / 2);
+  const auto dropLast = [](std::string& s) {
+    size_t cut = s.size() - 1;
+    while (cut > 0 && (static_cast<uint8_t>(s[cut]) & 0xC0) == 0x80) --cut;
+    s.erase(cut);
+  };
+  const auto dropFirst = [](std::string& s) {
+    size_t cut = 1;
+    while (cut < s.size() && (static_cast<uint8_t>(s[cut]) & 0xC0) == 0x80) ++cut;
+    s.erase(0, cut);
+  };
+  while (!head.empty() || !tail.empty()) {
+    if (head.size() >= tail.size()) {
+      dropLast(head);
+    } else {
+      dropFirst(tail);
+    }
+    if (width(head + kEllipsis + tail) <= maxWidth) break;
+  }
+  text = head + kEllipsis + tail;
+}
 }  // namespace
 
 KOReaderSettingsActivity::KOReaderSettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
@@ -54,17 +87,12 @@ int KOReaderSettingsActivity::listCount() const { return MENU_ITEMS; }
 
 const char* KOReaderSettingsActivity::headerTitle() const { return tr(STR_KOREADER_SYNC); }
 
-bool KOReaderSettingsActivity::handleCustomInput() {
-  return optionPopup.handleInput(mappedInput, [this] { requestUpdate(); });
-}
-
 void KOReaderSettingsActivity::activateIndex(const int index) {
-  if (optionPopup.isActive()) return;
   // Activation opens a keyboard/sub-activity or repaints a new value; a
   // lingering flash would gray an unrelated row.
   app.clearTapFlash();
   if (index == IDX_USERNAME) {
-    startActivityForResult(std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_KOREADER_USERNAME),
+    startActivityForResult(std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_USERNAME),
                                                                    KOREADER_STORE.getUsername(), 64, InputType::Text),
                            [this](const ActivityResult& result) {
                              if (!result.isCancelled) {
@@ -75,8 +103,8 @@ void KOReaderSettingsActivity::activateIndex(const int index) {
                            });
   } else if (index == IDX_PASSWORD) {
     startActivityForResult(
-        std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_KOREADER_PASSWORD),
-                                                KOREADER_STORE.getPassword(), 64, InputType::Password),
+        std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_PASSWORD), KOREADER_STORE.getPassword(),
+                                                64, InputType::Password),
         [this](const ActivityResult& result) {
           if (!result.isCancelled) {
             const auto& kb = std::get<KeyboardResult>(result.data);
@@ -100,13 +128,12 @@ void KOReaderSettingsActivity::activateIndex(const int index) {
                            });
   } else if (index == IDX_SERVER_TYPE) {
     const auto current = KOREADER_STORE.getServerType();
-    optionPopup.show(StrId::STR_SERVER_TYPE, serverTypeNames, SERVER_TYPE_ITEMS, static_cast<int>(current),
-                     [this](const int selected) {
-                       if (selected == static_cast<int>(KOREADER_STORE.getServerType())) return;
-                       KOREADER_STORE.setServerType(static_cast<KOReaderServerType>(selected));
-                       KOREADER_STORE.saveToFile();
-                     });
-    requestUpdate();
+    ValuePickerActivity::open(*this, renderer, mappedInput, StrId::STR_SERVER_TYPE, serverTypeNames, SERVER_TYPE_ITEMS,
+                              static_cast<int>(current), [](const int selected) {
+                                if (selected == static_cast<int>(KOREADER_STORE.getServerType())) return;
+                                KOREADER_STORE.setServerType(static_cast<KOReaderServerType>(selected));
+                                KOREADER_STORE.saveToFile();
+                              });
   } else if (index == IDX_CUSTOM_HEADER_1 || index == IDX_CUSTOM_HEADER_2) {
     // Single "Name: Value" line, parsed on save.
     const size_t slot = static_cast<size_t>(index == IDX_CUSTOM_HEADER_1 ? 0 : 1);
@@ -174,13 +201,13 @@ void KOReaderSettingsActivity::buildScreen(UiScreen& screen) {
     } else if (i == IDX_PASSWORD) {
       rowValues_[i] = KOREADER_STORE.getPassword().empty() ? tr(STR_NOT_SET) : "******";
     } else if (i == IDX_SERVER_URL) {
+      // The host alone, cut in the middle so both ends stay readable; the
+      // built-in server reads "По умолчанию".
       rowValues_[i] = KOREADER_STORE.getServerUrl();
-      if (rowValues_[i].empty()) {
-        std::string defaultUrl = KOREADER_STORE.getBaseUrl();
-        const auto schemeEnd = defaultUrl.find("://");
-        if (schemeEnd != std::string::npos) defaultUrl.erase(0, schemeEnd + 3);
-        rowValues_[i] = std::string(tr(STR_DEFAULT_VALUE)) + ": " + defaultUrl;
-      }
+      const auto schemeEnd = rowValues_[i].find("://");
+      if (schemeEnd != std::string::npos) rowValues_[i].erase(0, schemeEnd + 3);
+      if (rowValues_[i].empty()) rowValues_[i] = tr(STR_DEFAULT_VALUE);
+      truncateMiddle(screen, rowValues_[i], renderer.getScreenWidth() * 2 / 3);
     } else if (i == IDX_SERVER_TYPE) {
       const auto type = KOREADER_STORE.getServerType();
       rowValues_[i] = type == KOReaderServerType::CROSSPOINT ? tr(STR_CROSSPOINT)
@@ -199,7 +226,7 @@ void KOReaderSettingsActivity::buildScreen(UiScreen& screen) {
       rowValues_[i] =
           KOREADER_STORE.getSyncBehavior() == KOReaderSyncBehavior::SMART ? tr(STR_SMART_SYNC) : tr(STR_ASK_EVERY_TIME);
     } else {
-      rowValues_[i] = KOREADER_STORE.hasCredentials() ? "" : std::string("[") + tr(STR_SET_CREDENTIALS_FIRST) + "]";
+      rowValues_[i] = KOREADER_STORE.hasCredentials() ? "" : tr(STR_NOT_SET);
     }
     rowItems_[i].value = rowValues_[i].empty() ? nullptr : rowValues_[i].c_str();
   }
@@ -218,9 +245,4 @@ void KOReaderSettingsActivity::buildScreen(UiScreen& screen) {
   props.labelText.maxLines = 2;
   syncListViewport(screen, props);
   screen.list(props);
-}
-
-void KOReaderSettingsActivity::render(RenderLock&& lock) {
-  if (optionPopup.processRender(renderer, mappedInput)) return;
-  UiListActivity::render(std::move(lock));
 }
