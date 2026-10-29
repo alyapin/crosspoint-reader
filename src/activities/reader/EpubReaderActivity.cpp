@@ -1286,7 +1286,8 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
                                  }
                                  section.reset();
                                }
-                               openReaderMenu();
+                               // Button boards go straight back to the page: the menu would cost a Back.
+                               if (mappedInput.hasTouch()) openReaderMenu();
                              });
       break;
     }
