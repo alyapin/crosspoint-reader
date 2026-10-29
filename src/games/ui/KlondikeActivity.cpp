@@ -172,6 +172,8 @@ void KlondikeActivity::showHint() {
     pickIndex = game.pile(m.from).count - m.count;
     hintPile = m.to;
   }
+  // Button boards: the next Confirm plays the hint.
+  if (!hasBar() && hintPile != kNone) focus = hintPile;
   requestRepaint(RepaintUpdate);
 }
 
