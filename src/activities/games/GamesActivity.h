@@ -2,6 +2,10 @@
 
 #include "activities/SetkaListActivity.h"
 
+// The keyboard games (Сканворды, Виселица, 5 букв, Кейворды) take too many key
+// presses on the button-only X4 and X3, so their builds leave them out.
+#define SOVA_KEYBOARD_GAMES (!(FREEINK_DEVICE_X4 || FREEINK_DEVICE_X3))
+
 // "Игры" under "Ещё": one row per entry of the game registry in
 // GamesActivity.cpp; an empty registry shows the empty-state line.
 class GamesActivity final : public SetkaListActivity {

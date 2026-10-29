@@ -20,6 +20,7 @@ Games, under More → Games, with touch on the X4 Pro and buttons on the X4, sav
 - Tic-tac-toe against the computer or a friend, 2048, the 15 puzzle.
 - Hangman and 5 letters (a Russian Wordle) on built-in word lists; hangman has a separate mode with crude words.
 - More games are in progress on separate branches.
+- The X4 build leaves out the keyboard games (scanwords, hangman, 5 letters, codewords): they take too many key presses.
 
 Books and screens:
 
