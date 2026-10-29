@@ -238,6 +238,17 @@ class HalStorage {
   bool openFileForWrite(const char* module, const std::string& path, HalFile& file) {
     return openFileForWrite(module, path.c_str(), file);
   }
+  bool ensureDirectoryExists(const char* path) { return mkdir(path); }
+  bool readFileToString(const char*, const std::string& path, const size_t cap, std::string& out) {
+    out.clear();
+    HalFile file = open(path.c_str());
+    if (!file || file.isDirectory() || file.fileSize() == 0 || file.fileSize() > cap) return false;
+    out.resize(file.fileSize());
+    return file.read(out.data(), out.size()) == static_cast<int>(out.size());
+  }
+  bool replaceFile(const char* tmpPath, const char* path) {
+    return (!exists(path) || remove(path)) && rename(tmpPath, path);
+  }
   bool remove(const char* path) { return fake::files.erase(path) != 0; }
   bool rename(const char* from, const char* to) {
     if (fake::fail(fake::failRename) || !exists(from) || exists(to)) return false;

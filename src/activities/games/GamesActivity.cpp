@@ -9,9 +9,14 @@
 #include "games/chess/ui/chessIcons.h"
 #include "games/scanword/ui/ScanwordActivity.h"
 #include "games/scanword/ui/scanwordIcons.h"
+#include "games/ui/FifteenActivity.h"
+#include "games/ui/FiveLettersActivity.h"
+#include "games/ui/Game2048Activity.h"
+#include "games/ui/HangmanActivity.h"
 #include "games/ui/KlondikeActivity.h"
 #include "games/ui/MinesweeperActivity.h"
 #include "games/ui/SudokuActivity.h"
+#include "games/ui/TicTacToeActivity.h"
 #include "games/ui/gameIcons.h"
 
 namespace {
@@ -37,6 +42,11 @@ constexpr Game kGames[] = {
     {StrId::STR_MINESWEEPER, &icon_bomb_24, &openMinesweeper, &minesweeperListStatus},
     {StrId::STR_KLONDIKE, &icon_spade_24, &openKlondike, &klondikeListStatus},
     {StrId::STR_SCANWORDS, &icon_scanword_24, &openScanwords, &scanwordListStatus},
+    {StrId::STR_TICTACTOE, &icon_tictactoe_24, &openTicTacToe, &tictactoeListStatus},
+    {StrId::STR_2048, &icon_tiles_24, &openGame2048, &game2048ListStatus},
+    {StrId::STR_FIFTEEN, &icon_fifteen_24, &openFifteen, &fifteenListStatus},
+    {StrId::STR_HANGMAN, &icon_hangman_24, &openHangman, &hangmanListStatus},
+    {StrId::STR_FIVE_LETTERS, &icon_five_letters_24, &openFiveLetters, &fiveLettersListStatus},
     {},
 };
 constexpr int kGameCount = static_cast<int>(std::size(kGames)) - 1;

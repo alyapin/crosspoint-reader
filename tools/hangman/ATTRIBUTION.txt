@@ -1,0 +1,10 @@
+The hangman words and definitions (lib/Games/HangmanWords.h) come from the
+Russian Wiktionary (https://ru.wiktionary.org) by the Russian Wiktionary
+contributors, licensed under CC BY-SA 4.0
+(https://creativecommons.org/licenses/by-sa/4.0/). The definitions were
+shortened: only the first clause of a definition is kept, without examples or
+remarks in parentheses. The clues of a few words in the second list were
+written for the game. Words were ranked with wordfreq data (CC BY-SA 4.0) and
+checked with pymorphy3 against OpenCorpora dictionary data (CC BY-SA 3.0,
+https://creativecommons.org/licenses/by-sa/3.0/). The word list is shared
+under CC BY-SA 4.0.

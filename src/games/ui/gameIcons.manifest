@@ -8,9 +8,14 @@ grid = grid-3x3
 grid-small = grid-2x2
 bomb = bomb
 spade = spade
+fifteen = blocks
 card = rectangle-vertical
 cards = layers
 circle-check = circle-check
+tictactoe = hash
+tiles = layout-grid
+hangman = baseline
+hangman-rude = flame
 # action bar (games/ui/ActionBar.h)
 bar-notes = pencil
 bar-erase = eraser
@@ -19,3 +24,7 @@ bar-flag = flag
 bar-restart = rotate-ccw
 bar-new-game = plus
 bar-hint = lightbulb
+# «5 букв»: games list, keyboard
+five-letters = spell-check
+key-delete = delete
+key-enter = corner-down-left
