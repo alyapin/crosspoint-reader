@@ -59,7 +59,7 @@ void drawActionBar(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, con
   const int cellTop = top + kRuleWidth;
   const int cellHeight = bottom - cellTop;
   const int captionHeight = renderer.getLineHeight(kCaptionFont);
-  // A short bar (the scanword keyboard's) closes the gap under the icon first.
+  // A short bar closes the gap under the icon first.
   const int gap = std::clamp((cellHeight - kIconSize - captionHeight) / 3, 0, kIconGap);
   const int iconTop = cellTop + (cellHeight - kIconSize - gap - captionHeight) / 2;
   const bool dividers = std::count_if(slots, slots + count, [](const ActionSlot& s) { return s.label; }) > 1;

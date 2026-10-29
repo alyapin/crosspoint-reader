@@ -47,8 +47,8 @@ constexpr int kIconSize = 24;
 constexpr int kIconGap = 16;
 constexpr int kFooterHeight = 56;
 constexpr int kStripHeight = 96;
-constexpr int kKeyHeight = 50;
-constexpr int kActionHeight = 50;
+constexpr int kKeyHeight = 43;
+constexpr int kActionHeight = games::ui::kActionBarHeight;
 constexpr int kKeyRows = 3;
 constexpr int kKeysPerRow = 11;
 constexpr int kBoxSize = 44;
@@ -1157,7 +1157,8 @@ void ScanwordActivity::drawKeyboard(UiScreen& screen) const {
       drawLetter(kKeys[r][k], x0, y, x1 - x0, kKeyHeight, 16);
       if (k > 0) renderer.drawLine(x0, y, x0, y + kKeyHeight - 1);
     }
-    renderer.drawLine(0, y + kKeyHeight - 1, width - 1, y + kKeyHeight - 1);
+    // The bar's rule closes the last row.
+    if (r < kKeyRows - 1) renderer.drawLine(0, y + kKeyHeight - 1, width - 1, y + kKeyHeight - 1);
   }
   // One hit for all keys (the frame holds few interactions); handleAction finds the key.
   screen.frame().hit(fui::makeRect(0, keysTop, width, kKeyRows * kKeyHeight), ACTION_KEY, 0, kTap);
