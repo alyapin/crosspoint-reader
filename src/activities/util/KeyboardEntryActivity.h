@@ -20,12 +20,15 @@ class KeyboardEntryActivity : public Activity {
  public:
   explicit KeyboardEntryActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
                                  std::string title = "Enter Text", std::string initialText = "",
-                                 const size_t maxLength = 0, InputType inputType = InputType::Text)
+                                 const size_t maxLength = 0, InputType inputType = InputType::Text,
+                                 const bool latinFirst = false)
       : Activity("KeyboardEntry", renderer, mappedInput),
         title(std::move(title)),
-        text(std::move(initialText)),
+        initialText(std::move(initialText)),
+        text(this->initialText),
         maxLength(maxLength),
-        inputType(inputType) {}
+        inputType(inputType),
+        latinFirst(latinFirst) {}
 
   void onEnter() override;
   void onExit() override;
@@ -35,9 +38,11 @@ class KeyboardEntryActivity : public Activity {
 
  private:
   std::string title;
+  std::string initialText;  // Back asks before dropping an edit of it (button boards)
   std::string text;
   size_t maxLength;
   InputType inputType;
+  bool latinFirst;  // opens on a Latin layout (network names, passwords)
   bool passwordVisible = false;
 
   ButtonNavigator buttonNavigator;
@@ -124,6 +129,7 @@ class KeyboardEntryActivity : public Activity {
 
   void onComplete(std::string text);
   void onCancel();
+  void confirmDiscard();
   bool cursorPositionFromPoint(int x, int y, size_t& position) const;
   std::string displayTextForCurrentState() const;
   // Advance of s[start, end) measured in place by temporarily null-terminating

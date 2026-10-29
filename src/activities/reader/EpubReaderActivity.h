@@ -73,11 +73,14 @@ class EpubReaderActivity final : public ReaderActivity {
   Overlay overlay = Overlay::None;
   int focusedTool = 0;  // toolbar tool focus: 0=Contents, 1=Text, 2=More
   int panelIndex = 0;   // selected row within the active panel
+  // The current chapter's Contents row, looked up once when the panel opens:
+  // the lookup reads the section file, too slow for every cursor repaint.
+  int contentsCurrentIndex = 0;
   // Panel list navigation: a tap steps one row, a hold jumps PANEL_HOLD_STEP rows in one go
   // (a contents list runs to hundreds of chapters). One jump per hold, not a repeat -- every
   // step repaints the panel, so repeating is bounded by the e-ink refresh anyway and reads as
   // sluggish. True once a hold has jumped, so the release that ends it is swallowed.
-  static constexpr unsigned long PANEL_HOLD_MS = 1500;
+  static constexpr unsigned long PANEL_HOLD_MS = 500;  // the list page-jump hold
   static constexpr int PANEL_HOLD_STEP = 10;
   bool panelHoldJumped = false;
   // Whether the panel draws its cursor row. Button boards always do; touch

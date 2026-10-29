@@ -31,8 +31,8 @@ const StrId menuNames[ClockSettingsActivity::ITEM_COUNT] = {
     StrId::STR_CLOCK_IN_HEADER, StrId::STR_CLOCK_SYNC_NOW,
 };
 
-const StrId dstNames[CrossPointSettings::CLOCK_DST_MODE_COUNT] = {StrId::STR_CLOCK_DST_AUTO, StrId::STR_STATE_ON,
-                                                                  StrId::STR_STATE_OFF};
+const StrId dstNames[CrossPointSettings::CLOCK_DST_MODE_COUNT] = {StrId::STR_CLOCK_DST_AUTO, StrId::STR_YES,
+                                                                  StrId::STR_NO};
 }  // namespace
 
 ClockSettingsActivity::ClockSettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)

@@ -46,13 +46,17 @@ void SleepImagePreviewActivity::screenFn(UiScreen& screen, void* user) {
 void SleepImagePreviewActivity::paintBar(GfxRenderer& renderer, const bool grayPlane, void* user) {
   using namespace setka;
   const auto& self = *static_cast<const SleepImagePreviewActivity*>(user);
+  const int width = renderer.getScreenWidth();
   if (!self.mappedInput.hasTouch()) {
-    // Button boards: the usual front-button hints, which handle the gray planes themselves.
+    // Button boards: a white band under the usual front-button hints, which
+    // handle the gray planes themselves; the picture ends above it.
+    const int hintsHeight = UITheme::getInstance().getMetrics().buttonHintsHeight;
+    renderer.fillRect(0, renderer.getScreenHeight() - hintsHeight, width, hintsHeight,
+                      grayPlane && !renderer.grayPlanesAreAbsolute());
     const auto labels = self.mappedInput.mapLabels(tr(STR_BACK), self.failed ? "" : tr(STR_SELECT), "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
     return;
   }
-  const int width = renderer.getScreenWidth();
   const int top = barTop(renderer);
   if (grayPlane && !renderer.grayPlanesAreAbsolute()) {
     // Overlay planes mark gray pixels only; clear them under the bar.

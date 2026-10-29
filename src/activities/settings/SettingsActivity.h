@@ -200,6 +200,7 @@ class SettingsActivity final : public UiListActivity {
   void rebuildRowItems();
   void toggleSelectedSetting();
   void openSleepTimeoutPicker();
+  void openValueSlider(const SettingInfo& setting);
   void openValuePicker(const SettingInfo& setting, int current, std::function<void(int)> onSelect);
   void applyUiSettingChange(uint8_t CrossPointSettings::* valuePtr);
   void syncQuickResumeTimeoutForSleepScreen(bool sleepScreenChanged, bool quickResumeTimeoutChanged);

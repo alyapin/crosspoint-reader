@@ -1,5 +1,6 @@
 #include "LanguageSelectActivity.h"
 
+#include <FreeInkUIIcon.h>
 #include <GfxRenderer.h>
 #include <I18n.h>
 
@@ -10,6 +11,7 @@
 #include "I18nKeys.h"
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
+#include "components/setka/setkaIcons.h"
 
 namespace fui = freeink::ui;
 
@@ -28,14 +30,12 @@ void LanguageSelectActivity::onEnter() {
   nav.selected = (it != end) ? static_cast<int>(std::distance(begin, it)) : 0;
 
   // Built once here rather than every buildScreen() call: labels are static,
-  // and the "Selected" marker can't go stale mid-visit since activateIndex()
+  // and the radio marks can't go stale mid-visit since activateIndex()
   // finishes the activity immediately on selection.
   for (int i = 0; i < totalItems; ++i) {
     fui::ListItem item;
     item.label = I18N.getLanguageName(static_cast<Language>(SORTED_LANGUAGE_INDICES[i]));
-    if (SORTED_LANGUAGE_INDICES[i] == currentLang) {
-      item.value = tr(STR_SELECTED);
-    }
+    item.icon = fui::bitmapFromIcon(SORTED_LANGUAGE_INDICES[i] == currentLang ? icon_radio_on_24 : icon_radio_24);
     item.actionValue = static_cast<int16_t>(i);
     rowItems[i] = item;
   }

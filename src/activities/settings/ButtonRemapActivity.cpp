@@ -23,6 +23,7 @@ void ButtonRemapActivity::onEnter() {
 
   // Start with all roles unassigned to avoid duplicate blocking.
   currentStep = 0;
+  resetAsked = false;
   tempMapping[0] = kUnassigned;
   tempMapping[1] = kUnassigned;
   tempMapping[2] = kUnassigned;
@@ -46,10 +47,15 @@ void ButtonRemapActivity::loop() {
     return;
   }
 
-  // Side buttons:
-  // - Up: reset mapping to defaults and exit.
-  // - Down: cancel without saving.
+  // Side buttons (fixed, so they work under any front mapping):
+  // - Up: ask, then on a second Up reset mapping to defaults and exit.
+  // - Down: cancel without saving, or take back the reset question.
   if (mappedInput.wasPressed(MappedInputManager::Button::Up)) {
+    if (!resetAsked) {
+      resetAsked = true;
+      requestUpdate();
+      return;
+    }
     // Persist default mapping immediately so the user can recover quickly.
     SETTINGS.frontButtonBack = CrossPointSettings::FRONT_HW_BACK;
     SETTINGS.frontButtonConfirm = CrossPointSettings::FRONT_HW_CONFIRM;
@@ -61,6 +67,11 @@ void ButtonRemapActivity::loop() {
   }
 
   if (mappedInput.wasPressed(MappedInputManager::Button::Down)) {
+    if (resetAsked) {
+      resetAsked = false;
+      requestUpdate();
+      return;
+    }
     // Exit without changing settings.
     finish();
     return;
@@ -76,6 +87,7 @@ void ButtonRemapActivity::loop() {
     if (pressedButton < 0) {
       return;
     }
+    resetAsked = false;
 
     // Update temporary mapping and advance the remap step.
     // Only accept the press if this hardware button isn't already assigned elsewhere.
@@ -131,10 +143,10 @@ void ButtonRemapActivity::render(RenderLock&&) {
   // Provide side button actions at the bottom of the screen (split across two lines).
   GUI.drawHelpText(renderer,
                    Rect{0, topOffset + 4 * metrics.listRowHeight + 4 * metrics.verticalSpacing, pageWidth, 20},
-                   tr(STR_REMAP_RESET_HINT));
+                   resetAsked ? tr(STR_REMAP_RESET_CONFIRM_HINT) : tr(STR_REMAP_RESET_HINT));
   GUI.drawHelpText(renderer,
                    Rect{0, topOffset + 4 * metrics.listRowHeight + 5 * metrics.verticalSpacing + 20, pageWidth, 20},
-                   tr(STR_REMAP_CANCEL_HINT));
+                   resetAsked ? tr(STR_REMAP_RESET_KEEP_HINT) : tr(STR_REMAP_CANCEL_HINT));
 
   // Live preview of logical labels under front buttons.
   // This mirrors the on-device front button order: Back, Confirm, Left, Right.

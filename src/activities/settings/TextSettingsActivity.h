@@ -51,6 +51,7 @@ class TextSettingsActivity final : public UiTabListActivity {
   void drawChrome() override;
   void drawFooter() override;
   bool handleButtons() override;
+  void navigateButtons() override;
 
   void applyFamily(int listIndex);
   void applySize(int listIndex);

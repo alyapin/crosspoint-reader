@@ -17,10 +17,12 @@
 #include "MappedInputManager.h"
 #include "RecentBooksStore.h"
 #include "activities/cards/CardsActivity.h"
+#include "activities/stats/statsIcons.h"
 #include "activities/util/ConfirmationActivity.h"
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "components/UiAppHelpers.h"
+#include "components/setka/setkaIcons.h"
 #include "fontIds.h"
 #include "stats/ReadingStats.h"
 #include "util/BookCacheUtils.h"
@@ -400,7 +402,9 @@ void FileBrowserActivity::showEntryActions() {
   const bool isDirectory = entry.back() == '/';
   const std::string name = utf8ComposeNfc(isDirectory ? entry.substr(0, entry.size() - 1) : entry);
   const char* options[] = {tr(STR_OPEN), tr(STR_DELETE), tr(STR_RENAME)};
-  optionPopup.show(name.c_str(), options, isDirectory ? 2 : 3, OptionPopup::kMenu, [this](const int index) {
+  const freeink::Icon* icons[] = {isDirectory ? &icon_folder_open_24 : &icon_book_open_24, &icon_trash_2_24,
+                                  &icon_pencil_24};
+  optionPopup.show(name.c_str(), options, icons, isDirectory ? 2 : 3, OptionPopup::kMenu, [this](const int index) {
     if (index == 0) {
       activateSelected();
     } else if (index == 1) {

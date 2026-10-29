@@ -74,4 +74,21 @@ TEST_F(ButtonPressNavigationTest, FastDirectionChangeStartsANewRepeatInterval) {
   EXPECT_EQ(pages, 1);
 }
 
+TEST(GridRowNavigation, StepsAWholeRowInTheSameColumn) {
+  EXPECT_EQ(ButtonNavigator::nextRowIndex(1, 9, 3), 4);
+  EXPECT_EQ(ButtonNavigator::previousRowIndex(7, 9, 3), 4);
+}
+
+TEST(GridRowNavigation, ShortLastRowTakesItsLastItem) {
+  EXPECT_EQ(ButtonNavigator::nextRowIndex(5, 8, 3), 7);
+  EXPECT_EQ(ButtonNavigator::previousRowIndex(2, 8, 3), 7);
+}
+
+TEST(GridRowNavigation, RowsWrapToTheOtherEndOfTheColumn) {
+  EXPECT_EQ(ButtonNavigator::nextRowIndex(7, 8, 3), 1);
+  EXPECT_EQ(ButtonNavigator::nextRowIndex(6, 9, 3), 0);
+  EXPECT_EQ(ButtonNavigator::previousRowIndex(0, 9, 3), 6);
+  EXPECT_EQ(ButtonNavigator::nextRowIndex(1, 2, 3), 1);
+}
+
 }  // namespace

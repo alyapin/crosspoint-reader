@@ -138,7 +138,7 @@ void StatisticsActivity::render(RenderLock&&) {
     renderer.drawText(kText12Font, width - kSidePadding - renderer.getTextWidth(kText12Font, text, kSemiBold), y, text,
                       true, kSemiBold);
   }
-  statsui::drawHints(renderer, mappedInput, "");
+  statsui::drawHints(renderer, mappedInput, "", /*navigates=*/false);
   renderer.displayBuffer(entryRefresh ? cadence.entry() : cadence.update());
   entryRefresh = false;
 }

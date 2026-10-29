@@ -31,8 +31,9 @@ Bands drawHeader(const GfxRenderer& renderer, const char* title, const bool back
   return bands;
 }
 
-void drawHints(GfxRenderer& renderer, const MappedInputManager& input, const char* confirmLabel) {
-  const auto labels = input.mapLabels(tr(STR_BACK), confirmLabel, tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+void drawHints(GfxRenderer& renderer, const MappedInputManager& input, const char* confirmLabel, const bool navigates) {
+  const auto labels =
+      input.mapLabels(tr(STR_BACK), confirmLabel, navigates ? tr(STR_DIR_UP) : "", navigates ? tr(STR_DIR_DOWN) : "");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 }
 

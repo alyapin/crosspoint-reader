@@ -530,6 +530,17 @@ void TextSettingsActivity::switchTab(const int direction) {
   requestUpdate();
 }
 
+void TextSettingsActivity::navigateButtons() {
+  // Next from the tab bar lands on the current font or size, not on the first row.
+  if (ringPos() == 0 && (tab_ == Tab::Family || tab_ == Tab::Size) && listCount() > 0 &&
+      mappedInput.wasPressed(MappedInputManager::Button::NavNext)) {
+    navigationStartedOnTabs = true;
+    moveRingTo((tab_ == Tab::Family ? currentFamilyIndex_ : currentSizeIndex_) + 1);
+    return;
+  }
+  UiTabListActivity::navigateButtons();
+}
+
 int TextSettingsActivity::listCount() const {
   switch (tab_) {
     case Tab::Family:

@@ -132,11 +132,10 @@ void LyraTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
     // A button with nothing to do gets no hint: an empty frame reads as a missing label.
     if (labels[i] == nullptr || labels[i][0] == '\0') continue;
     const int x = buttonPositions[i];
-    renderer.fillRoundedRect(x, pageHeight - buttonY, buttonWidth, buttonHeight, cornerRadius,
+    renderer.fillRoundedRect(x, pageHeight - buttonY, buttonWidth, buttonHeight, 0,
                              grayscale ? Color::Black : Color::White);
     if (grayscale) continue;
-    renderer.drawRoundedRect(x, pageHeight - buttonY, buttonWidth, buttonHeight, 1, cornerRadius, true, true, false,
-                             false, true);
+    renderer.drawRoundedRect(x, pageHeight - buttonY, buttonWidth, buttonHeight, 1, 0, true, true, false, false, true);
     drawHintLabel(renderer, SMALL_FONT_ID, labels[i], x, buttonWidth, pageHeight - buttonY, buttonHeight);
   }
 
@@ -158,16 +157,15 @@ void LyraTheme::drawSideButtonHints(const GfxRenderer& renderer, const char* top
     constexpr int x3ButtonY = 155;
 
     if (topBtn != nullptr && topBtn[0] != '\0') {
-      renderer.drawRoundedRect(buttonMargin, x3ButtonY, buttonWidth, buttonHeight, 1, cornerRadius, false, true, false,
-                               true, true);
+      renderer.drawRoundedRect(buttonMargin, x3ButtonY, buttonWidth, buttonHeight, 1, 0, false, true, false, true,
+                               true);
       const int textWidth = renderer.getTextWidth(SMALL_FONT_ID, topBtn);
       renderer.drawTextRotated90CW(SMALL_FONT_ID, buttonMargin, x3ButtonY + (buttonHeight + textWidth) / 2, topBtn);
     }
 
     if (bottomBtn != nullptr && bottomBtn[0] != '\0') {
       const int rightX = screenWidth - buttonWidth;
-      renderer.drawRoundedRect(rightX, x3ButtonY, buttonWidth, buttonHeight, 1, cornerRadius, true, false, true, false,
-                               true);
+      renderer.drawRoundedRect(rightX, x3ButtonY, buttonWidth, buttonHeight, 1, 0, true, false, true, false, true);
       const int textWidth = renderer.getTextWidth(SMALL_FONT_ID, bottomBtn);
       renderer.drawTextRotated90CW(SMALL_FONT_ID, rightX, x3ButtonY + (buttonHeight + textWidth) / 2, bottomBtn);
     }
@@ -177,13 +175,12 @@ void LyraTheme::drawSideButtonHints(const GfxRenderer& renderer, const char* top
     const int x = screenWidth - buttonWidth;
 
     if (topBtn != nullptr && topBtn[0] != '\0') {
-      renderer.drawRoundedRect(x, topHintButtonY, buttonWidth, buttonHeight, 1, cornerRadius, true, false, true, false,
-                               true);
+      renderer.drawRoundedRect(x, topHintButtonY, buttonWidth, buttonHeight, 1, 0, true, false, true, false, true);
     }
 
     if (bottomBtn != nullptr && bottomBtn[0] != '\0') {
-      renderer.drawRoundedRect(x, topHintButtonY + buttonHeight + 5, buttonWidth, buttonHeight, 1, cornerRadius, true,
-                               false, true, false, true);
+      renderer.drawRoundedRect(x, topHintButtonY + buttonHeight + 5, buttonWidth, buttonHeight, 1, 0, true, false, true,
+                               false, true);
     }
 
     for (int i = 0; i < 2; i++) {

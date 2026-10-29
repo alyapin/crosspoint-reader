@@ -11,6 +11,7 @@
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "components/icons/readerToolbarIcons.h"
+#include "components/setka/SetkaStyle.h"
 
 namespace fui = freeink::ui;
 
@@ -28,8 +29,8 @@ constexpr fui::ActionId ACTION_ROW = 6;      // panel list row, value = row inde
 constexpr int16_t kScrubButton = 36;  // chapter step buttons (square)
 constexpr int16_t kScrubKnob = 16;    // round knob on the 2px progress track
 constexpr int16_t kScrubGap = 12;     // air between the buttons and the track
-// Tool row: a 24px glyph centred in each slot, the active slot in an outline
-// pill. The whole slot is the tap target; the row height sets its size.
+// Tool row: a 24px glyph centred in each slot, the active slot in the Setka
+// 4 px inset frame. The whole slot is the tap target; the row height sets its size.
 constexpr int16_t kToolRowH = 80;
 constexpr int16_t kToolPillInset = 10;
 constexpr int kToolCount = 3;
@@ -40,14 +41,21 @@ constexpr int kPanelHeightPercent = 62;
 constexpr int kPanelHeightMaxPercent = 72;
 // Landscape has less vertical room; leave a narrow page strip for tap-to-dismiss.
 constexpr int kLandscapePanelHeightPercent = 88;
+// How far the sheet's top edge may rise to a clear gap of the page, and the
+// clear air it keeps above its rule (as OptionPopup's band).
+constexpr int kSheetLiftMax = 40;
+constexpr int kSheetAir = 4;
+// Page left above a lifted sheet, so a tap there can still dismiss it (landscape).
+constexpr int kPageAboveSheet = 44;
 }  // namespace
 
-ReaderToolbarUi::ReaderToolbarUi(GfxRenderer& renderer) : UiAppHost(renderer) {}
+ReaderToolbarUi::ReaderToolbarUi(GfxRenderer& renderer) : UiAppHost(renderer), renderer_(renderer) {}
 
 void ReaderToolbarUi::begin() {
   resetUi();
   pending_ = Routed{};
   nav_.reset();
+  liftTop_ = -1;
   for (fui::ActionId id = ACTION_DISMISS; id <= ACTION_ROW; ++id) {
     app.on(id, &ReaderToolbarUi::onAction, this);
   }
@@ -98,11 +106,12 @@ void ReaderToolbarUi::screenFn(UiScreen& screen, void* user) {
 }
 
 // The Contents / Text / More row: three equal slots, an icon centred in each,
-// the active one inside an outline pill (the theme's control radius). Each
-// slot is registered as one tap target, so the row stays light (no filled
-// tiles, no labels -- the glyphs carry the meaning).
+// the active one inside the Setka 4 px inset frame (other themes: an outline
+// pill). Each slot is registered as one tap target, so the row stays light
+// (no filled tiles, no labels -- the glyphs carry the meaning).
 void ReaderToolbarUi::buildToolRow(UiScreen& screen, const fui::LayoutAnchor anchor, const int16_t sideInset) {
   const auto& tokens = screen.theme();
+  const bool setkaFrame = tokens.listSelectionStyle == fui::SelectionStyle::LeftBar;
   const fui::BitmapRef icons[kToolCount] = {fui::bitmapFromIcon(icon_reader_contents_24),
                                             fui::bitmapFromIcon(icon_reader_text_24),
                                             fui::bitmapFromIcon(icon_reader_more_24)};
@@ -112,20 +121,41 @@ void ReaderToolbarUi::buildToolRow(UiScreen& screen, const fui::LayoutAnchor anc
   // the toolbar for a panel.
   const fui::Rect row = screen.take(anchor, kToolRowH).inset(fui::Insets{0, sideInset, 0, sideInset});
   const int16_t slotW = static_cast<int16_t>(row.width / kToolCount);
-  // Theme radius as-is (the frontlight panel pattern); the fill clamps to
-  // the shape's own height so round themes cannot overshoot.
-  const uint8_t pillRadius = tokens.controlRadius;
   for (int i = 0; i < kToolCount; ++i) {
     const fui::Rect slot{static_cast<int16_t>(row.x + slotW * i), row.y, slotW, row.height};
     if (i == model_.activeTool) {
       screen.target().stroke(slot.inset(fui::Insets{4, kToolPillInset, 4, kToolPillInset}),
-                             fui::Paint::solid(fui::Color::Black), 2, pillRadius);
+                             fui::Paint::solid(fui::Color::Black), setkaFrame ? setka::kCellFrameWidth : 2,
+                             setkaFrame ? 0 : tokens.controlRadius);
     }
     const fui::Rect iconRect{static_cast<int16_t>(slot.x + (slot.width - 24) / 2),
                              static_cast<int16_t>(slot.y + (slot.height - 24) / 2), 24, 24};
     screen.target().bitmap(iconRect, icons[i], fui::BitmapMode::Center);
     screen.frame().hit(slot, ACTION_TOOL, static_cast<int16_t>(i), fui::InputTouch);
   }
+}
+
+int16_t ReaderToolbarUi::hintsHeight() const {
+  return model_.buttonHints ? static_cast<int16_t>(UITheme::getInstance().getMetrics().buttonHintsHeight) : 0;
+}
+
+int16_t ReaderToolbarUi::openSheet(UiScreen& screen, const fui::SheetProps& props, const int16_t height) {
+  const int top = std::min(screen.frame().device().screen().bottom(), screen.frame().safeRect().bottom()) - height;
+  // Repaints over the sheet keep the lift found on the bare page.
+  if (top != liftTop_) {
+    liftTop_ = top;
+    lift_ = 0;
+    for (int lift = 0; lift <= kSheetLiftMax && top - lift >= kPageAboveSheet; ++lift) {
+      int clear = 0;
+      while (clear < kSheetAir && renderer_.isRowClear(top - lift - kSheetAir + clear)) ++clear;
+      if (clear == kSheetAir) {
+        lift_ = static_cast<int16_t>(lift);
+        break;
+      }
+    }
+  }
+  screen.sheet(props, static_cast<int16_t>(height + lift_));
+  return lift_;
 }
 
 void ReaderToolbarUi::buildToolbar(UiScreen& screen) {
@@ -147,9 +177,9 @@ void ReaderToolbarUi::buildToolbar(UiScreen& screen) {
   sheetProps.grabberInset = static_cast<int16_t>(tokens.spaceLg + tokens.spaceMd);
   const int16_t grabberBand =
       static_cast<int16_t>(sheetProps.grabberMargin + sheetProps.grabberHeight + sheetProps.grabberInset);
-  screen.sheet(sheetProps, static_cast<int16_t>(contentH + grabberBand));
+  const int16_t lift = openSheet(screen, sheetProps, static_cast<int16_t>(contentH + grabberBand + hintsHeight()));
   screen.insetContent(fui::Insets{0, tokens.spaceLg, 0, tokens.spaceLg});
-  screen.spacer(tokens.spaceMd);
+  screen.spacer(static_cast<int16_t>(lift + tokens.spaceMd));
 
   // Scrub row: < [progress track + knob: tap/drag to jump] >
   {
@@ -246,7 +276,10 @@ void ReaderToolbarUi::buildPanel(UiScreen& screen) {
   if (static_cast<int16_t>(chrome + (sheetRows + 1) * rowStride - rowGap) <= cap) ++sheetRows;
   if (model_.itemCount > 0 && sheetRows > model_.itemCount) sheetRows = model_.itemCount;
   if (sheetRows < 1) sheetRows = 1;
-  screen.sheet(sheetProps, static_cast<int16_t>(chrome + sheetRows * rowStride - rowGap));
+  const int16_t lift =
+      openSheet(screen, sheetProps, static_cast<int16_t>(chrome + sheetRows * rowStride - rowGap + hintsHeight()));
+  if (lift > 0) screen.spacer(lift);
+  if (model_.buttonHints) screen.spacer(hintsHeight(), fui::LayoutAnchor::Bottom);
   // No blanket side inset: Screen::list() draws in the content band, and the
   // scroll track must reach the sheet's edge like a full-screen list's does.
   // The title insets itself; the rows inset via rowInset below.
@@ -301,6 +334,9 @@ void ReaderToolbarUi::buildPanel(UiScreen& screen) {
   nav_.followOnBuild = nav_.selected >= 0;
   nav_.followPending = false;
   nav_.syncToProps(listRect, listProps_.rowHeight, rowGap, count, listProps_);
+  if (nav_.selected < 0 && model_.currentIndex >= 0 && model_.currentIndex < count) {
+    listProps_.selectedIndex = static_cast<int16_t>(model_.currentIndex);
+  }
 
   // Materialise only the visible window of rows.
   const int windowCount = std::min({nav_.visibleRows, count - nav_.top, kMaxWindow});

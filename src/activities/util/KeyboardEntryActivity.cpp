@@ -3,6 +3,8 @@
 #include <BidiUtils.h>
 #include <HalGPIO.h>
 #include <I18n.h>
+#include <Logging.h>
+#include <Memory.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -11,6 +13,7 @@
 #include "HapticFeedback.h"
 #include "KeyboardLayoutSet.h"
 #include "MappedInputManager.h"
+#include "activities/util/ConfirmationActivity.h"
 #include "components/UITheme.h"
 #include "components/setka/SetkaStyle.h"
 #include "fontIds.h"
@@ -174,7 +177,11 @@ void KeyboardEntryActivity::onEnter() {
   cursorPos = text.length();
   // URL layers are EN-arranged app tables; everything else opens on the UI
   // language's layout, or on an enabled one if the user switched that off.
-  layoutId = inputType == InputType::Url ? fui::KeyboardLayoutId::QwertyEn : keyboard_layouts::startingLayout();
+  if (inputType == InputType::Url) {
+    layoutId = fui::KeyboardLayoutId::QwertyEn;
+  } else {
+    layoutId = latinFirst ? keyboard_layouts::startingLatinLayout() : keyboard_layouts::startingLayout();
+  }
   // The key only earns its slot in the bottom row with somewhere to go.
   const uint16_t enabledLayouts = keyboard_layouts::enabled();
   showLangKey = (enabledLayouts & (enabledLayouts - 1)) != 0;
@@ -887,7 +894,12 @@ void KeyboardEntryActivity::loop() {
   }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
-    onCancel();
+    // A stray Back on a button board would throw away a long entry.
+    if (!mappedInput.hasTouch() && text != initialText) {
+      confirmDiscard();
+    } else {
+      onCancel();
+    }
   }
 
   if (hintVisible && !cursorMode && millis() - hintShowTime > 4000) {
@@ -1144,7 +1156,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   const fui::KeyboardLayout& layout = currentLayout();
   props.layout = &layout;
   props.keyAction = ACTION_KEY;  // one action id; loop() dispatches on key value
-  props.okLabel = tr(STR_OK_BUTTON);
+  props.okLabel = tr(STR_KEYBOARD_DONE);
   // Match the label to the layer the mode key leads back from: the symbols
   // layer and the URL snippet panel both label it "abc" in the static tables.
   props.modeLabel =
@@ -1219,10 +1231,14 @@ void KeyboardEntryActivity::drawKeyGrid(const fui::Rect& keysRect, const int row
     if (keysRect.right() - right >= KEY_EDGE_SNAP) renderer.drawLine(right, key.y, right, bottom);
     if (hits[i].value != fui::QWERTY_KEY_ENTER) continue;
     const int fontId = keyLabelFont(keysRect.width);
-    const char* label = tr(STR_OK_BUTTON);
+    const int keyWidth = std::min<int>(right, keysRect.right()) - key.x;
+    // The bar and the label keep 4 px clear of the key edges; a narrower key says OK.
+    const char* label = tr(STR_KEYBOARD_DONE);
+    if (renderer.getTextWidth(fontId, label, kSemiBold) + kSelectionBarWidth + 6 > keyWidth - 8) {
+      label = tr(STR_OK_BUTTON);
+    }
     const int lineHeight = renderer.getLineHeight(fontId);
     const int labelWidth = renderer.getTextWidth(fontId, label, kSemiBold);
-    const int keyWidth = std::min<int>(right, keysRect.right()) - key.x;
     const int labelX = key.x + (keyWidth - labelWidth + kSelectionBarWidth + 6) / 2;
     const int labelY = key.y + (rowHeight - lineHeight) / 2;
     drawSelectionBar(renderer, labelX - kSelectionBarWidth - 6, labelY, lineHeight);
@@ -1264,4 +1280,17 @@ void KeyboardEntryActivity::onCancel() {
   result.isCancelled = true;
   setResult(std::move(result));
   finish();
+}
+
+void KeyboardEntryActivity::confirmDiscard() {
+  auto confirm = makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_KEYBOARD_DISCARD_CONFIRM), "",
+                                                         tr(STR_CANCEL), tr(STR_KEYBOARD_DISCARD));
+  if (!confirm) {
+    LOG_ERR("KBD", "OOM: discard confirmation");
+    onCancel();
+    return;
+  }
+  startActivityForResult(std::move(confirm), [this](const ActivityResult& result) {
+    if (!result.isCancelled) onCancel();
+  });
 }

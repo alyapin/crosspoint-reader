@@ -27,7 +27,8 @@ class EpubReaderClippingListActivity final : public UiListActivity {
   void onRowLongPress(int index) override;
   bool handleCustomInput() override;
   bool handleButtons() override;
-  const char* headerTitle() const override;
+  // The header clears the hint gutter in every orientation.
+  void drawChrome() override;
 
   static constexpr int ROW_WINDOW = 8;
   std::array<std::array<char, clippingPreview::BUFFER_BYTES>, ROW_WINDOW> previews{};

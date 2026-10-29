@@ -130,3 +130,17 @@ int ButtonNavigator::previousPageIndex(const int currentIndex, const int totalIt
 
   return lastPageIndex * itemsPerPage;
 }
+
+int ButtonNavigator::nextRowIndex(const int currentIndex, const int totalItems, const int columns) {
+  if (totalItems <= 0 || columns <= 0) return 0;
+  const int lastRow = (totalItems - 1) / columns;
+  if (currentIndex / columns < lastRow) return std::min(currentIndex + columns, totalItems - 1);
+  return currentIndex % columns;
+}
+
+int ButtonNavigator::previousRowIndex(const int currentIndex, const int totalItems, const int columns) {
+  if (totalItems <= 0 || columns <= 0) return 0;
+  if (currentIndex >= columns) return currentIndex - columns;
+  const int lastRow = (totalItems - 1) / columns;
+  return std::min(lastRow * columns + currentIndex, totalItems - 1);
+}

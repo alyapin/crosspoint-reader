@@ -244,6 +244,10 @@ void EpubReaderBookmarksActivity::deleteSelectedBookmark() {
   requestUpdate(true);
 }
 
+void EpubReaderBookmarksActivity::drawChrome() {
+  GUI.drawHeader(renderer, UITheme::getInstance().getHeaderRect(renderer, true, false), tr(STR_BOOKMARKS));
+}
+
 void EpubReaderBookmarksActivity::buildScreen(UiScreen& screen) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
@@ -259,12 +263,15 @@ void EpubReaderBookmarksActivity::buildScreen(UiScreen& screen) {
     return;
   }
 
-  // This hint names a physical button, so omit it on touch boards.
+  // This caption names a physical button, so omit it on touch boards.
   if (!mappedInput.hasTouch()) {
     const int helpLineHeight = renderer.getLineHeight(SMALL_FONT_ID);
-    const fui::Rect band = screen.takeBottom(static_cast<int16_t>(helpLineHeight + metrics.verticalSpacing));
-    GUI.drawHelpText(renderer, Rect{band.x, band.y + metrics.verticalSpacing, band.width, helpLineHeight},
-                     tr(STR_HOLD_OPEN_FOR_ACTIONS));
+    const fui::Rect band = screen.takeBottom(static_cast<int16_t>(helpLineHeight + 2 * metrics.verticalSpacing));
+    renderer.drawText(
+        SMALL_FONT_ID, band.x + metrics.contentSidePadding, band.y + metrics.verticalSpacing,
+        renderer
+            .truncatedText(SMALL_FONT_ID, tr(STR_HOLD_OPEN_FOR_ACTIONS), band.width - 2 * metrics.contentSidePadding)
+            .c_str());
   }
 
   // bookmarkSubtitles/bookmarkRowItems are built once whenever `bookmarks`
@@ -284,25 +291,7 @@ void EpubReaderBookmarksActivity::buildScreen(UiScreen& screen) {
 
 void EpubReaderBookmarksActivity::render(RenderLock&&) {
   renderer.clearScreen();
-
-  const auto pageWidth = renderer.getScreenWidth();
-  const auto orientation = renderer.getOrientation();
-  // Landscape orientation: reserve a horizontal gutter for button hints.
-  const bool isLandscapeCw = orientation == GfxRenderer::Orientation::LandscapeClockwise;
-  const bool isLandscapeCcw = orientation == GfxRenderer::Orientation::LandscapeCounterClockwise;
-  // Inverted portrait: reserve vertical space for hints at the top.
-  const bool isPortraitInverted = orientation == GfxRenderer::Orientation::PortraitInverted;
-  const int hintGutterWidth = (isLandscapeCw || isLandscapeCcw) ? 40 : 0;
-  // Landscape CW places hints on the left edge; CCW keeps them on the right.
-  const int contentX = isLandscapeCw ? hintGutterWidth : 0;
-  const int contentWidth = pageWidth - hintGutterWidth;
-  const int contentY = isPortraitInverted ? 50 : 0;
-
-  // Manual centering to honor content gutters.
-  const int titleX =
-      contentX + (contentWidth - renderer.getTextWidth(UI_12_FONT_ID, tr(STR_BOOKMARKS), EpdFontFamily::BOLD)) / 2;
-  renderer.drawText(UI_12_FONT_ID, titleX, 15 + contentY, tr(STR_BOOKMARKS), true, EpdFontFamily::BOLD);
-
+  drawChrome();
   renderUi();
 
   if (confirmPopup.processRender(renderer, mappedInput)) return;

@@ -75,6 +75,9 @@ void KeyboardLayoutsActivity::buildScreen(UiScreen& screen) {
   props.count = keyboard_layouts::COUNT;
   props.action = ACTION_ROW;
   props.inputMask = fui::InputTouch;  // physical buttons stay in loop()
+  // The settings lists' label role; maxLines=2 marks it caller-owned.
+  props.labelText = screen.theme().smallText;
+  props.labelText.maxLines = 2;
   syncListViewport(screen, props);
   screen.list(props);
 }

@@ -278,6 +278,11 @@ void SettingsActivity::toggleSelectedSetting() {
     }
     setting.valueSetter((cur + 1) % totalValues);
   } else if (setting.type == SettingType::VALUE && setting.valuePtr != nullptr) {
+    // Confirm only counts up and wraps; buttons get the slider, taps keep stepping.
+    if (!mappedInput.hasTouch()) {
+      openValueSlider(setting);
+      return;
+    }
     const int8_t currentValue = SETTINGS.*(setting.valuePtr);
     if (currentValue + setting.valueRange.step > setting.valueRange.max) {
       SETTINGS.*(setting.valuePtr) = setting.valueRange.min;
@@ -397,16 +402,14 @@ void SettingsActivity::toggleSelectedSetting() {
                                });
         break;
       case SettingAction::Plugins: {
-        ValuePickerActivity::open(*this, renderer, mappedInput, tr(STR_PLUGINS), {tr(STR_ENABLED), tr(STR_DISABLED)},
-                                  SETTINGS.pluginsEnabled ? 0 : 1, [this](const int idx) {
-                                    SETTINGS.pluginsEnabled = idx == 0 ? 1 : 0;
-                                    // Turning plugins on brings back a dismissed Plugin Hub install row.
-                                    if (SETTINGS.pluginsEnabled) SETTINGS.pluginHubPromptHidden = 0;
-                                    SETTINGS.saveToFile();
-                                    // Applies to event delivery now, not after a reboot.
-                                    pluginevents::refreshSubscriptions();
-                                    rebuildSettings();
-                                  });
+        SETTINGS.pluginsEnabled = SETTINGS.pluginsEnabled ? 0 : 1;
+        // Turning plugins on brings back a dismissed Plugin Hub install row.
+        if (SETTINGS.pluginsEnabled) SETTINGS.pluginHubPromptHidden = 0;
+        SETTINGS.saveToFile();
+        // Applies to event delivery now, not after a reboot.
+        pluginevents::refreshSubscriptions();
+        rebuildSettings();
+        nav.selected = std::min(selectedSetting, static_cast<int>(settings.size()) - 1);
         return;
       }
       case SettingAction::KeyboardLayouts:
@@ -479,13 +482,31 @@ void SettingsActivity::openSleepTimeoutPicker() {
       });
 }
 
+void SettingsActivity::openValueSlider(const SettingInfo& setting) {
+  const auto valuePtr = setting.valuePtr;
+  const auto range = setting.valueRange;
+  const StrId format =
+      valuePtr == &CrossPointSettings::readingGoalMinutes ? StrId::STR_SLEEP_TIMER_VALUE_FORMAT : StrId::STR_NONE_OPT;
+  auto slider = makeUniqueNoThrow<IntervalSelectionActivity>(renderer, mappedInput, "SettingValue", setting.nameId,
+                                                             SETTINGS.*valuePtr, range.min, range.max, range.step,
+                                                             range.step * 6, format);
+  if (!slider) {
+    LOG_ERR("SET", "OOM: value slider");
+    return;
+  }
+  startActivityForResult(std::move(slider), [valuePtr](const ActivityResult& result) {
+    if (result.isCancelled) return;
+    SETTINGS.*valuePtr = static_cast<uint8_t>(std::get<IntervalResult>(result.data).value);
+    SETTINGS.saveToFile();
+  });
+}
+
 std::string SettingsActivity::settingValueText(const SettingInfo& setting) {
   if (setting.action == SettingAction::HomeButton) return tr(STR_CONFIGURE);
   if (setting.action == SettingAction::SleepImage) {
     const char* path = SETTINGS.sleepImagePath;
     return path[0] == '\0' ? tr(STR_SLEEP_IMAGE_RANDOM) : strrchr(path, '/') + 1;
   }
-  if (setting.action == SettingAction::Plugins) return SETTINGS.pluginsEnabled ? tr(STR_ENABLED) : tr(STR_DISABLED);
   if (setting.type == SettingType::ENUM && setting.valuePtr != nullptr) {
     // Guard like the valueGetter branch below: a corrupt/migrated settings
     // byte must not index past the enum table.
@@ -536,7 +557,10 @@ void SettingsActivity::buildScreen(UiScreen& screen) {
     const bool checkbox = setting.type == SettingType::TOGGLE ||
                           (setting.type == SettingType::ENUM && setting.enumStringValues.empty() &&
                            labels.size() == 2 && labels[0] == StrId::STR_STATE_OFF && labels[1] == StrId::STR_STATE_ON);
-    if (checkbox && (setting.valuePtr || setting.valueGetter)) {
+    if (setting.action == SettingAction::Plugins) {
+      rowValues_[i].clear();
+      GUI.setCheckboxRow(rowItems_[i], SETTINGS.pluginsEnabled != 0);
+    } else if (checkbox && (setting.valuePtr || setting.valueGetter)) {
       const bool checked = setting.valuePtr ? SETTINGS.*(setting.valuePtr) != 0 : setting.valueGetter() != 0;
       rowValues_[i].clear();
       GUI.setCheckboxRow(rowItems_[i], checked);
@@ -563,9 +587,8 @@ void SettingsActivity::buildScreen(UiScreen& screen) {
 
 void SettingsActivity::drawFooter() {
   const int selected = nav.selected;
-  const bool picker =
-      selected >= 0 && selected < static_cast<int>(settings.size()) &&
-      (settings[selected].type == SettingType::ACTION || settings[selected].nameId == StrId::STR_TIME_TO_SLEEP);
+  const bool picker = selected >= 0 && selected < static_cast<int>(settings.size()) &&
+                      (settings[selected].type == SettingType::ACTION || settings[selected].type == SettingType::VALUE);
   const auto labels =
       mappedInput.mapLabels(tr(STR_BACK), picker ? tr(STR_SELECT) : tr(STR_TOGGLE), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);

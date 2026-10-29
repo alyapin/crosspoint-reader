@@ -34,7 +34,9 @@ void EpubReaderClippingListActivity::onEnter() {
 
 int EpubReaderClippingListActivity::listCount() const { return static_cast<int>(CLIPPINGS.clippingCount()); }
 
-const char* EpubReaderClippingListActivity::headerTitle() const { return tr(STR_CLIPPINGS); }
+void EpubReaderClippingListActivity::drawChrome() {
+  GUI.drawHeader(renderer, UITheme::getInstance().getHeaderRect(renderer, true, false), tr(STR_CLIPPINGS));
+}
 
 void EpubReaderClippingListActivity::rebuildRows() {
   windowStart = -1;

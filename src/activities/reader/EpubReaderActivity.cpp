@@ -1286,7 +1286,8 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
                                  }
                                  section.reset();
                                }
-                               openReaderMenu();
+                               // Button boards go straight back to the page: the menu would cost a Back.
+                               if (mappedInput.hasTouch()) openReaderMenu();
                              });
       break;
     }
@@ -2091,6 +2092,7 @@ void EpubReaderActivity::renderBook() {
     // The page just re-rendered under the overlay: refresh the snapshot that
     // backs panel->toolbar restores (any previous copy is stale).
     overlayPageStored = renderer.storeBwBuffer();
+    if (toolbarUi) toolbarUi->pageChanged();
     renderOverlay();
     // FAST, same as openOverlay: HALF's inverting pass flashes the sheet
     // (white, in night mode) on every repaint under an open panel. Any AA
@@ -2737,6 +2739,7 @@ void EpubReaderActivity::openOverlay(Overlay target) {
     case Overlay::Contents: {
       RenderLock lock;
       panelIndex = currentTocIndex();
+      contentsCurrentIndex = panelIndex;
       // Fresh viewport opening on the current chapter, cursor shown or not.
       toolbarUi->nav().reset(panelIndex);
       toolbarUi->nav().top = panelIndex;
@@ -2823,6 +2826,13 @@ void EpubReaderActivity::renderOverlay() {
   model.activeTool = (overlay == Overlay::Toolbar && !panelCursorShown) ? -1 : focusedTool;
   // Strings the model points at live here until render() returns.
   std::string chapterTitle, pageInfo;
+  // Button hints under the sheet, on the bottom edge they name (portrait only).
+  model.buttonHints = !mappedInput.hasTouch() && renderer.getOrientation() == GfxRenderer::Orientation::Portrait;
+  const auto drawHints = [this, &model](const char* previous, const char* next) {
+    if (!model.buttonHints) return;
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), previous, next);
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+  };
 
   if (overlay == Overlay::Toolbar) {
     chapterTitle = currentChapterTitle();
@@ -2837,6 +2847,7 @@ void EpubReaderActivity::renderOverlay() {
     model.progressPermille = static_cast<int>(bookProgress * 1000.0f + 0.5f);
     toolbarUi->setModel(model);
     toolbarUi->render();
+    drawHints(tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
     return;
   }
 
@@ -2851,6 +2862,7 @@ void EpubReaderActivity::renderOverlay() {
   if (overlay == Overlay::Contents) {
     model.panelTitle = tr(STR_TOOL_CONTENTS);
     model.itemCount = epub->getTocItemsCount();
+    model.currentIndex = contentsCurrentIndex;
     model.rowText = [this](int i) {
       const auto item = epub->getTocItem(i);
       const int depth = item.level > 1 ? (item.level - 1) * 2 : 0;
@@ -2881,6 +2893,7 @@ void EpubReaderActivity::renderOverlay() {
   }
   toolbarUi->setModel(model);
   toolbarUi->render();
+  drawHints(tr(STR_DIR_UP), tr(STR_DIR_DOWN));
 }
 
 void EpubReaderActivity::handleOverlayInput() {
@@ -2945,13 +2958,18 @@ void EpubReaderActivity::handleOverlayInput() {
       closeOverlayToPage();
       return;
     }
-    if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
+    // Button boards have no hint for the side keys, so they step the tools as in
+    // every list; touch boards keep them on the chapter arrows they see.
+    const bool sideTools = !mappedInput.hasTouch();
+    if (mappedInput.wasReleased(MappedInputManager::Button::Left) ||
+        (sideTools && mappedInput.wasReleased(MappedInputManager::Button::Up))) {
       focusedTool = (focusedTool + 2) % 3;
       panelCursorShown = true;
       fastRedraw();
       return;
     }
-    if (mappedInput.wasReleased(MappedInputManager::Button::Right)) {
+    if (mappedInput.wasReleased(MappedInputManager::Button::Right) ||
+        (sideTools && mappedInput.wasReleased(MappedInputManager::Button::Down))) {
       focusedTool = (focusedTool + 1) % 3;
       panelCursorShown = true;
       fastRedraw();
