@@ -340,7 +340,7 @@ void KlondikeActivity::build(UiScreen& screen) {
                                    won ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU)};
   const freeink::Icon* icons[BAR_SLOTS] = {&icon_bar_undo_24, &icon_bar_hint_24,
                                            won ? &icon_bar_new_game_24 : &icon_menu_24};
-  const BarItem::Kind kinds[BAR_SLOTS] = {BarItem::Action, BarItem::Action, won ? BarItem::NewGame : BarItem::Menu};
+  const BarItem::Kind kinds[BAR_SLOTS] = {BarItem::Repeat, BarItem::Repeat, won ? BarItem::NewGame : BarItem::Menu};
   for (int i = 0; i < BAR_SLOTS; ++i) {
     if (barShown(i)) items[i] = {icons[i], labels[i], false, kinds[i]};
   }

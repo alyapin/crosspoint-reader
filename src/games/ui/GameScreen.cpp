@@ -134,10 +134,12 @@ void GameScreen::addOwnRows(GamePickerActivity::Row* rows, int& count) {
 }
 
 void GameScreen::showMenu(const char* title, const GamePickerActivity::Row* rows, const int count) {
-  // Button boards reopen on the last game action chosen here (another undo is one Confirm), else the first row.
-  const int last = static_cast<int>(std::find(menuIds, menuIds + count, lastMenuRow) - menuIds);
-  auto menu = makeUniqueNoThrow<GamePickerActivity>(renderer, mappedInput, title, rows, count,
-                                                    !hasBar() && last < count ? last : 0);
+  // Button boards reopen on the last mode or Repeat action chosen here (another undo is one Confirm), else on
+  // Продолжить; touch boards start on Новая игра, so a stray key never resigns or offers a draw.
+  const int8_t start = hasBar() ? static_cast<int8_t>(kRowNewGame) : lastMenuRow;
+  const int found = static_cast<int>(std::find(menuIds, menuIds + count, start) - menuIds);
+  auto menu =
+      makeUniqueNoThrow<GamePickerActivity>(renderer, mappedInput, title, rows, count, found < count ? found : 0);
   if (!menu) {
     LOG_ERR("GAMES", "OOM: %u bytes for the menu", static_cast<unsigned>(sizeof(GamePickerActivity)));
     return;
@@ -150,7 +152,9 @@ void GameScreen::showMenu(const char* title, const GamePickerActivity::Row* rows
     const auto* choice = std::get_if<MenuResult>(&result.data);
     const bool chosen = !result.isCancelled && choice != nullptr && choice->action >= 0 && choice->action < count;
     const int row = chosen ? menuIds[choice->action] : kRowContinue;
-    lastMenuRow = static_cast<int8_t>(row >= 0 ? row : kRowContinue);
+    const bool repeatable =
+        row >= 0 && row < shownCount && (shownBar[row].kind == BarItem::Mode || shownBar[row].kind == BarItem::Repeat);
+    lastMenuRow = static_cast<int8_t>(repeatable ? row : kRowContinue);
     if (row == kRowFinish) {
       confirmFinish();
       return;

@@ -562,7 +562,7 @@ void ChessActivity::activateRow(const int index) {
   if (view == View::Menu) {
     // Keys reopen the menu on a game action chosen here last.
     const Row row = rows[index];
-    lastMenuRow = row == Row::Undo || row == Row::Flip || row == Row::Draw || row == Row::Pieces ? row : Row::Continue;
+    lastMenuRow = row == Row::Undo || row == Row::Flip || row == Row::Pieces ? row : Row::Continue;
   }
   switch (rows[index]) {
     case Row::Start:
