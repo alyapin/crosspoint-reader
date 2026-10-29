@@ -68,6 +68,7 @@ class DraughtsActivity final : public GameScreen {
   draughts::Game game;
   std::unique_ptr<draughts::Engine> engine;  // made on the computer's first turn
   bool noEngine = false;                     // it did not fit in memory: the computer cannot move
+  uint32_t engineTriedMs = 0;                // the last try to make it, retried once a second
   draughts::Move moves[draughts::MAX_MOVES];
   int moveCount = 0;
   int selected = -1;

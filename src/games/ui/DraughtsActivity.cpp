@@ -38,6 +38,7 @@ constexpr int kLineGap = 6;
 constexpr int kFlipSlot = 1;
 constexpr int kNewGameSlot = 2;
 constexpr uint32_t kSliceMs = 40;
+constexpr uint32_t kEngineRetryMs = 1000;
 constexpr int kCenter = 17;  // d4: the key cursor starts on the piece nearest to it
 
 bool has(const uint32_t set, const int square) { return (set >> square & 1u) != 0; }
@@ -117,6 +118,7 @@ void DraughtsActivity::resumeGame() {
   if (!game.computerToMove() || (engine && (engine->thinking() || engine->ready()))) return;
   if (!engine) engine = makeUniqueNoThrow<draughts::Engine>();
   noEngine = !engine;
+  engineTriedMs = GameScreen::nowMs();
   if (noEngine) {
     LOG_ERR("DRAUGHTS", "OOM: %u bytes for the engine", static_cast<unsigned>(sizeof(draughts::Engine)));
     return;
@@ -160,6 +162,11 @@ void DraughtsActivity::resign() {
 // --- loop task ---------------------------------------------------------------
 
 void DraughtsActivity::loop() {
+  if (noEngine && game.computerToMove() && GameScreen::nowMs() - engineTriedMs >= kEngineRetryMs) {
+    RenderLock lock(*this);
+    resumeGame();
+    if (!noEngine) requestRepaint(RepaintUpdate);
+  }
   if (engine && engine->thinking()) engine->step(kSliceMs);
   if (engine && engine->ready()) {
     RenderLock lock(RenderLock::Mode::Try);
