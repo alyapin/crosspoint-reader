@@ -49,6 +49,7 @@ class CrossPointWebServerActivity final : public Activity {
 
   // Set when Back or Home is seen while an upload holds handleClient().
   bool leaveRequested = false;
+  bool homeRequested = false;  // that one was Home
 
   // Sustained WiFi-loss tracking; abandon only after WIFI_ABANDON_MS.
   int consecutiveDisconnects = 0;
@@ -61,6 +62,8 @@ class CrossPointWebServerActivity final : public Activity {
   void renderServerRunning() const;
   void renderWifiIndicator(int subHeaderTop) const;
 
+  // Back: to Ещё when opened from there, else Home.
+  void leave();
   void onNetworkModeSelected(NetworkMode mode);
   void onWifiSelectionComplete(bool connected);
   void startAccessPoint();

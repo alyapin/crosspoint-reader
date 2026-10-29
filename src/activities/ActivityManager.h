@@ -89,8 +89,9 @@ class ActivityManager {
 
   // goTo... functions are convenient wrapper for replaceActivity()
   void goToFileTransfer();
-  void goToJoinNetwork();  // File Transfer straight into Join Network (post heap-defrag reboot)
-  void goToUsbDrive();
+  // File Transfer straight into Join Network (post heap-defrag reboot); underMore puts Ещё back under it.
+  void goToJoinNetwork(bool underMore = false);
+  void goToUsbDrive(bool toMore = false);  // toMore: its exit reboot lands on Ещё
   // openSection jumps straight into one group (End = the section list).
   void goToSettings(SettingsSection openSection = SettingsSection::End);
   void goToFileBrowser(std::string path = {});
@@ -112,6 +113,10 @@ class ActivityManager {
   void popActivity();
   // The current activity was pushed: finish() returns to the screen under it.
   bool hasParentActivity() const { return !stackActivities.empty(); }
+  // Ещё is under the current activity: it was opened from there.
+  bool isUnderMore() const;
+  // Back is popping the current activity onto a stack that holds Ещё.
+  bool isBackToMore() const { return pendingAction == PendingAction::Pop && isUnderMore(); }
 
   bool preventAutoSleep() const;
   bool requiresExclusiveStorageLoop() const;

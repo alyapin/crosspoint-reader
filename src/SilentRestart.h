@@ -7,7 +7,7 @@
 // comes back exactly as it was, regardless of the Restore Light on Wake
 // preference.
 
-void silentRestart();            // home screen
+void silentRestart();            // home screen, or Ещё when Back is returning there
 void silentRestartToReader();    // currently-open EPUB (APP_STATE.openEpubPath)
 void silentRestartToSettings();  // settings screen
 void silentRestartToMore();      // the Ещё tab
@@ -20,3 +20,4 @@ void silentRestartToJoinNetwork();
 // Reboots immediately after an activity releases exclusive raw storage. The
 // RTC target ensures setup() lands on Home instead of resuming a reader.
 void restartToHomeAfterStorageHandoff();
+void restartToMoreAfterStorageHandoff();  // the same, landing on Ещё

@@ -188,5 +188,5 @@ void UsbDriveActivity::restartToHome() {
   restartRequested = true;
   Storage.endUsbDrive();
   delay(20);
-  restartToHomeAfterStorageHandoff();
+  toMore ? restartToMoreAfterStorageHandoff() : restartToHomeAfterStorageHandoff();
 }

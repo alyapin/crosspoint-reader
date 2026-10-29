@@ -169,6 +169,7 @@ constexpr uint32_t SILENT_REBOOT_TARGET_JOIN_NETWORK = 3;
 constexpr uint32_t SILENT_REBOOT_TARGET_MORE = 4;
 constexpr uint32_t SILENT_REBOOT_TARGET_MAX = SILENT_REBOOT_TARGET_MORE;
 constexpr uint32_t SILENT_REBOOT_LIGHT_ON = 1U << 0;
+constexpr uint32_t SILENT_REBOOT_UNDER_MORE = 1U << 1;  // join-network target: opened from Ещё
 
 // How the device is coming back to life, resolved once at boot. Both resume
 // flows suppress the splash and leave the panel holding its pre-boot frame; a
@@ -217,7 +218,14 @@ static void silentRestartTo(const uint32_t target, const char* targetName) {
   ESP.restart();
 }
 
-void silentRestart() { silentRestartTo(SILENT_REBOOT_TARGET_HOME, "home"); }
+void silentRestart() {
+  // Back from a screen opened from Ещё lands there again.
+  if (activityManager.isBackToMore()) {
+    silentRestartTo(SILENT_REBOOT_TARGET_MORE, "more");
+  } else {
+    silentRestartTo(SILENT_REBOOT_TARGET_HOME, "home");
+  }
+}
 
 void silentRestartToReader() { silentRestartTo(SILENT_REBOOT_TARGET_READER, "reader"); }
 
@@ -234,21 +242,26 @@ void silentRestartToJoinNetwork() {
   if (BoardConfig::hasTouch()) return;
 #endif
   armSilentReboot(SILENT_REBOOT_TARGET_JOIN_NETWORK);
+  if (activityManager.isUnderMore()) silentRebootPayload |= SILENT_REBOOT_UNDER_MORE;
   LOG_DBG("MAIN", "Silent restart (target=join-network)");
   GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
   delay(50);
   ESP.restart();
 }
 
-void restartToHomeAfterStorageHandoff() {
+static void restartAfterStorageHandoff(const uint32_t target, const char* targetName) {
   if (deepSleepInProgress) return;  // sleeping supersedes the storage handoff reboot
-  armSilentReboot(SILENT_REBOOT_TARGET_HOME);
-  LOG_DBG("MAIN", "Restart after storage handoff (target=home)");
+  armSilentReboot(target);
+  LOG_DBG("MAIN", "Restart after storage handoff (target=%s)", targetName);
   GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
   delay(50);
   handoffUsbOtgToSerialJtag();
   ESP.restart();
 }
+
+void restartToHomeAfterStorageHandoff() { restartAfterStorageHandoff(SILENT_REBOOT_TARGET_HOME, "home"); }
+
+void restartToMoreAfterStorageHandoff() { restartAfterStorageHandoff(SILENT_REBOOT_TARGET_MORE, "more"); }
 
 void toggleFrontlight() {
   if (!Frontlight.present()) return;
@@ -657,6 +670,7 @@ void setup() {
   const uint32_t snapshotTarget =
       (isSilentReboot && silentRebootTarget <= SILENT_REBOOT_TARGET_MAX) ? silentRebootTarget : 0;
   const bool silentRebootLightOn = isSilentReboot && (silentRebootPayload & SILENT_REBOOT_LIGHT_ON) != 0;
+  const bool silentRebootUnderMore = isSilentReboot && (silentRebootPayload & SILENT_REBOOT_UNDER_MORE) != 0;
   silentRebootMagic = 0;
   silentRebootTarget = 0;
   silentRebootPayload = 0;
@@ -865,7 +879,7 @@ void setup() {
   } else if (resume == BootResume::Silent && snapshotTarget == SILENT_REBOOT_TARGET_JOIN_NETWORK) {
     // Rebooted on the way *into* File Transfer > Join Network for a fresh heap;
     // resume that flow directly instead of landing on home.
-    activityManager.goToJoinNetwork();
+    activityManager.goToJoinNetwork(silentRebootUnderMore);
   } else if (resume == BootResume::Silent && snapshotTarget == SILENT_REBOOT_TARGET_SETTINGS) {
     // Back out of the WiFi rows and the user is where they left off, not on Home.
     activityManager.goToSettings(SettingsSection::Network);

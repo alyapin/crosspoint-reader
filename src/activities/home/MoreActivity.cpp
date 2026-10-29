@@ -3,9 +3,14 @@
 #include <I18n.h>
 
 #include "CrossPointSettings.h"
+#include "OpdsServerStore.h"
+#include "activities/browser/OpdsBookBrowserActivity.h"
 #include "activities/games/GamesActivity.h"
 #include "activities/home/FileBrowserActivity.h"
+#include "activities/network/CrossPointWebServerActivity.h"
 #include "activities/network/LocalSendActivity.h"
+#include "activities/plugins/PluginCatalogActivity.h"
+#include "activities/settings/OpdsServerListActivity.h"
 #include "components/icons/listIcons.h"
 #include "components/setka/setkaIcons.h"
 
@@ -68,14 +73,21 @@ void MoreActivity::activateIndex(const int index) {
       openChild(std::make_unique<LocalSendActivity>(renderer, mappedInput));
       break;
     case Entry::FileTransfer:
-      activityManager.goToFileTransfer();
+      openChild(std::make_unique<CrossPointWebServerActivity>(renderer, mappedInput));
       break;
-    case Entry::Catalogs:
-      activityManager.goToBrowser();
+    case Entry::Catalogs: {
+      // As ActivityManager::goToBrowser(): one server skips the server picker.
+      const auto& servers = OPDS_STORE.getServers();
+      if (servers.size() == 1) {
+        openChild(std::make_unique<OpdsBookBrowserActivity>(renderer, mappedInput, servers[0]));
+      } else {
+        openChild(std::make_unique<OpdsServerListActivity>(renderer, mappedInput, true));
+      }
       break;
+    }
     case Entry::Plugins:
       // Catalogs have their own row here, so the plugin list skips its OPDS entry.
-      activityManager.goToPlugins(false);
+      openChild(std::make_unique<PluginCatalogActivity>(renderer, mappedInput, false));
       break;
     case Entry::SdFiles:
       openChild(std::make_unique<FileBrowserActivity>(renderer, mappedInput));

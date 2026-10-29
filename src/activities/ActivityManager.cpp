@@ -22,6 +22,7 @@
 #include "home/CrashActivity.h"
 #include "home/FileBrowserActivity.h"
 #include "home/HomeActivity.h"
+#include "home/MoreActivity.h"
 #include "home/SetkaHomeActivity.h"
 #include "library/LibraryListActivity.h"
 #include "network/CrossPointWebServerActivity.h"
@@ -275,23 +276,36 @@ void ActivityManager::goToFileTransfer() {
   replaceActivity(std::make_unique<CrossPointWebServerActivity>(renderer, mappedInput));
 }
 
-void ActivityManager::goToJoinNetwork() {
+void ActivityManager::goToJoinNetwork(const bool underMore) {
   // Post heap-defrag reboot: enter the web-server activity straight in Join
   // Network mode (skips mode selection, does not reboot again).
+  if (underMore) {
+    // Opened from Ещё before the reboot (called at boot, with nothing current):
+    // Ещё goes back under it, so Back returns there.
+    auto more = std::make_unique<MoreActivity>(renderer, mappedInput);
+    more->onEnter();
+    stackActivities.push_back(std::move(more));
+  }
   replaceActivity(std::make_unique<CrossPointWebServerActivity>(renderer, mappedInput, /*startInJoinNetwork=*/true));
 }
 
-void ActivityManager::goToUsbDrive() {
+void ActivityManager::goToUsbDrive(const bool toMore) {
 #if FREEINK_CAP_USB_MSC
-  auto activity = makeUniqueNoThrow<UsbDriveActivity>(renderer, mappedInput);
+  auto activity = makeUniqueNoThrow<UsbDriveActivity>(renderer, mappedInput, toMore);
   if (!activity) {
     LOG_ERR("ACT", "OOM: USB Drive activity");
     return;
   }
   replaceActivity(std::move(activity));
 #else
+  (void)toMore;
   LOG_ERR("ACT", "USB Drive requested in a build without USB Drive capability");
 #endif
+}
+
+bool ActivityManager::isUnderMore() const {
+  return std::any_of(stackActivities.begin(), stackActivities.end(),
+                     [](const std::unique_ptr<Activity>& activity) { return activity->name == "More"; });
 }
 
 void ActivityManager::goToSettings(const SettingsSection openSection) {

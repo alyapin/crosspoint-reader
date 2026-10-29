@@ -7,8 +7,9 @@
 
 class UsbDriveActivity final : public Activity, private UiAppHost {
  public:
-  UsbDriveActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-      : Activity("UsbDrive", renderer, mappedInput), UiAppHost(renderer) {}
+  // toMore: opened under Ещё, so the exit reboot lands there.
+  UsbDriveActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const bool toMore = false)
+      : Activity("UsbDrive", renderer, mappedInput), UiAppHost(renderer), toMore(toMore) {}
 
   void onEnter() override;
   void onExit() override;
@@ -29,6 +30,7 @@ class UsbDriveActivity final : public Activity, private UiAppHost {
   void buildDriveScreen(UiScreen& screen) const;
   void restartToHome();
 
+  const bool toMore;
   State state = State::Unsupported;
   bool preparing = true;
   bool startFailed = false;

@@ -465,7 +465,7 @@ void OpdsBookBrowserActivity::navigateToEntry(const OpdsEntry& entry) {
 
 void OpdsBookBrowserActivity::navigateBack() {
   if (navigationHistory.empty()) {
-    onGoHome();
+    activityManager.hasParentActivity() ? finish() : onGoHome();  // finish: opened from Ещё
     return;
   }
   currentPath = navigationHistory.back();

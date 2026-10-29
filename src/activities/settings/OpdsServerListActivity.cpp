@@ -114,10 +114,10 @@ void OpdsServerListActivity::rebuildRowItems() {
 }
 
 void OpdsServerListActivity::onBackButton() {
-  if (pickerMode) {
+  if (pickerMode && !activityManager.hasParentActivity()) {
     activityManager.goHome(HomeMenuItem::OPDS_BROWSER);
   } else {
-    finish();
+    finish();  // pushed by Settings or Ещё
   }
 }
 
@@ -140,7 +140,13 @@ void OpdsServerListActivity::handleSelection() {
     if (nav.selected < serverCount) {
       const auto* server = OPDS_STORE.getServer(static_cast<size_t>(nav.selected));
       if (server) {
-        activityManager.replaceActivity(std::make_unique<OpdsBookBrowserActivity>(renderer, mappedInput, *server));
+        auto browser = std::make_unique<OpdsBookBrowserActivity>(renderer, mappedInput, *server);
+        if (activityManager.hasParentActivity()) {
+          // Opened from Ещё: the browser's Back leaves this picker too.
+          startActivityForResult(std::move(browser), [](const ActivityResult&) { finish(); });
+        } else {
+          activityManager.replaceActivity(std::move(browser));
+        }
       }
     } else {
       auto editor = makeUniqueNoThrow<OpdsSettingsActivity>(renderer, mappedInput, -1);
