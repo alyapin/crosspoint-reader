@@ -25,6 +25,7 @@ void MoreActivity::onEnter() {
   entries[entryCount++] = Entry::Catalogs;
   if (SETTINGS.pluginsEnabled) entries[entryCount++] = Entry::Plugins;
   entries[entryCount++] = Entry::SdFiles;
+  CardsActivity::dueTodayText(cardsStatus, sizeof(cardsStatus));
   SetkaListActivity::onEnter();
 }
 
@@ -71,7 +72,12 @@ const freeink::Icon* MoreActivity::rowIcon(const int index) const {
 }
 
 const char* MoreActivity::rowStatus(const int index) const {
-  return entries[index] == Entry::Cards ? CardsActivity::dueTodayText() : nullptr;
+  return entries[index] == Entry::Cards ? cardsStatus : nullptr;
+}
+
+void MoreActivity::onChildClosed() {
+  RenderLock lock(*this);
+  CardsActivity::dueTodayText(cardsStatus, sizeof(cardsStatus));
 }
 
 void MoreActivity::activateIndex(const int index) {

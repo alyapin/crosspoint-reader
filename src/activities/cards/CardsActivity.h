@@ -19,20 +19,21 @@
 // open deck, its current card and the session queue stay in RAM.
 //
 // Keys (the X4 has no touch): Left/Right and the side buttons move the focus,
-// Confirm acts, Back goes up a level. In a session the first Confirm shows the
-// answer and the second grades «Хорошо»; Left/Right pick «Снова» or «Легко».
-// Input is ignored for FLIP_GUARD_MS after the answer is shown.
+// Confirm acts, Back goes up a level. In a session Confirm shows the answer,
+// then Left grades «Снова», Confirm «Хорошо», Right «Легко»; holding Back
+// undoes the last answer. Input is ignored for FLIP_GUARD_MS after the answer
+// is on screen.
 class CardsActivity final : public Activity, protected UiAppHost {
  public:
-  // deckFile: a file in cards::DECK_DIR to open straight at its overview.
+  // deckFile: a file in cards::deckDir() to open straight at its overview.
   CardsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string deckFile = {});
   void onEnter() override;
   void onExit() override;
   void loop() override;
   void render(RenderLock&&) override;
 
-  // «Ещё» row status: cards due today over all decks, nullptr when unknown.
-  static const char* dueTodayText();
+  // «Ещё» row status: cards due today over all decks, "" when unknown.
+  static void dueTodayText(char* out, size_t cap);
 
  private:
   enum class Screen : uint8_t { Loading, List, Empty, Overview, Front, Back, Done, Message };
@@ -41,16 +42,21 @@ class CardsActivity final : public Activity, protected UiAppHost {
 
   static constexpr int MAX_DECKS = 64;
   static constexpr uint32_t FLIP_GUARD_MS = 300;
+  static constexpr unsigned long UNDO_HOLD_MS = 700;
 
   struct DeckRow {
     char name[72];  // file name without its extension, maybe cut
     uint32_t id;    // cards::deckId of the file name
+    uint32_t size;
+    uint32_t time;
     char caption[56];
   };
 
   // Loop task.
   void loadList();
   void openDeck();
+  void showOverview();
+  bool reopen(cards::Reindex reindex);
   void startSession(uint16_t extraNew);
   void showCard(bool entry);
   void grade(cards::Grade g);
@@ -58,7 +64,9 @@ class CardsActivity final : public Activity, protected UiAppHost {
   void activate(int index);
   void goBack();
   void moveFocus(int delta);
+  bool shown(int index) const;
   void showMessage(StrId text);
+  void showStatus(cards::Status status);
   void runAfterPaint(Job job, StrId text);
   void setScreen(Screen next, int focusIndex);
   void requestRepaint(Repaint kind);
@@ -98,12 +106,15 @@ class CardsActivity final : public Activity, protected UiAppHost {
   cards::Summary summary;
   char deckTitle[72] = {};
   std::unique_ptr<cards::Fields> fields;
-  uint32_t flipMs = 0;
+  // The guard starts when the answer is on screen, not when it is asked for.
+  std::atomic<bool> flipPending{false};
+  std::atomic<uint32_t> flipShownMs{0};
   uint32_t sessionStartMs = 0;
   uint32_t sessionMs = 0;
   uint16_t sessionCards = 0;
   uint16_t sessionCounts[3] = {};
 
+  char scratch[256] = {};         // render task: one line of card text
   setka::RefreshCadence cadence;  // render task only
   std::atomic<uint8_t> repaint{RepaintEntry};
 };

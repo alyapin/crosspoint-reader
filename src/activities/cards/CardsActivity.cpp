@@ -46,6 +46,7 @@ constexpr int kAnswerGap = 28;
 constexpr int kCenteredMaxLines = 6;
 constexpr int kSecondsPerCard = 10;
 constexpr int kStatColumn = 150;
+constexpr size_t kNameBytes = 256;
 
 constexpr int kFrontFonts[] = {NOTOSANS_18_FONT_ID, NOTOSANS_16_FONT_ID, NOTOSANS_14_FONT_ID, NOTOSANS_12_FONT_ID};
 constexpr int kBackFonts[][2] = {
@@ -55,9 +56,34 @@ constexpr int kBackFonts[][2] = {
 };
 
 enum OverviewRow : uint8_t { RowStart, RowNewPerDay, RowMoreNew };
+enum DoneRow : uint8_t { RowToDecks, RowDoneMoreNew, RowUndo };
 
-// Russian plural forms; English uses the "one" and "few" strings.
+// Decks whose indexing ran out of memory this boot, by file size and time:
+// the list does not read them again until the file changes.
+struct OutOfMemory {
+  uint32_t id;
+  uint32_t size;
+  uint32_t time;
+};
+OutOfMemory outOfMemory[8];
+uint8_t outOfMemoryCount = 0;
+
+bool knownOutOfMemory(const uint32_t id, const uint32_t size, const uint32_t time) {
+  for (uint8_t i = 0; i < outOfMemoryCount; i++) {
+    const OutOfMemory& d = outOfMemory[i];
+    if (d.id == id && d.size == size && d.time == time) return true;
+  }
+  return false;
+}
+
+void rememberOutOfMemory(const uint32_t id, const uint32_t size, const uint32_t time) {
+  outOfMemory[outOfMemoryCount % std::size(outOfMemory)] = {id, size, time};
+  if (outOfMemoryCount < 2 * std::size(outOfMemory)) outOfMemoryCount++;
+}
+
+// Russian forms; a language whose "few" and "many" match (English) has one and other.
 const char* plural(const unsigned n, const StrId one, const StrId few, const StrId many) {
+  if (strcmp(I18N.get(few), I18N.get(many)) == 0) return I18N.get(n == 1 ? one : many);
   const unsigned mod10 = n % 10;
   const unsigned mod100 = n % 100;
   if (mod10 == 1 && mod100 != 11) return I18N.get(one);
@@ -69,20 +95,32 @@ const char* cardsWord(const unsigned n) {
   return plural(n, StrId::STR_CARDS_CARD_ONE, StrId::STR_CARDS_CARD_FEW, StrId::STR_CARDS_CARD_MANY);
 }
 
-void deckCaption(const cards::Summary& s, char* out, const size_t cap) {
-  if (s.reviews > 0 && s.newCards > 0) {
-    snprintf(out, cap, tr(STR_CARDS_REVIEW_NEW), s.reviews, s.newCards);
-  } else if (s.reviews > 0) {
-    snprintf(out, cap, tr(STR_CARDS_REVIEW), s.reviews);
-  } else if (s.newCards > 0) {
-    snprintf(out, cap, tr(STR_CARDS_NEW), s.newCards);
-  } else if (s.cards == 0) {
-    snprintf(out, cap, "%s", tr(STR_CARDS_NO_CARDS));
-  } else if (s.tomorrow > 0) {
-    snprintf(out, cap, tr(STR_CARDS_ALL_DONE_TOMORROW), s.tomorrow);
-  } else {
-    snprintf(out, cap, "%s", tr(STR_CARDS_ALL_DONE));
+// Copies at most cap-1 bytes, never splitting a UTF-8 sequence.
+void copyCut(char* out, const size_t cap, const char* text, size_t len) {
+  if (len >= cap) {
+    len = cap - 1;
+    while (len > 0 && (static_cast<uint8_t>(text[len]) & 0xC0) == 0x80) len--;
   }
+  memcpy(out, text, len);
+  out[len] = '\0';
+}
+
+void deckCaption(const cards::Summary& s, char* out, const size_t cap) {
+  char text[96];
+  if (s.reviews > 0 && s.newCards > 0) {
+    snprintf(text, sizeof(text), tr(STR_CARDS_REVIEW_NEW), s.reviews, s.newCards);
+  } else if (s.reviews > 0) {
+    snprintf(text, sizeof(text), tr(STR_CARDS_REVIEW), s.reviews);
+  } else if (s.newCards > 0) {
+    snprintf(text, sizeof(text), tr(STR_CARDS_NEW), s.newCards);
+  } else if (s.cards == 0) {
+    snprintf(text, sizeof(text), "%s", tr(STR_CARDS_NO_CARDS));
+  } else if (s.tomorrow > 0) {
+    snprintf(text, sizeof(text), tr(STR_CARDS_ALL_DONE_TOMORROW), s.tomorrow);
+  } else {
+    snprintf(text, sizeof(text), "%s", tr(STR_CARDS_ALL_DONE));
+  }
+  copyCut(out, cap, text, strlen(text));
 }
 
 void intervalText(const uint16_t days, char* out, const size_t cap) {
@@ -99,16 +137,6 @@ void intervalText(const uint16_t days, char* out, const size_t cap) {
   }
 }
 
-// Copies at most cap-1 bytes, never splitting a UTF-8 sequence.
-void copyCut(char* out, const size_t cap, const char* text, size_t len) {
-  if (len >= cap) {
-    len = cap - 1;
-    while (len > 0 && (static_cast<uint8_t>(text[len]) & 0xC0) == 0x80) len--;
-  }
-  memcpy(out, text, len);
-  out[len] = '\0';
-}
-
 void stemOf(const char* file, char* out, const size_t cap) {
   const char* dot = strrchr(file, '.');
   copyCut(out, cap, file, dot && dot != file ? static_cast<size_t>(dot - file) : strlen(file));
@@ -118,15 +146,13 @@ struct Measure {
   const GfxRenderer* renderer;
   int font;
   EpdFontFamily::Style style;
+  char* buf;  // kNameBytes
 };
 
-int measureText(void* ctx, const char* text, size_t len) {
+int measureText(void* ctx, const char* text, const size_t len) {
   const auto* m = static_cast<const Measure*>(ctx);
-  char buf[256];
-  len = std::min(len, sizeof(buf) - 1);
-  memcpy(buf, text, len);
-  buf[len] = '\0';
-  return m->renderer->getTextWidth(m->font, buf, m->style);
+  copyCut(m->buf, kNameBytes, text, len);
+  return m->renderer->getTextWidth(m->font, m->buf, m->style);
 }
 
 struct Block {
@@ -138,22 +164,40 @@ struct Block {
   int height() const { return lines.count * lineHeight; }
 };
 
-void layoutBlock(const GfxRenderer& renderer, Block& b, const int font, const int maxHeight) {
+// Lines that fit maxHeight; at least one when `atLeastOne`.
+void layoutBlock(const GfxRenderer& renderer, Block& b, const int font, const int maxHeight, char* scratch,
+                 const bool atLeastOne = true) {
   b.font = font;
   b.lineHeight = renderer.getLineHeight(font);
-  Measure m{&renderer, font, b.style};
-  cards::wrapText(b.text, kCardWidth, std::max(1, maxHeight / b.lineHeight), &measureText, &m, b.lines);
+  const int maxLines = std::max(atLeastOne ? 1 : 0, maxHeight / b.lineHeight);
+  if (maxLines == 0 || *b.text == '\0') {
+    b.lines.count = 0;
+    b.lines.overflow = *b.text != '\0';
+    return;
+  }
+  Measure m{&renderer, font, b.style, scratch};
+  cards::wrapText(b.text, kCardWidth, maxLines, &measureText, &m, b.lines);
 }
 
-// Lines centred, the block left-aligned when it runs long.
-void drawBlock(const GfxRenderer& renderer, const Block& b, int y) {
+// Lines centred, the block left-aligned when it runs long; text cut short ends with "…".
+void drawBlock(const GfxRenderer& renderer, const Block& b, int y, char* scratch) {
   const int width = renderer.getScreenWidth();
   const bool left = b.lines.count > kCenteredMaxLines;
-  char buf[256];
   for (int i = 0; i < b.lines.count; i++) {
-    copyCut(buf, sizeof(buf), b.text + b.lines.line[i].start, b.lines.line[i].len);
-    const int w = renderer.getTextWidth(b.font, buf, b.style);
-    renderer.drawText(b.font, left ? (width - kCardWidth) / 2 : (width - w) / 2, y, buf, true, b.style);
+    const char* line = b.text + b.lines.line[i].start;
+    size_t len = b.lines.line[i].len;
+    const bool cut = b.lines.overflow && i == b.lines.count - 1;
+    while (true) {
+      copyCut(scratch, kNameBytes - 4, line, len);
+      if (!cut) break;
+      strcat(scratch, "\xE2\x80\xA6");
+      if (len == 0 || renderer.getTextWidth(b.font, scratch, b.style) <= kCardWidth) break;
+      len = strlen(scratch) - 3;
+      do len--;
+      while (len > 0 && (static_cast<uint8_t>(line[len]) & 0xC0) == 0x80);
+    }
+    const int w = renderer.getTextWidth(b.font, scratch, b.style);
+    renderer.drawText(b.font, left ? (width - kCardWidth) / 2 : (width - w) / 2, y, scratch, true, b.style);
     y += b.lineHeight;
   }
 }
@@ -165,6 +209,8 @@ const char* sideText(const cards::Fields& f, const int side) {
   return "";
 }
 
+uint16_t cardDay() { return stats::localDay(cards::cardEpoch(trustedtime::trustedNow())); }
+
 }  // namespace
 
 CardsActivity::CardsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string deckFile)
@@ -173,13 +219,13 @@ CardsActivity::CardsActivity(GfxRenderer& renderer, MappedInputManager& mappedIn
       deckFile(std::move(deckFile)),
       direct(!this->deckFile.empty()) {}
 
-const char* CardsActivity::dueTodayText() {
-  static char text[32];
+void CardsActivity::dueTodayText(char* out, const size_t cap) {
   uint16_t total = 0;
-  const uint16_t day = stats::localDay(cards::cardEpoch(trustedtime::trustedNow()));
-  if (!cards::loadDueTotal(day, total) || total == 0) return nullptr;
-  snprintf(text, sizeof(text), tr(STR_CARDS_DUE_TODAY), total);
-  return text;
+  if (cards::loadDueTotal(cardDay(), total) && total > 0) {
+    snprintf(out, cap, tr(STR_CARDS_DUE_TODAY), total);
+  } else if (cap > 0) {
+    out[0] = '\0';
+  }
 }
 
 void CardsActivity::onEnter() {
@@ -202,7 +248,7 @@ void CardsActivity::onExit() {
   Activity::onExit();
 }
 
-uint16_t CardsActivity::realDay() const { return stats::localDay(cards::cardEpoch(trustedtime::trustedNow())); }
+uint16_t CardsActivity::realDay() const { return cardDay(); }
 
 bool CardsActivity::hasTouch() const { return UITheme::getInstance().getMetrics().buttonHintsHeight == 0; }
 
@@ -223,6 +269,23 @@ void CardsActivity::setScreen(const Screen next, const int focusIndex) {
 void CardsActivity::showMessage(const StrId text) {
   message = text;
   setScreen(Screen::Message, 0);
+}
+
+void CardsActivity::showStatus(const cards::Status status) {
+  switch (status) {
+    case cards::Status::TooLarge:
+      showMessage(StrId::STR_CARDS_TOO_LARGE_BODY);
+      return;
+    case cards::Status::NoMemory:
+      showMessage(StrId::STR_CARDS_NO_MEMORY);
+      return;
+    case cards::Status::Unsupported:
+      showMessage(StrId::STR_CARDS_UTF16);
+      return;
+    default:
+      showMessage(StrId::STR_CARDS_FAILED);
+      return;
+  }
 }
 
 // Slow work (indexing a deck) runs after a "preparing" frame is on screen.
@@ -249,7 +312,7 @@ void CardsActivity::loop() {
     return;
   }
 
-  const bool guarded = view == Screen::Back && millis() - flipMs < FLIP_GUARD_MS;
+  const bool guarded = view == Screen::Back && (flipPending || millis() - flipShownMs < FLIP_GUARD_MS);
   if (const auto touch = routeTouch(mappedInput)) {
     if (guarded) return;
     RenderLock lock(*this);
@@ -272,6 +335,21 @@ void CardsActivity::loop() {
   if (guarded) return;
 
   using Button = MappedInputManager::Button;
+  const bool card = view == Screen::Front || view == Screen::Back;
+  // Button boards grade in two presses: Confirm shows the answer, then Left =
+  // «Снова», Confirm = «Хорошо», Right = «Легко». Holding Back undoes.
+  if (card && !hasTouch()) {
+    if (view == Screen::Front && store->canUndo() && mappedInput.wasLongPressed(Button::Back, UNDO_HOLD_MS)) {
+      RenderLock lock(*this);
+      activate(0);
+      return;
+    }
+    if (view == Screen::Back && (mappedInput.wasPressed(Button::Left) || mappedInput.wasPressed(Button::Right))) {
+      RenderLock lock(*this);
+      grade(mappedInput.wasPressed(Button::Left) ? cards::Grade::Again : cards::Grade::Easy);
+      return;
+    }
+  }
   if (mappedInput.wasReleased(Button::Back)) {
     RenderLock lock(*this);
     goBack();
@@ -279,9 +357,10 @@ void CardsActivity::loop() {
   }
   if (mappedInput.wasReleased(Button::Confirm)) {
     RenderLock lock(*this);
-    activate(focus);
+    activate(card ? 1 : focus);
     return;
   }
+  if (card) return;
   if (view == Screen::List) {
     const auto swipe = mappedInput.wasSwipe();
     if (swipe == MappedInputManager::SwipeDir::Up || swipe == MappedInputManager::SwipeDir::Down) {
@@ -317,23 +396,24 @@ int CardsActivity::focusCount() const {
   }
 }
 
+bool CardsActivity::shown(const int i) const {
+  switch (view) {
+    case Screen::Overview:
+      return i == RowNewPerDay || (i == RowStart && summary.dueToday() > 0) ||
+             (i == RowMoreNew && summary.dueToday() == 0 && summary.fresh > 0);
+    case Screen::Done:
+      return i == RowToDecks || (i == RowDoneMoreNew && summary.fresh > 0) || (i == RowUndo && store->canUndo());
+    case Screen::Front:
+      return i == 1 || (i == 0 && store->canUndo());
+    default:
+      return i >= 0 && i < focusCount();
+  }
+}
+
 // Steps the focus over the items the screen shows.
 void CardsActivity::moveFocus(const int delta) {
   const int count = focusCount();
   if (count == 0) return;
-  auto shown = [this](const int i) {
-    switch (view) {
-      case Screen::Overview:
-        return i == RowNewPerDay || (i == RowStart && summary.dueToday() > 0) ||
-               (i == RowMoreNew && summary.dueToday() == 0 && summary.fresh > 0);
-      case Screen::Done:
-        return i == 0 || (i == 1 && summary.fresh > 0);
-      case Screen::Front:
-        return i == 1 || (i == 0 && store->canUndo());
-      default:
-        return i < focusCount();
-    }
-  };
   if (view == Screen::List) {
     focus = delta == 1 || delta == -1 ? (focus + delta + count) % count : std::clamp(focus + delta, 0, count - 1);
   } else {
@@ -352,12 +432,13 @@ void CardsActivity::goBack() {
   switch (view) {
     case Screen::Front:
     case Screen::Back:
-      finishSession();
-      setScreen(Screen::Overview, summary.dueToday() > 0 ? RowStart : RowNewPerDay);
+      store->endSession();
+      showOverview();
       return;
     case Screen::Overview:
     case Screen::Done:
     case Screen::Message:
+      store->endSession();
       if (!direct && (view != Screen::Message || deckTitle[0] != '\0')) {
         runAfterPaint(Job::LoadList, StrId::STR_CARDS_PREPARING);
         return;
@@ -371,6 +452,10 @@ void CardsActivity::goBack() {
 }
 
 void CardsActivity::activate(const int index) {
+  if (view != Screen::List && view != Screen::Empty && view != Screen::Back && view != Screen::Message &&
+      !shown(index)) {
+    return;
+  }
   switch (view) {
     case Screen::List:
       if (index < 0 || index >= deckCount) return;
@@ -396,11 +481,11 @@ void CardsActivity::activate(const int index) {
       return;
     }
     case Screen::Overview:
-      if (index == RowStart && summary.dueToday() > 0) {
+      if (index == RowStart) {
         startSession(0);
-      } else if (index == RowMoreNew && summary.fresh > 0) {
+      } else if (index == RowMoreNew) {
         startSession(cards::EXTRA_NEW);
-      } else if (index == RowNewPerDay) {
+      } else {
         const auto& choices = cards::NEW_PER_DAY_CHOICES;
         const auto* at = std::find(std::begin(choices), std::end(choices), summary.newPerDay);
         const uint8_t next = at == std::end(choices) || at + 1 == std::end(choices) ? choices[0] : *(at + 1);
@@ -410,12 +495,12 @@ void CardsActivity::activate(const int index) {
       }
       return;
     case Screen::Front:
-      if (index == 0 && store->canUndo()) {
+      if (index == 0) {
         if (store->undo()) showCard(false);
-      } else if (index == 1) {
+      } else {
         view = Screen::Back;
         focus = 1;
-        flipMs = millis();
+        flipPending = true;
         requestRepaint(RepaintUpdate);
       }
       return;
@@ -423,10 +508,12 @@ void CardsActivity::activate(const int index) {
       if (index >= 0 && index < 3) grade(static_cast<cards::Grade>(index));
       return;
     case Screen::Done:
-      if (index == 0) {
+      if (index == RowToDecks) {
         goBack();
-      } else if (index == 1 && summary.fresh > 0) {
+      } else if (index == RowDoneMoreNew) {
         startSession(cards::EXTRA_NEW);
+      } else if (store->undo()) {
+        showCard(true);
       }
       return;
     case Screen::Message:
@@ -438,15 +525,15 @@ void CardsActivity::activate(const int index) {
 }
 
 bool CardsActivity::findDeckFile(const uint32_t id, std::string& out) const {
-  HalFile dir = Storage.open(cards::DECK_DIR);
-  if (!dir || !dir.isDirectory()) return false;
-  char name[256];
+  auto name = makeUniqueNoThrow<char[]>(kNameBytes);
+  HalFile dir = Storage.open(cards::deckDir());
+  if (!name || !dir || !dir.isDirectory()) return false;
   for (HalFile entry = dir.openNextFile(); entry; entry = dir.openNextFile()) {
-    entry.getName(name, sizeof(name));
+    entry.getName(name.get(), kNameBytes);
     const bool isDir = entry.isDirectory();
     entry.close();
-    if (!isDir && cards::deckId(name) == id) {
-      out = name;
+    if (!isDir && cards::deckId(name.get()) == id) {
+      out = name.get();
       return true;
     }
   }
@@ -455,68 +542,101 @@ bool CardsActivity::findDeckFile(const uint32_t id, std::string& out) const {
 
 void CardsActivity::loadList() {
   deckTitle[0] = '\0';
-  if (!Storage.exists(cards::DECK_DIR)) Storage.mkdir(cards::DECK_DIR);
+  const char* folder = cards::deckDir();
+  if (!Storage.exists(folder)) Storage.mkdir(folder);
   if (!decks) decks = makeUniqueNoThrow<DeckRow[]>(MAX_DECKS);
-  if (!decks) {
+  auto name = makeUniqueNoThrow<char[]>(kNameBytes);
+  if (!decks || !name) {
     showMessage(StrId::STR_CARDS_NO_MEMORY);
     return;
   }
+  // Pass one keeps the first MAX_DECKS decks by name; pass two reads their progress.
   deckCount = 0;
+  HalFile dir = Storage.open(folder);
+  for (HalFile entry = dir ? dir.openNextFile() : HalFile(); entry; entry = dir.openNextFile()) {
+    entry.getName(name.get(), kNameBytes);
+    const bool isDir = entry.isDirectory();
+    const uint32_t size = isDir ? 0 : static_cast<uint32_t>(entry.fileSize());
+    const uint32_t time = isDir ? 0 : entry.modificationTime();
+    entry.close();
+    if (isDir || name[0] == '.' || !cards::isDeckName(name.get())) continue;
+    DeckRow row{};
+    stemOf(name.get(), row.name, sizeof(row.name));
+    row.id = cards::deckId(name.get());
+    row.size = size;
+    row.time = time;
+    int at = deckCount;
+    while (at > 0 && strcmp(row.name, decks[at - 1].name) < 0) at--;
+    if (at >= MAX_DECKS) continue;
+    const int moved = std::min(deckCount, MAX_DECKS - 1) - at;
+    memmove(&decks[at + 1], &decks[at], static_cast<size_t>(std::max(0, moved)) * sizeof(DeckRow));
+    decks[at] = row;
+    deckCount = std::min(deckCount + 1, MAX_DECKS);
+  }
+  if (dir) dir.close();
+
   const uint16_t day = realDay();
   uint32_t total = 0;
-  HalFile dir = Storage.open(cards::DECK_DIR);
-  char name[256];
-  for (HalFile entry = dir ? dir.openNextFile() : HalFile(); entry && deckCount < MAX_DECKS;
-       entry = dir.openNextFile()) {
-    entry.getName(name, sizeof(name));
+  dir = Storage.open(folder);
+  for (HalFile entry = dir ? dir.openNextFile() : HalFile(); entry; entry = dir.openNextFile()) {
+    entry.getName(name.get(), kNameBytes);
     const bool isDir = entry.isDirectory();
     entry.close();
-    if (isDir || name[0] == '.' || !cards::isDeckName(name)) continue;
-    DeckRow& row = decks[deckCount++];
-    stemOf(name, row.name, sizeof(row.name));
-    row.id = cards::deckId(name);
+    if (isDir) continue;
+    const uint32_t id = cards::deckId(name.get());
+    DeckRow* row = std::find_if(decks.get(), decks.get() + deckCount, [id](const DeckRow& r) { return r.id == id; });
+    if (row == decks.get() + deckCount || row->caption[0] != '\0') continue;
+    if (knownOutOfMemory(id, row->size, row->time)) {
+      snprintf(row->caption, sizeof(row->caption), "%s", tr(STR_CARDS_NO_MEMORY_SHORT));
+      continue;
+    }
     cards::Summary s;
-    switch (store->open(name, day, false)) {
+    const cards::Status status = store->open(name.get(), day, cards::Reindex::Never);
+    switch (status) {
       case cards::Status::Ok:
         store->summarize(s);
-        deckCaption(s, row.caption, sizeof(row.caption));
+        deckCaption(s, row->caption, sizeof(row->caption));
         total += s.dueToday();
         break;
       case cards::Status::TooLarge:
-        snprintf(row.caption, sizeof(row.caption), "%s", tr(STR_CARDS_TOO_LARGE));
+        snprintf(row->caption, sizeof(row->caption), "%s", tr(STR_CARDS_TOO_LARGE));
         break;
       case cards::Status::NoMemory:
-        snprintf(row.caption, sizeof(row.caption), "%s", tr(STR_CARDS_NO_MEMORY));
+        rememberOutOfMemory(id, row->size, row->time);
+        snprintf(row->caption, sizeof(row->caption), "%s", tr(STR_CARDS_NO_MEMORY_SHORT));
+        break;
+      case cards::Status::Unsupported:
+        snprintf(row->caption, sizeof(row->caption), "%s", tr(STR_CARDS_UTF16_SHORT));
         break;
       default:
-        snprintf(row.caption, sizeof(row.caption), "%s", tr(STR_CARDS_FAILED));
+        snprintf(row->caption, sizeof(row->caption), "%s", tr(STR_CARDS_FAILED));
         break;
     }
     store->close();
   }
   if (dir) dir.close();
-  std::sort(decks.get(), decks.get() + deckCount,
-            [](const DeckRow& a, const DeckRow& b) { return strcmp(a.name, b.name) < 0; });
   if (day != cards::NO_DAY) cards::saveDueTotal(day, static_cast<uint16_t>(std::min<uint32_t>(total, UINT16_MAX)));
   listTop = 0;
   setScreen(deckCount > 0 ? Screen::List : Screen::Empty, deckCount > 0 ? std::min(deckFocus, deckCount - 1) : 0);
 }
 
+bool CardsActivity::reopen(const cards::Reindex reindex) {
+  const cards::Status status = store->open(deckFile.c_str(), realDay(), reindex);
+  if (status != cards::Status::Ok) {
+    showStatus(status);
+    return false;
+  }
+  return true;
+}
+
 void CardsActivity::openDeck() {
   stemOf(deckFile.c_str(), deckTitle, sizeof(deckTitle));
-  switch (store->open(deckFile.c_str(), realDay())) {
-    case cards::Status::Ok:
-      break;
-    case cards::Status::TooLarge:
-      showMessage(StrId::STR_CARDS_TOO_LARGE_BODY);
-      return;
-    case cards::Status::NoMemory:
-      showMessage(StrId::STR_CARDS_NO_MEMORY);
-      return;
-    default:
-      showMessage(StrId::STR_CARDS_FAILED);
-      return;
-  }
+  if (reopen(cards::Reindex::IfChanged)) showOverview();
+}
+
+// The day may have turned at 04:00 since the deck was opened.
+void CardsActivity::showOverview() {
+  if (store->openedOn() != realDay() && !reopen(cards::Reindex::IfChanged)) return;
   if (!store->summarize(summary)) {
     showMessage(StrId::STR_CARDS_FAILED);
     return;
@@ -529,10 +649,11 @@ void CardsActivity::openDeck() {
 }
 
 void CardsActivity::startSession(const uint16_t extraNew) {
+  if (store->openedOn() != realDay() && !reopen(cards::Reindex::IfChanged)) return;
   if (!fields) fields = makeUniqueNoThrow<cards::Fields>();
   const cards::Status status = fields ? store->startSession(extraNew) : cards::Status::NoMemory;
   if (status != cards::Status::Ok) {
-    showMessage(status == cards::Status::NoMemory ? StrId::STR_CARDS_NO_MEMORY : StrId::STR_CARDS_FAILED);
+    showStatus(status);
     return;
   }
   sessionStartMs = millis();
@@ -542,12 +663,19 @@ void CardsActivity::startSession(const uint16_t extraNew) {
 void CardsActivity::showCard(const bool entry) {
   if (store->finished()) {
     finishSession();
-    setScreen(Screen::Done, 0);
+    setScreen(Screen::Done, RowToDecks);
     return;
   }
-  if (!store->loadCard(*fields)) {
+  const cards::Status status = store->loadCard(*fields);
+  if (status == cards::Status::Changed) {
+    // Edited in place, keeping its size and time: index it again.
     store->endSession();
-    showMessage(StrId::STR_CARDS_FAILED);
+    if (reopen(cards::Reindex::Always)) showOverview();
+    return;
+  }
+  if (status != cards::Status::Ok) {
+    store->endSession();
+    showStatus(status);
     return;
   }
   view = Screen::Front;
@@ -565,8 +693,8 @@ void CardsActivity::grade(const cards::Grade g) {
   showCard(false);
 }
 
+// The session stays open on the summary, so its last answer can be undone.
 void CardsActivity::finishSession() {
-  if (!store->inSession()) return;
   sessionMs = millis() - sessionStartMs;
   sessionCards = 0;
   for (int i = 0; i < 3; i++) {
@@ -574,7 +702,7 @@ void CardsActivity::finishSession() {
     sessionCards += sessionCounts[i];
   }
   const uint16_t before = summary.dueToday();
-  store->endSession();
+  store->flush();
   store->summarize(summary);
   // Keeps the «Ещё» count honest when the deck list is not visited again.
   uint16_t total = 0;
@@ -606,15 +734,19 @@ void CardsActivity::render(RenderLock&&) {
   }
   renderUi();
   if (!hasTouch()) {
-    const auto labels =
-        card ? mappedInput.mapLabels(tr(STR_CARDS_EXIT_HINT),
-                                     view == Screen::Front ? tr(STR_CARDS_SHOW_HINT) : tr(STR_CARDS_GRADE),
-                                     tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT))
-             : mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+    const auto labels = view == Screen::Front
+                            ? mappedInput.mapLabels(tr(STR_CARDS_EXIT_HINT), tr(STR_CARDS_SHOW_HINT), "", "")
+                        : card ? mappedInput.mapLabels(tr(STR_CARDS_EXIT_HINT), tr(STR_CARDS_GOOD), tr(STR_CARDS_AGAIN),
+                                                       tr(STR_CARDS_EASY))
+                               : mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   }
   const uint8_t kind = repaint.exchange(RepaintNone);
   renderer.displayBuffer(kind == RepaintEntry ? cadence.entry() : cadence.update());
+  if (view == Screen::Back && flipPending) {
+    flipShownMs = millis();
+    flipPending = false;
+  }
   if (job != Job::None) jobPainted = true;
 }
 
@@ -681,6 +813,16 @@ void CardsActivity::drawRow(UiScreen& screen, const int top, const freeink::Icon
   screen.frame().hit(fui::makeRect(0, top, width, kRowHeight), ACTION_ROW, static_cast<int16_t>(value),
                      fui::InputTouch);
 }
+void CardsActivity::drawStats(const int y, const uint16_t (&numbers)[3], const StrId (&labels)[3]) const {
+  const int line12 = renderer.getLineHeight(kText12Font);
+  for (int i = 0; i < 3; i++) {
+    char number[8];
+    snprintf(number, sizeof(number), "%u", numbers[i]);
+    const int x = kSidePadding + i * kStatColumn;
+    renderer.drawText(kText12Font, x, y, number, true, kSemiBold);
+    renderer.drawText(kCaptionFont, x, y + line12, I18N.get(labels[i]));
+  }
+}
 
 void CardsActivity::buildList(UiScreen& screen) {
   const int height = renderer.getScreenHeight() - UITheme::getInstance().getMetrics().buttonHintsHeight;
@@ -697,7 +839,6 @@ void CardsActivity::buildList(UiScreen& screen) {
   renderer.drawText(kCaptionFont, kSidePadding, noteTop, tr(STR_CARDS_LIST_NOTE));
   renderer.drawText(kCaptionFont, kSidePadding, noteTop + captionLine, tr(STR_CARDS_LIST_FORMATS));
 }
-
 void CardsActivity::buildEmpty(UiScreen& screen) {
   const int width = renderer.getScreenWidth();
   const int line12 = renderer.getLineHeight(kText12Font);
@@ -738,17 +879,6 @@ void CardsActivity::buildEmpty(UiScreen& screen) {
   for (const auto& text : renderer.wrappedText(kCaptionFont, tr(STR_CARDS_COPY_HINT), width - 2 * kSidePadding, 4)) {
     renderer.drawText(kCaptionFont, kSidePadding, y, text.c_str());
     y += captionLine;
-  }
-}
-
-void CardsActivity::drawStats(const int y, const uint16_t (&numbers)[3], const StrId (&labels)[3]) const {
-  const int line12 = renderer.getLineHeight(kText12Font);
-  for (int i = 0; i < 3; i++) {
-    char number[8];
-    snprintf(number, sizeof(number), "%u", numbers[i]);
-    const int x = kSidePadding + i * kStatColumn;
-    renderer.drawText(kText12Font, x, y, number, true, kSemiBold);
-    renderer.drawText(kCaptionFont, x, y + line12, I18N.get(labels[i]));
   }
 }
 
@@ -803,6 +933,11 @@ void CardsActivity::buildOverview(UiScreen& screen) {
     renderer.drawText(kCaptionFont, kSidePadding, y, text);
     y += captionLine;
   }
+  if (summary.dropped > 0) {
+    snprintf(text, sizeof(text), tr(STR_CARDS_DROPPED), summary.dropped);
+    renderer.drawText(kCaptionFont, kSidePadding, y, text);
+    y += captionLine;
+  }
   y += 12;
   drawRule(renderer, 0, y, width);
   y += kRuleWidth + 14;
@@ -820,7 +955,6 @@ void CardsActivity::buildOverview(UiScreen& screen) {
     drawRow(screen, y, &icon_bar_new_game_24, text, focus == RowMoreNew, sub, nullptr, RowMoreNew);
   }
 }
-
 void CardsActivity::buildDone(UiScreen& screen) {
   const int width = renderer.getScreenWidth();
   const int line12 = renderer.getLineHeight(kText12Font);
@@ -848,16 +982,19 @@ void CardsActivity::buildDone(UiScreen& screen) {
   y += captionLine + 14;
   drawRule(renderer, 0, y, width);
   y += kRuleWidth + 14;
-  drawRow(screen, y, &icon_cards_24, tr(STR_CARDS_BACK_TO_DECKS), focus == 0, nullptr, nullptr, 0);
+  drawRow(screen, y, &icon_cards_24, tr(STR_CARDS_BACK_TO_DECKS), focus == RowToDecks, nullptr, nullptr, RowToDecks);
   y += kRowHeight;
   if (summary.fresh > 0) {
     char left[32];
     snprintf(text, sizeof(text), tr(STR_CARDS_MORE_NEW), cards::EXTRA_NEW);
     snprintf(left, sizeof(left), tr(STR_CARDS_LEFT), summary.fresh);
-    drawRow(screen, y, &icon_bar_new_game_24, text, focus == 1, left, nullptr, 1);
+    drawRow(screen, y, &icon_bar_new_game_24, text, focus == RowDoneMoreNew, left, nullptr, RowDoneMoreNew);
+    y += kRowHeight;
+  }
+  if (store->canUndo()) {
+    drawRow(screen, y, &icon_bar_undo_24, tr(STR_CARDS_UNDO_LAST), focus == RowUndo, nullptr, nullptr, RowUndo);
   }
 }
-
 void CardsActivity::buildCard(UiScreen& screen) {
   const int width = renderer.getScreenWidth();
   const int height = renderer.getScreenHeight();
@@ -884,10 +1021,10 @@ void CardsActivity::buildCard(UiScreen& screen) {
   Block front;
   front.text = sideText(*fields, 0);
   for (const int font : kFrontFonts) {
-    layoutBlock(renderer, front, font, frontBottom - kGameBoardTop);
+    layoutBlock(renderer, front, font, frontBottom - kGameBoardTop, scratch);
     if (!front.lines.overflow) break;
   }
-  drawBlock(renderer, front, kGameBoardTop + (frontBottom - kGameBoardTop - front.height()) / 2);
+  drawBlock(renderer, front, kGameBoardTop + (frontBottom - kGameBoardTop - front.height()) / 2, scratch);
 
   struct Slot {
     const freeink::Icon* icon;
@@ -904,7 +1041,9 @@ void CardsActivity::buildCard(UiScreen& screen) {
       screen.frame().hit(fui::makeRect(exitWidth, kGameBoardTop, width - exitWidth, barTop - kGameBoardTop),
                          ACTION_CARD, 0, fui::InputTouch);
     }
-    if (store->canUndo()) slots[0] = {&icon_bar_undo_24, tr(STR_CARDS_UNDO), tr(STR_CARDS_UNDO_HINT)};
+    if (store->canUndo()) {
+      slots[0] = {&icon_bar_undo_24, tr(STR_CARDS_UNDO), touch ? tr(STR_CARDS_UNDO_HINT) : tr(STR_CARDS_UNDO_HOLD)};
+    }
     slots[1] = {&icon_show_24, tr(STR_CARDS_SHOW), nullptr};
   } else {
     drawRule(renderer, 60, frontBottom + 12, width - 120);
@@ -916,15 +1055,16 @@ void CardsActivity::buildCard(UiScreen& screen) {
     extra.text = sideText(*fields, 2);
     extra.style = EpdFontFamily::ITALIC;
     int total = 0;
+    // The example only where a line of it still fits.
     for (const auto& fonts : kBackFonts) {
-      layoutBlock(renderer, answer, fonts[0], zone);
-      if (*extra.text) layoutBlock(renderer, extra, fonts[1], std::max(0, zone - answer.height() - kAnswerGap));
-      total = answer.height() + (*extra.text ? kAnswerGap + extra.height() : 0);
+      layoutBlock(renderer, answer, fonts[0], zone, scratch);
+      layoutBlock(renderer, extra, fonts[1], zone - answer.height() - kAnswerGap, scratch, false);
+      total = answer.height() + (extra.lines.count > 0 ? kAnswerGap + extra.height() : 0);
       if (!answer.lines.overflow && !extra.lines.overflow && total <= zone) break;
     }
     int y = zoneTop + std::max(0, (zone - total) / 2);
-    drawBlock(renderer, answer, y);
-    if (*extra.text) drawBlock(renderer, extra, y + answer.height() + kAnswerGap);
+    drawBlock(renderer, answer, y, scratch);
+    if (extra.lines.count > 0) drawBlock(renderer, extra, y + answer.height() + kAnswerGap, scratch);
 
     const cards::CardState state = store->currentState();
     const StrId labels[3] = {StrId::STR_CARDS_AGAIN, StrId::STR_CARDS_GOOD, StrId::STR_CARDS_EASY};
@@ -947,7 +1087,7 @@ void CardsActivity::buildCard(UiScreen& screen) {
     const int iconTop = cellTop + 12;
     screen.target().bitmap(fui::makeRect(cx - kIconSize / 2, iconTop, kIconSize, kIconSize),
                            fui::bitmapFromIcon(*slots[i].icon), fui::BitmapMode::Center);
-    const bool focused = !touch && i == focus;
+    const bool focused = !touch && i == 1;
     const EpdFontFamily::Style style = focused ? kSemiBold : EpdFontFamily::REGULAR;
     renderer.drawText(kText10Font, cx - renderer.getTextWidth(kText10Font, slots[i].label, style) / 2,
                       iconTop + kIconSize + 4, slots[i].label, true, style);

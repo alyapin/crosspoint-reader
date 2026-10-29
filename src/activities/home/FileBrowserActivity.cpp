@@ -35,7 +35,7 @@ constexpr size_t NAME_BUFFER_SIZE = 500;
 // A file in the flashcard folder opens as a deck.
 bool inDeckFolder(std::string path) {
   while (path.size() > 1 && path.back() == '/') path.pop_back();
-  return path == cards::DECK_DIR;
+  return path == cards::DECK_DIR || path == cards::DECK_DIR_LOWER;
 }
 
 std::string getBookCachePath(const std::string& path) {

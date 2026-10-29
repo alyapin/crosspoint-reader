@@ -21,7 +21,9 @@ class MoreActivity final : public SetkaListActivity {
   const freeink::Icon* rowIcon(int index) const override;
   const char* rowStatus(int index) const override;
   void activateIndex(int index) override;
+  void onChildClosed() override;
 
   std::array<Entry, 7> entries{};
+  char cardsStatus[32] = {};  // read on entry and after a child closes, not per repaint
   int entryCount = 0;
 };
