@@ -174,11 +174,14 @@ void SleepImagePickerActivity::buildScreen(UiScreen& screen) {
     renderer.drawText(kText12Font, width - kSidePadding - pagesWidth, geo.footerTextTop, pages);
     nameWidth -= pagesWidth + kGap;
   }
-  const char* name = entries.empty() ? tr(STR_SLEEP_IMAGE_EMPTY)
+  std::string name = entries.empty() ? tr(STR_SLEEP_IMAGE_EMPTY)
                      : marked == 0   ? tr(STR_SLEEP_IMAGE_RANDOM)
                                      : baseName(entries[marked - 1].path);
+  // The picture's name without its file extension.
+  const size_t dot = name.rfind('.');
+  if (marked > 0 && dot != std::string::npos && dot > 0) name.erase(dot);
   renderer.drawText(kText12Font, kSidePadding, geo.footerTextTop,
-                    renderer.truncatedText(kText12Font, name, nameWidth).c_str());
+                    renderer.truncatedText(kText12Font, name.c_str(), nameWidth).c_str());
 }
 
 void SleepImagePickerActivity::drawTile(const int tile, const int x, const int y) {
