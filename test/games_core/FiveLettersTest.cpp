@@ -292,3 +292,31 @@ TEST(FiveLetters, StatsCountStreaks) {
   EXPECT_FALSE(back.deserialize(bad, strlen(bad)));
   EXPECT_EQ(back.played, 0u);
 }
+
+TEST(FiveLetters, TheAnswerCountsEvenOffTheList) {
+  Game g;
+  g.start(word("абвгд"));
+  typeWord(g, "абвгд");
+  EXPECT_EQ(g.submit(), Submit::Scored);
+  EXPECT_EQ(g.status(), Status::Won);
+  const std::string text = save(g);
+  Game back;
+  ASSERT_TRUE(back.deserialize(text.data(), text.size()));
+  EXPECT_EQ(back.status(), Status::Won);
+}
+
+TEST(FiveLetters, RudeWordsAreGuessesNotAnswersAndExcludedNeither) {
+  auto isAnswer = [](const uint32_t w) {
+    for (int i = 0; i < answerCount(); ++i) {
+      if (answerAt(i) == w) return true;
+    }
+    return false;
+  };
+  for (const char* w : {"шлюха", "пенис", "девка", "тварь", "дурак", "морда", "киска", "сучка"}) {
+    EXPECT_TRUE(isWord(word(w))) << w;
+    EXPECT_FALSE(isAnswer(word(w))) << w;
+  }
+  for (const char* w : {"хонда", "волга", "боинг", "генри", "стоун", "марго", "целое", "немец", "турок", "макао"}) {
+    EXPECT_FALSE(isWord(word(w))) << w;
+  }
+}

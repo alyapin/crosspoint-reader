@@ -1,36 +1,32 @@
 """Word list of the «5 букв» game: five-letter nouns of the scanword lexicon.
 
-    python3 -I gen_words.py LEXICON.tsv > lib/Games/FiveLettersWords.h
+    python3 -I tools/five-letters/gen_words.py LEXICON.tsv > lib/Games/FiveLettersWords.h
 
 LEXICON.tsv is the output of tools/scanword/lexicon.py build (word, Zipf
-frequency, clue, clue kind). Every five-letter noun is a valid guess; the
-common ones, minus BLOCKED, are the answers. Ё folds into Е.
+frequency, clue, clue kind). Every five-letter noun is a valid guess and the
+common ones are the answers, minus tools/wordlists/blocked.py: EXCLUDED words
+are neither, RUDE words only guesses. Ё folds into Е.
 """
 
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "wordlists"))
+
+import blocked  # noqa: E402
 
 ALPHABET = "абвгдежзийклмнопрстуфхцчшщъыьэюя"  # ё folds to е
 CODE = {ch: i for i, ch in enumerate(ALPHABET)}
 LETTERS = 5
 ANSWER_ZIPF = 3.2
-# Common but poor answers: rude words, nationalities, brands, units named after
-# people, and nouns that read first as another part of speech.
-BLOCKED = set(
-    "шлюха сучка порно пенис девка еврей цыган турок немец бурят поляк казах узбек "
-    "хонда волга боинг шкода опель пепси айфон трамп рэмбо генри вебер ферми марго "
-    "стоун хаджи погиб малый целое знать стать полон думка альба аборт рвота матка "
-    "резня пацан".split()
+ATTRIBUTION = (Path(__file__).resolve().parent / "ATTRIBUTION.txt").read_text(
+    encoding="utf-8"
 )
-ATTRIBUTION = """The words are derived from the Russian Wiktionary
-(https://ru.wiktionary.org), licensed under CC BY-SA 4.0
-(https://creativecommons.org/licenses/by-sa/4.0/). Words were ranked with
-wordfreq (CC BY-SA 4.0) and pymorphy3 / OpenCorpora data. This list is
-shared under the same licence, CC BY-SA 4.0.
-"""
 
 
-def fold(word):
-    return word.lower().replace("ё", "е")
+fold = blocked.fold
+EXCLUDED = {fold(w) for w in blocked.EXCLUDED}
+RUDE = {fold(w) for w in blocked.RUDE}
 
 
 def pack(word):
@@ -46,7 +42,11 @@ def load(path):
         for line in f:
             cols = line.rstrip("\n").split("\t")
             word = fold(cols[0])
-            if len(word) == LETTERS and all(ch in CODE for ch in word):
+            if (
+                len(word) == LETTERS
+                and all(ch in CODE for ch in word)
+                and word not in EXCLUDED
+            ):
                 zipf[word] = max(zipf.get(word, 0.0), float(cols[1]))
     return zipf
 
@@ -63,9 +63,7 @@ def main():
     if len(sys.argv) != 2:
         sys.exit(__doc__)
     zipf = load(sys.argv[1])
-    answers = sorted(
-        w for w, z in zipf.items() if z >= ANSWER_ZIPF and w not in BLOCKED
-    )
+    answers = sorted(w for w, z in zipf.items() if z >= ANSWER_ZIPF and w not in RUDE)
     extra = sorted(set(zipf) - set(answers))
     notice = "".join(
         f"// {line}\n" if line else "//\n" for line in ATTRIBUTION.splitlines()

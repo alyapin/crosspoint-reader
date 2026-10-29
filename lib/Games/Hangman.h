@@ -1,7 +1,7 @@
 #pragma once
 
-// A hangman round over the built-in word list (HangmanWords.h):
-//   newGame(seed)          a word not among the last RECENT_COUNT
+// A hangman round over one of the built-in word lists (HangmanWords.h):
+//   newGame(list, seed)    a word of that list not among the last RECENT_COUNT
 //   guess(letter)          a miss costs a mistake; MAX_MISTAKES lose
 //   hint()                 opens the first hidden letter for a mistake
 //   shown(i), key(letter), mistakes(), status()  for drawing
@@ -20,7 +20,7 @@ constexpr uint8_t LETTER_YO = 7;
 constexpr int MAX_LENGTH = 10;
 constexpr int MAX_MISTAKES = 6;
 constexpr int RECENT_COUNT = 32;
-constexpr size_t MAX_CLUE_BYTES = 64;
+constexpr size_t MAX_CLUE_BYTES = 112;
 constexpr size_t SAVE_MAX = 320;
 
 // One byte per letter in the word list and the save, А..Я.
@@ -53,14 +53,16 @@ enum class Status : uint8_t { Playing, Won, Lost };
 enum class Key : uint8_t { Untried, Right, Wrong };
 enum class Guess : uint8_t { Hit, Miss, Repeat, Ignored };
 
+// The lists share one index space: a later list extends the one before it.
 class Game {
  public:
-  explicit Game(const WordList& words);
+  Game(const WordList* lists, uint8_t listCount);
 
-  void newGame(uint32_t seed);
-  // The word at `index`; false (game unchanged) when it does not load.
-  bool start(uint16_t index);
+  void newGame(uint8_t list, uint32_t seed);
+  // The word at `index` of `list`; false (game unchanged) when it does not load.
+  bool start(uint8_t list, uint16_t index);
 
+  uint8_t list() const { return listIndex; }
   uint16_t wordIndex() const { return index; }
   int length() const { return len; }
   uint8_t letter(const int i) const { return word[i]; }
@@ -78,7 +80,7 @@ class Game {
   bool hint();
 
   size_t serialize(char* out, size_t cap) const;
-  // Restores a serialize()d round of the same word list. False (game unchanged) on bad input.
+  // Restores a serialize()d round of the same word lists. False (game unchanged) on bad input.
   bool deserialize(const char* text, size_t len);
 
  private:
@@ -88,7 +90,9 @@ class Game {
   void remember(uint16_t word);
   bool recent(uint16_t word) const;
 
-  const WordList* words;
+  const WordList* lists;
+  uint8_t listCount;
+  uint8_t listIndex = 0;
   uint16_t index = 0;
   uint8_t word[MAX_LENGTH] = {};
   uint8_t len = 0;

@@ -11,8 +11,8 @@ const char* fiveLettersListStatus();
 std::unique_ptr<Activity> openFiveLetters(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
 // Six rows of five cells over a ЙЦУКЕН keyboard: a placed letter is a black
-// cell, a present one a thick frame, an absent one a thin frame and a light
-// letter; keys carry the same marks, absent keys turn grey and stop typing.
+// cell, a present one a thick frame, an absent one a thin frame and a
+// regular-weight letter; keys carry the same marks, absent keys turn grey and stop typing.
 // Меню (Новая игра once over) is the only bar action. A game opens at once,
 // without a picker; dropping it after a guess (Новая игра, Завершить) counts as a loss.
 class FiveLettersActivity final : public GameScreen {

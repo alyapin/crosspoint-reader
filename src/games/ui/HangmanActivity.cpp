@@ -1,6 +1,7 @@
 #include "HangmanActivity.h"
 
 #include <GfxRenderer.h>
+#include <HalStorage.h>
 #include <HangmanWords.h>
 #include <I18n.h>
 #include <Memory.h>
@@ -38,7 +39,25 @@ constexpr int kClueGap = 28;
 constexpr int kClueLines = 4;
 constexpr int kStartKey = 15;  // О
 
-const hangman::WordList kWordList(hangman::WORDS, hangman::WORD_COUNT);
+// Обычные слова, and С крепкими словами: the same words with the rude ones after them.
+const hangman::WordList kLists[] = {
+    {hangman::WORDS, hangman::WORD_COUNT},
+    {hangman::WORDS, static_cast<uint16_t>(hangman::WORD_COUNT + hangman::RUDE_WORD_COUNT)},
+};
+constexpr int kListCount = static_cast<int>(std::size(kLists));
+// The list last picked outlives the game, so it is kept apart from the save.
+constexpr const char* kListDir = "/.crosspoint/games";
+constexpr const char* kListPath = "/.crosspoint/games/hangman-list.txt";
+
+uint8_t loadList() {
+  if (!Storage.exists(kListPath)) return 0;
+  const String text = Storage.readFile(kListPath);
+  return text.length() > 0 && text[0] == '1' ? 1 : 0;
+}
+
+void saveList(const uint8_t list) {
+  if (Storage.ensureDirectoryExists(kListDir)) Storage.writeFile(kListPath, String(list == 1 ? "1" : "0"));
+}
 
 int measureText(void* ctx, const char* text) {
   const auto* renderer = static_cast<const GfxRenderer*>(ctx);
@@ -60,27 +79,41 @@ std::unique_ptr<Activity> openHangman(GfxRenderer& renderer, MappedInputManager&
 }
 
 HangmanActivity::HangmanActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : GameScreen("Hangman", renderer, mappedInput), game(kWordList) {}
+    : GameScreen("Hangman", renderer, mappedInput), game(kLists, kListCount) {}
 
 bool HangmanActivity::restore() {
-  if (!gamesave::load(game)) game.newGame(esp_random());
+  chosenList = loadList();
+  if (!gamesave::load(game)) return false;
   cursor = mappedInput.hasTouch() ? -1 : kStartKey;
   barFocus = -1;
   return true;
 }
 
-void HangmanActivity::saveGame() { gamesave::save(game); }
+void HangmanActivity::saveGame() {
+  gamesave::save(game);
+  if (listPending) {
+    listPending = false;
+    saveList(chosenList);
+  }
+}
 
 void HangmanActivity::clearSave() { gamesave::clear(gamesave::Kind::Hangman); }
 
-void HangmanActivity::openNewGame() { deal(); }
+void HangmanActivity::openNewGame() {
+  const GamePickerActivity::Row rows[] = {
+      {tr(STR_HANGMAN_NORMAL), &icon_hangman_24},
+      {tr(STR_HANGMAN_RUDE), &icon_hangman_rude_24},
+  };
+  openPicker(tr(STR_GAMES_NEW_GAME), rows, static_cast<int>(std::size(rows)), chosenList);
+}
 
-void HangmanActivity::deal() {
-  game.newGame(esp_random());
+void HangmanActivity::pickerChosen(const int row, bool) {
+  const auto list = static_cast<uint8_t>(std::clamp(row, 0, kListCount - 1));
+  listPending = listPending || list != chosenList;
+  chosenList = list;
+  game.newGame(list, esp_random());
   cursor = mappedInput.hasTouch() ? -1 : kStartKey;
   barFocus = -1;
-  hasGame = true;
-  markChanged();
 }
 
 // --- input -------------------------------------------------------------------
@@ -92,7 +125,7 @@ void HangmanActivity::runAction(const Action action) {
       break;
     case Action::Menu:
       if (game.isOver()) {
-        deal();
+        openNewGame();
       } else {
         openGameMenu();
       }
@@ -261,7 +294,7 @@ void HangmanActivity::drawClue(const int left, const int top) const {
   snprintf(caption, sizeof(caption), tr(STR_HANGMAN_LETTERS), game.length());
   renderer.drawText(kCaptionFont, left, top, caption);
   char clue[hangman::MAX_CLUE_BYTES];
-  kWordList.clue(game.wordIndex(), clue, sizeof(clue));
+  kLists[game.list()].clue(game.wordIndex(), clue, sizeof(clue));
   scanword::ClueLines lines;
   scanword::layoutClue(clue, renderer.getScreenWidth() - kSidePadding - left, kClueLines, measureText, &renderer,
                        lines);

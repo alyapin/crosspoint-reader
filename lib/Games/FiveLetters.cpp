@@ -150,7 +150,9 @@ bool Game::erase() {
 Submit Game::submit() {
   if (isOver()) return Submit::Over;
   if (count < LETTERS) return Submit::Incomplete;
-  if (!isWord(pack(board[rows]))) return Submit::Unknown;
+  // The answer always counts, even if a later list drops it.
+  const uint32_t word = pack(board[rows]);
+  if (word != target && !isWord(word)) return Submit::Unknown;
   scoreRow();
   return Submit::Scored;
 }
