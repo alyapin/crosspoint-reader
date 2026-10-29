@@ -218,7 +218,7 @@ void ReversiActivity::build(UiScreen& screen) {
     // The level as the picker names it.
     const StrId levels[] = {StrId::STR_SUDOKU_EASY_LOWER, StrId::STR_SUDOKU_MEDIUM_LOWER, StrId::STR_SUDOKU_HARD_LOWER};
     const int level = std::clamp(static_cast<int>(game.mode()), 0, static_cast<int>(std::size(levels)) - 1);
-    drawTopLine(screen, {{tr(STR_CHESS_COMPUTER), nullptr}, {I18N.get(levels[level]), nullptr}}, false);
+    drawTopLine(screen, {{tr(STR_GAMES_COMPUTER_LOWER), nullptr}, {I18N.get(levels[level]), nullptr}}, false);
   } else {
     drawTopLine(screen, {{tr(STR_GAMES_TWO_PLAYERS), nullptr}}, false);
   }

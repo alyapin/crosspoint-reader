@@ -1223,13 +1223,13 @@ void ChessActivity::drawTopLine(UiScreen& screen) const {
   int count = 0;
   const bool vs = match->settings().mode == chess::Mode::VsComputer;
   if (vs) {
-    status[count++] = {tr(STR_CHESS_COMPUTER), nullptr};
+    status[count++] = {tr(STR_GAMES_COMPUTER_LOWER), nullptr};
     status[count++] = {tr(STR_GAMES_LEVEL), level};
   } else if (timed) {
     status[count++] = {far == chess::WHITE ? tr(STR_CHESS_WHITE) : tr(STR_CHESS_BLACK), nullptr};
   }
   if (timed) status[count++] = {nullptr, clock};
-  // With a clock, too long beside "‹ Выйти": the level without "Компьютер", then the clock alone.
+  // With a clock, too long beside "‹ Выйти": the level without "компьютер", then the clock alone.
   const int room = width - kSidePadding - exitWidth;
   if (timed && vs && games::ui::statusWidth(renderer, status, count) > room) {
     std::copy(status + 1, status + count, status);
