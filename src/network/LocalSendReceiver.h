@@ -74,10 +74,11 @@ class LocalSendReceiver {
     char tmpPath[216] = {};
     mbedtls_sha256_context sha = {};
     bool hashing = false;
+    bool deck = false;  // a flashcard deck: replaces one of the same name, so its progress carries over
     uint64_t freeCache = 0;
     bool freeKnown = false;
     void stopHashing();
-    bool placeIn(const char* folder, const char* name);
+    bool placeIn(const char* folder, const char* name, bool replace);
     int entryIndex(const localsend::FileEntry& entry) const;
   };
 

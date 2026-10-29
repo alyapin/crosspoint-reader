@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "CardDeck.h"
+#include "CardStore.h"
 #include "CrossPointSettings.h"
 #include "util/BookCacheUtils.h"
 #include "util/TaskWatchdog.h"
@@ -72,7 +73,7 @@ bool LocalSendReceiver::start(const Config& config) {
     store.dir[0] = 0;
   }
   store.reclaimPartials(store.dir);
-  if (Storage.exists(cards::DECK_DIR)) store.reclaimPartials(cards::DECK_DIR);
+  if (Storage.exists(cards::deckDir())) store.reclaimPartials(cards::deckDir());
   store.forgetFreeSpace();
   // The first query scans the FAT (seconds on a large card): do it now, while
   // no sender waits on a prepare-upload.
@@ -174,10 +175,10 @@ int LocalSendReceiver::Store::entryIndex(const localsend::FileEntry& entry) cons
   return -1;
 }
 
-// Picks a free final path in `folder` and its partial next to it.
-bool LocalSendReceiver::Store::placeIn(const char* folder, const char* entryName) {
+// Picks a free final path in `folder` (or the same name, to replace) and its partial next to it.
+bool LocalSendReceiver::Store::placeIn(const char* folder, const char* entryName, const bool replace) {
   char name[localsend::FILE_NAME_MAX + 16];
-  for (int i = 0; i < MAX_COLLISIONS; i++) {
+  for (int i = 0; i < (replace ? 1 : MAX_COLLISIONS); i++) {
     if (!localsend::makeCollisionName(entryName, i, name, sizeof(name))) return false;
     const int n = snprintf(finalPath, sizeof(finalPath), "%s/%s", folder, name);
     const int m = snprintf(tmpPath, sizeof(tmpPath), "%s%s", finalPath, PART_SUFFIX);
@@ -185,7 +186,7 @@ bool LocalSendReceiver::Store::placeIn(const char* folder, const char* entryName
       return false;
     }
     // A partial without its book is left over from an interrupted transfer.
-    if (!Storage.exists(finalPath) && (!Storage.exists(tmpPath) || Storage.remove(tmpPath))) return true;
+    if ((replace || !Storage.exists(finalPath)) && (!Storage.exists(tmpPath) || Storage.remove(tmpPath))) return true;
   }
   return false;
 }
@@ -195,9 +196,9 @@ bool LocalSendReceiver::Store::open(const localsend::FileEntry& entry) {
   const int index = entryIndex(entry);
   if (index >= 0) toCards &= static_cast<uint16_t>(~(1u << index));
   // Flashcard tables go straight to the deck folder; a .txt is sorted at commit().
-  const bool deck =
-      cards::isTableName(entry.name) && (Storage.exists(cards::DECK_DIR) || Storage.mkdir(cards::DECK_DIR));
-  if (!placeIn(deck ? cards::DECK_DIR : dir, entry.name) || !Storage.openFileForWrite("LSND", tmpPath, file)) {
+  const char* decks = cards::deckDir();
+  deck = cards::isTableName(entry.name) && (Storage.exists(decks) || Storage.mkdir(decks));
+  if (!placeIn(deck ? decks : dir, entry.name, deck) || !Storage.openFileForWrite("LSND", tmpPath, file)) {
     LOG_ERR("LSND", "cannot create a file for %s", entry.name);
     tmpPath[0] = 0;
     return false;
@@ -249,23 +250,23 @@ int LocalSendReceiver::Store::commit(const localsend::FileEntry& entry) {
     }
     char partial[sizeof(tmpPath)];
     snprintf(partial, sizeof(partial), "%s", tmpPath);
-    if (got > 0 && cards::hasAnkiHeader(head, static_cast<size_t>(got)) &&
-        (Storage.exists(cards::DECK_DIR) || Storage.mkdir(cards::DECK_DIR)) && placeIn(cards::DECK_DIR, entry.name)) {
+    const char* decks = cards::deckDir();
+    deck = got > 0 && cards::hasAnkiHeader(head, static_cast<size_t>(got)) &&
+           (Storage.exists(decks) || Storage.mkdir(decks)) && placeIn(decks, entry.name, true);
+    if (deck) {
       snprintf(tmpPath, sizeof(tmpPath), "%s", partial);
     } else {
       snprintf(tmpPath, sizeof(tmpPath), "%s", partial);
       snprintf(finalPath, sizeof(finalPath), "%.*s", static_cast<int>(strlen(partial) - strlen(PART_SUFFIX)), partial);
     }
   }
-  if (!Storage.rename(tmpPath, finalPath)) {
+  if (!(deck ? Storage.replaceFile(tmpPath, finalPath) : Storage.rename(tmpPath, finalPath))) {
     LOG_ERR("LSND", "rename failed: %s", finalPath);
     abort();
     return 500;
   }
   const int index = entryIndex(entry);
-  if (index >= 0 && strncmp(finalPath, cards::DECK_DIR, strlen(cards::DECK_DIR)) == 0) {
-    toCards |= static_cast<uint16_t>(1u << index);
-  }
+  if (index >= 0 && deck) toCards |= static_cast<uint16_t>(1u << index);
   tmpPath[0] = 0;
   clearBookCache(finalPath);
   if (library::isLibraryBookFile(finalPath)) library::markLibraryIndexDirty();

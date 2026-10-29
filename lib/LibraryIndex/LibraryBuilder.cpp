@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
+#include <initializer_list>
 
 #include "LibraryIndexFile.h"
 #include "LibraryText.h"
@@ -493,7 +494,7 @@ void walk(WalkState& st, const std::string& path, const int depth) {
     if (isDir) {
       const std::string child = joinLibraryPath(path, name);
       // Flashcard decks are text files, not books.
-      if (child == cards::DECK_DIR) continue;
+      if (child == cards::DECK_DIR || child == cards::DECK_DIR_LOWER) continue;
       const size_t resumePosition = dir.position();
       dir.close();
       walk(st, child, depth + 1);
@@ -1065,9 +1066,8 @@ bool emitIndex(const char* folderStagePath, WalkState& st, const uint16_t* order
 const char* libraryIndexPath() { return INDEX_PATH; }
 
 bool isLibraryBookFile(const std::string_view path) {
-  if (path.starts_with(cards::DECK_DIR) && path.size() > sizeof(cards::DECK_DIR) - 1 &&
-      path[sizeof(cards::DECK_DIR) - 1] == '/') {
-    return false;
+  for (const std::string_view decks : {std::string_view(cards::DECK_DIR), std::string_view(cards::DECK_DIR_LOWER)}) {
+    if (path.size() > decks.size() && path.starts_with(decks) && path[decks.size()] == '/') return false;
   }
   // Match the walk's exclusions in every path component. A lone "." names the folder itself.
   size_t start = 0;

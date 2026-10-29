@@ -102,6 +102,7 @@ TEST_F(LibraryBuilderTest, SkipsSystemFolderContents) {
 
 TEST_F(LibraryBuilderTest, SkipsTheFlashcardFolder) {
   EXPECT_FALSE(isLibraryBookFile("/Карточки/es.txt"));
+  EXPECT_FALSE(isLibraryBookFile("/карточки/es.txt"));
   EXPECT_TRUE(isLibraryBookFile("/Карточки старые/es.txt"));
   fake::add("/Карточки/es.txt");
   fake::add("/Книги/book.txt");
