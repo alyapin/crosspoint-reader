@@ -57,7 +57,6 @@ harness = r"""
 #include <EpdFont.h>
 #include <builtinFonts/ubuntu_10_regular.h>
 #include <builtinFonts/ubuntu_12_regular.h>
-#include <components/ListPager.h>
 #include <components/themes/lyra/LyraTheme.h>
 #include <components/themes/roundedraff/RoundedRaffTheme.h>
 #include <algorithm>
@@ -139,11 +138,6 @@ struct TextSettingsActivity : UiTabListActivity {
   fui::ListNav nav;
   fui::ListNav& activeNav() { return nav; }
   int listCount() const { return rowItems_.size(); }
-  ListPager pager_;
-  bool paged_ = false;
-  int lineTop = -1;  // the page line takes the 28 px over the band's bottom
-  bool showsPageLine() const { return true; }
-  int pageLineTop() const { return lineTop; }
   void syncListViewport(UiScreen&, fui::ListProps&, int);
   void syncTabListViewport(UiScreen& screen, fui::ListProps& props) {
     syncListViewport(screen, props, 1);
@@ -225,7 +219,6 @@ void checkLayout(const BoardConfig::BoardProfile& profile, GfxRenderer::Orientat
                            static_cast<int16_t>(bottom), static_cast<int16_t>(left)};
   const Rect safe = UITheme::getInstance().getScreenSafeArea(activity.renderer, true, false);
   activity.enterGeometry();
-  activity.lineTop = safe.y + safe.height - 28;
   activity.drawChrome();
   const Rect preview = activity.renderer.preview;
   assert(preview.x == safe.x && preview.width == safe.width);
@@ -294,8 +287,7 @@ void checkLayout(const BoardConfig::BoardProfile& profile, GfxRenderer::Orientat
       assert(rect.x >= safe.x && rect.right() <= safe.x + safe.width);
       assert(rect.y >= content.y && rect.bottom() <= content.bottom());
     }
-    // Button boards page instead: no track.
-    assert(touch == std::any_of(target.fills.begin(), target.fills.end(), [safe, content, theme](fui::Rect rect) {
+    assert(std::any_of(target.fills.begin(), target.fills.end(), [safe, content, theme](fui::Rect rect) {
       return rect.width == theme.listScrollWidth && rect.x >= safe.x && rect.right() <= safe.x + safe.width &&
              rect.y == content.y && rect.bottom() == content.bottom();
     }));
@@ -380,32 +372,26 @@ void checkSharedPartialRows(const bool touch) {
   TextSettingsActivity activity;
   activity.rowItems_.assign(10, fui::ListItem{});
   for (auto& row : activity.rowItems_) { row.label = "Paragraph Indentation"; row.value = "2"; }
-  // Text Settings uses the shared next-row preview policy, including pixel clipping;
-  // button boards draw whole rows only.
+  // Text Settings uses the shared next-row preview policy, including pixel
+  // clipping, on touch boards; button boards draw whole rows only.
   for (int remainder : {4, 14, 18, 20, 24, 36}) {
     for (int selected : {1, 4}) {
+      interactions.clear();
+      target.textRects.clear();
+      target.clippedText = false;
       activity.nav.reset(selected);
-      fui::Rect content{};
-      // Builds until the pager has walked to the selection's page and back.
-      do {
-        interactions.clear();
-        target.textRects.clear();
-        target.clippedText = false;
-        UiScreen screen(frame, theme);
-        screen.setContentMarginFromScreen(fui::Insets{100, 0, static_cast<int16_t>(260 - remainder), 0});
-        content = screen.contentRect();
-        activity.lineTop = content.bottom() - 28;
-        activity.buildRows(screen);
-        if (!touch) activity.pager_.afterLayout(activity.nav);
-      } while (activity.nav.consumeRebuildNeeded());
+      UiScreen screen(frame, theme);
+      screen.setContentMarginFromScreen(fui::Insets{100, 0, static_cast<int16_t>(260 - remainder), 0});
+      const auto content = screen.contentRect();
+      activity.buildRows(screen);
       const bool preview = touch && remainder >= 18;
       assert(target.clippedText == preview);
-      assert(activity.nav.drawnRows == (touch || remainder >= 28 ? 3 : 2));
-      assert(target.textRects.size() == (preview ? 8 : 2 * static_cast<size_t>(activity.nav.drawnRows)));
+      assert(activity.nav.drawnRows == 3);
+      assert(target.textRects.size() == (preview ? 8 : 6));
       for (const auto& rect : target.textRects) {
         assert(rect.y >= content.y && rect.bottom() <= content.bottom());
       }
-      assert(activity.nav.top <= selected - 1 && selected - 1 < activity.nav.top + activity.nav.drawnRows);
+      assert(activity.nav.top <= selected - 1 && selected - 1 < activity.nav.top + 3);
     }
   }
 }

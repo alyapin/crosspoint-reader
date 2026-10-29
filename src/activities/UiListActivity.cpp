@@ -8,7 +8,6 @@
 
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
-#include "components/setka/SetkaStyle.h"
 #if FREEINK_CAP_TOUCH
 #include "components/UiAppHelpers.h"
 #endif
@@ -34,10 +33,7 @@ void UiListActivity::onEnter() {
 }
 
 void UiListActivity::screenTrampoline(UiScreen& screen, void* user) {
-  auto* self = static_cast<UiListActivity*>(user);
-  self->paged_ = false;  // set again by syncListViewport when the build shows the list
-  self->buildScreen(screen);
-  self->finishPage();
+  static_cast<UiListActivity*>(user)->buildScreen(screen);
 }
 
 void UiListActivity::rowActionTrampoline(const fui::ActionEvent& event, void* user) {
@@ -217,19 +213,15 @@ void UiListActivity::syncListViewport(UiScreen& screen, fui::ListProps& props, c
   props.toggleCheckbox = true;
   props.toggleWidth = 28;
   props.toggleHeight = 28;
+  // Touch boards preview the next row as a swipe hint; button boards draw
+  // whole rows only, and the follow keeps the selected row among them.
+  props.partialTrailingRow = screen.device().hasTouch;
   auto& n = activeNav();
   const int prevTop = n.top;
   const bool trusted = n.trusts(listCount());
   const int drawn = n.drawnRows;
-  paged_ = !screen.device().hasTouch;
-  props.partialTrailingRow = !paged_;
 
   screen.syncListViewport(n, props, listCount(), selectionOffset);
-  if (paged_) {
-    pager_.prepare(screen, props, n, listCount(), showsPageLine() ? pageLineTop() : -1);
-    pager_.follow(n, props);
-    return;
-  }
 
   // When the selection is already visible in the current viewport (based on
   // the measured drawnRows rather than the unweighted visibleRows estimate),
@@ -251,30 +243,6 @@ void UiListActivity::drawChrome() {
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.headerHeight}, title);
 }
 
-int UiListActivity::pageLineTop() const {
-  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-  return setka::hintCaptionTop(renderer, SMALL_FONT_ID, safe.y + safe.height);
-}
-
-void UiListActivity::finishPage() {
-  if (!paged_) return;
-  auto& n = activeNav();
-  pager_.afterLayout(n);
-  // Wrapped rows overflowed a band the estimate said they fit: build again with the line.
-  if (pager_.lineMissing()) {
-    n.rebuildNeeded = true;
-    return;
-  }
-  int page = 0;
-  int pages = 0;
-  if (!showsPageLine() || !pager_.position(page, pages)) return;
-  char text[24];
-  snprintf(text, sizeof(text), tr(STR_LIST_PAGE), page, pages);
-  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-  const int x = safe.x + safe.width - setka::kSidePadding - renderer.getTextWidth(SMALL_FONT_ID, text);
-  renderer.drawText(SMALL_FONT_ID, x, pageLineTop(), text);
-}
-
 void UiListActivity::drawFooter() {
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
@@ -284,7 +252,16 @@ void UiListActivity::render(RenderLock&&) {
   renderer.clearScreen();
   drawChrome();
   renderUi();
-  settleList([this] { drawChrome(); });
+  // Wrapped labels grow rows, so fewer rows can fit than the fixed-height
+  // estimate ListNav plans with. list() reports the real layout back
+  // (ListNav::onListRendered); when the selection landed past the drawn rows
+  // the nav advanced the viewport and asked for another build. Bounded: top
+  // strictly advances toward the selection each pass.
+  for (int pass = 0; activeNav().consumeRebuildNeeded() && pass < 8; ++pass) {
+    renderer.clearScreen();
+    drawChrome();
+    renderUi();
+  }
   drawFooter();
   renderer.displayBuffer();
 }

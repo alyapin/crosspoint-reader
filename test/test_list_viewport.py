@@ -14,30 +14,41 @@ method = "void UiListActivity::syncListViewport(" + method.split(
 harness = r"""
 #include <components/lists/list.h>
 #include <cassert>
+#include <cstring>
 namespace fui = freeink::ui;
 struct UiScreen {
   int16_t height = 80;
-  fui::DeviceContext device() const {
-    fui::DeviceContext touch;
-    touch.hasTouch = true;  // button-board paging is ListPager's, tested in test/list_pager
-    return touch;
-  }
+  int16_t rowHeight = 20;
+  fui::DeviceContext device() const { return {}; }
   void syncListViewport(fui::ListNav& nav, fui::ListProps& props, int count, int offset) {
-    nav.syncToProps({0, 0, 200, height}, 20, 0, count, props, offset);
+    nav.syncToProps({0, 0, 200, height}, rowHeight, 0, count, props, offset);
   }
+};
+// 8 px a byte, 12 in SemiBold; clips like the firmware target, so a preview
+// row would show up as text past the band.
+struct BoldTarget : fui::DrawTarget {
+  fui::Rect clip{0, 0, 32767, 32767};
+  int lowest = 0;
+  fui::Size measureText(fui::FontId, const char* text, fui::TextStyle style) const override {
+    return {static_cast<int16_t>((style.bold ? 12 : 8) * std::strlen(text)), 20};
+  }
+  int16_t lineHeight(fui::FontId) const override { return 20; }
+  fui::Rect clipRect() const override { return clip; }
+  bool setClipRect(fui::Rect rect) override { clip = rect; return true; }
+  void fill(fui::Rect, fui::Paint, uint8_t, uint8_t) override {}
+  void stroke(fui::Rect, fui::Paint, uint8_t, uint8_t, uint8_t) override {}
+  void line(fui::Point, fui::Point, uint8_t, fui::Paint) override {}
+  void triangle(fui::Point, fui::Point, fui::Point, fui::Paint) override {}
+  void text(fui::Rect rect, const char*, fui::TextStyle) override {
+    if (rect.bottom() > lowest) lowest = rect.bottom();
+  }
+  void bitmap(fui::Rect, fui::BitmapRef, fui::BitmapMode, fui::Paint, fui::Rotation) override {}
 };
 struct UiListActivity {
   fui::ListNav nav;
   int count = 16;
-  bool paged_ = false;
-  struct {
-    void prepare(UiScreen&, fui::ListProps&, const fui::ListNav&, int, int) {}
-    void follow(fui::ListNav&, fui::ListProps&) {}
-  } pager_;
   fui::ListNav& activeNav() { return nav; }
   int listCount() const { return count; }
-  bool showsPageLine() const { return false; }
-  int pageLineTop() const { return -1; }
   void syncListViewport(UiScreen&, fui::ListProps&, int = 0);
 };
 """ + method + r"""
@@ -70,12 +81,50 @@ int main() {
     assert(nav.top == 2 && props.topIndex == 2);
   }
 
+  // Button boards draw whole rows only, and a selected label that wraps only
+  // in SemiBold still lands among them after the render's follow passes.
+  {
+    UiListActivity activity;
+    activity.count = 12;
+    UiScreen screen;
+    screen.height = 200;
+    screen.rowHeight = 30;
+    fui::ListItem items[12];
+    for (auto& item : items) item.label = "Eighteen chars.";  // 120 px, 180 in SemiBold
+    BoldTarget target;
+    fui::DeviceContext device;
+    device.width = 200;
+    device.height = 200;
+    fui::InputSnapshot input;
+    fui::InteractionBuffer<32> interactions;
+    for (int selection : {0, 5, 6, 7, 11, 3, 0}) {
+      activity.nav.requestSelection(selection);
+      for (int pass = 0; pass < 8; ++pass) {
+        fui::ListProps props;
+        props.items = items;
+        props.count = 12;
+        props.rowHeight = 30;
+        props.sidePadding = 0;
+        props.labelText.maxLines = 2;
+        props.boldSelected = true;
+        activity.syncListViewport(screen, props);
+        assert(!props.partialTrailingRow);
+        interactions.clear();
+        target.lowest = 0;
+        fui::Frame<32> frame(target, device, input, interactions);
+        fui::list(frame, {0, 0, 160, 200}, props);
+        if (!activity.nav.consumeRebuildNeeded()) break;
+      }
+      assert(target.lowest <= 200);
+      assert(activity.nav.top <= selection && selection < activity.nav.top + activity.nav.drawnRows);
+    }
+  }
 }
 """
 with tempfile.TemporaryDirectory() as directory:
     cpp = Path(directory) / "viewport.cpp"
     executable = Path(directory) / "viewport"
-    cpp.write_text("#include <algorithm>\n#include <initializer_list>\n#include <utility>\n" + harness)
+    cpp.write_text("#include <initializer_list>\n" + harness)
     subprocess.run([
         "c++", "-std=c++17", "-I",
         str(ROOT / "freeink-sdk/libs/ui/FreeInkUI/include"),
