@@ -28,3 +28,6 @@ bar-hint = lightbulb
 five-letters = spell-check
 key-delete = delete
 key-enter = corner-down-left
+# Шашки: games list, «Сдаться» in the menu
+draughts = disc-2
+surrender = hand

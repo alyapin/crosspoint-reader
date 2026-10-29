@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <climits>
 #include <cstdio>
-#include <iterator>
 #include <variant>
 
 #include "ElapsedText.h"
@@ -90,29 +89,33 @@ void GameScreen::openPicker(const char* title, const GamePickerActivity::Row* ro
 }
 
 void GameScreen::openGameMenu() {
-  const GamePickerActivity::Row rows[] = {
-      {tr(STR_GAMES_NEW_GAME), &icon_bar_new_game_24},
-      {tr(STR_GAMES_FINISH), &icon_resign_24},
-  };
-  auto menu = makeUniqueNoThrow<GamePickerActivity>(renderer, mappedInput, tr(STR_GAMES_MENU), rows,
-                                                    static_cast<int>(std::size(rows)), 0);
+  GamePickerActivity::Row rows[GamePickerActivity::MAX_ROWS] = {{tr(STR_GAMES_NEW_GAME), &icon_bar_new_game_24}};
+  int count = 1 + menuRows(rows + 1);
+  const int finishRow = count;
+  rows[count++] = {tr(STR_GAMES_FINISH), &icon_resign_24};
+  auto menu = makeUniqueNoThrow<GamePickerActivity>(renderer, mappedInput, tr(STR_GAMES_MENU), rows, count, 0);
   if (!menu) {
     LOG_ERR("GAMES", "OOM: %u bytes for the menu", static_cast<unsigned>(sizeof(GamePickerActivity)));
     return;
   }
   app.clearTapFlash();
   pauseGame();
-  startActivityForResult(std::move(menu), [this](const ActivityResult& result) {
+  startActivityForResult(std::move(menu), [this, finishRow](const ActivityResult& result) {
     RenderLock lock(*this);
     const auto* choice = std::get_if<MenuResult>(&result.data);
-    if (!result.isCancelled && choice != nullptr && choice->action == 1) {
+    if (!result.isCancelled && choice != nullptr && choice->action == finishRow) {
       confirmFinish();
       return;
     }
     resumeGame();
     clockShown = shownMinutes();
     requestRepaint(RepaintEntry);
-    if (!result.isCancelled && choice != nullptr) openNewGame();
+    if (result.isCancelled || choice == nullptr) return;
+    if (choice->action == 0) {
+      openNewGame();
+    } else {
+      menuChosen(choice->action - 1);
+    }
   });
 }
 

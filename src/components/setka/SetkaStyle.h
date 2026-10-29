@@ -84,6 +84,24 @@ inline void drawCellFrame(const GfxRenderer& renderer, const int x, const int y,
   renderer.drawRect(x, y, width, height, kCellFrameWidth, true);
 }
 
+// Last move marker on a board square: 2 px dashes inset 2 px, one dash in each corner.
+inline void drawDashedFrame(const GfxRenderer& renderer, const int x, const int y, const int size) {
+  constexpr int kInset = 2;
+  constexpr int kWidth = 2;
+  constexpr int kDash = 8;
+  constexpr int kGap = 4;
+  const int length = size - 2 * kInset;
+  const int left = x + kInset;
+  const int top = y + kInset;
+  for (int d = 0; d < length; d += kDash + kGap) {
+    const int n = std::min(kDash, length - d);
+    renderer.fillRect(left + d, top, n, kWidth, true);
+    renderer.fillRect(left + d, top + length - kWidth, n, kWidth, true);
+    renderer.fillRect(left, top + d, kWidth, n, true);
+    renderer.fillRect(left + length - kWidth, top + d, kWidth, n, true);
+  }
+}
+
 inline void drawRule(const GfxRenderer& renderer, const int x, const int y, const int width) {
   renderer.fillRect(x, y, width, kRuleWidth, true);
 }

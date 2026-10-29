@@ -9,6 +9,7 @@
 #include "games/chess/ui/chessIcons.h"
 #include "games/scanword/ui/ScanwordActivity.h"
 #include "games/scanword/ui/scanwordIcons.h"
+#include "games/ui/DraughtsActivity.h"
 #include "games/ui/FifteenActivity.h"
 #include "games/ui/FiveLettersActivity.h"
 #include "games/ui/Game2048Activity.h"
@@ -47,6 +48,7 @@ constexpr Game kGames[] = {
     {StrId::STR_FIFTEEN, &icon_fifteen_24, &openFifteen, &fifteenListStatus},
     {StrId::STR_HANGMAN, &icon_hangman_24, &openHangman, &hangmanListStatus},
     {StrId::STR_FIVE_LETTERS, &icon_five_letters_24, &openFiveLetters, &fiveLettersListStatus},
+    {StrId::STR_DRAUGHTS, &icon_draughts_24, &openDraughts, &draughtsListStatus},
     {},
 };
 constexpr int kGameCount = static_cast<int>(std::size(kGames)) - 1;

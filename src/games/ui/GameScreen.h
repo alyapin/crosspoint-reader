@@ -78,11 +78,14 @@ class GameScreen : public Activity, protected UiAppHost {
   virtual int32_t shownMinutes() const { return -1; }
   // Board hits carry InputLongPress (event.longPress on a held tap).
   virtual bool wantsLongPress() const { return false; }
+  // Rows the game adds to its menu between Новая игра and Завершить, and the choice of one.
+  virtual int menuRows(GamePickerActivity::Row* /*out*/) const { return 0; }
+  virtual void menuChosen(int /*row*/) {}
 
   void openPicker(const char* title, const GamePickerActivity::Row* rows, int count, int selected, int toggleRow = -1,
                   bool toggleOn = false);
-  // The menu of a game in progress: Новая игра, or Завершить, which after a
-  // confirmation drops the save and leaves.
+  // The menu of a game in progress: Новая игра, the game's rows, or Завершить,
+  // which after a confirmation drops the save and leaves.
   void openGameMenu();
   void requestRepaint(Repaint kind);
   int barTop() const;

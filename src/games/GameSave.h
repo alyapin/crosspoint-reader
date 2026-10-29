@@ -34,10 +34,13 @@ class Game;
 namespace hangman {
 class Game;
 }
+namespace draughts {
+class Game;
+}
 
 namespace gamesave {
 
-enum class Kind { Sudoku, Minesweeper, Klondike, TicTacToe, Fifteen, FiveLetters, Game2048, Hangman };
+enum class Kind { Sudoku, Minesweeper, Klondike, TicTacToe, Fifteen, FiveLetters, Game2048, Hangman, Draughts };
 
 bool hasGameInProgress(Kind kind);
 void clear(Kind kind);
@@ -52,6 +55,7 @@ bool save(const fifteen::Game& game);
 bool save(const fiveletters::Game& game);
 bool save(const g2048::Game& game);
 bool save(const hangman::Game& game);
+bool save(const draughts::Game& game);
 
 // Restore the saved game, paused. False on failure; a file that reads but does
 // not parse is removed.
@@ -64,6 +68,7 @@ bool load(fifteen::Game& game);
 bool load(fiveletters::Game& game);
 bool load(g2048::Game& game);
 bool load(hangman::Game& game);
+bool load(draughts::Game& game);
 
 // Records outlive their games. A missing or corrupt one loads empty; one that
 // cannot be read loads false (2048: 0) and is not written until a load reads it.

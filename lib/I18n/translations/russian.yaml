@@ -944,3 +944,13 @@ STR_HANGMAN_WON: "Отгадано"
 STR_HANGMAN_LOST: "Не отгадано"
 STR_HANGMAN_NORMAL: "Обычные слова"
 STR_HANGMAN_RUDE: "С крепкими словами"
+
+# Draughts
+STR_DRAUGHTS: "Шашки"
+STR_DRAUGHTS_MUST_CAPTURE: "Бить обязательно"
+STR_DRAUGHTS_ONLY_CAPTURES: "Другие ходы не принимаются."
+STR_DRAUGHTS_MUST_CAPTURE_LINE: "Бить обязательно."
+STR_DRAUGHTS_CHAIN: "Бьёт подряд: точки по очереди."
+STR_DRAUGHTS_NO_AUTO_FLIP: "Доска сама не переворачивается."
+STR_DRAUGHTS_NO_MOVES: "Ходов не осталось"
+STR_DRAUGHTS_KING_MOVES: "15 ходов одними дамками"

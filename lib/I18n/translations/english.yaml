@@ -944,3 +944,13 @@ STR_HANGMAN_WON: "Guessed"
 STR_HANGMAN_LOST: "Not guessed"
 STR_HANGMAN_NORMAL: "Ordinary words"
 STR_HANGMAN_RUDE: "With strong language"
+
+# Draughts
+STR_DRAUGHTS: "Draughts"
+STR_DRAUGHTS_MUST_CAPTURE: "Capture is mandatory"
+STR_DRAUGHTS_ONLY_CAPTURES: "No other move is accepted."
+STR_DRAUGHTS_MUST_CAPTURE_LINE: "A capture is mandatory."
+STR_DRAUGHTS_CHAIN: "Captures in a row: dots in turn."
+STR_DRAUGHTS_NO_AUTO_FLIP: "The board does not turn by itself."
+STR_DRAUGHTS_NO_MOVES: "No moves left"
+STR_DRAUGHTS_KING_MOVES: "15 moves with kings only"
