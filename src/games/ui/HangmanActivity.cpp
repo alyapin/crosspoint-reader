@@ -79,7 +79,7 @@ std::unique_ptr<Activity> openHangman(GfxRenderer& renderer, MappedInputManager&
 }
 
 HangmanActivity::HangmanActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : GameScreen("Hangman", renderer, mappedInput), game(kLists, kListCount) {}
+    : GameScreen("Hangman", StrId::STR_HANGMAN, renderer, mappedInput), game(kLists, kListCount) {}
 
 bool HangmanActivity::restore() {
   chosenList = loadList();
@@ -139,8 +139,6 @@ void HangmanActivity::guessKey(const int key) {
   if (key < 0 || key >= kKeyCount) return;
   const hangman::Guess result = game.guess(static_cast<uint8_t>(key + 1));
   if (result != hangman::Guess::Hit && result != hangman::Guess::Miss) return;
-  // Buttons: the next word is one Confirm away.
-  if (game.isOver() && !mappedInput.hasTouch()) barFocus = static_cast<int>(Action::Menu);
   markChanged();
 }
 
@@ -199,7 +197,7 @@ void HangmanActivity::onKey(const int dx, const int dy, const bool confirm) {
       cursor -= kKeysPerRow;
     } else if (dy > 0 && row < kKeyRows - 1) {
       cursor += kKeysPerRow;
-    } else if (dy > 0) {
+    } else if (dy > 0 && hasBar()) {
       barFocus = nextBarSlot(BAR_SLOTS - 1, 1);
     }
   }
@@ -252,7 +250,8 @@ void HangmanActivity::build(UiScreen& screen) {
   BarItem items[BAR_SLOTS];
   const bool over = game.isOver();
   if (barShown(0)) items[0] = {&icon_bar_hint_24, tr(STR_HANGMAN_HINT)};
-  items[2] = {over ? &icon_bar_new_game_24 : &icon_menu_24, over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU)};
+  items[2] = {over ? &icon_bar_new_game_24 : &icon_menu_24, over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU), false,
+              over ? BarItem::NewGame : BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 

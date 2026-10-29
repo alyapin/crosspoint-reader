@@ -481,6 +481,8 @@ void ScanwordActivity::goBack() {
       if (stripOpen || keyboardOpen) {
         closeInput();
         requestRepaint(RepaintUpdate);
+      } else if (!touchBoard()) {
+        setView(View::Menu);
       } else {
         closePuzzle();
       }
@@ -617,7 +619,7 @@ void ScanwordActivity::handleMenuKeys() {
 
 // Buttons. Side buttons pick the answer, Left/Right the cell, Confirm opens the
 // letter strip (Left/Right choose, Confirm types and moves on, Back closes it),
-// a long Confirm opens the action menu. On touch boards Left/Right step through
+// a long Confirm or Back opens the action menu. On touch boards Left/Right step through
 // the answers with the keyboard open.
 void ScanwordActivity::handleBoardKeys() {
   using Button = MappedInputManager::Button;
@@ -740,8 +742,9 @@ void ScanwordActivity::render(RenderLock&&) {
   }
   renderUi();
   const bool board = view == View::Board;
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), board ? tr(STR_DIR_LEFT) : tr(STR_DIR_UP),
-                                            board ? tr(STR_DIR_RIGHT) : tr(STR_DIR_DOWN));
+  const auto labels =
+      mappedInput.mapLabels(board ? tr(STR_GAMES_MENU) : tr(STR_BACK), tr(STR_SELECT),
+                            board ? tr(STR_DIR_LEFT) : tr(STR_DIR_UP), board ? tr(STR_DIR_RIGHT) : tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   const uint8_t kind = repaint.exchange(RepaintNone);
   renderer.displayBuffer(kind == RepaintEntry ? cadence.entry() : cadence.update());
@@ -894,10 +897,12 @@ void ScanwordActivity::buildBoard(UiScreen& screen) {
 void ScanwordActivity::drawTopLine(UiScreen& screen) const {
   const int width = renderer.getScreenWidth();
   drawStatusLine(renderer);
-  const char* exitLabel = tr(STR_SCANWORD_EXIT);
-  renderer.drawText(kText12Font, kSidePadding, kHeaderTop, exitLabel);
-  const int exitWidth = renderer.getTextWidth(kText12Font, exitLabel) + 2 * kSidePadding;
-  screen.frame().hit(fui::makeRect(0, 0, exitWidth, kGridTop), ACTION_BACK, 0, kTap);
+  if (touchBoard()) {
+    const char* exitLabel = tr(STR_SCANWORD_EXIT);
+    renderer.drawText(kText12Font, kSidePadding, kHeaderTop, exitLabel);
+    const int exitWidth = renderer.getTextWidth(kText12Font, exitLabel) + 2 * kSidePadding;
+    screen.frame().hit(fui::makeRect(0, 0, exitWidth, kGridTop), ACTION_BACK, 0, kTap);
+  }
   char count[16];
   snprintf(count, sizeof(count), "%u/%u", static_cast<unsigned>(game->filledCount()),
            static_cast<unsigned>(puzzle->letterCount()));

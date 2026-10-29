@@ -55,7 +55,7 @@ std::unique_ptr<Activity> openTicTacToe(GfxRenderer& renderer, MappedInputManage
 }
 
 TicTacToeActivity::TicTacToeActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : GameScreen("TicTacToe", renderer, mappedInput) {}
+    : GameScreen("TicTacToe", StrId::STR_TICTACTOE, renderer, mappedInput) {}
 
 // A finished game still loads for its score; the screen then opens the picker.
 bool TicTacToeActivity::restore() {
@@ -87,7 +87,6 @@ void TicTacToeActivity::pickerChosen(const int row, bool) {
 
 void TicTacToeActivity::play(const int cell) {
   if (!game.play(cell)) return;
-  if (game.isOver() && !mappedInput.hasTouch()) barFocus = kNewGameSlot;
   markChanged();
 }
 
@@ -150,7 +149,7 @@ void TicTacToeActivity::onKey(const int dx, const int dy, const bool confirm) {
     cursor -= 3;
   } else if (dy > 0 && cursor < 6) {
     cursor += 3;
-  } else if (dy > 0) {
+  } else if (dy > 0 && hasBar()) {
     barFocus = nextBarSlot(BAR_SLOTS - 1, 1);
   }
   const int after[] = {cursor, barFocus};
@@ -221,7 +220,8 @@ void TicTacToeActivity::build(UiScreen& screen) {
   BarItem items[BAR_SLOTS];
   if (barShown(0)) items[0] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO)};
   items[kNewGameSlot] = {over ? &icon_bar_new_game_24 : &icon_menu_24,
-                         over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU)};
+                         over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU), false,
+                         over ? BarItem::NewGame : BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 

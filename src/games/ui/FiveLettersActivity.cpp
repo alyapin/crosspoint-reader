@@ -56,7 +56,7 @@ std::unique_ptr<Activity> openFiveLetters(GfxRenderer& renderer, MappedInputMana
 }
 
 FiveLettersActivity::FiveLettersActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : GameScreen("FiveLetters", renderer, mappedInput) {}
+    : GameScreen("FiveLetters", StrId::STR_FIVE_LETTERS, renderer, mappedInput) {}
 
 // No setup to pick: without a save a new game starts here.
 bool FiveLettersActivity::restore() {
@@ -120,7 +120,7 @@ void FiveLettersActivity::press(const uint8_t key) {
       if (game.isOver()) {
         stats.record(game.status() == fiveletters::Status::Won);
         statsPending = true;
-        if (keyRow >= 0) barFocus = MENU_SLOT;
+        if (keyRow >= 0 && hasBar()) barFocus = MENU_SLOT;
       }
       markChanged();
       break;
@@ -181,7 +181,7 @@ void FiveLettersActivity::onKey(const int dx, const int dy, const bool confirm) 
     moveRow(-1);
   } else if (dy > 0 && keyRow < kKeyRows - 1) {
     moveRow(1);
-  } else if (dy > 0) {
+  } else if (dy > 0 && hasBar()) {
     barFocus = MENU_SLOT;
   }
   const int after[] = {keyRow, keyIndex, barFocus, unknownWord};
@@ -274,8 +274,8 @@ void FiveLettersActivity::build(UiScreen& screen) {
   }
 
   BarItem items[BAR_SLOTS];
-  items[MENU_SLOT] = game.isOver() ? BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME)}
-                                   : BarItem{&icon_menu_24, tr(STR_GAMES_MENU)};
+  items[MENU_SLOT] = game.isOver() ? BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame}
+                                   : BarItem{&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 

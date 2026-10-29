@@ -24,6 +24,8 @@ bar-flag = flag
 bar-restart = rotate-ccw
 bar-new-game = plus
 bar-hint = lightbulb
+# pause menu (button boards)
+exit = log-out
 # «5 букв»: games list, keyboard
 five-letters = spell-check
 key-delete = delete

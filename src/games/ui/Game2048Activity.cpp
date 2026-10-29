@@ -62,7 +62,7 @@ std::unique_ptr<Activity> openGame2048(GfxRenderer& renderer, MappedInputManager
 }
 
 Game2048Activity::Game2048Activity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : GameScreen("2048", renderer, mappedInput) {}
+    : GameScreen("2048", StrId::STR_2048, renderer, mappedInput) {}
 
 // Without a save a new game starts right away.
 bool Game2048Activity::restore() {
@@ -110,8 +110,6 @@ void Game2048Activity::loop() {
 
 void Game2048Activity::slide(const Dir dir) {
   if (!game.move(dir)) return;
-  // Button boards: the arrows have nothing left to do, Новая игра takes the focus.
-  if (game.isOver() && !mappedInput.hasTouch()) barFocus = kMenuSlot;
   markChanged();
 }
 
@@ -146,7 +144,7 @@ void Game2048Activity::onKey(const int dx, const int dy, const bool confirm) {
   const int before = barFocus;
   if (barFocus < 0) {
     if (confirm) {
-      barFocus = nextBarSlot(BAR_SLOTS - 1, 1);
+      if (hasBar()) barFocus = nextBarSlot(BAR_SLOTS - 1, 1);
     } else if (dx != 0) {
       slide(dx < 0 ? Dir::Left : Dir::Right);
     } else if (dy != 0) {
@@ -205,8 +203,8 @@ void Game2048Activity::build(UiScreen& screen) {
 
   BarItem items[BAR_SLOTS];
   if (barShown(0)) items[0] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false};
-  items[kMenuSlot] = game.isOver() ? BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false}
-                                   : BarItem{&icon_menu_24, tr(STR_GAMES_MENU), false};
+  items[kMenuSlot] = game.isOver() ? BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame}
+                                   : BarItem{&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 

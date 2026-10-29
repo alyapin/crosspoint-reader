@@ -12,7 +12,7 @@ std::unique_ptr<Activity> openGame2048(GfxRenderer& renderer, MappedInputManager
 
 // A 4x4 board of tiles with the score on top and the record under it. A swipe
 // on the board (the arrows on button boards) slides the tiles. Отменить / Меню.
-// Keys: Confirm moves the focus to the bar, Up or Back returns it to the board.
+// Keys with the bar shown: Confirm moves the focus to it, Up or Back returns it to the board.
 class Game2048Activity final : public GameScreen {
  public:
   Game2048Activity(GfxRenderer& renderer, MappedInputManager& mappedInput);
