@@ -16,6 +16,7 @@
 #include "components/icons/listIcons.h"
 #include "statsIcons.h"
 #include "util/ButtonNavigator.h"
+#include "util/StringUtils.h"
 
 namespace fui = freeink::ui;
 using namespace setka;
@@ -137,12 +138,7 @@ void LibraryShelvesActivity::reloadLocked() {
           row.path = book.path;
           const char* slash = std::strrchr(book.path, '/');
           row.title = book.title[0] ? book.title : slash ? slash + 1 : book.path;
-          // Some books store the role in the creator field ("автор Николай Гоголь").
-          const char* author = book.author;
-          for (const char* role : {"автор ", "Автор "}) {
-            if (std::strncmp(author, role, std::strlen(role)) == 0) author += std::strlen(role);
-          }
-          snprintf(row.author, sizeof(row.author), "%s", author);
+          snprintf(row.author, sizeof(row.author), "%s", book.author + StringUtils::authorRoleLength(book.author));
           const unsigned percent = (book.progressBp + 50) / 100;
           const uint32_t left = book.status == stats::BookStatus::Reading ? stats::estimateSecondsLeft(book) : 0;
           if (left > 0) {

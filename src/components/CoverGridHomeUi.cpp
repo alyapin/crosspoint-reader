@@ -17,6 +17,7 @@
 #include "icons/settings2.h"
 #include "icons/transfer.h"
 #include "util/BookProgress.h"
+#include "util/StringUtils.h"
 
 namespace fui = freeink::ui;
 namespace {
@@ -186,7 +187,7 @@ void CoverGridHomeUi::drawCurrent(UiScreen& screen, fui::Rect rect, const int co
   const auto& theme = screen.theme();
   const auto& book = books->front();
   card.title = book.title.c_str();
-  card.author = book.author.empty() ? nullptr : book.author.c_str();
+  card.author = book.author.empty() ? nullptr : book.author.c_str() + StringUtils::authorRoleLength(book.author.c_str());
   card.meta = nullptr;
   card.progressLabel = progress >= 0 ? progressText : nullptr;
   card.centerTextOnCover = true;

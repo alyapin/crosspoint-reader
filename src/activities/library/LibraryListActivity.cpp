@@ -26,6 +26,7 @@
 #include "components/icons/search32.h"
 #include "fontIds.h"
 #include "util/BookCacheUtils.h"
+#include "util/StringUtils.h"
 
 namespace fui = freeink::ui;
 
@@ -716,6 +717,7 @@ bool LibraryListActivity::rowTextFor(const int entry, std::string& title, std::s
     const auto& book = books[static_cast<size_t>(entry)];
     title = book.title;
     author = book.author;
+    author.erase(0, StringUtils::authorRoleLength(author.c_str()));
     if (fileName) *fileName = book.path;
     return true;
   }
@@ -727,6 +729,7 @@ bool LibraryListActivity::rowTextFor(const int entry, std::string& title, std::s
     // Re-parsing the name here would throw that away, and only works while the
     // name still looks like "Title - Author".
     if (!index.readAuthor(record, author)) author.clear();
+    author.erase(0, StringUtils::authorRoleLength(author.c_str()));
     // The stored title when the book gave one, the filename otherwise.
     if (!index.readTitle(record, title) || title.empty()) index.readName(record, title);
     if (fileName) index.readName(record, *fileName);

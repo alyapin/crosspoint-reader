@@ -19,6 +19,7 @@
 #include "components/icons/listIcons.h"
 #include "components/setka/setkaIcons.h"
 #include "util/ButtonNavigator.h"
+#include "util/StringUtils.h"
 
 namespace fui = freeink::ui;
 using namespace setka;
@@ -134,7 +135,8 @@ void SetkaHomeActivity::loadBooks() {
     snprintf(text, sizeof(text), tr(STR_CHAPTER_OF), current.chapter, current.chapterCount);
     currentSubtitle = text;
   } else {
-    currentSubtitle = slots[0].book.author;
+    const std::string& author = slots[0].book.author;
+    currentSubtitle.assign(author, StringUtils::authorRoleLength(author.c_str()));
   }
 }
 

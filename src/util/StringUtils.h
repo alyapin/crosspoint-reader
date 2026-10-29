@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cctype>
+#include <cstring>
+#include <initializer_list>
 #include <string>
 
 namespace StringUtils {
@@ -25,6 +27,19 @@ inline int asciiCaseCmp(const char* a, const char* b) {
     ++b;
   }
   return std::tolower(static_cast<unsigned char>(*a)) - std::tolower(static_cast<unsigned char>(*b));
+}
+
+/**
+ * Length of a role some books store before the name in the creator field
+ * ("автор Николай Гоголь", "by Lewis Carroll"); 0 when there is none. Lists
+ * show the name alone.
+ */
+inline size_t authorRoleLength(const char* author) {
+  for (const char* role : {"автор ", "Автор ", "by ", "By "}) {
+    const size_t length = std::strlen(role);
+    if (std::strncmp(author, role, length) == 0) return length;
+  }
+  return 0;
 }
 
 /**
