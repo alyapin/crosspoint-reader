@@ -39,6 +39,7 @@ constexpr int kRowHeight = kNavRowHeight;
 constexpr int kIconSize = 24;
 constexpr int kIconGap = 16;
 constexpr int kGradeBarHeight = 100;
+constexpr int kNoteGap = 12;
 constexpr int kCardWidth = 440;
 constexpr int kFrontBottomTouch = 400;
 constexpr int kFrontBottomButtons = 360;
@@ -737,11 +738,10 @@ void CardsActivity::render(RenderLock&&) {
   }
   renderUi();
   if (!hasTouch()) {
-    const auto labels = view == Screen::Front
-                            ? mappedInput.mapLabels(tr(STR_CARDS_EXIT_HINT), tr(STR_CARDS_SHOW_HINT), "", "")
-                        : card ? mappedInput.mapLabels(tr(STR_CARDS_EXIT_HINT), tr(STR_CARDS_GOOD), tr(STR_CARDS_AGAIN),
-                                                       tr(STR_CARDS_EASY))
-                               : mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+    const auto labels =
+        view == Screen::Front ? mappedInput.mapLabels(tr(STR_BACK), tr(STR_CARDS_SHOW), "", "")
+        : card ? mappedInput.mapLabels(tr(STR_BACK), tr(STR_CARDS_GOOD), tr(STR_CARDS_AGAIN), tr(STR_CARDS_EASY))
+               : mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   }
   const uint8_t kind = repaint.exchange(RepaintNone);
@@ -1017,7 +1017,12 @@ void CardsActivity::buildCard(UiScreen& screen) {
   renderer.drawText(kText12Font, width - kSidePadding - renderer.getTextWidth(kText12Font, text, kSemiBold),
                     kGameTopLineY, text, true, kSemiBold);
 
-  const int barTop = height - UITheme::getInstance().getMetrics().buttonHintsHeight - kGradeBarHeight;
+  // Touch grades on a bar of three slots; button boards say what the keys do
+  // above the hints, in a line that wraps once when the intervals run long.
+  const int hintsTop = height - UITheme::getInstance().getMetrics().buttonHintsHeight;
+  const int noteLine = renderer.getLineHeight(kDenseFont);
+  const int noteTop = hintsTop - kNoteGap - noteLine;
+  const int barTop = touch ? hintsTop - kGradeBarHeight : noteTop - noteLine - kNoteGap;
   const int frontBottom = touch ? kFrontBottomTouch : kFrontBottomButtons;
 
   // The front stays put when the answer shows, so the flip is a FAST refresh.
@@ -1045,7 +1050,8 @@ void CardsActivity::buildCard(UiScreen& screen) {
                          ACTION_CARD, 0, fui::InputTouch);
     }
     if (store->canUndo()) {
-      slots[0] = {&icon_bar_undo_24, tr(STR_CARDS_UNDO), touch ? tr(STR_CARDS_UNDO_HINT) : tr(STR_CARDS_UNDO_HOLD)};
+      slots[0] = {&icon_bar_undo_24, tr(STR_CARDS_UNDO), tr(STR_CARDS_UNDO_HINT)};
+      if (!touch) renderer.drawText(kDenseFont, kSidePadding, noteTop, tr(STR_CARDS_UNDO_HOLD));
     }
     slots[1] = {&icon_show_24, tr(STR_CARDS_SHOW), nullptr};
   } else {
@@ -1078,7 +1084,47 @@ void CardsActivity::buildCard(UiScreen& screen) {
       intervalText(cards::intervalAfter(state.box, static_cast<cards::Grade>(i)), captions[i], sizeof(captions[i]));
       slots[i] = {icons[i], I18N.get(labels[i]), captions[i]};
     }
+    if (!touch) {
+      // "Good: tomorrow · Again: today · …" in the order of the keys under it.
+      char parts[3][40];
+      for (int i = 0; i < 3; i++) snprintf(parts[i], sizeof(parts[i]), "%s: %s", slots[i].label, captions[i]);
+      const auto keys = mappedInput.mapLabels("", parts[1], parts[0], parts[2]);
+      const char* order[4] = {};
+      int count = 0;
+      for (const char* part : {keys.btn1, keys.btn2, keys.btn3, keys.btn4}) {
+        if (part != nullptr && *part != '\0') order[count++] = part;
+      }
+      // Breaks only between pairs; the last line sits on noteTop.
+      const int maxWidth = width - 2 * kSidePadding;
+      const int separator = renderer.getTextWidth(kDenseFont, " · ");
+      bool breakBefore[4] = {};
+      int lineWidth = 0;
+      int breaks = 0;
+      for (int i = 0; i < count; i++) {
+        const int partWidth = renderer.getTextWidth(kDenseFont, order[i]);
+        if (i > 0 && lineWidth + separator + partWidth > maxWidth) {
+          breakBefore[i] = true;
+          breaks++;
+          lineWidth = partWidth;
+        } else {
+          lineWidth += (i > 0 ? separator : 0) + partWidth;
+        }
+      }
+      int y = noteTop - breaks * noteLine;
+      scratch[0] = '\0';
+      for (int i = 0; i < count; i++) {
+        if (breakBefore[i]) {
+          renderer.drawText(kDenseFont, kSidePadding, y, scratch);
+          y += noteLine;
+          scratch[0] = '\0';
+        }
+        const size_t used = strlen(scratch);
+        snprintf(scratch + used, kNameBytes - used, "%s%s", used > 0 ? " · " : "", order[i]);
+      }
+      renderer.drawText(kDenseFont, kSidePadding, y, scratch);
+    }
   }
+  if (!touch) return;
 
   drawRule(renderer, 0, barTop, width);
   const int cellTop = barTop + kRuleWidth;
@@ -1092,15 +1138,12 @@ void CardsActivity::buildCard(UiScreen& screen) {
     const int iconTop = cellTop + 12;
     screen.target().bitmap(fui::makeRect(cx - kIconSize / 2, iconTop, kIconSize, kIconSize),
                            fui::bitmapFromIcon(*slots[i].icon), fui::BitmapMode::Center);
-    const bool focused = !touch && i == 1;
-    const EpdFontFamily::Style style = focused ? kSemiBold : EpdFontFamily::REGULAR;
-    renderer.drawText(kText10Font, cx - renderer.getTextWidth(kText10Font, slots[i].label, style) / 2,
-                      iconTop + kIconSize + 4, slots[i].label, true, style);
+    renderer.drawText(kText10Font, cx - renderer.getTextWidth(kText10Font, slots[i].label) / 2, iconTop + kIconSize + 4,
+                      slots[i].label);
     if (slots[i].caption != nullptr) {
       renderer.drawText(kCaptionFont, cx - renderer.getTextWidth(kCaptionFont, slots[i].caption) / 2,
                         iconTop + kIconSize + 4 + line10, slots[i].caption);
     }
-    if (focused) drawSelectionBar(renderer, cx - kIconSize / 2 - 22, iconTop, kIconSize);
     screen.frame().hit(fui::makeRect(x0, cellTop, x1 - x0, kGradeBarHeight - kRuleWidth), ACTION_SLOT,
                        static_cast<int16_t>(i), fui::InputTouch);
   }
