@@ -575,11 +575,11 @@ void NonogramActivity::drawCaption(const int top) const {
     // The keys caption names the Confirm hint.
     char text[160];
     snprintf(text, sizeof(text), hint, tr(STR_NONOGRAM_MARK), tr(STR_NONOGRAM_MARK));
-    captionLines = renderer.wrappedText(kCaptionFont, text, renderer.getScreenWidth() - 2 * kSidePadding, 2);
+    captionLines = renderer.wrappedText(kText10Font, text, renderer.getScreenWidth() - 2 * kSidePadding, 2);
   }
   int y = top;
   for (const auto& text : captionLines) {
-    renderer.drawText(kCaptionFont, kSidePadding, y, text.c_str());
-    y += renderer.getLineHeight(kCaptionFont);
+    renderer.drawText(kText10Font, kSidePadding, y, text.c_str());
+    y += renderer.getLineHeight(kText10Font);
   }
 }
