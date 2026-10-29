@@ -29,11 +29,10 @@ constexpr int kMenuSlot = 2;
 constexpr int kSliceMs = 20;
 constexpr int kDiscInset = 7;
 constexpr int kDot = 10;
-constexpr int kMark = 12;
 constexpr int kCursorInset = 4;
 constexpr int kStatusGap = 22;
 constexpr int kLineGap = 10;
-constexpr int kCountDisc = 18;
+constexpr int kCountDisc = 14;  // as Шашки's count discs
 constexpr int kCountGap = 8;
 constexpr int kCountSpace = 22;
 }  // namespace
@@ -243,9 +242,8 @@ void ReversiActivity::build(UiScreen& screen) {
     const Disc disc = game.at(s);
     if (disc != Disc::None) {
       drawDisc(disc, x + kDiscInset, y + kDiscInset, cell - 2 * kDiscInset);
-      if (s == last) {
-        renderer.fillRect(x + (cell - kMark) / 2, y + (cell - kMark) / 2, kMark, kMark, disc == Disc::White);
-      }
+      // The last move framed as in Шахматы and Шашки.
+      if (s == last) drawDashedFrame(renderer, x, y, cell);
     } else if (moves >> s & 1) {
       renderer.fillRoundedRect(x + (cell - kDot) / 2, y + (cell - kDot) / 2, kDot, kDot, kDot / 2, Color::Black);
     }
@@ -307,7 +305,6 @@ void ReversiActivity::drawStatus(const int top) const {
     lines[0] = passed == Disc::Black   ? (vs ? tr(STR_REVERSI_PASS_YOU) : tr(STR_REVERSI_PASS_BLACK))
                : passed == Disc::White ? (vs ? tr(STR_REVERSI_PASS_COMPUTER) : tr(STR_REVERSI_PASS_WHITE))
                                        : tr(STR_REVERSI_HINT_DOTS);
-    lines[1] = vs ? tr(STR_REVERSI_HINT_LAST) : tr(STR_REVERSI_HINT_LAST_TWO);
   }
   int y = top + lineHeight + kLineGap;
   for (const char* line : lines) {
