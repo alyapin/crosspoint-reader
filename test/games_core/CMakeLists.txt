@@ -8,11 +8,12 @@ set(GAMES_SOURCES
   ${GAMES_DIR}/TicTacToe.cpp
   ${GAMES_DIR}/Fifteen.cpp
   ${GAMES_DIR}/FiveLetters.cpp
+  ${GAMES_DIR}/Game2048.cpp
   KlondikeSolver.cpp
 )
 
 add_executable(GamesCoreTest SudokuTest.cpp MinesweeperTest.cpp KlondikeTest.cpp TicTacToeTest.cpp FifteenTest.cpp
-               FiveLettersTest.cpp ElapsedTextTest.cpp ${GAMES_SOURCES})
+               FiveLettersTest.cpp Game2048Test.cpp ElapsedTextTest.cpp ${GAMES_SOURCES})
 target_include_directories(GamesCoreTest PRIVATE ${GAMES_DIR})
 target_link_libraries(GamesCoreTest PRIVATE crosspoint_test_common GTest::gtest_main)
 gtest_discover_tests(GamesCoreTest DISCOVERY_TIMEOUT 60)

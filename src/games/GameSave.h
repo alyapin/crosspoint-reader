@@ -1,10 +1,12 @@
 #pragma once
 
+#include <cstdint>
+
 // SD persistence for the games, one file each under /.crosspoint/games. A save
 // exists only while its game is in progress, so its presence is the "game in
 // progress" flag. Some games keep a second file that outlives the game: the
 // last finished tic-tac-toe game (for the score it carries), the 15 puzzle
-// best and the «5 букв» totals.
+// best, the «5 букв» totals and the 2048 record.
 
 namespace sudoku {
 class Game;
@@ -26,10 +28,13 @@ namespace fiveletters {
 class Game;
 struct Stats;
 }  // namespace fiveletters
+namespace g2048 {
+class Game;
+}
 
 namespace gamesave {
 
-enum class Kind { Sudoku, Minesweeper, Klondike, TicTacToe, Fifteen, FiveLetters };
+enum class Kind { Sudoku, Minesweeper, Klondike, TicTacToe, Fifteen, FiveLetters, Game2048 };
 
 bool hasGameInProgress(Kind kind);
 void clear(Kind kind);
@@ -42,6 +47,7 @@ bool save(const klondike::Game& game);
 bool save(const tictactoe::Game& game);
 bool save(const fifteen::Game& game);
 bool save(const fiveletters::Game& game);
+bool save(const g2048::Game& game);
 
 // Restore the saved game, paused. False on failure; a file that reads but does
 // not parse is removed.
@@ -52,6 +58,7 @@ bool load(klondike::Game& game);
 bool load(tictactoe::Game& game);
 bool load(fifteen::Game& game);
 bool load(fiveletters::Game& game);
+bool load(g2048::Game& game);
 
 // The best finished 15 puzzle, kept apart from the save.
 bool save(const fifteen::Best& best);
@@ -60,5 +67,9 @@ bool load(fifteen::Best& best);
 // «5 букв» totals, kept across games. A missing file is zero totals.
 bool saveStats(const fiveletters::Stats& stats);
 bool loadStats(fiveletters::Stats& stats);
+
+// The 2048 record outlives its games; 0 when none.
+uint32_t loadBest2048();
+void saveBest2048(uint32_t score);
 
 }  // namespace gamesave

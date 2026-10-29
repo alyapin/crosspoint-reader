@@ -13,6 +13,7 @@ card = rectangle-vertical
 cards = layers
 circle-check = circle-check
 tictactoe = hash
+tiles = layout-grid
 # action bar (games/ui/ActionBar.h)
 bar-notes = pencil
 bar-erase = eraser

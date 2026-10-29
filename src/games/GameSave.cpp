@@ -2,6 +2,7 @@
 
 #include <Fifteen.h>
 #include <FiveLetters.h>
+#include <Game2048.h>
 #include <HalStorage.h>
 #include <Klondike.h>
 #include <Logging.h>
@@ -10,6 +11,7 @@
 #include <Sudoku.h>
 #include <TicTacToe.h>
 
+#include <cstdio>
 #include <string>
 
 namespace gamesave {
@@ -34,6 +36,8 @@ Paths pathsOf(const Kind kind) {
       return {"/.crosspoint/games/fifteen.json", "/.crosspoint/games/fifteen.json.tmp"};
     case Kind::FiveLetters:
       return {"/.crosspoint/games/fiveletters.json", "/.crosspoint/games/fiveletters.json.tmp"};
+    case Kind::Game2048:
+      return {"/.crosspoint/games/2048.json", "/.crosspoint/games/2048.json.tmp"};
     case Kind::Klondike:
       break;
   }
@@ -44,6 +48,7 @@ constexpr Paths TICTACTOE_DONE{"/.crosspoint/games/tictactoe-done.json", "/.cros
 constexpr Paths FIFTEEN_BEST{"/.crosspoint/games/fifteen-best.json", "/.crosspoint/games/fifteen-best.json.tmp"};
 constexpr Paths FIVE_LETTERS_STATS{"/.crosspoint/games/fiveletters-stats.json",
                                    "/.crosspoint/games/fiveletters-stats.json.tmp"};
+constexpr Paths BEST_2048{"/.crosspoint/games/2048-best.txt", "/.crosspoint/games/2048-best.txt.tmp"};
 
 // Crash-safe: tmp file + rename.
 bool writeText(const Paths& p, const char* text, const size_t len) {
@@ -83,15 +88,21 @@ bool write(const Kind kind, const GameT& game, const size_t cap) {
   return writeTo(pathsOf(kind), game, cap);
 }
 
-template <typename T>
-bool readFrom(const Paths& p, T& value, const size_t cap) {
+// A read error may be transient: the file is kept.
+bool readText(const Paths& p, const size_t cap, std::string& text) {
   if (!Storage.exists(p.path)) return false;
-  std::string text;
-  // A read error may be transient: keep the file. Only content that fails to parse is dropped.
   if (!Storage.readFileToString("GAMES", p.path, cap, text)) {
     LOG_ERR("GAMES", "Cannot read %s", p.path);
     return false;
   }
+  return true;
+}
+
+// Only content that fails to parse is dropped.
+template <typename T>
+bool readFrom(const Paths& p, T& value, const size_t cap) {
+  std::string text;
+  if (!readText(p, cap, text)) return false;
   if (!value.deserialize(text.data(), text.size())) {
     LOG_ERR("GAMES", "Discarding corrupt %s", p.path);
     Storage.remove(p.path);
@@ -125,6 +136,7 @@ bool save(const tictactoe::Game& game) {
 }
 bool save(const fifteen::Game& game) { return write(Kind::Fifteen, game, fifteen::SAVE_MAX); }
 bool save(const fiveletters::Game& game) { return write(Kind::FiveLetters, game, fiveletters::SAVE_MAX); }
+bool save(const g2048::Game& game) { return write(Kind::Game2048, game, g2048::SAVE_MAX); }
 
 bool load(sudoku::Game& game) { return read(Kind::Sudoku, game, sudoku::SAVE_MAX); }
 bool load(minesweeper::Game& game) { return read(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
@@ -134,6 +146,7 @@ bool load(tictactoe::Game& game) {
 }
 bool load(fifteen::Game& game) { return read(Kind::Fifteen, game, fifteen::SAVE_MAX); }
 bool load(fiveletters::Game& game) { return read(Kind::FiveLetters, game, fiveletters::SAVE_MAX); }
+bool load(g2048::Game& game) { return read(Kind::Game2048, game, g2048::SAVE_MAX); }
 
 bool save(const fifteen::Best& best) {
   char text[48];
@@ -149,6 +162,18 @@ bool saveStats(const fiveletters::Stats& stats) {
 bool loadStats(fiveletters::Stats& stats) {
   stats = fiveletters::Stats{};
   return !Storage.exists(FIVE_LETTERS_STATS.path) || readFrom(FIVE_LETTERS_STATS, stats, fiveletters::STATS_MAX);
+}
+
+uint32_t loadBest2048() {
+  std::string text;
+  unsigned long best = 0;
+  if (!readText(BEST_2048, 16, text) || sscanf(text.c_str(), "%lu", &best) != 1) return 0;
+  return static_cast<uint32_t>(best);
+}
+
+void saveBest2048(const uint32_t score) {
+  char text[16];
+  writeText(BEST_2048, text, snprintf(text, sizeof(text), "%lu", static_cast<unsigned long>(score)));
 }
 
 }  // namespace gamesave
