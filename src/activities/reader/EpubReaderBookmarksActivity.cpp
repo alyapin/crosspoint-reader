@@ -12,6 +12,7 @@
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "components/UiAppHelpers.h"
+#include "components/setka/SetkaStyle.h"
 #include "fontIds.h"
 
 namespace fui = freeink::ui;
@@ -263,15 +264,18 @@ void EpubReaderBookmarksActivity::buildScreen(UiScreen& screen) {
     return;
   }
 
-  // This caption names a physical button, so omit it on touch boards.
+  // This caption names a physical button, so omit it on touch boards. It sits
+  // on the caption line over the hints, wrapping rather than losing its end,
+  // and the rows stop a spacing above its first line.
   if (!mappedInput.hasTouch()) {
-    const int helpLineHeight = renderer.getLineHeight(SMALL_FONT_ID);
-    const fui::Rect band = screen.takeBottom(static_cast<int16_t>(helpLineHeight + 2 * metrics.verticalSpacing));
-    renderer.drawText(
-        SMALL_FONT_ID, band.x + metrics.contentSidePadding, band.y + metrics.verticalSpacing,
-        renderer
-            .truncatedText(SMALL_FONT_ID, tr(STR_HOLD_OPEN_FOR_ACTIONS), band.width - 2 * metrics.contentSidePadding)
-            .c_str());
+    const char* help = tr(STR_HOLD_OPEN_FOR_ACTIONS);
+    const int width = screen.contentRect().width - 2 * metrics.contentSidePadding;
+    const int lines = setka::textLines(renderer, SMALL_FONT_ID, help, width, 2);
+    const int bottom = safe.y + safe.height;
+    const int top = setka::hintCaptionTop(renderer, SMALL_FONT_ID, bottom) -
+                    (lines - 1) * renderer.getLineHeight(SMALL_FONT_ID);
+    const fui::Rect band = screen.takeBottom(static_cast<int16_t>(bottom - top + metrics.verticalSpacing));
+    setka::drawTextLines(renderer, SMALL_FONT_ID, band.x + metrics.contentSidePadding, top, help, width, 2);
   }
 
   // bookmarkSubtitles/bookmarkRowItems are built once whenever `bookmarks`
