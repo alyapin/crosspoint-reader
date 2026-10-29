@@ -194,9 +194,9 @@ void Game2048Activity::build(UiScreen& screen) {
       renderer.drawText(kText12Font, kSidePadding, y, tr(STR_2048_WON), true, kSemiBold);
       y += renderer.getLineHeight(kText12Font) + kFooterGap / 2;
     }
-    // The record, then how to move, as the other boards' captions.
-    for (const char* line : {static_cast<const char*>(footer),
-                             mappedInput.hasTouch() ? tr(STR_2048_SWIPE_HINT) : tr(STR_2048_SIDE_HINT)}) {
+    // How to move, then the record, which comes and goes with the score: the first line never moves.
+    for (const char* line : {mappedInput.hasTouch() ? tr(STR_2048_SWIPE_HINT) : tr(STR_2048_SIDE_HINT),
+                             static_cast<const char*>(footer)}) {
       if (*line == '\0') continue;
       renderer.drawText(kText10Font, kSidePadding, y, line);
       y += renderer.getLineHeight(kText10Font);
