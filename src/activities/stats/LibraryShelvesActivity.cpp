@@ -231,6 +231,20 @@ void LibraryShelvesActivity::moveFocus(const int delta) {
   requestUpdate();
 }
 
+void LibraryShelvesActivity::jumpPage(const int direction) {
+  RenderLock lock(*this);
+  const int count = rowCount();
+  if (count == 0) return;
+  buttonsUsed = true;
+  const int visible = std::max(1, visibleRows.load());
+  const int from = std::max(0, focus);
+  focus = direction > 0 ? ButtonNavigator::nextPageIndex(from, count, visible)
+                        : ButtonNavigator::previousPageIndex(from, count, visible);
+  top = std::min(focus, std::max(0, count - visible));
+  thumbsChecked = false;
+  requestUpdate();
+}
+
 void LibraryShelvesActivity::activateRow(const int index) {
   if (index < 0 || index >= rowCount()) return;
   app.clearTapFlash();
@@ -428,6 +442,8 @@ void LibraryShelvesActivity::loop() {
   }
   ButtonNavigator::onNextPress([this] { moveFocus(1); });
   ButtonNavigator::onPreviousPress([this] { moveFocus(-1); });
+  buttonNavigator.onNextContinuous([this] { jumpPage(1); });
+  buttonNavigator.onPreviousContinuous([this] { jumpPage(-1); });
 }
 
 int LibraryShelvesActivity::drawTabs(UiScreen& screen, const int stripTop, const int width) {

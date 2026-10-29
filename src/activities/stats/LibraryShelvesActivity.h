@@ -9,6 +9,7 @@
 #include "activities/Activity.h"
 #include "components/UiAppHost.h"
 #include "stats/ReadingStats.h"
+#include "util/ButtonNavigator.h"
 
 // «Библиотека» by reading status: tabs «Читаю / Прочитано / Отложено /
 // Полки». Book rows show the cover, title and progress; a long press (or a
@@ -70,6 +71,7 @@ class LibraryShelvesActivity final : public Activity, private UiAppHost {
   int rowCount() const;
   void selectTab(int next);
   void moveFocus(int delta);
+  void jumpPage(int direction);
   void activateRow(int index);
   void openMenu(int index);
   void openShelfPicker();
@@ -91,6 +93,7 @@ class LibraryShelvesActivity final : public Activity, private UiAppHost {
   int menuFocus = 0;
   // Measured by the render task.
   std::atomic<int> visibleRows{1};
+  ButtonNavigator buttonNavigator;
 
   bool entryRefresh = true;
   bool thumbsChecked = false;

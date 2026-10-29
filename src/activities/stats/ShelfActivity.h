@@ -8,6 +8,7 @@
 #include "StatsUi.h"
 #include "activities/Activity.h"
 #include "components/UiAppHost.h"
+#include "util/ButtonNavigator.h"
 
 // One shelf as a 3-column cover grid with a «+» tile that lists the other
 // catalog books to add. Tap or Confirm opens a book; a long press (or held
@@ -49,6 +50,7 @@ class ShelfActivity final : public Activity, private UiAppHost {
 
   int itemCount() const;
   void moveFocus(int delta);
+  void jumpPage(int direction);
   void activate(int index);
   void openMenu(int index);
   void closeMenu();
@@ -69,6 +71,7 @@ class ShelfActivity final : public Activity, private UiAppHost {
   int menuCell = -1;
   // Measured by the render task: grid or picker rows that fit, and grid columns.
   std::atomic<int> visibleRows{1};
+  ButtonNavigator buttonNavigator;
 
   bool entryRefresh = true;
   bool thumbsChecked = false;

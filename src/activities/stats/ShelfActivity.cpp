@@ -181,6 +181,21 @@ void ShelfActivity::moveFocus(const int delta) {
   requestUpdate();
 }
 
+void ShelfActivity::jumpPage(const int direction) {
+  RenderLock lock(*this);
+  const int count = itemCount();
+  if (count == 0) return;
+  buttonsUsed = true;
+  const int columns = picking ? 1 : kColumns;
+  const int visible = std::max(1, visibleRows.load());
+  focus = direction > 0 ? ButtonNavigator::nextPageIndex(focus, count, visible * columns)
+                        : ButtonNavigator::previousPageIndex(focus, count, visible * columns);
+  const int rows = (count + columns - 1) / columns;
+  top = std::min(focus / columns, std::max(0, rows - visible));
+  thumbsChecked = false;
+  requestUpdate();
+}
+
 void ShelfActivity::activate(const int index) {
   if (index < 0 || index >= itemCount()) return;
   app.clearTapFlash();
@@ -256,6 +271,8 @@ void ShelfActivity::loop() {
   }
   ButtonNavigator::onNextPress([this] { moveFocus(1); });
   ButtonNavigator::onPreviousPress([this] { moveFocus(-1); });
+  buttonNavigator.onNextContinuous([this] { jumpPage(1); });
+  buttonNavigator.onPreviousContinuous([this] { jumpPage(-1); });
 }
 
 int ShelfActivity::drawGrid(UiScreen& screen, const int areaTop, const int bottom, const int width) {
