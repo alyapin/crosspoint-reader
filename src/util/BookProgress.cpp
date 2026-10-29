@@ -23,11 +23,14 @@ BookPosition loadBookPosition(const std::string& path) {
     auto epub = makeUniqueNoThrow<Epub>(path, "/.crosspoint");
     if (!epub) {
       LOG_ERR("HOME", "OOM: progress metadata");
+      position.unreadable = true;
       return position;
     }
+    const std::string progressPath = epub->getCachePath() + "/progress.bin";
+    position.unreadable = Storage.exists(progressPath.c_str());
     if (!epub->load(false, true)) return position;
     HalFile file;
-    if (!Storage.openFileForRead("HOME", epub->getCachePath() + "/progress.bin", file)) return position;
+    if (!Storage.openFileForRead("HOME", progressPath, file)) return position;
     const int size = file.read(data, sizeof(data));
     if (size != 4 && size != 6 && size != 10) return position;
     const int spine = data[0] | (data[1] << 8);
@@ -41,6 +44,7 @@ BookPosition loadBookPosition(const std::string& path) {
       position.chapter = tocIndex + 1;
       position.chapterCount = tocCount;
     }
+    position.unreadable = false;
     if (spine == spineCount) {
       position.percent = 100;
       return position;
@@ -53,14 +57,17 @@ BookPosition loadBookPosition(const std::string& path) {
     auto xtc = makeUniqueNoThrow<Xtc>(path, "/.crosspoint");
     if (!xtc) {
       LOG_ERR("HOME", "OOM: XTC progress metadata");
+      position.unreadable = true;
       return position;
     }
+    const std::string progressPath = xtc->getCachePath() + "/progress.bin";
+    position.unreadable = Storage.exists(progressPath.c_str());
     if (!xtc->load()) return position;
     HalFile file;
-    if (!Storage.openFileForRead("HOME", xtc->getCachePath() + "/progress.bin", file) || file.read(data, 4) != 4)
-      return position;
+    if (!Storage.openFileForRead("HOME", progressPath, file) || file.read(data, 4) != 4) return position;
     const uint32_t page = readLe32(data);
     if (xtc->getPageCount() == 0) return position;
+    position.unreadable = false;
     position.percent = page >= xtc->getPageCount() ? 100 : xtc->calculateProgress(page);
     return position;
   }

@@ -21,6 +21,8 @@ constexpr char LOG_PATH[] = "/.crosspoint/stats/log.bin";
 constexpr char TOTALS_PATH[] = "/.crosspoint/stats/totals.bin";
 constexpr char BOOKS_PATH[] = "/.crosspoint/stats/books.bin";
 constexpr char SEEDED_PATH[] = "/.crosspoint/stats/seeded";
+constexpr char SEED_TRIES_PATH[] = "/.crosspoint/stats/seed_tries";
+constexpr uint8_t SEED_RETRY_BOOTS = 3;
 
 constexpr uint8_t VERSION = 1;
 constexpr char LOG_MAGIC[4] = {'S', 'L', 'O', 'G'};
@@ -130,6 +132,11 @@ bool writeAll(HalFile& f, const void* data, const size_t size) {
 
 bool readAll(HalFile& f, void* data, const size_t size) {
   return size == 0 || f.read(data, size) == static_cast<int>(size);
+}
+
+bool sameSegment(const ReadingSegment& a, const ReadingSegment& b) {
+  return a.startEpoch == b.startEpoch && a.day == b.day && a.seconds == b.seconds && a.pages == b.pages &&
+         a.progressBp == b.progressBp && a.continues == b.continues;
 }
 
 bool keepAsBad(const char* path) {
@@ -681,6 +688,12 @@ bool ReadingStats::prepareLog() {
 bool ReadingStats::appendSegment(const int bookId, const ReadingSegment& segment) {
   if (segment.seconds == 0 && segment.pages == 0) return true;
   if (!prepareLog()) return false;
+  if (uncertain.seq != 0) {
+    const bool landed = nextSeq > uncertain.seq;
+    const bool retry = uncertain.bookId == bookId && sameSegment(uncertain.segment, segment);
+    uncertain.seq = 0;
+    if (landed && retry) return true;
+  }
   if (logCount >= LOG_HARD_MAX) {
     LOG_ERR("STAT", "Reading log full; segment dropped");
     return false;
@@ -700,7 +713,11 @@ bool ReadingStats::appendSegment(const int bookId, const ReadingSegment& segment
     // Rescan and trim a torn record; one that reached the card counts, so a retry does not add it twice.
     const uint32_t written = nextSeq;
     logReady = false;
-    return prepareLog() && nextSeq > written;
+    if (prepareLog()) return nextSeq > written;
+    uncertain.seq = written;
+    uncertain.bookId = bookId;
+    uncertain.segment = segment;
+    return false;
   }
   logCount++;
   nextSeq++;
@@ -1034,6 +1051,22 @@ bool ReadingStats::markSeedingDone() {
   Storage.mkdir(STATS_DIR);
   HalFile f;
   return Storage.openFileForWrite("STAT", SEEDED_PATH, f) && f.close();
+}
+
+bool ReadingStats::consumeSeedRetry() {
+  uint8_t tries = 0;
+  HalFile f;
+  if (Storage.openFileForRead("STAT", SEED_TRIES_PATH, f)) {
+    if (f.read(&tries, 1) != 1) tries = 0;
+    f.close();
+  }
+  if (tries >= SEED_RETRY_BOOTS) return false;
+  tries++;
+  Storage.mkdir(STATS_DIR);
+  if (!Storage.openFileForWrite("STAT", SEED_TRIES_PATH, f) || !writeAll(f, &tries, 1) || !f.close()) {
+    LOG_ERR("STAT", "Cannot count seeding retries");
+  }
+  return true;
 }
 
 bool ReadingStats::seedBook(const std::string& path, const std::string& title, const std::string& author,

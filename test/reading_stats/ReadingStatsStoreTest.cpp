@@ -329,6 +329,36 @@ TEST(ReadingStatsStore, AppendErrorsReportWhetherTheRecordLanded) {
   EXPECT_EQ(summary(reboot(), days).todaySeconds, 600u);
 }
 
+TEST(ReadingStatsStore, UncertainAppendIsNotCountedTwiceOnRetry) {
+  auto& store = freshStore();
+  const int a = store.openBook("/a.epub", "A", "", TODAY, 0);
+  ASSERT_TRUE(store.appendSegment(a, segment(TODAY, 100)));
+  // The record reached the card, closing failed and so did the rescan: the outcome is unknown.
+  fake::failClosePath = LOG;
+  fake::failRead = 0;
+  EXPECT_FALSE(store.appendSegment(a, segment(TODAY, 200)));
+  // The retry finds the record already there and writes nothing.
+  EXPECT_TRUE(store.appendSegment(a, segment(TODAY, 200)));
+  EXPECT_EQ(fake::files.at(LOG)->bytes.size(), 8u + 2 * 24u);
+  // A different segment after it is written as usual.
+  ASSERT_TRUE(store.appendSegment(a, segment(TODAY, 50)));
+  DayWindow days;
+  EXPECT_EQ(summary(reboot(), days).todaySeconds, 350u);
+}
+
+TEST(ReadingStatsStore, UncertainAppendThatDidNotLandIsWrittenOnRetry) {
+  auto& store = freshStore();
+  const int a = store.openBook("/a.epub", "A", "", TODAY, 0);
+  ASSERT_TRUE(store.appendSegment(a, segment(TODAY, 100)));
+  fake::shortWrite = 5;
+  fake::failRead = 0;
+  EXPECT_FALSE(store.appendSegment(a, segment(TODAY, 200)));
+  ASSERT_TRUE(store.appendSegment(a, segment(TODAY, 200)));
+  EXPECT_EQ(fake::files.at(LOG)->bytes.size(), 8u + 2 * 24u);
+  DayWindow days;
+  EXPECT_EQ(summary(reboot(), days).todaySeconds, 300u);
+}
+
 TEST(ReadingStatsStore, DamagedRecordsAreSkippedOrSetAside) {
   auto& store = freshStore();
   const int a = store.openBook("/a.epub", "A", "", TODAY, 0);
@@ -529,6 +559,13 @@ TEST(ReadingStatsStore, SeedingAddsBooksReadBeforeStatsAndKeepsStatuses) {
   EXPECT_EQ(info.firstDay, TODAY);
   EXPECT_EQ(info.startProgressBp, 1500u);
   EXPECT_EQ(info.status, BookStatus::Paused);
+}
+
+TEST(ReadingStatsStore, SeedingRetriesStopAfterAFewBoots) {
+  freshStore();
+  for (int boot = 0; boot < 3; boot++) EXPECT_TRUE(reboot().consumeSeedRetry()) << boot;
+  EXPECT_FALSE(reboot().consumeSeedRetry());
+  EXPECT_FALSE(reboot().consumeSeedRetry());
 }
 
 TEST(ReadingStatsStore, SeedingCutShortResumesUntilMarkedDone) {

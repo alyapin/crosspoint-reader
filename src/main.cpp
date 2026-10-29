@@ -575,14 +575,17 @@ void enterDeepSleep(bool fromTimeout = false) {
 }
 
 // Statistics start with the books already being read: recent books with saved
-// progress get Читаю or Прочитано, retried each boot until all are stored.
-static void seedReadingStats() {
+// progress get Читаю or Прочитано. A boot that cannot read or store all of them
+// tries again on the next few boots.
+static void seedReadingStats(const bool recentLoaded) {
   if (READING_STATS.seedingDone()) return;
-  bool stored = true;
+  bool complete = recentLoaded;
   for (const auto& book : RECENT_BOOKS.getBooks()) {
-    stored = READING_STATS.seedBook(book.path, book.title, book.author, loadBookProgress(book.path) * 100) && stored;
+    const BookPosition position = loadBookPosition(book.path);
+    complete = READING_STATS.seedBook(book.path, book.title, book.author, position.percent * 100) &&
+               !position.unreadable && complete;
   }
-  if (stored) READING_STATS.markSeedingDone();
+  if (complete || !READING_STATS.consumeSeedRetry()) READING_STATS.markSeedingDone();
 }
 
 void setupDisplayAndFonts(bool seamless = false) {
@@ -746,8 +749,8 @@ void setup() {
   // Push the saved timezone's POSIX rule into the clock (migrating the legacy
   // UTC-offset setting on first boot after the update).
   timezones::applyToClock();
-  RECENT_BOOKS.loadFromFile();
-  seedReadingStats();
+  const bool recentLoaded = RECENT_BOOKS.loadFromFile() || !Storage.exists(RecentBooksStore::getFilePath());
+  seedReadingStats(recentLoaded);
   I18N.setLanguage(static_cast<Language>(SETTINGS.language));
   KOREADER_STORE.loadFromFile();
   OPDS_STORE.loadFromFile();
