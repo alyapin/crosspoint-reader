@@ -682,9 +682,11 @@ Rect ClipSelectionActivity::actionRect() const {
   const auto& metrics = UITheme::getInstance().getMetrics();
   int top, right, bottom, left;
   renderer.getOrientedViewableTRBL(&top, &right, &bottom, &left);
-  const int rightEdge = std::min(safe.x + safe.width, renderer.getScreenWidth() - right);
+  // Inside the Setka side padding, like every other panel.
+  const int rightEdge = std::min(
+      {safe.x + safe.width, renderer.getScreenWidth() - right, renderer.getScreenWidth() - setka::kSidePadding});
   const int bottomEdge = std::min(safe.y + safe.height, renderer.getScreenHeight() - bottom);
-  safe.x = std::max(safe.x, left);
+  safe.x = std::max({safe.x, left, setka::kSidePadding});
   safe.y = std::max(safe.y, top) + std::max(metrics.topPadding, metrics.verticalSpacing);
   safe.width = rightEdge - safe.x;
   safe.height = bottomEdge - safe.y;
@@ -912,12 +914,31 @@ void ClipSelectionActivity::drawActions() const {
     bandTop = std::min(bandTop, top);
     bandBottom = std::max(bandBottom, bottom);
   }
-  if (panel.y < selectionTop()) {
-    bandBottom = std::min(bandBottom, selectionTop());
+  if (panel.y + panel.height <= selectionTop()) {
+    // At least down to the selection, so a clear gap stays under the panel.
+    bandBottom = std::max(bandBottom, selectionTop());
+  } else if (panel.y < selectionTop()) {
+    bandBottom = std::min(bandBottom, selectionTop());  // no room around: the panel sits on the selection
   } else {
     bandTop = std::max(bandTop, selectionBottom() + handleSize());
   }
-  if (bandBottom > bandTop) renderer.fillRect(0, bandTop, renderer.getScreenWidth(), bandBottom - bandTop, false);
+  if (bandBottom > bandTop) {
+    renderer.fillRect(0, bandTop, renderer.getScreenWidth(), bandBottom - bandTop, false);
+    // Line boxes overlap (descenders reach into the next line's box), so the
+    // band edges cut the lines beside it: redraw those words whole.
+    for (size_t i = 0; i < wordCount; ++i) {
+      const WordBox& word = words[i];
+      const int top = word.y + offset;
+      const int bottom = top + word.height;
+      const bool besidePanel = bottom <= panel.y || top >= panel.y + panel.height;
+      const bool cut = (top < bandTop && bottom > bandTop) || (top < bandBottom && bottom > bandBottom);
+      if (word.pageOffset == currentPageOffset && besidePanel && cut) {
+        prewarmWord(static_cast<int>(i));
+        renderer.drawText(word.fontId, word.x + textXOffset(), top, word.text, true, word.style,
+                          BidiUtils::BidiBaseDir::AUTO, word.characterSpacing);
+      }
+    }
+  }
   renderer.fillRect(panel.x, panel.y, panel.width, panel.height, false);
   renderer.drawRect(panel.x, panel.y, panel.width, panel.height, setka::kRuleWidth, true);
   for (int i = 0; i < count; ++i) {
@@ -945,9 +966,10 @@ void ClipSelectionActivity::drawSelection() const {
     previous = &word;
   }
   if (rangeStart >= 0 && mappedInput.hasTouch()) {
+    // The panel's band may reach into the selected line: handles go on top.
+    if (!touchDragSelecting) drawActions();
     if (words[first].pageOffset == currentPageOffset) drawHandle(first, true);
     if (words[last].pageOffset == currentPageOffset) drawHandle(last, false);
-    if (!touchDragSelecting) drawActions();
   } else {
     const WordBox& cursor = words[selected];
     renderer.drawRect(cursor.x + offsetX, cursor.y + offset, cursor.width, cursor.height, true);
