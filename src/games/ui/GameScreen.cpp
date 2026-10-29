@@ -239,10 +239,10 @@ void GameScreen::loop() {
   } else {
     int dx = 0;
     int dy = 0;
-    if (mappedInput.wasPressed(Button::Left)) dx = -1;
-    if (mappedInput.wasPressed(Button::Right)) dx = 1;
-    if (mappedInput.wasPressed(Button::Up)) dy = -1;
-    if (mappedInput.wasPressed(Button::Down)) dy = 1;
+    keyRepeat.onPressAndContinuous({Button::Left}, [&dx] { dx = -1; });
+    keyRepeat.onPressAndContinuous({Button::Right}, [&dx] { dx = 1; });
+    keyRepeat.onPressAndContinuous({Button::Up}, [&dy] { dy = -1; });
+    keyRepeat.onPressAndContinuous({Button::Down}, [&dy] { dy = 1; });
     const bool confirm = mappedInput.wasReleased(Button::Confirm);
     if (dx != 0 || dy != 0 || confirm) {
       RenderLock lock(*this);
@@ -269,16 +269,19 @@ void GameScreen::loop() {
 
 // --- render task -------------------------------------------------------------
 
-void GameScreen::render(RenderLock&&) {
+void GameScreen::render(RenderLock&& lock) {
   renderer.clearScreen();
   renderUi();
   const auto labels = mappedInput.mapLabels(tr(STR_GAMES_MENU), confirmActs() ? tr(STR_SELECT) : "", tr(STR_DIR_LEFT),
                                             tr(STR_DIR_RIGHT));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   const uint8_t kind = repaint.exchange(RepaintNone);
-  renderer.displayBuffer(kind == RepaintEntry   ? cadence.entry()
-                         : kind == RepaintClock ? HalDisplay::FAST_REFRESH
-                                                : cadence.update());
+  const HalDisplay::RefreshMode mode = kind == RepaintEntry   ? cadence.entry()
+                                       : kind == RepaintClock ? HalDisplay::FAST_REFRESH
+                                                              : cadence.update();
+  // Keys pressed during the panel refresh still move the game; the next render shows where they ended.
+  lock.unlock();
+  renderer.displayBuffer(mode);
 }
 
 void GameScreen::screenFn(UiScreen& screen, void* user) {

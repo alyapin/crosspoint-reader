@@ -352,10 +352,10 @@ void ChessActivity::handleGameKeys() {
   const bool sideStep = gpio.hasEdgeSideButtons();
   int dx = 0;
   int dy = 0;
-  if (mappedInput.wasPressed(Button::Left)) dx = -1;
-  if (mappedInput.wasPressed(Button::Right)) dx = 1;
-  if (mappedInput.wasPressed(Button::Up)) (sideStep ? dx : dy) = -1;
-  if (mappedInput.wasPressed(Button::Down)) (sideStep ? dx : dy) = 1;
+  keyRepeat.onPressAndContinuous({Button::Left}, [&dx] { dx = -1; });
+  keyRepeat.onPressAndContinuous({Button::Right}, [&dx] { dx = 1; });
+  keyRepeat.onPressAndContinuous({Button::Up}, [&] { (sideStep ? dx : dy) = -1; });
+  keyRepeat.onPressAndContinuous({Button::Down}, [&] { (sideStep ? dx : dy) = 1; });
   const bool confirm = mappedInput.wasReleased(Button::Confirm);
   if (dx == 0 && dy == 0 && !confirm) return;
 
@@ -1005,7 +1005,7 @@ void ChessActivity::lastMoveText(char* out, const size_t cap) const {
 
 // --- render task -------------------------------------------------------------
 
-void ChessActivity::render(RenderLock&&) {
+void ChessActivity::render(RenderLock&& lock) {
   renderer.clearScreen();
   if (view == View::Game) {
     HeaderBackTapTarget::clear();  // the board screen has its own "‹ Выйти"
@@ -1021,9 +1021,12 @@ void ChessActivity::render(RenderLock&&) {
                             board ? tr(STR_DIR_LEFT) : tr(STR_DIR_UP), board ? tr(STR_DIR_RIGHT) : tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   const uint8_t kind = repaint.exchange(RepaintNone);
-  renderer.displayBuffer(kind == RepaintEntry   ? cadence.entry()
-                         : kind == RepaintClock ? HalDisplay::FAST_REFRESH
-                                                : cadence.update());
+  const HalDisplay::RefreshMode mode = kind == RepaintEntry   ? cadence.entry()
+                                       : kind == RepaintClock ? HalDisplay::FAST_REFRESH
+                                                              : cadence.update();
+  // Keys pressed during the panel refresh still move the cursor; the next render shows where it ended.
+  lock.unlock();
+  renderer.displayBuffer(mode);
 }
 
 bool ChessActivity::hasBar() const { return UITheme::getInstance().getMetrics().buttonHintsHeight == 0; }

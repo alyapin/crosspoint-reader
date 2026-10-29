@@ -10,11 +10,12 @@
 #include "activities/Activity.h"
 #include "components/UiAppHost.h"
 #include "components/setka/SetkaStyle.h"
+#include "games/ui/ActionBar.h"
 #include "util/ButtonNavigator.h"
 
 // Games list hook for the "Шахматы" row: chessListStatus() is the row's second
 // line ("партия идёт" while a saved game exists) or nullptr, and openChess()
-// builds the screen, which resumes the saved game or opens "Новая партия".
+// builds the screen, which resumes the saved game or opens "Новая игра".
 const char* chessListStatus();
 std::unique_ptr<Activity> openChess(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
@@ -157,6 +158,7 @@ class ChessActivity final : public Activity, private UiAppHost {
   bool savePending = false;
 
   ButtonNavigator buttonNavigator;
-  setka::RefreshCadence cadence;  // render task only
+  ButtonNavigator keyRepeat{games::ui::kKeyRepeatMs, games::ui::kKeyRepeatStartMs};  // the board cursor
+  setka::RefreshCadence cadence;                                                     // render task only
   std::atomic<uint8_t> repaint{RepaintEntry};
 };

@@ -25,6 +25,9 @@ struct ActionSlot {
 };
 
 constexpr int kActionBarHeight = 70;  // the rule included
+// A held arrow key repeats on the boards.
+constexpr uint16_t kKeyRepeatStartMs = 400;
+constexpr uint16_t kKeyRepeatMs = 250;
 
 // Draws the bar from `top` (its rule) down to the button hints (the screen bottom on touch boards)
 // and adds a hit per shown slot.

@@ -11,6 +11,7 @@
 #include "activities/Activity.h"
 #include "components/UiAppHost.h"
 #include "components/setka/SetkaStyle.h"
+#include "util/ButtonNavigator.h"
 
 // The shell of the Sudoku, Minesweeper and Klondike boards (ui-style Setka):
 // the shared clock/battery line (setka::drawStatusLine), a top line with "‹ Выйти" and a status on the right,
@@ -158,6 +159,7 @@ class GameScreen : public Activity, protected UiAppHost {
   int8_t menuIds[GamePickerActivity::MAX_ROWS] = {};  // the open menu's rows (GameScreen.cpp MenuRow)
   setka::RefreshCadence cadence;                      // render task only
   std::atomic<uint8_t> repaint{RepaintEntry};
+  ButtonNavigator keyRepeat{games::ui::kKeyRepeatMs, games::ui::kKeyRepeatStartMs};
   int32_t clockShown = -1;
   bool savePending = false;
 };
