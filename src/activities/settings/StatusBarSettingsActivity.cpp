@@ -10,6 +10,7 @@
 
 #include "CrossPointSettings.h"
 #include "MappedInputManager.h"
+#include "activities/util/ValuePickerActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -107,12 +108,7 @@ void StatusBarSettingsActivity::onEnter() {
   }
 }
 
-bool StatusBarSettingsActivity::handleCustomInput() {
-  return optionPopup.handleInput(mappedInput, [this] { requestUpdate(); });
-}
-
 void StatusBarSettingsActivity::activateIndex(const int index) {
-  if (optionPopup.isActive()) return;
   nav.selected = index;
   // Activation opens a popup/sub-activity or repaints a new value; a lingering
   // flash would gray an unrelated row.
@@ -136,38 +132,44 @@ void StatusBarSettingsActivity::handleSelection() {
       SETTINGS.statusBarBookProgressPercentage = (SETTINGS.statusBarBookProgressPercentage + 1) % 2;
       break;
     case ITEM_PROGRESS_BAR:
-      optionPopup.show(StrId::STR_PROGRESS_BAR, progressBarNames, PROGRESS_BAR_ITEMS, SETTINGS.statusBarProgressBar,
-                       [this](int idx) {
-                         SETTINGS.statusBarProgressBar = idx;
-                         SETTINGS.saveToFile();
-                       });
+      ValuePickerActivity::open(*this, renderer, mappedInput, StrId::STR_PROGRESS_BAR, progressBarNames,
+                                PROGRESS_BAR_ITEMS, SETTINGS.statusBarProgressBar, [](const int idx) {
+                                  SETTINGS.statusBarProgressBar = idx;
+                                  SETTINGS.saveToFile();
+                                });
       return;
     case ITEM_PROGRESS_BAR_THICKNESS:
-      optionPopup.show(StrId::STR_PROGRESS_BAR_THICKNESS, progressBarThicknessNames, PROGRESS_BAR_THICKNESS_ITEMS,
-                       SETTINGS.statusBarProgressBarThickness, [this](int idx) {
-                         SETTINGS.statusBarProgressBarThickness = idx;
-                         SETTINGS.saveToFile();
-                       });
+      ValuePickerActivity::open(*this, renderer, mappedInput, StrId::STR_PROGRESS_BAR_THICKNESS,
+                                progressBarThicknessNames, PROGRESS_BAR_THICKNESS_ITEMS,
+                                SETTINGS.statusBarProgressBarThickness, [](const int idx) {
+                                  SETTINGS.statusBarProgressBarThickness = idx;
+                                  SETTINGS.saveToFile();
+                                });
       return;
     case ITEM_TITLE:
-      optionPopup.show(StrId::STR_TITLE, titleNames, TITLE_ITEMS, SETTINGS.statusBarTitle, [this](int idx) {
-        SETTINGS.statusBarTitle = idx;
-        SETTINGS.saveToFile();
-      });
+      ValuePickerActivity::open(*this, renderer, mappedInput, StrId::STR_TITLE, titleNames, TITLE_ITEMS,
+                                SETTINGS.statusBarTitle, [](const int idx) {
+                                  SETTINGS.statusBarTitle = idx;
+                                  SETTINGS.saveToFile();
+                                });
       return;
     case ITEM_BATTERY:
       SETTINGS.statusBarBattery = (SETTINGS.statusBarBattery + 1) % 2;
       break;
     case ITEM_XTC_STATUS_BAR:
-      optionPopup.show(StrId::STR_XTC_STATUS_BAR, xtcStatusBarNames, XTC_STATUS_BAR_ITEMS, SETTINGS.xtcStatusBarMode,
-                       [this](int idx) {
-                         SETTINGS.xtcStatusBarMode = idx;
-                         SETTINGS.saveToFile();
-                       });
+      ValuePickerActivity::open(*this, renderer, mappedInput, StrId::STR_XTC_STATUS_BAR, xtcStatusBarNames,
+                                XTC_STATUS_BAR_ITEMS, SETTINGS.xtcStatusBarMode, [](const int idx) {
+                                  SETTINGS.xtcStatusBarMode = idx;
+                                  SETTINGS.saveToFile();
+                                });
       return;
     case ITEM_CLOCK:
-      SETTINGS.statusBarClock = (SETTINGS.statusBarClock + 1) % STATUS_BAR_CLOCK_ITEMS;
-      break;
+      ValuePickerActivity::open(*this, renderer, mappedInput, StrId::STR_CLOCK, statusBarClockNames,
+                                STATUS_BAR_CLOCK_ITEMS, SETTINGS.statusBarClock, [](const int idx) {
+                                  SETTINGS.statusBarClock = idx;
+                                  SETTINGS.saveToFile();
+                                });
+      return;
     default:
       return;
   }
@@ -231,8 +233,6 @@ void StatusBarSettingsActivity::buildScreen(UiScreen& screen) {
 }
 
 void StatusBarSettingsActivity::render(RenderLock&&) {
-  if (optionPopup.processRender(renderer, mappedInput)) return;
-
   renderer.clearScreen();
 
   auto metrics = UITheme::getInstance().getMetrics();

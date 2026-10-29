@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "activities/UiListActivity.h"
-#include "components/OptionPopup.h"
 
 class EpubReaderMenuActivity final : public UiListActivity {
  public:
@@ -48,7 +47,6 @@ class EpubReaderMenuActivity final : public UiListActivity {
 
   void onEnter() override;
   void onExit() override;
-  void render(RenderLock&&) override;
   bool handleHomeGesture() override;
   bool acceptsRemoteInput() const override { return routingReady(); }
 
@@ -64,8 +62,6 @@ class EpubReaderMenuActivity final : public UiListActivity {
   int listCount() const override { return static_cast<int>(menuItems.size()); }
   void buildScreen(UiScreen& screen) override;
   void activateIndex(int index) override;
-  // Popup input runs before any button or touch handling.
-  bool handleCustomInput() override;
   // Back closes on RELEASE and Confirm activates on RELEASE; everything else
   // (row navigation, page jumps) falls through to the base handler.
   bool handleButtons() override;
@@ -78,7 +74,6 @@ class EpubReaderMenuActivity final : public UiListActivity {
   std::vector<MenuItem> menuItems;
   MenuAction& selectedAction;
 
-  OptionPopup optionPopup;
   std::string title = "Reader Menu";
   uint8_t pendingOrientation = 0;
   uint8_t selectedPageTurnOption = 0;

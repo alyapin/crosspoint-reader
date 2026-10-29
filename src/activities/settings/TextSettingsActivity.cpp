@@ -1,5 +1,6 @@
 #include "TextSettingsActivity.h"
 
+#include <FreeInkUIIcon.h>
 #include <GfxRenderer.h>
 #include <I18n.h>
 
@@ -8,6 +9,7 @@
 #include <cstring>
 #include <iterator>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "CrossPointSettings.h"
@@ -16,7 +18,9 @@
 #include "ReaderLineSpacing.h"
 #include "SdCardFontSystem.h"
 #include "TextSettingsPreview.h"
+#include "activities/util/ValuePickerActivity.h"
 #include "components/UITheme.h"
+#include "components/setka/setkaIcons.h"
 #include "fontIds.h"
 
 namespace fui = freeink::ui;
@@ -160,7 +164,6 @@ void TextSettingsActivity::rebuildSizeList() {
 }
 
 void TextSettingsActivity::onTabAction(const int index) {
-  if (optionPopup_.isActive()) return;
   if (tab_ != static_cast<Tab>(index)) {
     tab_ = static_cast<Tab>(index);
     rebuildRowItems();
@@ -175,15 +178,10 @@ void TextSettingsActivity::onTabAction(const int index) {
 }
 
 void TextSettingsActivity::activateIndex(const int index) {
-  if (optionPopup_.isActive()) return;
   // Most rows repaint a different surface (popup, preview, new value);
   // a lingering tap flash would gray an unrelated element.
   app.clearTapFlash();
   activateRow(index);
-}
-
-bool TextSettingsActivity::handleCustomInput() {
-  return optionPopup_.handleInput(mappedInput, [this] { requestUpdate(); });
 }
 
 bool TextSettingsActivity::handleButtons() {
@@ -222,11 +220,12 @@ void TextSettingsActivity::buildScreen(UiScreen& screen) {
   for (int i = 0; i < count; i++) {
     switch (tab_) {
       case Tab::Family:
-        rowValues_[i] = (i == currentFamilyIndex_) ? tr(STR_SELECTED) : "";
+      case Tab::Size: {
+        // A radio per row, as in the value picker: the current one is filled.
+        const int current = tab_ == Tab::Family ? currentFamilyIndex_ : currentSizeIndex_;
+        rowItems_[i].icon = fui::bitmapFromIcon(i == current ? icon_radio_on_24 : icon_radio_24);
         break;
-      case Tab::Size:
-        rowValues_[i] = (i == currentSizeIndex_) ? tr(STR_SELECTED) : "";
-        break;
+      }
       case Tab::Layout:
         rowValues_[i] = layoutValueText(i);
         break;
@@ -281,7 +280,7 @@ void TextSettingsActivity::drawChrome() {
                              ? sizes_[currentSizeIndex_].name.c_str()
                              : "";
   char labelBuf[128];
-  snprintf(labelBuf, sizeof(labelBuf), "%s \"%s, %s\"", tr(STR_PREVIEW), familyName, sizeName);
+  snprintf(labelBuf, sizeof(labelBuf), "%s \xC2\xAB%s, %s\xC2\xBB", tr(STR_PREVIEW), familyName, sizeName);
   const Rect safeArea = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   const Rect previewBounds{safeArea.x, afterHeader, safeArea.width, previewHeight};
   const auto [savedX, savedY, savedWidth, savedHeight] = renderer.getClipRect();
@@ -298,11 +297,6 @@ void TextSettingsActivity::drawChrome() {
 void TextSettingsActivity::drawFooter() {
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), confirmLabelText(), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-}
-
-void TextSettingsActivity::render(RenderLock&& lock) {
-  if (optionPopup_.processRender(renderer, mappedInput)) return;  // picker draws over everything
-  UiListActivity::render(std::move(lock));
 }
 
 // Font switching runs on the main task from loop(), which deliberately holds no
@@ -394,58 +388,57 @@ void TextSettingsActivity::confirmLayoutRow(int row) {
       options.reserve(6);
       options.push_back(tr(STR_STATE_OFF));
       for (int spaces = 1; spaces <= 5; ++spaces) options.push_back(std::to_string(spaces));
-      optionPopup_.show(StrId::STR_PARAGRAPH_INDENTATION, options, SETTINGS.paragraphIndentSpaces, [](int idx) {
-        SETTINGS.paragraphIndentSpaces = static_cast<uint8_t>(idx);
-        SETTINGS.saveToFile();
-      });
-      requestUpdate();
+      ValuePickerActivity::open(*this, renderer, mappedInput, tr(STR_PARAGRAPH_INDENTATION), std::move(options),
+                                SETTINGS.paragraphIndentSpaces, [](const int idx) {
+                                  SETTINGS.paragraphIndentSpaces = static_cast<uint8_t>(idx);
+                                  SETTINGS.saveToFile();
+                                });
       break;
     }
     case LayoutRow::LineSpacing:
-      optionPopup_.show(StrId::STR_LINE_SPACING, LINE_SPACING_IDS, static_cast<int>(std::size(LINE_SPACING_IDS)),
-                        SETTINGS.lineSpacing, [](int idx) {
-                          SETTINGS.lineSpacing = static_cast<uint8_t>(idx);
-                          SETTINGS.saveToFile();
-                        });
-      requestUpdate();
+      ValuePickerActivity::open(*this, renderer, mappedInput, StrId::STR_LINE_SPACING, LINE_SPACING_IDS,
+                                static_cast<int>(std::size(LINE_SPACING_IDS)), SETTINGS.lineSpacing, [](const int idx) {
+                                  SETTINGS.lineSpacing = static_cast<uint8_t>(idx);
+                                  SETTINGS.saveToFile();
+                                });
       break;
     case LayoutRow::Alignment:
-      optionPopup_.show(StrId::STR_ALIGNMENT, ALIGNMENT_IDS, static_cast<int>(std::size(ALIGNMENT_IDS)),
-                        SETTINGS.paragraphAlignment, [](int idx) {
-                          SETTINGS.paragraphAlignment = static_cast<uint8_t>(idx);
-                          SETTINGS.saveToFile();
-                        });
-      requestUpdate();
+      ValuePickerActivity::open(*this, renderer, mappedInput, StrId::STR_ALIGNMENT, ALIGNMENT_IDS,
+                                static_cast<int>(std::size(ALIGNMENT_IDS)), SETTINGS.paragraphAlignment,
+                                [](const int idx) {
+                                  SETTINGS.paragraphAlignment = static_cast<uint8_t>(idx);
+                                  SETTINGS.saveToFile();
+                                });
       break;
     case LayoutRow::WordSpacing: {
       const int cur = (std::clamp<int>(SETTINGS.wordSpacing, WORD_SPACING_MIN, WORD_SPACING_MAX) - WORD_SPACING_MIN) /
                       WORD_SPACING_STEP;
-      optionPopup_.show(StrId::STR_WORD_SPACING, WORD_SPACING_IDS, static_cast<int>(std::size(WORD_SPACING_IDS)), cur,
-                        [](int idx) {
-                          SETTINGS.wordSpacing = static_cast<uint8_t>(WORD_SPACING_MIN + idx * WORD_SPACING_STEP);
-                          SETTINGS.saveToFile();
-                        });
-      requestUpdate();
+      ValuePickerActivity::open(*this, renderer, mappedInput, StrId::STR_WORD_SPACING, WORD_SPACING_IDS,
+                                static_cast<int>(std::size(WORD_SPACING_IDS)), cur, [](const int idx) {
+                                  SETTINGS.wordSpacing =
+                                      static_cast<uint8_t>(WORD_SPACING_MIN + idx * WORD_SPACING_STEP);
+                                  SETTINGS.saveToFile();
+                                });
       break;
     }
     case LayoutRow::CharacterSpacing:
-      optionPopup_.show(StrId::STR_CHARACTER_SPACING, CHARACTER_SPACING_IDS,
-                        static_cast<int>(std::size(CHARACTER_SPACING_IDS)), SETTINGS.characterSpacing, [](int idx) {
-                          SETTINGS.characterSpacing = static_cast<uint8_t>(idx);
-                          SETTINGS.saveToFile();
-                        });
-      requestUpdate();
+      ValuePickerActivity::open(*this, renderer, mappedInput, StrId::STR_CHARACTER_SPACING, CHARACTER_SPACING_IDS,
+                                static_cast<int>(std::size(CHARACTER_SPACING_IDS)), SETTINGS.characterSpacing,
+                                [](const int idx) {
+                                  SETTINGS.characterSpacing = static_cast<uint8_t>(idx);
+                                  SETTINGS.saveToFile();
+                                });
       break;
     case LayoutRow::ScreenMargin: {
       std::vector<std::string> options;
       options.reserve((MARGIN_MAX - MARGIN_MIN) / MARGIN_STEP + 1);
       for (int m = MARGIN_MIN; m <= MARGIN_MAX; m += MARGIN_STEP) options.push_back(std::to_string(m));
       const int cur = (std::clamp<int>(SETTINGS.screenMargin, MARGIN_MIN, MARGIN_MAX) - MARGIN_MIN) / MARGIN_STEP;
-      optionPopup_.show(StrId::STR_SCREEN_MARGIN, options, cur, [](int idx) {
-        SETTINGS.screenMargin = static_cast<uint8_t>(MARGIN_MIN + idx * MARGIN_STEP);
-        SETTINGS.saveToFile();
-      });
-      requestUpdate();
+      ValuePickerActivity::open(*this, renderer, mappedInput, tr(STR_SCREEN_MARGIN), std::move(options), cur,
+                                [](const int idx) {
+                                  SETTINGS.screenMargin = static_cast<uint8_t>(MARGIN_MIN + idx * MARGIN_STEP);
+                                  SETTINGS.saveToFile();
+                                });
       break;
     }
 

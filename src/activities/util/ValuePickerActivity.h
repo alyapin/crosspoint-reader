@@ -1,5 +1,7 @@
 #pragma once
 
+#include <I18n.h>
+
 #include <atomic>
 #include <functional>
 #include <string>
@@ -21,6 +23,9 @@ class ValuePickerActivity final : public UiListActivity {
   // Opens the picker over host; onSelect runs in the host after a value is picked.
   static void open(Activity& host, GfxRenderer& renderer, MappedInputManager& mappedInput, std::string title,
                    std::vector<std::string> labels, int current, std::function<void(int)> onSelect);
+  // As above, for a translated title and option list.
+  static void open(Activity& host, GfxRenderer& renderer, MappedInputManager& mappedInput, StrId title,
+                   const StrId* options, int count, int current, std::function<void(int)> onSelect);
 
   void onEnter() override;
   void render(RenderLock&&) override;

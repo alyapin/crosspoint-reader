@@ -104,6 +104,24 @@ class KeyboardEntryActivity : public Activity {
   bool hintVisible = false;
   unsigned long hintShowTime = 0;
 
+  // Long-press alternates: a strip of the key's characters (its own and the
+  // alternate, e.g. "е ё") above the key. Keys carry one label; the strip is
+  // the only place the alternate shows. Touch picks with a tap after the
+  // finger lifts; buttons move with Left/Right, Confirm inserts, Back closes.
+  bool altOpen = false;
+  bool altArmed = false;           // touch: the long-pressing finger has lifted
+  bool altSwallowConfirm = false;  // buttons: the hold that opened the strip is still down
+  int altFocus = 1;
+  int altCount = 0;
+  char altChoices[2][16] = {};
+  int16_t altValue = 0;                 // the long-pressed key
+  std::atomic<int16_t> altCenterX{-1};  // its centre, found by render() in the table it builds
+  bool openAltStrip(int16_t value);
+  void closeAltStrip();
+  void handleAltStrip();
+  freeink::ui::Rect altCellRect(int index) const;
+  void drawAltStrip(int fontId) const;
+
   void onComplete(std::string text);
   void onCancel();
   bool cursorPositionFromPoint(int x, int y, size_t& position) const;

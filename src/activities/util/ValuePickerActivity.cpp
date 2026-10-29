@@ -39,6 +39,15 @@ void ValuePickerActivity::open(Activity& host, GfxRenderer& renderer, MappedInpu
   });
 }
 
+void ValuePickerActivity::open(Activity& host, GfxRenderer& renderer, MappedInputManager& mappedInput,
+                               const StrId title, const StrId* options, const int count, const int current,
+                               std::function<void(int)> onSelect) {
+  std::vector<std::string> labels;
+  labels.reserve(count);
+  for (int i = 0; i < count; ++i) labels.emplace_back(I18N.get(options[i]));
+  open(host, renderer, mappedInput, I18N.get(title), std::move(labels), current, std::move(onSelect));
+}
+
 void ValuePickerActivity::onEnter() {
   // The render task may run as soon as ActivityManager drops its lock; keep it
   // out until the state below is in place (same as SetkaHomeActivity).
