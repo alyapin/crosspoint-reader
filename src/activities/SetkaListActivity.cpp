@@ -62,6 +62,8 @@ void SetkaListActivity::buildScreen(UiScreen& screen) {
   const int selected = nav.selected;
   const int perPage = rowsPerPage();
   const int first = selected / perPage * perPage;
+  // Held Up/Down page by this (UiListActivity::navigateButtons).
+  nav.onListRendered(static_cast<uint16_t>(first), perPage, true);
   for (int i = first; i < std::min(count, first + perPage); ++i) {
     const int top = listTop + (i - first) * (kRowHeight + kRowGap);
     const bool focused = i == selected;
