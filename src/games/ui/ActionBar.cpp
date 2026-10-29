@@ -14,6 +14,7 @@ using namespace setka;
 namespace games::ui {
 
 namespace {
+constexpr int kBarCells = 3;
 constexpr int kIconSize = 24;
 constexpr int kIconGap = 4;
 constexpr int kResultLineGap = 4;
@@ -62,11 +63,12 @@ void drawActionBar(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, con
   // A short bar closes the gap under the icon first.
   const int gap = std::clamp((cellHeight - kIconSize - captionHeight) / 3, 0, kIconGap);
   const int iconTop = cellTop + (cellHeight - kIconSize - gap - captionHeight) / 2;
-  const bool dividers = std::count_if(slots, slots + count, [](const ActionSlot& s) { return s.label; }) > 1;
+  // The right cell is the same on every bar; more slots share the cells left of it.
+  const int split = count > kBarCells ? width - width / kBarCells : width;
+  const int shared = count > kBarCells ? count - 1 : count;
   for (int i = 0; i < count; ++i) {
-    const int x0 = i * width / count;
-    const int x1 = (i + 1) * width / count;
-    if (i > 0 && dividers) renderer.fillRect(x0, cellTop, 1, cellHeight, true);
+    const int x0 = i < shared ? i * split / shared : split;
+    const int x1 = i < shared ? (i + 1) * split / shared : width;
     const ActionSlot& slot = slots[i];
     if (slot.label == nullptr) continue;
     const int iconX = x0 + (x1 - x0 - kIconSize) / 2;
