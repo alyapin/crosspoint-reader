@@ -749,7 +749,7 @@ void ScanwordActivity::render(RenderLock&&) {
     char page[16] = "";
     const int per = rowsPerPage();
     const int pages = (itemCount + per - 1) / per;
-    if (view == View::List && pages > 1) snprintf(page, sizeof(page), "%d/%d", focus / per + 1, pages);
+    if (view == View::List && pages > 1) snprintf(page, sizeof(page), tr(STR_GAMES_OF), focus / per + 1, pages);
     GUI.drawHeader(renderer, Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.headerHeight},
                    view == View::List ? tr(STR_SCANWORDS) : tr(STR_SCANWORD_MENU), page[0] ? page : nullptr);
   }
