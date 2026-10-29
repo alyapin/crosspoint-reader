@@ -28,6 +28,8 @@
 //               number, plus the shelf names.
 //   seeded      empty; written once the books read before statistics started
 //               are seeded.
+//   seed_tries  one byte: boots that retried seeding after a read or write
+//               failure.
 // A query adds the log records past a file's applied sequence number, so the
 // files may be rewritten in any order and a crash between two rewrites
 // neither loses nor double-counts reading. totals.bin and books.bin are
@@ -155,6 +157,10 @@ class ReadingStats {
   // markSeedingDone(), so seeding cut short by a reset resumes on the next boot.
   bool seedingDone();
   bool markSeedingDone();
+  // Counts a boot whose seeding could not read or store everything; false once
+  // enough such boots have passed, or the count cannot be stored, so seeding
+  // stops retrying.
+  bool consumeSeedRetry();
   // Such a book gets seedStatus(progressBp) and that progress, unless it
   // already has a status. False when it could not be stored (storage, memory
   // or a full catalog); nothing to seed counts as stored.
@@ -174,7 +180,10 @@ class ReadingStats {
   void forgetPath(const std::string& path);
 
   // Forget cached log state, e.g. after the SD card changed under the store.
-  void reset() { logReady = false; }
+  void reset() {
+    logReady = false;
+    uncertain.seq = 0;
+  }
 
  private:
   ReadingStats() = default;
@@ -186,6 +195,13 @@ class ReadingStats {
   bool logReady = false;
   uint16_t logCount = 0;
   uint32_t nextSeq = 1;
+  // An append whose record may have reached the card: retrying the same segment
+  // checks the log instead of writing it a second time.
+  struct {
+    uint32_t seq = 0;
+    int bookId = 0;
+    ReadingSegment segment;
+  } uncertain;
 };
 
 }  // namespace stats
