@@ -6,6 +6,7 @@
 #include <Memory.h>
 #include <Minesweeper.h>
 #include <Sudoku.h>
+#include <TicTacToe.h>
 
 #include <string>
 
@@ -25,20 +26,19 @@ Paths pathsOf(const Kind kind) {
       return {"/.crosspoint/games/sudoku.json", "/.crosspoint/games/sudoku.json.tmp"};
     case Kind::Minesweeper:
       return {"/.crosspoint/games/minesweeper.json", "/.crosspoint/games/minesweeper.json.tmp"};
+    case Kind::TicTacToe:
+      return {"/.crosspoint/games/tictactoe.json", "/.crosspoint/games/tictactoe.json.tmp"};
     case Kind::Klondike:
       break;
   }
   return {"/.crosspoint/games/klondike.json", "/.crosspoint/games/klondike.json.tmp"};
 }
 
+constexpr Paths kTicTacToeDone{"/.crosspoint/games/tictactoe-done.json", "/.crosspoint/games/tictactoe-done.json.tmp"};
+
 // Cold path (exit, sleep, after a move): one bounded buffer, freed on return.
 template <typename GameT>
-bool write(const Kind kind, const GameT& game, const size_t cap) {
-  const Paths p = pathsOf(kind);
-  if (!game.inProgress()) {
-    clear(kind);
-    return true;
-  }
+bool writeTo(const Paths& p, const GameT& game, const size_t cap) {
   auto text = makeUniqueNoThrow<char[]>(cap);
   if (!text) {
     LOG_ERR("GAMES", "OOM: %u bytes for save", static_cast<unsigned>(cap));
@@ -62,8 +62,16 @@ bool write(const Kind kind, const GameT& game, const size_t cap) {
 }
 
 template <typename GameT>
-bool read(const Kind kind, GameT& game, const size_t cap) {
-  const Paths p = pathsOf(kind);
+bool write(const Kind kind, const GameT& game, const size_t cap) {
+  if (!game.inProgress()) {
+    clear(kind);
+    return true;
+  }
+  return writeTo(pathsOf(kind), game, cap);
+}
+
+template <typename GameT>
+bool readFrom(const Paths& p, GameT& game, const size_t cap) {
   if (!Storage.exists(p.path)) return false;
   std::string text;
   // A read error may be transient: keep the file. Only content that fails to parse is dropped.
@@ -79,6 +87,11 @@ bool read(const Kind kind, GameT& game, const size_t cap) {
   return true;
 }
 
+template <typename GameT>
+bool read(const Kind kind, GameT& game, const size_t cap) {
+  return readFrom(pathsOf(kind), game, cap);
+}
+
 }  // namespace
 
 bool hasGameInProgress(const Kind kind) { return Storage.exists(pathsOf(kind).path); }
@@ -91,9 +104,18 @@ void clear(const Kind kind) {
 bool save(const sudoku::Game& game) { return write(Kind::Sudoku, game, sudoku::SAVE_MAX); }
 bool save(const minesweeper::Game& game) { return write(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
 bool save(const klondike::Game& game) { return write(Kind::Klondike, game, klondike::SAVE_MAX); }
+bool save(const tictactoe::Game& game) {
+  if (game.inProgress()) return writeTo(pathsOf(Kind::TicTacToe), game, tictactoe::SAVE_MAX);
+  const bool ok = writeTo(kTicTacToeDone, game, tictactoe::SAVE_MAX);
+  if (ok) clear(Kind::TicTacToe);
+  return ok;
+}
 
 bool load(sudoku::Game& game) { return read(Kind::Sudoku, game, sudoku::SAVE_MAX); }
 bool load(minesweeper::Game& game) { return read(Kind::Minesweeper, game, minesweeper::SAVE_MAX); }
 bool load(klondike::Game& game) { return read(Kind::Klondike, game, klondike::SAVE_MAX); }
+bool load(tictactoe::Game& game) {
+  return read(Kind::TicTacToe, game, tictactoe::SAVE_MAX) || readFrom(kTicTacToeDone, game, tictactoe::SAVE_MAX);
+}
 
 }  // namespace gamesave
