@@ -278,6 +278,11 @@ void SettingsActivity::toggleSelectedSetting() {
     }
     setting.valueSetter((cur + 1) % totalValues);
   } else if (setting.type == SettingType::VALUE && setting.valuePtr != nullptr) {
+    // Confirm only counts up and wraps; buttons get the slider, taps keep stepping.
+    if (!mappedInput.hasTouch()) {
+      openValueSlider(setting);
+      return;
+    }
     const int8_t currentValue = SETTINGS.*(setting.valuePtr);
     if (currentValue + setting.valueRange.step > setting.valueRange.max) {
       SETTINGS.*(setting.valuePtr) = setting.valueRange.min;
@@ -477,6 +482,25 @@ void SettingsActivity::openSleepTimeoutPicker() {
       });
 }
 
+void SettingsActivity::openValueSlider(const SettingInfo& setting) {
+  const auto valuePtr = setting.valuePtr;
+  const auto range = setting.valueRange;
+  const StrId format =
+      valuePtr == &CrossPointSettings::readingGoalMinutes ? StrId::STR_SLEEP_TIMER_VALUE_FORMAT : StrId::STR_NONE_OPT;
+  auto slider = makeUniqueNoThrow<IntervalSelectionActivity>(renderer, mappedInput, "SettingValue", setting.nameId,
+                                                             SETTINGS.*valuePtr, range.min, range.max, range.step,
+                                                             range.step * 6, format);
+  if (!slider) {
+    LOG_ERR("SET", "OOM: value slider");
+    return;
+  }
+  startActivityForResult(std::move(slider), [valuePtr](const ActivityResult& result) {
+    if (result.isCancelled) return;
+    SETTINGS.*valuePtr = static_cast<uint8_t>(std::get<IntervalResult>(result.data).value);
+    SETTINGS.saveToFile();
+  });
+}
+
 std::string SettingsActivity::settingValueText(const SettingInfo& setting) {
   if (setting.action == SettingAction::HomeButton) return tr(STR_CONFIGURE);
   if (setting.action == SettingAction::SleepImage) {
@@ -563,9 +587,8 @@ void SettingsActivity::buildScreen(UiScreen& screen) {
 
 void SettingsActivity::drawFooter() {
   const int selected = nav.selected;
-  const bool picker =
-      selected >= 0 && selected < static_cast<int>(settings.size()) &&
-      (settings[selected].type == SettingType::ACTION || settings[selected].nameId == StrId::STR_TIME_TO_SLEEP);
+  const bool picker = selected >= 0 && selected < static_cast<int>(settings.size()) &&
+                      (settings[selected].type == SettingType::ACTION || settings[selected].type == SettingType::VALUE);
   const auto labels =
       mappedInput.mapLabels(tr(STR_BACK), picker ? tr(STR_SELECT) : tr(STR_TOGGLE), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
