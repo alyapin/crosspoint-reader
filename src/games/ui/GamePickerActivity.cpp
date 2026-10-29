@@ -23,7 +23,7 @@ void GamePickerActivity::onEnter() {
 
 const char* GamePickerActivity::rowStatus(const int index) const {
   if (index != toggleRow) return rows[index].status;
-  return toggleOn ? tr(STR_YES) : tr(STR_NO);
+  return toggleOn ? tr(STR_GAMES_ON) : tr(STR_GAMES_OFF);
 }
 
 void GamePickerActivity::activateIndex(const int index) {
