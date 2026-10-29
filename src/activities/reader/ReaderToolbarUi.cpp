@@ -45,6 +45,8 @@ constexpr int kLandscapePanelHeightPercent = 88;
 // clear air it keeps above its rule (as OptionPopup's band).
 constexpr int kSheetLiftMax = 40;
 constexpr int kSheetAir = 4;
+// Page left above a lifted sheet, so a tap there can still dismiss it (landscape).
+constexpr int kPageAboveSheet = 44;
 }  // namespace
 
 ReaderToolbarUi::ReaderToolbarUi(GfxRenderer& renderer) : UiAppHost(renderer), renderer_(renderer) {}
@@ -140,7 +142,7 @@ int16_t ReaderToolbarUi::openSheet(UiScreen& screen, const fui::SheetProps& prop
   if (top != liftTop_) {
     liftTop_ = top;
     lift_ = 0;
-    for (int lift = 0; lift <= kSheetLiftMax && top - lift - kSheetAir >= 0; ++lift) {
+    for (int lift = 0; lift <= kSheetLiftMax && top - lift >= kPageAboveSheet; ++lift) {
       int clear = 0;
       while (clear < kSheetAir && renderer_.isRowClear(top - lift - kSheetAir + clear)) ++clear;
       if (clear == kSheetAir) {
