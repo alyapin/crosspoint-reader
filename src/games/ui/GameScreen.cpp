@@ -9,9 +9,13 @@
 #include <algorithm>
 #include <climits>
 #include <cstdio>
+#include <iterator>
 #include <variant>
 
 #include "ElapsedText.h"
+#include "activities/util/ConfirmationActivity.h"
+#include "gameIcons.h"
+#include "games/chess/ui/chessIcons.h"
 
 namespace fui = freeink::ui;
 using namespace setka;
@@ -81,6 +85,58 @@ void GameScreen::openPicker(const char* title, const GamePickerActivity::Row* ro
     resumeGame();
     clockShown = shownMinutes();
     requestRepaint(RepaintEntry);
+  });
+}
+
+void GameScreen::openGameMenu() {
+  const GamePickerActivity::Row rows[] = {
+      {tr(STR_GAMES_NEW_GAME), &icon_bar_new_game_24},
+      {tr(STR_GAMES_FINISH), &icon_resign_24},
+  };
+  auto menu = makeUniqueNoThrow<GamePickerActivity>(renderer, mappedInput, tr(STR_GAMES_MENU), rows,
+                                                    static_cast<int>(std::size(rows)), 0);
+  if (!menu) {
+    LOG_ERR("GAMES", "OOM: %u bytes for the menu", static_cast<unsigned>(sizeof(GamePickerActivity)));
+    return;
+  }
+  app.clearTapFlash();
+  pauseGame();
+  startActivityForResult(std::move(menu), [this](const ActivityResult& result) {
+    RenderLock lock(*this);
+    const auto* choice = std::get_if<MenuResult>(&result.data);
+    if (!result.isCancelled && choice != nullptr && choice->action == 1) {
+      confirmFinish();
+      return;
+    }
+    resumeGame();
+    clockShown = shownMinutes();
+    requestRepaint(RepaintEntry);
+    if (!result.isCancelled && choice != nullptr) openNewGame();
+  });
+}
+
+void GameScreen::confirmFinish() {
+  auto confirm =
+      makeUniqueNoThrow<ConfirmationActivity>(renderer, mappedInput, tr(STR_GAMES_FINISH_CONFIRM),
+                                              tr(STR_GAMES_FINISH_BODY), tr(STR_CANCEL), tr(STR_GAMES_FINISH));
+  if (!confirm) {
+    LOG_ERR("GAMES", "OOM: finish confirmation");
+    resumeGame();
+    requestRepaint(RepaintEntry);
+    return;
+  }
+  startActivityForResult(std::move(confirm), [this](const ActivityResult& result) {
+    RenderLock lock(*this);
+    if (result.isCancelled) {
+      resumeGame();
+      clockShown = shownMinutes();
+      requestRepaint(RepaintEntry);
+      return;
+    }
+    hasGame = false;
+    savePending = false;
+    clearSave();
+    leave();
   });
 }
 

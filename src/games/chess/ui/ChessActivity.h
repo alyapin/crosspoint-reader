@@ -90,6 +90,7 @@ class ChessActivity final : public Activity, private UiAppHost {
   GameAction focusedAction() const;
   void runAction(GameAction action);
   void activateRow(int index);
+  void confirmResign();
   void applyOption(int option);
   void stepCustom(int field, int delta);
   void goBack();

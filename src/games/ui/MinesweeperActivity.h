@@ -12,7 +12,7 @@ std::unique_ptr<Activity> openMinesweeper(GfxRenderer& renderer, MappedInputMana
 
 // Full-width minefield: covered cells dithered, open cells white with their
 // count, flags. A tap digs (or flags in Флажок mode; a held tap always flags);
-// Заново deals the same field again, Новая игра opens the field picker.
+// Заново deals the same field again, Меню holds Новая игра and Завершить.
 class MinesweeperActivity final : public GameScreen {
  public:
   MinesweeperActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
@@ -28,6 +28,7 @@ class MinesweeperActivity final : public GameScreen {
   void resumeGame() override { game.resume(); }
   void openNewGame() override;
   void pickerChosen(int row, bool toggle) override;
+  void clearSave() override;
   void build(UiScreen& screen) override;
   void onTouch(const freeink::ui::ActionEvent& event, int x, int y) override;
   void onKey(int dx, int dy, bool confirm) override;

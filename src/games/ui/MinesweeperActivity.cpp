@@ -12,6 +12,7 @@
 #include "ElapsedText.h"
 #include "gameIcons.h"
 #include "games/GameSave.h"
+#include "games/chess/ui/chessIcons.h"
 
 namespace fui = freeink::ui;
 using namespace setka;
@@ -65,6 +66,8 @@ bool MinesweeperActivity::restore() {
 
 void MinesweeperActivity::saveGame() { gamesave::save(game); }
 
+void MinesweeperActivity::clearSave() { gamesave::clear(gamesave::Kind::Minesweeper); }
+
 void MinesweeperActivity::openNewGame() {
   const GamePickerActivity::Row rows[] = {
       {tr(STR_MINES_SMALL), &icon_grid_small_24},
@@ -100,7 +103,11 @@ void MinesweeperActivity::runAction(const Action action) {
       markChanged();
       break;
     case Action::Menu:
-      openNewGame();
+      if (game.isOver()) {
+        openNewGame();
+      } else {
+        openGameMenu();
+      }
       break;
   }
 }
@@ -129,7 +136,7 @@ void MinesweeperActivity::onTouch(const fui::ActionEvent& event, const int x, co
 }
 
 bool MinesweeperActivity::barShown(const int slot) const {
-  // Флажок while playing, Заново once there is something to deal again, Новая игра always.
+  // Флажок while playing, Заново once there is something to deal again, Меню (Новая игра once over) always.
   if (slot == 0) return !game.isOver();
   if (slot == 1) return game.status() != minesweeper::Status::Ready;
   return slot == 2;
@@ -234,8 +241,11 @@ void MinesweeperActivity::build(UiScreen& screen) {
                      static_cast<uint16_t>(fui::InputTouch | fui::InputLongPress));
 
   BarItem items[BAR_SLOTS];
-  const char* labels[BAR_SLOTS] = {tr(STR_MINES_FLAG), tr(STR_MINES_NEW), tr(STR_GAMES_NEW_GAME)};
-  const freeink::Icon* icons[BAR_SLOTS] = {&icon_bar_flag_24, &icon_bar_restart_24, &icon_bar_new_game_24};
+  const bool over = game.isOver();
+  const char* labels[BAR_SLOTS] = {tr(STR_MINES_FLAG), tr(STR_MINES_NEW),
+                                   over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU)};
+  const freeink::Icon* icons[BAR_SLOTS] = {&icon_bar_flag_24, &icon_bar_restart_24,
+                                           over ? &icon_bar_new_game_24 : &icon_menu_24};
   for (int i = 0; i < BAR_SLOTS; ++i) {
     if (barShown(i)) items[i] = {icons[i], labels[i], i == 0 && flagMode};
   }

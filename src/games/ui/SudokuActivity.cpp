@@ -77,6 +77,17 @@ bool SudokuActivity::restore() {
 
 void SudokuActivity::saveGame() { gamesave::save(game); }
 
+void SudokuActivity::clearSave() { gamesave::clear(gamesave::Kind::Sudoku); }
+
+// The bar has no room for a menu: the level and clock status opens it.
+void SudokuActivity::openStatusMenu() {
+  if (game.isSolved()) {
+    openNewGame();
+  } else {
+    openGameMenu();
+  }
+}
+
 void SudokuActivity::openNewGame() {
   const GamePickerActivity::Row rows[] = {
       {tr(STR_SUDOKU_EASY), &icon_level_1_24},
@@ -142,7 +153,7 @@ bool SudokuActivity::padKeyShown(const int digit) const { return game.digitCount
 void SudokuActivity::onTouch(const fui::ActionEvent& event, const int x, const int y) {
   switch (event.action) {
     case ACTION_STATUS:
-      openNewGame();
+      openStatusMenu();
       break;
     case ACTION_BOARD:
       if (const int cell = cellAt(x, y); cell >= 0) {
@@ -197,7 +208,7 @@ void SudokuActivity::onKey(const int dx, const int dy, const bool confirm) {
   switch (area) {
     case Area::Status:
       if (confirm) {
-        openNewGame();
+        openStatusMenu();
       } else if (dy > 0) {
         area = Area::Grid;
       }

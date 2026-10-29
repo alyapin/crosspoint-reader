@@ -11,6 +11,7 @@
 
 #include "gameIcons.h"
 #include "games/GameSave.h"
+#include "games/chess/ui/chessIcons.h"
 
 namespace fui = freeink::ui;
 using namespace setka;
@@ -120,6 +121,8 @@ bool KlondikeActivity::restore() {
 }
 
 void KlondikeActivity::saveGame() { gamesave::save(game); }
+
+void KlondikeActivity::clearSave() { gamesave::clear(gamesave::Kind::Klondike); }
 
 void KlondikeActivity::openNewGame() {
   const GamePickerActivity::Row rows[] = {
@@ -231,7 +234,11 @@ void KlondikeActivity::runBar(const int slot) {
   } else if (slot == 1) {
     showHint();
   } else if (slot == 2) {
-    openNewGame();
+    if (game.isWon()) {
+      openNewGame();
+    } else {
+      openGameMenu();
+    }
   }
 }
 
@@ -375,8 +382,11 @@ void KlondikeActivity::build(UiScreen& screen) {
   }
 
   BarItem items[BAR_SLOTS];
-  const char* labels[BAR_SLOTS] = {tr(STR_GAMES_UNDO), tr(STR_KLONDIKE_HINT), tr(STR_GAMES_NEW_GAME)};
-  const freeink::Icon* icons[BAR_SLOTS] = {&icon_bar_undo_24, &icon_bar_hint_24, &icon_bar_new_game_24};
+  const bool won = game.isWon();
+  const char* labels[BAR_SLOTS] = {tr(STR_GAMES_UNDO), tr(STR_KLONDIKE_HINT),
+                                   won ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU)};
+  const freeink::Icon* icons[BAR_SLOTS] = {&icon_bar_undo_24, &icon_bar_hint_24,
+                                           won ? &icon_bar_new_game_24 : &icon_menu_24};
   for (int i = 0; i < BAR_SLOTS; ++i) {
     if (barShown(i)) items[i] = {icons[i], labels[i], false};
   }
