@@ -742,7 +742,7 @@ void CardsActivity::render(RenderLock&&) {
   renderUi();
   if (!hasTouch()) {
     const auto labels =
-        view == Screen::Front ? mappedInput.mapLabels(tr(STR_BACK), tr(STR_CARDS_SHOW), "", "")
+        view == Screen::Front ? mappedInput.mapLabels(tr(STR_BACK), tr(STR_CARDS_SHOW_HINT), "", "")
         : card ? mappedInput.mapLabels(tr(STR_BACK), tr(STR_CARDS_GOOD), tr(STR_CARDS_AGAIN), tr(STR_CARDS_EASY))
                : mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);

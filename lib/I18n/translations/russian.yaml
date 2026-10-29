@@ -1011,6 +1011,7 @@ STR_CARDS_TAP_TO_SHOW: "коснитесь, чтобы показать отве
 STR_CARDS_UNDO: "Отменить"
 STR_CARDS_UNDO_HINT: "последний ответ"
 STR_CARDS_SHOW: "Показать"
+STR_CARDS_SHOW_HINT: "Ответ"
 STR_CARDS_AGAIN: "Снова"
 STR_CARDS_GOOD: "Хорошо"
 STR_CARDS_EASY: "Легко"
