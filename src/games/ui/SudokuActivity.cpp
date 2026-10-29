@@ -307,6 +307,11 @@ void SudokuActivity::build(UiScreen& screen) {
     drawResult(games::ui::captionTop(renderer, BOARD_TOP + kGridSize, kText12Font), line);
   } else {
     drawPad(screen);
+    // Touch boards name the notes mode under the pad, as Японские name Крестик.
+    if (notesMode && hasBar()) {
+      games::ui::drawCaption(renderer, games::ui::captionTop(renderer, kPadTop + kKeyHeight, kText10Font),
+                             tr(STR_SUDOKU_NOTES_HINT));
+    }
   }
 
   Action actions[SLOTS];

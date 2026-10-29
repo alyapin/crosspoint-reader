@@ -225,8 +225,10 @@ bool MinesweeperActivity::onBack() {
   return true;
 }
 
+// Under the board: the result, or the caption (two lines with Флажок on a touch board).
 int MinesweeperActivity::cellSize() const {
-  const int room = barTop() - kBoardGap - games::ui::kCaptionGap - resultHeight(false) - BOARD_TOP;
+  const int caption = hasBar() ? 2 * renderer.getLineHeight(kText10Font) : 0;
+  const int room = barTop() - kBoardGap - games::ui::kCaptionGap - std::max(resultHeight(false), caption) - BOARD_TOP;
   return std::min(renderer.getScreenWidth() / game.columns(), room / game.rows());
 }
 
@@ -265,7 +267,11 @@ void MinesweeperActivity::build(UiScreen& screen) {
   if (over) {
     drawResult(games::ui::captionTop(renderer, BOARD_TOP + height + 1, kText12Font),
                game.status() == minesweeper::Status::Won ? tr(STR_GAMES_WON) : tr(STR_MINES_LOST));
-  } else if (!hasBar()) {
+  } else if (hasBar()) {
+    // Touch boards name what a tap does now, as Японские.
+    games::ui::drawCaption(renderer, games::ui::captionTop(renderer, BOARD_TOP + height + 1, kText10Font),
+                           flagMode ? tr(STR_MINES_FLAG_HINT) : tr(STR_MINES_TAP_HINT));
+  } else {
     // Button boards flag with a held Confirm (the bar's Флажок is touch only).
     char line[64];
     snprintf(line, sizeof(line), tr(STR_MINES_FLAG_HOLD), tr(STR_GAMES_DIG));

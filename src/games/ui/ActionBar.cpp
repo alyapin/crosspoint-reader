@@ -4,6 +4,7 @@
 #include <GfxRenderer.h>
 
 #include <algorithm>
+#include <cstring>
 
 #include "components/UITheme.h"
 #include "components/setka/SetkaStyle.h"
@@ -18,6 +19,7 @@ constexpr int kBarCells = 3;
 constexpr int kIconSize = 24;
 constexpr int kIconGap = 4;
 constexpr int kResultLineGap = 4;
+constexpr size_t kCaptionBytes = 160;
 constexpr const char* kStatusJoin = "\xC2\xB7";  // between spaces: a trailing space adds no width
 
 // Walks the status left to right from `x`; draws when `draw`. Returns the x after it.
@@ -89,6 +91,31 @@ int captionTop(const GfxRenderer& renderer, const int edge, const int font) {
   int cap = 0;
   if (!renderer.getCodepointMetrics(font, 0x41D, EpdFontFamily::REGULAR, advance, cap)) cap = 0;
   return edge + kCaptionGap - (renderer.getFontAscenderSize(font) - cap);
+}
+
+int drawCaption(const GfxRenderer& renderer, int y, const char* text) {
+  const int room = renderer.getScreenWidth() - 2 * kSidePadding;
+  char line[kCaptionBytes];
+  while (*text != '\0') {
+    // The longest run of whole words that fits; a first word too wide stands alone.
+    size_t fit = 0;
+    for (size_t end = 0; end < sizeof(line); ++end) {
+      if (text[end] != ' ' && text[end] != '\0') continue;
+      memcpy(line, text, end);
+      line[end] = '\0';
+      if (fit > 0 && renderer.getTextWidth(kText10Font, line) > room) break;
+      fit = end;
+      if (text[end] == '\0') break;
+    }
+    if (fit == 0) fit = std::min(strlen(text), sizeof(line) - 1);
+    memcpy(line, text, fit);
+    line[fit] = '\0';
+    renderer.drawText(kText10Font, kSidePadding, y, line);
+    y += renderer.getLineHeight(kText10Font);
+    text += fit;
+    while (*text == ' ') ++text;
+  }
+  return y;
 }
 
 int drawResult(const GfxRenderer& renderer, const int top, const char* result, const char* detail, const char* cue) {

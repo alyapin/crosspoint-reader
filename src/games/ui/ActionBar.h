@@ -45,6 +45,8 @@ void drawStatus(const GfxRenderer& renderer, int right, int y, const StatusItem*
 // Returns the y to draw that line at.
 constexpr int kCaptionGap = 24;
 int captionTop(const GfxRenderer& renderer, int edge, int font);
+// A caption line at the left margin in UI 9, wrapped by words to the screen width. Returns the y below it.
+int drawCaption(const GfxRenderer& renderer, int y, const char* text);
 
 // A finished game's result under the board at the left margin: the result in
 // UI 11 SemiBold, then an optional detail and, on button boards, the Confirm
