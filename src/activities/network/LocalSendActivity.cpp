@@ -95,7 +95,7 @@ void LocalSendActivity::onEnter() {
                          [this](const ActivityResult& result) {
                            entryRefresh = true;
                            if (result.isCancelled) {
-                             onGoHome();
+                             leave();
                              return;
                            }
                            const auto& wifi = std::get<WifiResult>(result.data);
@@ -111,13 +111,17 @@ void LocalSendActivity::onExit() {
   if (WiFi.getMode() != WIFI_MODE_NULL) {
     WiFi.disconnect(false);
     delay(30);
-    silentRestart();
+    if (leftToMore) {
+      silentRestartToMore();
+    } else {
+      silentRestart();
+    }
   }
 }
 
 void LocalSendActivity::onWifiResult(const bool connected, const char* ssid) {
   if (!connected) {
-    onGoHome();
+    leave();
     return;
   }
   char model[24];
@@ -135,6 +139,11 @@ void LocalSendActivity::onWifiResult(const bool connected, const char* ssid) {
     snprintf(view.network, sizeof(view.network), "%s", ssid);
   }
   setStage(Stage::Ready);
+}
+
+void LocalSendActivity::leave() {
+  leftToMore = true;
+  finish();
 }
 
 void LocalSendActivity::setStage(const Stage stage) {
@@ -161,7 +170,7 @@ void LocalSendActivity::loop() {
       decide(false);
     } else {
       app.clearTapFlash();
-      onGoHome();
+      leave();
     }
     return;
   }

@@ -89,7 +89,6 @@ class ActivityManager {
 
   // goTo... functions are convenient wrapper for replaceActivity()
   void goToFileTransfer();
-  void goToLocalSend();    // «Приём книг»
   void goToJoinNetwork();  // File Transfer straight into Join Network (post heap-defrag reboot)
   void goToUsbDrive();
   // openSection jumps straight into one group (End = the section list).
@@ -111,6 +110,8 @@ class ActivityManager {
   // Remove the currentActivity, returning the last one on stack
   // Note: if popActivity() on last activity on the stack, we will goHome()
   void popActivity();
+  // The current activity was pushed: finish() returns to the screen under it.
+  bool hasParentActivity() const { return !stackActivities.empty(); }
 
   bool preventAutoSleep() const;
   bool requiresExclusiveStorageLoop() const;

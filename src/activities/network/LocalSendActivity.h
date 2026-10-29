@@ -62,6 +62,9 @@ class LocalSendActivity final : public Activity, private UiAppHost {
   setka::RefreshCadence cadence;  // render task only
   std::atomic<bool> entryRefresh{true};
 
+  // Back to Ещё; the Wi-Fi reboot in onExit() lands there too.
+  void leave();
+  bool leftToMore = false;
   void onWifiResult(bool connected, const char* ssid);
   void setStage(Stage stage);
   void syncView();

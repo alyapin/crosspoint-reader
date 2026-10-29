@@ -4,6 +4,8 @@
 
 #include "CrossPointSettings.h"
 #include "activities/games/GamesActivity.h"
+#include "activities/home/FileBrowserActivity.h"
+#include "activities/network/LocalSendActivity.h"
 #include "components/icons/listIcons.h"
 #include "components/setka/setkaIcons.h"
 
@@ -63,7 +65,7 @@ void MoreActivity::activateIndex(const int index) {
       openChild(std::make_unique<GamesActivity>(renderer, mappedInput));
       break;
     case Entry::ReceiveBooks:
-      activityManager.goToLocalSend();
+      openChild(std::make_unique<LocalSendActivity>(renderer, mappedInput));
       break;
     case Entry::FileTransfer:
       activityManager.goToFileTransfer();
@@ -76,7 +78,7 @@ void MoreActivity::activateIndex(const int index) {
       activityManager.goToPlugins(false);
       break;
     case Entry::SdFiles:
-      activityManager.goToFileBrowser();
+      openChild(std::make_unique<FileBrowserActivity>(renderer, mappedInput));
       break;
   }
 }
