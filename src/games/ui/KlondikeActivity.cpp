@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <iterator>
 
+#include "CardRenderer.h"
 #include "gameIcons.h"
 #include "games/GameSave.h"
 #include "games/chess/ui/chessIcons.h"
@@ -23,72 +24,19 @@ namespace {
 constexpr int kCardWidth = 62;
 constexpr int kCardHeight = 88;
 constexpr int kCardGap = 4;
-constexpr int kCorner = 4;
 constexpr int kFan = 18;
 constexpr int kTableauTop = GameScreen::BOARD_TOP + kCardHeight + 14;
 constexpr int kTableauGap = 8;  // between the columns and the bar rule
 constexpr int kDownStep = 10;
 constexpr int kUpStep = 30;
 constexpr int kPickFrame = 4;
-constexpr int kSuitSize = 16;
+constexpr games::ui::CardStyle kCardStyle{kCardWidth, kCardHeight, kText12Font, 16, 5};
 constexpr int kBarFocus = PILES;  // focus values past the piles are bar slots
 constexpr int kFirstFoundationColumn = 3;
-constexpr const char* kRanks[RANKS] = {"A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"};
 
 int columnX(const int screenWidth, const int column) {
   constexpr int width = TABLEAU_PILES * kCardWidth + (TABLEAU_PILES - 1) * kCardGap;
   return (screenWidth - width) / 2 + column * (kCardWidth + kCardGap);
-}
-
-void fillCircle(const GfxRenderer& renderer, const int cx, const int cy, const int r) {
-  renderer.fillRoundedRect(cx - r, cy - r, 2 * r, 2 * r, r, Color::Black);
-}
-
-// Filled suit glyph in a `size` box.
-void drawSuit(const GfxRenderer& renderer, const int x, const int y, const int size, const int suit) {
-  const int cx = x + size / 2;
-  const int r = size / 4;
-  switch (suit) {
-    case DIAMONDS:
-      GameScreen::fillTriangle(renderer, cx, y, x + size - 2, y + size / 2, x + 2, y + size / 2);
-      GameScreen::fillTriangle(renderer, cx, y + size, x + size - 2, y + size / 2, x + 2, y + size / 2);
-      break;
-    case HEARTS:
-      fillCircle(renderer, cx - r, y + r + 1, r + 1);
-      fillCircle(renderer, cx + r, y + r + 1, r + 1);
-      GameScreen::fillTriangle(renderer, x, y + r + 2, x + size, y + r + 2, cx, y + size);
-      break;
-    case SPADES:
-      GameScreen::fillTriangle(renderer, cx, y, x + size, y + size * 3 / 5, x, y + size * 3 / 5);
-      fillCircle(renderer, cx - r, y + size * 3 / 5, r + 1);
-      fillCircle(renderer, cx + r, y + size * 3 / 5, r + 1);
-      GameScreen::fillTriangle(renderer, cx, y + size / 2, cx + r, y + size, cx - r, y + size);
-      break;
-    case CLUBS:
-      fillCircle(renderer, cx, y + r + 1, r + 1);
-      fillCircle(renderer, cx - r - 1, y + size / 2 + 1, r + 1);
-      fillCircle(renderer, cx + r + 1, y + size / 2 + 1, r + 1);
-      GameScreen::fillTriangle(renderer, cx, y + size / 3, cx + r, y + size, cx - r, y + size);
-      break;
-    default:
-      break;
-  }
-}
-
-void drawDashedRect(const GfxRenderer& renderer, const int x, const int y, const int w, const int h) {
-  constexpr int kDash = 6;
-  constexpr int kGap = 4;
-  constexpr int kStroke = 2;
-  for (int d = 0; d < w; d += kDash + kGap) {
-    const int n = std::min(kDash, w - d);
-    renderer.fillRect(x + d, y, n, kStroke, true);
-    renderer.fillRect(x + d, y + h - kStroke, n, kStroke, true);
-  }
-  for (int d = 0; d < h; d += kDash + kGap) {
-    const int n = std::min(kDash, h - d);
-    renderer.fillRect(x, y + d, kStroke, n, true);
-    renderer.fillRect(x + w - kStroke, y + d, kStroke, n, true);
-  }
 }
 
 // The tableau column a top-row pile sits above, and back.
@@ -371,7 +319,7 @@ void KlondikeActivity::build(UiScreen& screen) {
   if (hintPile != kNone) {
     const int pad = 3;
     const int top = isTableau(hintPile) ? cardY(hintPile, std::max(0, game.pile(hintPile).count - 1)) : BOARD_TOP;
-    drawDashedRect(renderer, pileX(hintPile) - pad, top - pad, kCardWidth + 2 * pad, kCardHeight + 2 * pad);
+    games::ui::drawDashedRect(renderer, pileX(hintPile) - pad, top - pad, kCardWidth + 2 * pad, kCardHeight + 2 * pad);
   }
   if (focus != kNone && focus < kBarFocus) {
     const Pile& p = game.pile(focus);
@@ -398,7 +346,7 @@ void KlondikeActivity::drawPile(const int pile) const {
   const int x = pileX(pile);
   if (p.count == 0) {
     // Empty stock, foundations and columns: a dashed outline to drop on.
-    drawDashedRect(renderer, x, isTableau(pile) ? kTableauTop : BOARD_TOP, kCardWidth, kCardHeight);
+    games::ui::drawDashedRect(renderer, x, isTableau(pile) ? kTableauTop : BOARD_TOP, kCardWidth, kCardHeight);
     return;
   }
   if (pile == STOCK) {
@@ -419,15 +367,5 @@ void KlondikeActivity::drawPile(const int pile) const {
 }
 
 void KlondikeActivity::drawCard(const int x, const int y, const uint8_t card) const {
-  renderer.fillRect(x + 1, y + 1, kCardWidth - 2, kCardHeight - 2, false);
-  if (!isFaceUp(card)) {
-    renderer.fillRectDither(x + 3, y + 3, kCardWidth - 6, kCardHeight - 6, Color::LightGray);
-  } else {
-    const char* rank = kRanks[rankOf(card)];
-    renderer.drawText(kText12Font, x + 5, y + 2, rank, true, kSemiBold);
-    const int rankWidth = renderer.getTextWidth(kText12Font, rank, kSemiBold);
-    const int lineHeight = renderer.getLineHeight(kText12Font);
-    drawSuit(renderer, x + 7 + rankWidth, y + 2 + (lineHeight - kSuitSize) / 2, kSuitSize, suitOf(card));
-  }
-  renderer.drawRoundedRect(x, y, kCardWidth, kCardHeight, 1, kCorner, true);
+  games::ui::drawCard(renderer, kCardStyle, x, y, rankOf(card), suitOf(card), isFaceUp(card));
 }
