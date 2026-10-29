@@ -133,6 +133,10 @@ void ReaderToolbarUi::buildToolRow(UiScreen& screen, const fui::LayoutAnchor anc
   }
 }
 
+int16_t ReaderToolbarUi::hintsHeight() const {
+  return model_.buttonHints ? static_cast<int16_t>(UITheme::getInstance().getMetrics().buttonHintsHeight) : 0;
+}
+
 int16_t ReaderToolbarUi::openSheet(UiScreen& screen, const fui::SheetProps& props, const int16_t height) {
   const int top = std::min(screen.frame().device().screen().bottom(), screen.frame().safeRect().bottom()) - height;
   // Repaints over the sheet keep the lift found on the bare page.
@@ -171,7 +175,7 @@ void ReaderToolbarUi::buildToolbar(UiScreen& screen) {
   sheetProps.grabberInset = static_cast<int16_t>(tokens.spaceLg + tokens.spaceMd);
   const int16_t grabberBand =
       static_cast<int16_t>(sheetProps.grabberMargin + sheetProps.grabberHeight + sheetProps.grabberInset);
-  const int16_t lift = openSheet(screen, sheetProps, static_cast<int16_t>(contentH + grabberBand));
+  const int16_t lift = openSheet(screen, sheetProps, static_cast<int16_t>(contentH + grabberBand + hintsHeight()));
   screen.insetContent(fui::Insets{0, tokens.spaceLg, 0, tokens.spaceLg});
   screen.spacer(static_cast<int16_t>(lift + tokens.spaceMd));
 
@@ -270,8 +274,10 @@ void ReaderToolbarUi::buildPanel(UiScreen& screen) {
   if (static_cast<int16_t>(chrome + (sheetRows + 1) * rowStride - rowGap) <= cap) ++sheetRows;
   if (model_.itemCount > 0 && sheetRows > model_.itemCount) sheetRows = model_.itemCount;
   if (sheetRows < 1) sheetRows = 1;
-  const int16_t lift = openSheet(screen, sheetProps, static_cast<int16_t>(chrome + sheetRows * rowStride - rowGap));
+  const int16_t lift =
+      openSheet(screen, sheetProps, static_cast<int16_t>(chrome + sheetRows * rowStride - rowGap + hintsHeight()));
   if (lift > 0) screen.spacer(lift);
+  if (model_.buttonHints) screen.spacer(hintsHeight(), fui::LayoutAnchor::Bottom);
   // No blanket side inset: Screen::list() draws in the content band, and the
   // scroll track must reach the sheet's edge like a full-screen list's does.
   // The title insets itself; the rows inset via rowInset below.

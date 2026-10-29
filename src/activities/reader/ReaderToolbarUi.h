@@ -46,6 +46,8 @@ class ReaderToolbarUi : public UiAppHost {
     // Button boards keep the theme's denser list row height (as every other
     // list does there); touch boards use FreeInkUI's finger-sized rows.
     bool denseRows = false;
+    // Button boards: the sheet keeps its bottom band free for the button hints.
+    bool buttonHints = false;
   };
 
   struct Routed {
@@ -90,6 +92,7 @@ class ReaderToolbarUi : public UiAppHost {
   // clear gap of the page under it, so no line of the page shows cut; the
   // content keeps its place. Returns the extra height at the top.
   int16_t openSheet(UiScreen& screen, const freeink::ui::SheetProps& props, int16_t height);
+  int16_t hintsHeight() const;
 
   const GfxRenderer& renderer_;
 

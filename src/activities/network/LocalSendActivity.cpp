@@ -256,6 +256,10 @@ void LocalSendActivity::render(RenderLock&&) {
     GUI.drawHeader(renderer, Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.headerHeight},
                    tr(STR_LOCALSEND_TITLE));
     renderUi();
+    const bool deciding = view.stage == Stage::Ready && view.phase == Phase::AwaitingDecision;
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), deciding ? tr(STR_SELECT) : "",
+                                              deciding ? tr(STR_DIR_LEFT) : "", deciding ? tr(STR_DIR_RIGHT) : "");
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   }
   renderer.displayBuffer(entryRefresh.exchange(false) ? cadence.entry() : cadence.update());
 }
@@ -314,7 +318,8 @@ void LocalSendActivity::drawRequest(int y, const int width) {
   y += line12 + 14;
 
   const int rowPitch = line12 + 4 + kProgressHeight + 18;
-  const int bottom = renderer.getScreenHeight() - kActionBarHeight - 8;
+  const int hints = mappedInput.hasTouch() ? 0 : UITheme::getInstance().getMetrics().buttonHintsHeight;
+  const int bottom = renderer.getScreenHeight() - hints - kActionBarHeight - 8;
   int shown = 0;
   for (; shown < view.rowCount && y + rowPitch <= bottom; shown++) {
     const Row& row = view.rows[shown];
@@ -357,7 +362,8 @@ void LocalSendActivity::drawRequest(int y, const int width) {
 
 void LocalSendActivity::drawActions(UiScreen& screen, const int width, const int height) {
   using namespace setka;
-  const int top = height - kActionBarHeight;
+  const int hints = mappedInput.hasTouch() ? 0 : UITheme::getInstance().getMetrics().buttonHintsHeight;
+  const int top = height - hints - kActionBarHeight;
   const int line12 = renderer.getLineHeight(kText12Font);
   const int textTop = top + (kActionBarHeight - line12) / 2;
   drawRule(renderer, 0, top, width);

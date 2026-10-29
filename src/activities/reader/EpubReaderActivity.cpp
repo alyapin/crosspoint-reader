@@ -2824,6 +2824,13 @@ void EpubReaderActivity::renderOverlay() {
   model.activeTool = (overlay == Overlay::Toolbar && !panelCursorShown) ? -1 : focusedTool;
   // Strings the model points at live here until render() returns.
   std::string chapterTitle, pageInfo;
+  // Button hints under the sheet, on the bottom edge they name (portrait only).
+  model.buttonHints = !mappedInput.hasTouch() && renderer.getOrientation() == GfxRenderer::Orientation::Portrait;
+  const auto drawHints = [this, &model](const char* previous, const char* next) {
+    if (!model.buttonHints) return;
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), previous, next);
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+  };
 
   if (overlay == Overlay::Toolbar) {
     chapterTitle = currentChapterTitle();
@@ -2838,6 +2845,7 @@ void EpubReaderActivity::renderOverlay() {
     model.progressPermille = static_cast<int>(bookProgress * 1000.0f + 0.5f);
     toolbarUi->setModel(model);
     toolbarUi->render();
+    drawHints(tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
     return;
   }
 
@@ -2883,6 +2891,7 @@ void EpubReaderActivity::renderOverlay() {
   }
   toolbarUi->setModel(model);
   toolbarUi->render();
+  drawHints(tr(STR_DIR_UP), tr(STR_DIR_DOWN));
 }
 
 void EpubReaderActivity::handleOverlayInput() {
