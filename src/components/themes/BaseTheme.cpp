@@ -11,6 +11,8 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
+#include <cstring>
 #include <string>
 
 #include "I18n.h"
@@ -825,13 +827,18 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
   }
   constexpr int clusterGap = 10;
   if (sb.showBookPage && bookPageText && bookPageText[0] != '\0') {
-    // An estimated page starts with "~": a size up, like the chapter estimate below, or it reads as a dash.
+    // An estimated page carries "~" before its number: a size up, like the chapter
+    // estimate below, or it reads as a dash.
     int pageX = leftClusterX;
-    if (bookPageText[0] == '~') {
+    if (const char* tilde = strchr(bookPageText, '~')) {
+      char lead[40];
+      snprintf(lead, sizeof(lead), "%.*s", static_cast<int>(tilde - bookPageText), bookPageText);
+      renderer.drawText(SMALL_FONT_ID, pageX, textY, lead);
+      pageX += renderer.getTextAdvanceX(SMALL_FONT_ID, lead, EpdFontFamily::REGULAR);  // keeps the trailing space
       const int estimateY = textY + (renderer.getLineHeight(SMALL_FONT_ID) - renderer.getLineHeight(UI_10_FONT_ID)) / 2;
       renderer.drawText(UI_10_FONT_ID, pageX, estimateY, "~");
       pageX += renderer.getTextWidth(UI_10_FONT_ID, "~") + 2;
-      ++bookPageText;
+      bookPageText = tilde + 1;
     }
     renderer.drawText(SMALL_FONT_ID, pageX, textY, bookPageText);
     leftClusterWidth += pageX - leftClusterX + renderer.getTextWidth(SMALL_FONT_ID, bookPageText) + clusterGap;

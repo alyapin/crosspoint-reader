@@ -256,7 +256,7 @@ void StatusBarSettingsActivity::render(RenderLock&&) {
 
   char bookPage[40];
   char timeLeft[40];
-  snprintf(bookPage, sizeof(bookPage), tr(STR_BOOK_PAGE_OF), 212u, 486u);
+  snprintf(bookPage, sizeof(bookPage), tr(STR_BOOK_PAGE_OF), "", 212u, 486u);
   snprintf(timeLeft, sizeof(timeLeft), tr(STR_TIME_LEFT_HOURS_MIN), 1u, 20u);
 
   // Anchor the preview as a footer directly above the button hints.

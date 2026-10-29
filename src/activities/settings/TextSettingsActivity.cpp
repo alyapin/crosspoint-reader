@@ -252,6 +252,11 @@ void TextSettingsActivity::buildScreen(UiScreen& screen) {
   props.labelText = screen.theme().smallText;
   props.labelText.maxLines = 2;
   syncTabListViewport(screen, props);
+  // Touch leaves the list without a focus: as in the value picker, the current
+  // font or size then carries the bar as well as the radio.
+  if (mappedInput.hasTouch() && ringPos() == 0 && (tab_ == Tab::Family || tab_ == Tab::Size)) {
+    props.selectedIndex = static_cast<int16_t>(tab_ == Tab::Family ? currentFamilyIndex_ : currentSizeIndex_);
+  }
   screen.list(props);
 }
 

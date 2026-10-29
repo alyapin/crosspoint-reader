@@ -105,10 +105,8 @@ void BookFooter::onPage(const uint32_t key, const int spine, const Section& sect
 
   const auto pos = map.locate(spine, page < 0 ? 0 : page, section.estimatedTotalPages(), chapterExact);
   shownExact = pos.exact;
-  char pages[sizeof(pageText_)];
-  snprintf(pages, sizeof(pages), tr(STR_BOOK_PAGE_OF), static_cast<unsigned>(pos.page),
+  snprintf(pageText_, sizeof(pageText_), tr(STR_BOOK_PAGE_OF), pos.exact ? "" : "~", static_cast<unsigned>(pos.page),
            static_cast<unsigned>(pos.total));
-  snprintf(pageText_, sizeof(pageText_), "%s%s", pos.exact ? "" : "~", pages);
 
   const uint32_t pagesLeft = pos.total - pos.page + 1;
   formatTimeLeft(readingSecondsLeft(pagesLeft, charsPerPage, pace.charsPerMinute()), tr(STR_TIME_LEFT_MIN),

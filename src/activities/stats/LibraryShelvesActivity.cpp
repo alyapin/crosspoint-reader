@@ -38,6 +38,8 @@ constexpr int kTabGapMin = 10;
 constexpr int kTabBarGap = 6;
 // Gap before the active tab: its bar, plus air on both sides.
 constexpr int kTabBarRun = kSelectionBarWidth + 2 * kTabBarGap;
+// The other gaps carry a thin divider, so the labels do not read as one phrase.
+constexpr int kTabDividerHeight = 16;
 // Rows kept per status tab, newest first: each holds its path and title.
 constexpr size_t kMaxRows = FREEINK_MCU_C3 ? 80 : 200;
 
@@ -459,6 +461,10 @@ int LibraryShelvesActivity::drawTabs(UiScreen& screen, const int stripTop, const
     renderer.drawText(font, x, textTop, label, true, style);
     screen.frame().hit(fui::makeRect(x - tabGap / 2, stripTop, labelWidth + tabGap, stripHeight), ACTION_TAB,
                        static_cast<int16_t>(i), fui::InputTouch);
+    if (i + 1 < TabCount && i + 1 != tab) {
+      renderer.fillRect(x + labelWidth + tabGap / 2, textTop + (lineHeight - kTabDividerHeight) / 2, 1,
+                        kTabDividerHeight, true);
+    }
     x += labelWidth + (i + 1 == tab ? std::max(tabGap, kTabBarRun) : tabGap);
   }
   drawRule(renderer, 0, stripTop + stripHeight, width);
