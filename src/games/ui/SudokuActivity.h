@@ -37,6 +37,8 @@ class SudokuActivity final : public GameScreen {
   void onTouch(const freeink::ui::ActionEvent& event, int x, int y) override;
   void onKey(int dx, int dy, bool confirm) override;
   bool onBack() override;
+  const char* backHint() const override { return area != Area::Grid ? tr(STR_CANCEL) : nullptr; }
+  const char* confirmHint() const override;
   int32_t shownMinutes() const override;
 
   void barActions(Action (&out)[SLOTS]) const;

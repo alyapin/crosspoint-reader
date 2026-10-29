@@ -1026,9 +1026,11 @@ void ChessActivity::render(RenderLock&& lock) {
   renderUi();
   // Button boards only; the lists and the action bar end above the hints.
   const bool board = view == View::Game;
-  const auto labels =
-      mappedInput.mapLabels(board ? tr(STR_CHESS_MENU) : tr(STR_BACK), tr(STR_SELECT),
-                            board ? tr(STR_DIR_LEFT) : tr(STR_DIR_UP), board ? tr(STR_DIR_RIGHT) : tr(STR_DIR_DOWN));
+  const auto labels = mappedInput.mapLabels(!board                                            ? tr(STR_BACK)
+                                            : selected != kNoSquare || promoFrom != kNoSquare ? tr(STR_CANCEL)
+                                                                                              : tr(STR_CHESS_MENU),
+                                            tr(STR_SELECT), board ? tr(STR_DIR_LEFT) : tr(STR_DIR_UP),
+                                            board ? tr(STR_DIR_RIGHT) : tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   const uint8_t kind = repaint.exchange(RepaintNone);
   const HalDisplay::RefreshMode mode = kind == RepaintEntry   ? cadence.entry()

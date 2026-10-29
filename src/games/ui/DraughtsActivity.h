@@ -38,6 +38,9 @@ class DraughtsActivity final : public GameScreen {
   void onTouch(const freeink::ui::ActionEvent& event, int x, int y) override;
   void onKey(int dx, int dy, bool confirm) override;
   bool onBack() override;
+  const char* backHint() const override {
+    return selected >= 0 && (chainLen > 0 || !soleMover()) ? tr(STR_CANCEL) : nullptr;
+  }
   int menuRows(GamePickerActivity::Row (&rows)[MENU_ROWS]) const override;
   void menuChosen(int row) override;
   bool resigns() const override { return true; }

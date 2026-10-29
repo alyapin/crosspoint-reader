@@ -301,6 +301,15 @@ void NonogramActivity::onKey(const int dx, const int dy, const bool confirm) {
   if (!std::equal(std::begin(before), std::end(before), std::begin(after))) requestRepaint(RepaintUpdate);
 }
 
+const char* NonogramActivity::confirmHint() const {
+  if (stroking) return tr(STR_GAMES_DONE);
+  if (!boardShown() || !game.inProgress() || barFocus >= 0 || cursor < 0) return nullptr;
+  const Mark m = game.mark(cursor);
+  return m == nonogram::Empty    ? tr(STR_GAMES_FILL)
+         : m == nonogram::Filled ? tr(STR_NONOGRAM_CROSS)
+                                 : tr(STR_GAMES_ERASE);
+}
+
 bool NonogramActivity::holdsConfirm() const {
   return !hasBar() && boardShown() && game.inProgress() && keyCursor && cursor >= 0 && barFocus < 0 && !stroking;
 }

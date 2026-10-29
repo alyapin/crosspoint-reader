@@ -100,8 +100,9 @@ class GameScreen : public Activity, protected UiAppHost {
   // A game against an opponent ends with Сдаться (resign) where a solo game drops its save and leaves.
   virtual bool resigns() const { return false; }
   virtual void resign() {}
-  // False hides the Confirm button hint while Confirm does nothing on the board.
-  virtual bool confirmActs() const { return true; }
+  // Button hints while the game runs, naming what Back and Confirm do now: nullptr keeps Меню and Выбрать, "" hides.
+  virtual const char* backHint() const { return nullptr; }
+  virtual const char* confirmHint() const { return nullptr; }
 
   void openPicker(const char* title, const GamePickerActivity::Row* rows, int count, int selected, int toggleRow = -1,
                   bool toggleOn = false);

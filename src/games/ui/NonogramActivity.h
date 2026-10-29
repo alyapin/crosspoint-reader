@@ -52,6 +52,8 @@ class NonogramActivity final : public GameScreen {
   // Button boards: a held Confirm crosses the cell (a filled one stays filled) and starts a stroke.
   bool holdsConfirm() const override;
   void onConfirmHold() override;
+  const char* backHint() const override { return stroking ? tr(STR_GAMES_DONE) : nullptr; }
+  const char* confirmHint() const override;
 
   Notice loadPicture(int side);
   bool boardShown() const { return game.hasPuzzle() && notice == Notice::None; }

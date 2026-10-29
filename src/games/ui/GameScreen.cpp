@@ -280,8 +280,12 @@ void GameScreen::loop() {
 void GameScreen::render(RenderLock&& lock) {
   renderer.clearScreen();
   renderUi();
-  const auto labels = mappedInput.mapLabels(tr(STR_GAMES_MENU), confirmActs() ? tr(STR_SELECT) : "", tr(STR_DIR_LEFT),
-                                            tr(STR_DIR_RIGHT));
+  const bool over = newGameSlot() >= 0;
+  const char* back = over ? nullptr : backHint();
+  const char* confirm = over ? nullptr : confirmHint();
+  const auto labels =
+      mappedInput.mapLabels(back != nullptr ? back : tr(STR_GAMES_MENU), confirm != nullptr ? confirm : tr(STR_SELECT),
+                            tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   const uint8_t kind = repaint.exchange(RepaintNone);
   const HalDisplay::RefreshMode mode = kind == RepaintEntry   ? cadence.entry()

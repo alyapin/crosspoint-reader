@@ -262,6 +262,12 @@ uint32_t SudokuActivity::idleSleepBudgetMs() const {
   return hasGame && !game.paused() ? games::ui::msUntilNextMinute(game.elapsedMs()) : light_sleep::kNoDeadline;
 }
 
+const char* SudokuActivity::confirmHint() const {
+  if (area == Area::Bar) return nullptr;
+  if (game.isLocked(selected)) return "";
+  return notesMode ? tr(STR_GAMES_NOTE) : tr(STR_GAMES_DIGIT);
+}
+
 bool SudokuActivity::onBack() {
   if (area == Area::Grid) return false;
   area = Area::Grid;
