@@ -335,14 +335,15 @@ class OptionPopup {
     uiReady = true;
   }
 
-  // One or two options share a row when both labels fit side by side.
+  // One or two options share a row when both labels fit side by side. Only the right label's bar takes
+  // room between them; the left one's sits in the side padding.
   bool buttonRow(const GfxRenderer& renderer) const {
     using namespace setka;
     const int count = std::min<int>(ownedStrings.size(), MAX_OPTIONS);
     if (count > 2 || !icons.empty()) return false;
-    int labelsWidth = kButtonGap;
+    int labelsWidth = kButtonGap + kButtonBarSpan;
     for (int i = 0; i < count; ++i) {
-      labelsWidth += renderer.getTextWidth(kText12Font, ownedStrings[i].c_str(), kSemiBold) + kButtonBarSpan;
+      labelsWidth += renderer.getTextWidth(kText12Font, ownedStrings[i].c_str(), kSemiBold);
     }
     return labelsWidth <= renderer.getScreenWidth() - 2 * (kSidePadding + kDialogSidePadding);
   }
