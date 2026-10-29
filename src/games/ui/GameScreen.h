@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "ActionBar.h"
 #include "GamePickerActivity.h"
 #include "activities/Activity.h"
 #include "components/UiAppHost.h"
@@ -34,7 +35,7 @@ class GameScreen : public Activity, protected UiAppHost {
   static constexpr int TOP_LINE_Y = setka::kGameTopLineY;
   static constexpr int BOARD_TOP = setka::kGameBoardTop;
   static constexpr int BAR_SLOTS = 3;
-  static constexpr int BAR_HEIGHT = 70;  // the rule and the action bar, at the bottom edge
+  static constexpr int BAR_HEIGHT = games::ui::kActionBarHeight;  // the rule and the action bar, at the bottom edge
 
   // Filled triangle without the heap (GfxRenderer::fillPolygon allocates per call).
   static void fillTriangle(const GfxRenderer& renderer, int x0, int y0, int x1, int y1, int x2, int y2);
@@ -51,8 +52,9 @@ class GameScreen : public Activity, protected UiAppHost {
   static constexpr freeink::ui::ActionId ACTION_USER = 5;
 
   struct BarItem {
+    const freeink::Icon* icon = nullptr;
     const char* label = nullptr;  // nullptr hides the slot
-    bool active = false;          // a mode that is on: left bar + SemiBold
+    bool active = false;          // a mode that is on: inset frame
   };
 
   GameScreen(const char* name, GfxRenderer& renderer, MappedInputManager& mappedInput);

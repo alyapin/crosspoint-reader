@@ -44,8 +44,8 @@ class ChessActivity final : public Activity, private UiAppHost {
   // Pending repaint, strongest wins: Entry = HALF, Update = cadence FAST,
   // Clock = plain FAST that does not count toward the cadence.
   enum Repaint : uint8_t { RepaintNone, RepaintClock, RepaintUpdate, RepaintEntry };
-  enum class GameAction : uint8_t { None, NewGame, Undo, Menu };
-  static constexpr int kMaxActions = 3;
+  enum class GameAction : uint8_t { None, NewGame, Undo, Flip, Menu };
+  static constexpr int kMaxActions = 4;
   static constexpr int kMaxRows = 8;
   static constexpr chess::Square kNoSquare = 0xFF;
 

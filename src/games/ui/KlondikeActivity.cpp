@@ -376,8 +376,9 @@ void KlondikeActivity::build(UiScreen& screen) {
 
   BarItem items[BAR_SLOTS];
   const char* labels[BAR_SLOTS] = {tr(STR_GAMES_UNDO), tr(STR_KLONDIKE_HINT), tr(STR_GAMES_NEW_GAME)};
+  const freeink::Icon* icons[BAR_SLOTS] = {&icon_bar_undo_24, &icon_bar_hint_24, &icon_bar_new_game_24};
   for (int i = 0; i < BAR_SLOTS; ++i) {
-    if (barShown(i)) items[i].label = labels[i];
+    if (barShown(i)) items[i] = {icons[i], labels[i], false};
   }
   drawBar(screen, items, focus >= kBarFocus ? focus - kBarFocus : -1);
 }

@@ -1,0 +1,11 @@
+# Difficulty marks for the game pickers: four bars, the empty ones outlined.
+# Regenerate from the repository root with:
+#   python3 freeink-sdk/libs/assets/Icons/tools/gen_icons.py \
+#     --manifest src/games/ui/levelIcons.manifest \
+#     --svgdir src/games/ui/icons \
+#     --sizes 24 --out src/games/ui/levelIcons.h
+# then clang-format the header.
+level-1 = level-1
+level-2 = level-2
+level-3 = level-3
+level-4 = level-4

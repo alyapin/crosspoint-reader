@@ -19,6 +19,7 @@
 #include "components/HeaderBackTapTarget.h"
 #include "components/UITheme.h"
 #include "games/chess/ChessSave.h"
+#include "games/ui/ActionBar.h"
 
 namespace fui = freeink::ui;
 using namespace setka;
@@ -32,6 +33,7 @@ constexpr fui::ActionId ACTION_UNDO = 5;
 constexpr fui::ActionId ACTION_MENU = 6;
 constexpr fui::ActionId ACTION_PROMOTE = 7;
 constexpr fui::ActionId ACTION_NEW_GAME = 8;
+constexpr fui::ActionId ACTION_FLIP = 9;
 
 // List screens: the CrossPoint 2.0 header and row pitch, Setka selection bar.
 constexpr int kHeaderTop = kGameTopLineY;  // game view top line, under the status line
@@ -49,7 +51,7 @@ constexpr int kSquare = 60;
 constexpr int kBoardTop = kGameBoardTop;
 constexpr int kBoardSize = 8 * kSquare;
 constexpr int kPanelTop = kBoardTop + kBoardSize;
-constexpr int kActionsTop = 718;
+constexpr int kActionsTop = 800 - games::ui::kActionBarHeight;
 constexpr int kPieceInset = (kSquare - 56) / 2;
 constexpr int kDotSize = 16;
 constexpr int kRingWidth = 3;
@@ -327,6 +329,7 @@ int ChessActivity::gameActions(GameAction* out) const {
   int n = 0;
   if (match->game().isOver()) out[n++] = GameAction::NewGame;
   if (match->canUndo()) out[n++] = GameAction::Undo;
+  out[n++] = GameAction::Flip;
   out[n++] = GameAction::Menu;
   return n;
 }
@@ -345,6 +348,10 @@ void ChessActivity::runAction(const GameAction action) {
       break;
     case GameAction::Undo:
       if (match->undo()) afterPly();
+      break;
+    case GameAction::Flip:
+      manualFlip = !manualFlip;
+      requestRepaint(RepaintUpdate);
       break;
     case GameAction::Menu:
       setView(View::Menu);
@@ -443,6 +450,9 @@ void ChessActivity::handleAction(const fui::ActionEvent& event, const int x, con
       break;
     case ACTION_UNDO:
       runAction(GameAction::Undo);
+      break;
+    case ACTION_FLIP:
+      runAction(GameAction::Flip);
       break;
     case ACTION_MENU:
       runAction(GameAction::Menu);
@@ -1359,24 +1369,17 @@ void ChessActivity::drawGameOver(UiScreen& screen) const {
 }
 
 void ChessActivity::drawActions(UiScreen& screen) const {
-  const int width = renderer.getScreenWidth();
-  drawRule(renderer, 0, kActionsTop, width);
-  const int bandTop = kActionsTop + kRuleWidth;
-  const int bandHeight = renderer.getScreenHeight() - bandTop;
-  const int lineHeight = renderer.getLineHeight(kText12Font);
-  const int textTop = bandTop + (bandHeight - lineHeight) / 2;
   const GameAction focused = focusedAction();
-  if (match->canUndo()) {
-    const bool on = focused == GameAction::Undo;
-    if (on) drawSelectionBar(renderer, kBarX, textTop, lineHeight);
-    renderer.drawText(kText12Font, kRowTextX, textTop, tr(STR_CHESS_UNDO), true,
-                      on ? kSemiBold : EpdFontFamily::REGULAR);
-    screen.frame().hit(fui::makeRect(0, bandTop, width / 2, bandHeight), ACTION_UNDO, 0, fui::InputTouch);
-  }
-  const bool on = focused == GameAction::Menu;
-  const auto style = on ? kSemiBold : EpdFontFamily::REGULAR;
-  const int menuX = width - kSidePadding - renderer.getTextWidth(kText12Font, tr(STR_CHESS_MENU), style);
-  if (on) drawSelectionBar(renderer, menuX - kRowTextX + kBarX, textTop, lineHeight);
-  renderer.drawText(kText12Font, menuX, textTop, tr(STR_CHESS_MENU), true, style);
-  screen.frame().hit(fui::makeRect(width / 2, bandTop, width / 2, bandHeight), ACTION_MENU, 0, fui::InputTouch);
+  games::ui::ActionSlot slots[] = {
+      {&icon_undo_move_24, tr(STR_CHESS_UNDO), false, ACTION_UNDO, 0},
+      {&icon_flip_24, tr(STR_CHESS_FLIP_SHORT), false, ACTION_FLIP, 0},
+      {&icon_menu_24, tr(STR_CHESS_MENU), false, ACTION_MENU, 0},
+  };
+  if (!match->canUndo()) slots[0].label = nullptr;
+  const int focusedSlot = focused == GameAction::Undo   ? 0
+                          : focused == GameAction::Flip ? 1
+                          : focused == GameAction::Menu ? 2
+                                                        : -1;
+  games::ui::drawActionBar(renderer, screen, kActionsTop, slots, static_cast<int>(std::size(slots)), focusedSlot,
+                           fui::InputTouch);
 }

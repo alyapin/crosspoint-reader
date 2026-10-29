@@ -183,25 +183,11 @@ void GameScreen::drawTopLine(UiScreen& screen, const char* label, const char* va
 }
 
 void GameScreen::drawBar(UiScreen& screen, const BarItem (&items)[BAR_SLOTS], const int focused) const {
-  const int width = renderer.getScreenWidth();
-  const int slot = width / BAR_SLOTS;
-  const int lineHeight = renderer.getLineHeight(kText12Font);
-  drawRule(renderer, 0, barTop(), width);
-  const int top = barTop() + kRuleWidth;
-  const int textTop = top + (BAR_HEIGHT - lineHeight) / 2;
+  games::ui::ActionSlot slots[BAR_SLOTS];
   for (int i = 0; i < BAR_SLOTS; ++i) {
-    const BarItem& item = items[i];
-    if (item.label == nullptr) continue;
-    const auto style = item.active ? kSemiBold : EpdFontFamily::REGULAR;
-    const int textWidth = renderer.getTextWidth(kText12Font, item.label, style);
-    // First slot left-aligned past the bar, last right-aligned, middle centred.
-    const int x = i == 0 ? kRowTextX : i == BAR_SLOTS - 1 ? width - kSidePadding - textWidth : (width - textWidth) / 2;
-    if (item.active) drawSelectionBar(renderer, x - kRowTextX + kSelectionBarX, textTop, lineHeight);
-    renderer.drawText(kText12Font, x, textTop, item.label, true, style);
-    if (i == focused) drawCellFrame(renderer, i * slot, top, slot, BAR_HEIGHT - kRuleWidth);
-    screen.frame().hit(fui::makeRect(i * slot, top, slot, BAR_HEIGHT - kRuleWidth), ACTION_BAR, static_cast<int16_t>(i),
-                       shellInput());
+    slots[i] = {items[i].icon, items[i].label, items[i].active, ACTION_BAR, static_cast<int16_t>(i)};
   }
+  games::ui::drawActionBar(renderer, screen, barTop(), slots, BAR_SLOTS, focused, shellInput());
 }
 
 void GameScreen::drawCentered(const int font, const int x, const int width, const int y, const char* text,

@@ -14,6 +14,7 @@
 #include "components/HeaderBackTapTarget.h"
 #include "components/UITheme.h"
 #include "games/scanword/ScanwordStore.h"
+#include "games/ui/ActionBar.h"
 #include "scanwordIcons.h"
 
 namespace fui = freeink::ui;
@@ -1142,33 +1143,12 @@ void ScanwordActivity::drawKeyboard(UiScreen& screen) const {
   // One hit for all keys (the frame holds few interactions); handleAction finds the key.
   screen.frame().hit(fui::makeRect(0, keysTop, width, kKeyRows * kKeyHeight), ACTION_KEY, 0, kTap);
 
-  const int actTop = keysTop + kKeyRows * kKeyHeight;
-  drawRule(renderer, 0, actTop, width);
-  struct Act {
-    const freeink::Icon* icon;
-    StrId label;
-    fui::ActionId action;
-  };
-  const Act acts[] = {{&icon_scanword_erase_24, StrId::STR_SCANWORD_ERASE, ACTION_ERASE},
-                      {&icon_scanword_check_24, StrId::STR_SCANWORD_CHECK, ACTION_CHECK},
-                      {&icon_scanword_hint_24, StrId::STR_SCANWORD_HINT, ACTION_HINT},
-                      {&icon_scanword_done_24, StrId::STR_SCANWORD_DONE, ACTION_DONE}};
-  constexpr int kActs = 4;
-  // Icon above a caption, like the bottom tabs.
-  const int cellTop = actTop + kRuleWidth;
-  const int cellHeight = height - cellTop;
-  const int captionHeight = renderer.getLineHeight(kCaptionFont);
-  const int iconTop = cellTop + (cellHeight - kIconSize - captionHeight) / 2;
-  for (int i = 0; i < kActs; ++i) {
-    const int x0 = i * width / kActs;
-    const int x1 = (i + 1) * width / kActs;
-    const char* label = I18N.get(acts[i].label);
-    drawIcon(screen, *acts[i].icon, x0 + (x1 - x0 - kIconSize) / 2, iconTop);
-    renderer.drawText(kCaptionFont, x0 + (x1 - x0 - renderer.getTextWidth(kCaptionFont, label)) / 2,
-                      iconTop + kIconSize, label);
-    if (i > 0) renderer.drawLine(x0, cellTop, x0, height - 1);
-    screen.frame().hit(fui::makeRect(x0, cellTop, x1 - x0, cellHeight), acts[i].action, 0, kTap);
-  }
+  const games::ui::ActionSlot acts[] = {{&icon_scanword_erase_24, tr(STR_SCANWORD_ERASE), false, ACTION_ERASE, 0},
+                                        {&icon_scanword_check_24, tr(STR_SCANWORD_CHECK), false, ACTION_CHECK, 0},
+                                        {&icon_scanword_hint_24, tr(STR_SCANWORD_HINT), false, ACTION_HINT, 0},
+                                        {&icon_scanword_done_24, tr(STR_SCANWORD_DONE), false, ACTION_DONE, 0}};
+  games::ui::drawActionBar(renderer, screen, keysTop + kKeyRows * kKeyHeight, acts, static_cast<int>(std::size(acts)),
+                           -1, kTap);
 }
 
 void ScanwordActivity::drawLetterStrip(const int top) const {

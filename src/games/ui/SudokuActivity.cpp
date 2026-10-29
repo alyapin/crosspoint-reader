@@ -12,6 +12,7 @@
 #include "ElapsedText.h"
 #include "gameIcons.h"
 #include "games/GameSave.h"
+#include "levelIcons.h"
 
 namespace fui = freeink::ui;
 using namespace setka;
@@ -78,10 +79,10 @@ void SudokuActivity::saveGame() { gamesave::save(game); }
 
 void SudokuActivity::openNewGame() {
   const GamePickerActivity::Row rows[] = {
-      {tr(STR_SUDOKU_EASY), &icon_signal_low_24},
-      {tr(STR_SUDOKU_MEDIUM), &icon_signal_medium_24},
-      {tr(STR_SUDOKU_HARD), &icon_signal_high_24},
-      {tr(STR_SUDOKU_EXPERT), &icon_signal_24},
+      {tr(STR_SUDOKU_EASY), &icon_level_1_24},
+      {tr(STR_SUDOKU_MEDIUM), &icon_level_2_24},
+      {tr(STR_SUDOKU_HARD), &icon_level_3_24},
+      {tr(STR_SUDOKU_EXPERT), &icon_level_4_24},
   };
   const int current = hasGame ? static_cast<int>(game.level()) : 1;
   openPicker(tr(STR_GAMES_NEW_GAME), rows, static_cast<int>(std::size(rows)), current);
@@ -306,16 +307,16 @@ void SudokuActivity::build(UiScreen& screen) {
   for (int i = 0; i < BAR_SLOTS; ++i) {
     switch (actions[i]) {
       case Action::Notes:
-        items[i] = {tr(STR_SUDOKU_NOTES), notesMode};
+        items[i] = {&icon_bar_notes_24, tr(STR_SUDOKU_NOTES), notesMode};
         break;
       case Action::Erase:
-        items[i] = {tr(STR_SUDOKU_ERASE), false};
+        items[i] = {&icon_bar_erase_24, tr(STR_SUDOKU_ERASE), false};
         break;
       case Action::Undo:
-        items[i] = {tr(STR_GAMES_UNDO), false};
+        items[i] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false};
         break;
       case Action::NewGame:
-        items[i] = {tr(STR_GAMES_NEW_GAME), false};
+        items[i] = {&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false};
         break;
       case Action::None:
         break;
