@@ -337,8 +337,15 @@ bool NonogramActivity::holdsConfirm() const {
   return !hasBar() && boardShown() && game.inProgress() && keyCursor && cursor >= 0 && barFocus < 0 && !stroking;
 }
 
+// The line puts what a press puts on an empty first cell (a fill, a cross in Крестик mode) and carries on
+// the mark of a marked one.
 void NonogramActivity::onConfirmHold() {
-  strokeMark = game.mark(cursor) == nonogram::Filled ? nonogram::Filled : nonogram::Crossed;
+  const Mark first = game.mark(cursor);
+  if (first == nonogram::Empty) {
+    strokeMark = crossMode ? nonogram::Crossed : nonogram::Filled;
+  } else {
+    strokeMark = first;
+  }
   stroking = true;
   if (game.mark(cursor) != strokeMark) {
     apply(cursor, strokeMark);
