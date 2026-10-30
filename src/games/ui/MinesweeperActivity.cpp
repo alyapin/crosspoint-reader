@@ -100,13 +100,16 @@ void MinesweeperActivity::runAction(const Action action) {
       requestRepaint(RepaintUpdate);
       break;
     case Action::New:
-      // A finished field has nothing to lose: it deals again at once.
-      if (game.isOver()) {
+      if (!game.isOver()) {
+        confirmRestart();
+      } else if (hasBar()) {
+        // A finished field has nothing to lose: the bar's Начать заново deals again at once.
         game.newGame(game.config(), esp_random());
         flagMode = false;
         markChanged();
       } else {
-        confirmRestart();
+        // Button boards: Confirm on a finished field opens the size picker, as «Выбрать»: новая игра says.
+        openNewGame();
       }
       break;
     case Action::Menu:
