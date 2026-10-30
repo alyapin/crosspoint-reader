@@ -17,7 +17,7 @@ TEST(OverGuard, TheEndCountsWhenTracked) {
   g.track(false, 0);
   g.track(true, 5000);  // the computer's move ended it in the loop pass
   EXPECT_TRUE(g.holds(true, 5500));
-  EXPECT_FALSE(g.holds(true, 6000));
+  EXPECT_FALSE(g.holds(true, 5000 + OverGuard::kHoldMs));
 }
 
 TEST(OverGuard, AGameShownAlreadyOverDoesNotHold) {
@@ -33,7 +33,7 @@ TEST(OverGuard, ANewGameEndsAgain) {
   g.track(false, 5000);  // Новая игра
   EXPECT_FALSE(g.holds(false, 5100));
   EXPECT_TRUE(g.holds(true, 9000));
-  EXPECT_FALSE(g.holds(true, 10000));
+  EXPECT_FALSE(g.holds(true, 9000 + OverGuard::kHoldMs));
 }
 
 TEST(OverGuard, ClockWrap) {
@@ -41,5 +41,5 @@ TEST(OverGuard, ClockWrap) {
   g.track(false, 0xFFFFFF00u);
   EXPECT_TRUE(g.holds(true, 0xFFFFFF00u));
   EXPECT_TRUE(g.holds(true, 0x100u));  // 512 ms later, across the wrap
-  EXPECT_FALSE(g.holds(true, 0x400u));
+  EXPECT_FALSE(g.holds(true, 0xFFFFFF00u + OverGuard::kHoldMs));  // wraps past zero
 }
