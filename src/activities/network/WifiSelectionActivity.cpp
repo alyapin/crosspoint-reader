@@ -764,15 +764,14 @@ void WifiSelectionActivity::loop() {
       return;
     }
 
-    // Holding Confirm on a saved network offers to forget it; the release is consumed.
+    // Holding Confirm on a saved network offers to forget it; on other rows it does nothing.
+    // Either way the release is consumed.
     if (mappedInput.wasLongPressed(MappedInputManager::Button::Confirm, kForgetHoldMs)) {
       if (!networks.empty() && networks[selectedNetworkIndex].hasSavedPassword) {
         selectedSSID = networks[selectedNetworkIndex].ssid;
         state = WifiSelectionState::FORGET_PROMPT;
         forgetPromptSelection = 0;  // Default to "Cancel"
         requestUpdate();
-      } else if (!networks.empty()) {
-        selectNetwork(selectedNetworkIndex);
       }
       return;
     }
