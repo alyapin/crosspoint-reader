@@ -136,9 +136,10 @@ void GameScreen::addOwnRows(GamePickerActivity::Row* rows, int& count) {
 }
 
 void GameScreen::showMenu(const char* title, const GamePickerActivity::Row* rows, const int count) {
-  // Button boards open on Продолжить, so Back then Confirm always returns to the game; touch boards start on
-  // Новая игра, so a stray key never resigns or offers a draw.
-  const int8_t start = hasBar() ? kRowNewGame : kRowContinue;
+  // Button boards open on Продолжить, so Back then Confirm always returns to the game; touch boards and a finished
+  // game (no Продолжить, and Back then Confirm must not undo the last move) start on Новая игра, so a stray key never
+  // resigns or offers a draw.
+  const int8_t start = hasBar() || newGameSlot() >= 0 ? kRowNewGame : kRowContinue;
   const int found = static_cast<int>(std::find(menuIds, menuIds + count, start) - menuIds);
   auto menu =
       makeUniqueNoThrow<GamePickerActivity>(renderer, mappedInput, title, rows, count, found < count ? found : 0);
