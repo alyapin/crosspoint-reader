@@ -21,6 +21,7 @@ struct WifiNetworkInfo {
   bool isEncrypted;
   bool hasSavedPassword;             // Whether we have saved credentials for this network
   bool isHiddenPlaceholder = false;  // Synthetic "Add hidden network..." list entry
+  bool isRescanPlaceholder = false;  // Synthetic "Scan again" last entry on button boards
 };
 
 // WiFi selection states

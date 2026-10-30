@@ -16,7 +16,9 @@
 #include "WifiCredentialStore.h"
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
+#include "components/icons/listIcons.h"
 #include "components/icons/signalIcons.h"
+#include "components/setka/SetkaStyle.h"
 #include "fontIds.h"
 #include "util/PluginEvents.h"
 
@@ -26,6 +28,7 @@ namespace {
 constexpr fui::ActionId ACTION_ROW = 1;
 constexpr fui::ActionId ACTION_SCAN = 2;
 constexpr fui::ActionId ACTION_PROMPT = 3;
+constexpr unsigned long kForgetHoldMs = 1000;
 }  // namespace
 
 WifiSelectionActivity::WifiSelectionActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
@@ -168,11 +171,15 @@ void WifiSelectionActivity::onExit() {
 void WifiSelectionActivity::startWifiScan(const bool autoScan) {
   autoConnecting = autoScan;
   manualNetworkListRequested = false;
-  listNav.reset();
-  state = WifiSelectionState::SCANNING;
-  networks.clear();
-  // The cached rows point into the cleared networks' strings; drop them too.
-  networkRowItems.clear();
+  {
+    // The render task reads the list and its row items.
+    RenderLock lock(*this);
+    listNav.reset();
+    state = WifiSelectionState::SCANNING;
+    networks.clear();
+    // The cached rows point into the cleared networks' strings; drop them too.
+    networkRowItems.clear();
+  }
   requestUpdate();
 
   // Set WiFi mode to station
@@ -274,7 +281,13 @@ void WifiSelectionActivity::appendHiddenNetworkEntry() {
   placeholder.isEncrypted = true;  // Treated as encrypted; an empty password still connects open APs
   placeholder.hasSavedPassword = false;
   placeholder.isHiddenPlaceholder = true;
-  networks.push_back(std::move(placeholder));
+  networks.push_back(placeholder);
+  // Button boards scan again from a last row; touch boards from the empty list's button.
+  if (!mappedInput.hasTouch()) {
+    placeholder.isHiddenPlaceholder = false;
+    placeholder.isRescanPlaceholder = true;
+    networks.push_back(std::move(placeholder));
+  }
 }
 
 // Derives networkRowItems from `networks`. Called whenever `networks` changes
@@ -286,12 +299,14 @@ void WifiSelectionActivity::rebuildNetworkRowItems() {
   for (size_t i = 0; i < networks.size(); i++) {
     const auto& network = networks[i];
     fui::ListItem item;
-    item.label = network.isHiddenPlaceholder ? tr(STR_ADD_HIDDEN_NETWORK) : network.ssid.c_str();
+    item.label = network.isHiddenPlaceholder   ? tr(STR_ADD_HIDDEN_NETWORK)
+                 : network.isRescanPlaceholder ? tr(STR_WIFI_SCAN_AGAIN)
+                                               : network.ssid.c_str();
     // Signal strength leads the row, a lock trails it on secured networks.
     item.icon = signalIcon(network);
     if (network.hasSavedPassword) item.value = tr(STR_NETWORK_SAVED);
     static const fui::BitmapRef lock = fui::bitmapFromIcon(icon_wifi_lock_16);
-    if (network.isEncrypted && !network.isHiddenPlaceholder) item.valueIcon = &lock;
+    if (network.isEncrypted && !network.isHiddenPlaceholder && !network.isRescanPlaceholder) item.valueIcon = &lock;
     item.actionValue = static_cast<int16_t>(i);
     networkRowItems.push_back(item);
   }
@@ -307,6 +322,10 @@ void WifiSelectionActivity::selectNetwork(const int index) {
   // Synthetic "Add hidden network..." entry: prompt the user to type the SSID first
   if (network.isHiddenPlaceholder) {
     promptHiddenSsid();
+    return;
+  }
+  if (network.isRescanPlaceholder) {
+    startWifiScan();
     return;
   }
 
@@ -756,6 +775,19 @@ void WifiSelectionActivity::loop() {
       return;
     }
 
+    // Holding Confirm on a saved network offers to forget it; the release is consumed.
+    if (mappedInput.wasLongPressed(MappedInputManager::Button::Confirm, kForgetHoldMs)) {
+      if (!networks.empty() && networks[selectedNetworkIndex].hasSavedPassword) {
+        selectedSSID = networks[selectedNetworkIndex].ssid;
+        state = WifiSelectionState::FORGET_PROMPT;
+        forgetPromptSelection = 0;  // Default to "Cancel"
+        requestUpdate();
+      } else if (!networks.empty()) {
+        selectNetwork(selectedNetworkIndex);
+      }
+      return;
+    }
+
     // Check for Confirm button to select network or rescan
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
       if (!networks.empty()) {
@@ -764,23 +796,6 @@ void WifiSelectionActivity::loop() {
         startWifiScan();
       }
       return;
-    }
-
-    if (mappedInput.wasPressed(MappedInputManager::Button::Right)) {
-      startWifiScan();
-      return;
-    }
-
-    const bool leftPressed = mappedInput.wasPressed(MappedInputManager::Button::Left);
-    if (leftPressed) {
-      const bool hasSavedPassword = !networks.empty() && networks[selectedNetworkIndex].hasSavedPassword;
-      if (hasSavedPassword) {
-        selectedSSID = networks[selectedNetworkIndex].ssid;
-        state = WifiSelectionState::FORGET_PROMPT;
-        forgetPromptSelection = 0;  // Default to "Cancel"
-        requestUpdate();
-        return;
-      }
     }
 
     // Touch goes through the FreeInkApp: render() registered the row hit
@@ -817,6 +832,7 @@ void WifiSelectionActivity::loop() {
 
 freeink::ui::BitmapRef WifiSelectionActivity::signalIcon(const WifiNetworkInfo& network) {
   if (network.isHiddenPlaceholder) return fui::bitmapFromIcon(icon_network_add_24);
+  if (network.isRescanPlaceholder) return fui::bitmapFromIcon(icon_refresh_cw_24);
   if (network.rssi >= -60) return fui::bitmapFromIcon(icon_wifi_full_24);
   if (network.rssi >= -70) return fui::bitmapFromIcon(icon_wifi_high_24);
   return fui::bitmapFromIcon(icon_wifi_low_24);
@@ -1019,10 +1035,14 @@ void WifiSelectionActivity::renderNetworkList(const Rect* screen, const ThemeMet
     UITheme::drawCenteredText(renderer, *screen, SMALL_FONT_ID, top + height + 10, tr(STR_PRESS_OK_SCAN));
   }
 
-  const bool hasSavedPassword = !networks.empty() && networks[selectedNetworkIndex].hasSavedPassword;
-  const char* forgetLabel = hasSavedPassword ? tr(STR_FORGET_BUTTON) : "";
+  // A saved network is forgotten by holding Confirm; the caption says so on the caption line.
+  if (!mappedInput.hasTouch() && !networks.empty() && networks[selectedNetworkIndex].hasSavedPassword) {
+    renderer.drawText(SMALL_FONT_ID, screen->x + metrics->contentSidePadding,
+                      setka::hintCaptionTop(renderer, SMALL_FONT_ID, screen->y + screen->height),
+                      tr(STR_HOLD_SELECT_TO_FORGET));
+  }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_CONNECT), forgetLabel, tr(STR_RETRY));
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_CONNECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 }
 
