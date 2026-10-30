@@ -1016,7 +1016,7 @@ void WifiSelectionActivity::renderNetworkList(const Rect* screen, const ThemeMet
   if (!mappedInput.hasTouch() && !networks.empty() && networks[selectedNetworkIndex].hasSavedPassword) {
     renderer.drawText(SMALL_FONT_ID, screen->x + metrics->contentSidePadding,
                       setka::hintCaptionTop(renderer, SMALL_FONT_ID, screen->y + screen->height),
-                      tr(STR_HOLD_SELECT_TO_FORGET));
+                      tr(STR_WIFI_HOLD_TO_FORGET));
   }
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_CONNECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
