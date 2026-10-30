@@ -1,6 +1,7 @@
 #pragma once
 
 #include <I18n.h>
+#include <OverGuard.h>
 
 #include <atomic>
 #include <cstddef>
@@ -73,6 +74,8 @@ class GameScreen : public Activity, protected UiAppHost {
 
   // Restores the saved game; false when there is none.
   virtual bool restore() = 0;
+  // Won, lost or solved. Straight after it turns, the new-game control ignores a press (games::OverGuard).
+  virtual bool isOver() const = 0;
   virtual void saveGame() = 0;
   virtual void pauseGame() = 0;
   virtual void resumeGame() = 0;
@@ -155,6 +158,7 @@ class GameScreen : public Activity, protected UiAppHost {
   static void screenFn(UiScreen& screen, void* user);
   void confirmFinish();
   bool applyKeys();
+  bool newGameHeld(int slot);
   void drawMode(UiScreen& screen, const BarItem* items, int count) const;
   void addMenuRow(GamePickerActivity::Row* rows, int& count, int8_t id, const GamePickerActivity::Row& row);
   void addOwnRows(GamePickerActivity::Row* rows, int& count);
@@ -168,7 +172,8 @@ class GameScreen : public Activity, protected UiAppHost {
   int8_t menuIds[GamePickerActivity::MAX_ROWS] = {};  // the open menu's rows (GameScreen.cpp MenuRow)
   setka::RefreshCadence cadence;                      // render task only
   std::atomic<uint8_t> repaint{RepaintEntry};
-  games::ui::BoardKeys keys;  // loop task only
+  games::ui::BoardKeys keys;   // loop task only
+  games::OverGuard overGuard;  // loop task only
   int32_t clockShown = -1;
   bool savePending = false;
 };

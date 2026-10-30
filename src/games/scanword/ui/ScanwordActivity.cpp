@@ -266,6 +266,7 @@ void ScanwordActivity::openPuzzle(const uint16_t item) {
     shelfPending = true;
   }
   openItem = item;
+  overGuard.reset(game->solved());
   dirty = false;
   solveUncounted = false;
   savedSeconds = game->progress().seconds;
@@ -491,6 +492,7 @@ void ScanwordActivity::confirmFinish() {
 
 void ScanwordActivity::loop() {
   if (!game) return;
+  if (openItem >= 0) overGuard.track(game->solved(), nowMs());
   if (view != View::List) tickTime();
 
   if (const auto touch = routeTouch(mappedInput, true)) {
@@ -605,7 +607,8 @@ void ScanwordActivity::handleAction(const fui::ActionEvent& event, const int x, 
       if (board) setView(View::Menu);
       break;
     case ACTION_NEW_GAME:
-      if (board && game->solved()) closePuzzle();
+      // Not straight after the solve: a doubled tap on the Подсказка that solved it keeps the result.
+      if (board && game->solved() && !overGuard.holds(true, nowMs())) closePuzzle();
       break;
     default:
       break;

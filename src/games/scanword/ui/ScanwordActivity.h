@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Icon.h>
+#include <OverGuard.h>
 #include <ScanwordGame.h>
 #include <ScanwordPuzzle.h>
 #include <ScanwordShelf.h>
@@ -140,6 +141,7 @@ class ScanwordActivity final : public Activity, private UiAppHost {
   uint32_t savedSeconds = 0;
 
   ButtonNavigator buttonNavigator;
+  games::OverGuard overGuard;     // the open puzzle's solve; loop task only
   setka::RefreshCadence cadence;  // render task only
   std::atomic<uint8_t> repaint{RepaintEntry};
 };

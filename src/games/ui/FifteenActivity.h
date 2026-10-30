@@ -21,6 +21,7 @@ class FifteenActivity final : public GameScreen {
 
  private:
   bool restore() override;
+  bool isOver() const override { return game.isSolved(); }
   void saveGame() override;
   void pauseGame() override { game.pause(); }
   void resumeGame() override { game.resume(); }

@@ -24,6 +24,7 @@ class KlondikeActivity final : public GameScreen {
   static constexpr int kNone = -1;
 
   bool restore() override;
+  bool isOver() const override { return game.isWon(); }
   void saveGame() override;
   void pauseGame() override { game.pause(); }
   void resumeGame() override { game.resume(); }

@@ -232,6 +232,7 @@ void ChessActivity::onEnter() {
   }
   prefs = chess::ui::loadPrefs();
   if (chesssave::load(*match, esp_random())) {
+    overGuard.reset(match->game().isOver());
     inGame = true;
     setView(View::Game);
   } else {
@@ -274,6 +275,7 @@ void ChessActivity::requestRepaint(const Repaint kind) {
 
 void ChessActivity::loop() {
   if (!match) return;
+  overGuard.track(match->game().isOver(), nowMs());
   if (view == View::Game) {
     {
       RenderLock lock(RenderLock::Mode::Try);
@@ -339,7 +341,8 @@ ChessActivity::GameAction ChessActivity::focusedAction() const {
 void ChessActivity::runAction(const GameAction action) {
   switch (action) {
     case GameAction::NewGame:
-      setView(View::Setup);
+      // Not straight after the move that ended the game: a doubled press keeps the result on screen.
+      if (!overGuard.holds(match->game().isOver(), nowMs())) setView(View::Setup);
       break;
     case GameAction::Undo:
       if (match->undo()) afterPly();

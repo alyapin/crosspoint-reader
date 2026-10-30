@@ -27,6 +27,7 @@ class SudokuActivity final : public GameScreen {
   static constexpr freeink::ui::ActionId ACTION_PAD = ACTION_USER;  // value = digit
 
   bool restore() override;
+  bool isOver() const override { return game.isSolved(); }
   void saveGame() override;
   void pauseGame() override { game.pause(); }
   void resumeGame() override { game.resume(); }

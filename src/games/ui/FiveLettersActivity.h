@@ -25,6 +25,7 @@ class FiveLettersActivity final : public GameScreen {
   static constexpr int MENU_SLOT = 2;
 
   bool restore() override;
+  bool isOver() const override { return game.isOver(); }
   void saveGame() override;
   void pauseGame() override {}
   void resumeGame() override {}

@@ -23,6 +23,7 @@ class MinesweeperActivity final : public GameScreen {
   enum class Action : uint8_t { Flag, New, Menu };
 
   bool restore() override;
+  bool isOver() const override { return game.isOver(); }
   void saveGame() override;
   void pauseGame() override { game.pause(); }
   void resumeGame() override { game.resume(); }
