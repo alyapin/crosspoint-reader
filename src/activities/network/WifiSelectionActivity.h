@@ -83,7 +83,8 @@ class WifiSelectionActivity final : public Activity, private UiAppHost {
   // Whether we are attempting to auto-connect or auto-scan saved networks.
   bool autoConnecting = false;
 
-  // True from the Confirm press that stops auto-connect until that button is released.
+  // True from the Confirm press that stops auto-connect, or leaves a failed connection for the
+  // list, until that button is released.
   bool manualNetworkListRequested = false;
 
   // Saved SSIDs already attempted during the current auto-connect session.

@@ -752,8 +752,10 @@ void WifiSelectionActivity::loop() {
         forgetPromptSelection = 0;  // Default to "Cancel"
         forgetFromList = false;
       } else {
-        // Go back to network list on failure for non-saved credentials
+        // Go back to network list on failure for non-saved credentials; the
+        // list waits out a held Confirm, so its release does not select again.
         state = WifiSelectionState::NETWORK_LIST;
+        manualNetworkListRequested = mappedInput.isPressed(MappedInputManager::Button::Confirm);
       }
       requestUpdate();
       return;
