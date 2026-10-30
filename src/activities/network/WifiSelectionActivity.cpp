@@ -26,7 +26,6 @@ namespace fui = freeink::ui;
 
 namespace {
 constexpr fui::ActionId ACTION_ROW = 1;
-constexpr fui::ActionId ACTION_SCAN = 2;
 constexpr fui::ActionId ACTION_PROMPT = 3;
 constexpr unsigned long kForgetHoldMs = 1000;
 }  // namespace
@@ -55,13 +54,6 @@ void WifiSelectionActivity::onRowEvent(const fui::ActionEvent& event, void* user
   // flash would gray an unrelated row.
   self->app.clearTapFlash();
   self->selectNetwork(static_cast<int>(self->selectedNetworkIndex));
-}
-
-void WifiSelectionActivity::onScanEvent(const fui::ActionEvent&, void* user) {
-  auto* self = static_cast<WifiSelectionActivity*>(user);
-  if (self->state != WifiSelectionState::NETWORK_LIST) return;
-  self->app.clearTapFlash();  // the scan screen replaces this one
-  self->startWifiScan();
 }
 
 void WifiSelectionActivity::onPromptEvent(const fui::ActionEvent& event, void* user) {
@@ -124,7 +116,6 @@ void WifiSelectionActivity::onEnter() {
   listNav.reset();
   resetUi();
   app.on(ACTION_ROW, &WifiSelectionActivity::onRowEvent, this);
-  app.on(ACTION_SCAN, &WifiSelectionActivity::onScanEvent, this);
   app.on(ACTION_PROMPT, &WifiSelectionActivity::onPromptEvent, this);
   app.setScreen(&WifiSelectionActivity::listScreen, this);
 
@@ -282,12 +273,10 @@ void WifiSelectionActivity::appendHiddenNetworkEntry() {
   placeholder.hasSavedPassword = false;
   placeholder.isHiddenPlaceholder = true;
   networks.push_back(placeholder);
-  // Button boards scan again from a last row; touch boards from the empty list's button.
-  if (!mappedInput.hasTouch()) {
-    placeholder.isHiddenPlaceholder = false;
-    placeholder.isRescanPlaceholder = true;
-    networks.push_back(std::move(placeholder));
-  }
+  // The last row scans again.
+  placeholder.isHiddenPlaceholder = false;
+  placeholder.isRescanPlaceholder = true;
+  networks.push_back(std::move(placeholder));
 }
 
 // Derives networkRowItems from `networks`. Called whenever `networks` changes
@@ -910,21 +899,6 @@ void WifiSelectionActivity::buildListScreen(UiScreen& screen) {
 
   if (networks.empty()) {
     screen.centeredText(tr(STR_NO_NETWORKS), screen.theme().bodyText);
-    if (mappedInput.hasTouch()) {
-      // Touch has no OK button to rescan with; offer the retry on screen instead
-      // of the "Press OK" hint renderNetworkList draws for button boards.
-      const auto& theme = screen.theme();
-      const fui::Rect body = screen.body();
-      const int16_t buttonWidth = static_cast<int16_t>(body.width / 2);
-      const fui::Rect buttonRect{static_cast<int16_t>(body.x + (body.width - buttonWidth) / 2),
-                                 static_cast<int16_t>(body.y + body.height * 2 / 3), buttonWidth, theme.rowHeight};
-      fui::ButtonProps scan;
-      scan.label = tr(STR_RETRY);
-      scan.action = ACTION_SCAN;
-      scan.inputMask = fui::InputTouch;
-      scan.text = theme.bodyText;
-      fui::button(screen.frame(), buttonRect, scan);
-    }
     return;
   }
 
@@ -1027,14 +1001,6 @@ void WifiSelectionActivity::renderNetworkList(const Rect* screen, const ThemeMet
     drawListHeader();
     renderUi();
   }
-  if (networks.empty() && !mappedInput.hasTouch()) {
-    // Below the centered "no networks" line the app drew. Touch boards get an
-    // on-screen Retry button from the screen builder instead of this hint.
-    const auto height = renderer.getLineHeight(UI_10_FONT_ID);
-    const auto top = screen->y + (screen->height - height) / 2;
-    UITheme::drawCenteredText(renderer, *screen, SMALL_FONT_ID, top + height + 10, tr(STR_PRESS_OK_SCAN));
-  }
-
   // A saved network is forgotten by holding Confirm; the caption says so on the caption line.
   if (!mappedInput.hasTouch() && !networks.empty() && networks[selectedNetworkIndex].hasSavedPassword) {
     renderer.drawText(SMALL_FONT_ID, screen->x + metrics->contentSidePadding,

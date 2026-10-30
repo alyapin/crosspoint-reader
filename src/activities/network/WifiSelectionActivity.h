@@ -21,7 +21,7 @@ struct WifiNetworkInfo {
   bool isEncrypted;
   bool hasSavedPassword;             // Whether we have saved credentials for this network
   bool isHiddenPlaceholder = false;  // Synthetic "Add hidden network..." list entry
-  bool isRescanPlaceholder = false;  // Synthetic "Scan again" last entry on button boards
+  bool isRescanPlaceholder = false;  // Synthetic "Scan again" last entry
 };
 
 // WiFi selection states
@@ -107,7 +107,6 @@ class WifiSelectionActivity final : public Activity, private UiAppHost {
 
   static void listScreen(UiScreen& screen, void* user);
   static void onRowEvent(const freeink::ui::ActionEvent& event, void* user);
-  static void onScanEvent(const freeink::ui::ActionEvent& event, void* user);
   static void onPromptEvent(const freeink::ui::ActionEvent& event, void* user);
   void buildListScreen(UiScreen& screen);
   void buildPromptDialog(UiScreen& screen);
