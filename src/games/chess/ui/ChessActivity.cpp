@@ -40,6 +40,7 @@ constexpr fui::ActionId ACTION_FLIP = 9;
 
 // List screens: the CrossPoint 2.0 header, then the rows of the other game menus (setka::kList*).
 constexpr int kHeaderTop = kGameTopLineY;  // game view top line, under the status line
+constexpr int kExitStatusGap = 40;         // the least room between "‹ Выйти" and the status
 constexpr int kRowHeight = setka::kListPitch;
 constexpr int kRowGap = 0;
 constexpr int kIconSize = 24;
@@ -1231,9 +1232,10 @@ void ChessActivity::drawTopLine(UiScreen& screen) const {
     status[count++] = {far == chess::WHITE ? tr(STR_CHESS_WHITE) : tr(STR_CHESS_BLACK), nullptr};
   }
   if (timed) status[count++] = {nullptr, clock};
-  // With a clock, too long beside "‹ Выйти": the level without "компьютер", then the clock alone.
-  const int room = width - kSidePadding - exitWidth;
-  if (timed && vs && games::ui::statusWidth(renderer, status, count) > room) {
+  // The status keeps kExitStatusGap from "‹ Выйти": too long, the level drops "компьютер", then with a clock
+  // the clock stands alone.
+  const int room = exitWidth > 0 ? width - exitWidth - kExitStatusGap : width - kSidePadding;
+  if (vs && games::ui::statusWidth(renderer, status, count) > room) {
     std::copy(status + 1, status + count, status);
     --count;
   }
