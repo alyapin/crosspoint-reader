@@ -656,7 +656,9 @@ bool LibraryShelvesActivity::generateMissingThumbs() {
 void LibraryShelvesActivity::render(RenderLock&&) {
   renderer.clearScreen();
   renderUi();
-  const char* confirmLabel = focus < 0 ? tr(STR_SHELF_TAB_NEXT) : tab == TabShelves ? tr(STR_SELECT) : tr(STR_OPEN);
+  const char* confirmLabel = focus < 0                                ? tr(STR_SHELF_TAB_NEXT)
+                             : menu != Menu::None || tab == TabShelves ? tr(STR_SELECT)
+                                                                       : tr(STR_OPEN);
   statsui::drawHints(renderer, mappedInput, confirmLabel);
   renderer.displayBuffer(entryRefresh ? cadence.entry() : cadence.update());
   entryRefresh = false;
