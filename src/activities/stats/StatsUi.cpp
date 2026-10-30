@@ -122,27 +122,27 @@ void drawIconRow(const GfxRenderer& renderer, freeink::ui::DrawTarget& target, c
                  const bool focused) {
   namespace fui = freeink::ui;
   using namespace setka;
-  if (focused) drawSelectionBar(renderer, x - (kRowTextX - kSelectionBarX), y, height);
+  if (focused) drawSelectionBar(renderer, x - (kListIconX - kListBarX), y, height);
   int textX = x;
   if (icon) {
     target.bitmap(fui::makeRect(x, y + (height - kIconSize) / 2, kIconSize, kIconSize), fui::bitmapFromIcon(*icon),
                   fui::BitmapMode::Center);
-    textX += kIconSize + kIconGap;
+    textX += kIconSize + kListIconGap;
   }
-  const int lineHeight = renderer.getLineHeight(kText12Font);
+  const int lineHeight = renderer.getLineHeight(kListFont);
   const int textTop = y + (height - lineHeight) / 2;
   int labelWidth = x + width - textX;
   if (status && *status) {
     const int statusWidth = renderer.getTextWidth(kText10Font, status);
     // Shares the label's baseline.
     const int statusTop =
-        textTop + renderer.getFontAscenderSize(kText12Font) - renderer.getFontAscenderSize(kText10Font);
+        textTop + renderer.getFontAscenderSize(kListFont) - renderer.getFontAscenderSize(kText10Font);
     renderer.drawText(kText10Font, x + width - statusWidth, statusTop, status);
     labelWidth -= statusWidth + kIconGap;
   }
   const auto style = focused ? kSemiBold : EpdFontFamily::REGULAR;
-  renderer.drawText(kText12Font, textX, textTop, renderer.truncatedText(kText12Font, label, labelWidth, style).c_str(),
-                    true, style);
+  renderer.drawText(kListFont, textX, textTop, renderer.truncatedText(kListFont, label, labelWidth, style).c_str(), true,
+                    style);
 }
 
 void drawMenuBox(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, const char* title, const int count,
@@ -209,7 +209,7 @@ void drawMenuBox(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, const
     renderer.drawText(kText12Font, boxX + kPad, titleTop, line.c_str(), true, kSemiBold);
     titleTop += line12;
   }
-  const int rowX = boxX + kPad + (kRowTextX - kSelectionBarX);
+  const int rowX = boxX + kPad + (kListIconX - kListBarX);
   const int rowWidth = boxX + boxWidth - kPad - rowX;
   for (int i = first; i < first + shown; ++i) {
     const freeink::Icon* icon = nullptr;

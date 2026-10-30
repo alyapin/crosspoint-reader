@@ -22,6 +22,7 @@
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "components/UiAppHelpers.h"
+#include "components/setka/SetkaStyle.h"
 #include "components/setka/setkaIcons.h"
 #include "fontIds.h"
 #include "stats/ReadingStats.h"
@@ -629,14 +630,13 @@ void FileBrowserActivity::buildScreen(UiScreen& screen) {
                                                 static_cast<int16_t>(metrics.buttonHintsHeight), 0});
   screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
 
-  // Full path band at the bottom: separator on top, left-truncated so the
-  // deepest directory stays visible. The card root needs no path.
+  // The path under the list, on the caption line over the hints, left-truncated
+  // so the deepest directory stays visible. The card root needs no path.
   if (basepath != "/") {
     const int pathLineHeight = renderer.getLineHeight(SMALL_FONT_ID);
     const fui::Rect band = screen.takeBottom(static_cast<int16_t>(pathLineHeight + metrics.verticalSpacing));
-    screen.target().fill(fui::Rect{band.x, band.y, band.width, 3}, fui::Paint::solid(fui::Color::Black));
-    const int pathY =
-        band.y + metrics.verticalSpacing / 2 + (band.height - metrics.verticalSpacing / 2 - pathLineHeight) / 2;
+    const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    const int pathY = setka::hintCaptionTop(renderer, SMALL_FONT_ID, safe.y + safe.height);
     const int pathMaxWidth = band.width - metrics.contentSidePadding * 2;
     const char* pathStr = basepath.c_str();
     const char* pathDisplay = pathStr;

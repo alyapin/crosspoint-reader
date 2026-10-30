@@ -36,9 +36,8 @@ constexpr fui::ActionId ACTION_EXIT = 2;
 constexpr fui::ActionId ACTION_CARD = 3;
 constexpr fui::ActionId ACTION_SLOT = 4;
 
-constexpr int kRowHeight = kNavRowHeight;
+constexpr int kRowHeight = kListPitch;
 constexpr int kIconSize = 24;
-constexpr int kIconGap = 16;
 constexpr int kNoteGap = 12;
 constexpr int kCardWidth = 440;
 constexpr int kFrontBottomTouch = 400;
@@ -790,30 +789,30 @@ void CardsActivity::build(UiScreen& screen) {
 void CardsActivity::drawRow(UiScreen& screen, const int top, const freeink::Icon* icon, const char* label,
                             const bool focused, const char* status, const char* caption, const int value) {
   const int width = renderer.getScreenWidth();
-  if (focused) drawSelectionBar(renderer, kSelectionBarX, top, kRowHeight);
-  int x = kRowTextX;
+  if (focused) drawSelectionBar(renderer, kListBarX, top, kRowHeight);
+  int x = kListTextX;
   if (icon != nullptr) {
-    screen.target().bitmap(fui::makeRect(x, top + (kRowHeight - kIconSize) / 2, kIconSize, kIconSize),
+    screen.target().bitmap(fui::makeRect(kListIconX, top + (kRowHeight - kIconSize) / 2, kIconSize, kIconSize),
                            fui::bitmapFromIcon(*icon), fui::BitmapMode::Center);
-    x += kIconSize + kIconGap;
+    x = kListIconX + kIconSize + kListIconGap;
   }
   const EpdFontFamily::Style style = focused ? kSemiBold : EpdFontFamily::REGULAR;
-  const int line12 = renderer.getLineHeight(kText12Font);
+  const int labelLine = renderer.getLineHeight(kListFont);
   int statusWidth = 0;
   if (status != nullptr && *status) statusWidth = renderer.getTextWidth(kText10Font, status) + kSidePadding;
-  const std::string fitted = renderer.truncatedText(kText12Font, label, width - kSidePadding - x - statusWidth, style);
-  int textTop = top + (kRowHeight - line12) / 2;
+  const std::string fitted = renderer.truncatedText(kListFont, label, width - kListValueInset - x - statusWidth, style);
+  int textTop = top + (kRowHeight - labelLine) / 2;
   if (caption != nullptr && *caption) {
     const int captionLine = renderer.getLineHeight(kCaptionFont);
-    textTop = top + (kRowHeight - line12 - captionLine) / 2;
-    const std::string cut = renderer.truncatedText(kCaptionFont, caption, width - kSidePadding - x);
-    renderer.drawText(kCaptionFont, x, textTop + line12, cut.c_str());
+    textTop = top + (kRowHeight - labelLine - captionLine) / 2;
+    const std::string cut = renderer.truncatedText(kCaptionFont, caption, width - kListValueInset - x);
+    renderer.drawText(kCaptionFont, x, textTop + labelLine, cut.c_str());
   }
-  renderer.drawText(kText12Font, x, textTop, fitted.c_str(), true, style);
+  renderer.drawText(kListFont, x, textTop, fitted.c_str(), true, style);
   if (statusWidth > 0) {
     const int statusTop =
-        textTop + renderer.getFontAscenderSize(kText12Font) - renderer.getFontAscenderSize(kText10Font);
-    renderer.drawText(kText10Font, width - kSidePadding - renderer.getTextWidth(kText10Font, status), statusTop,
+        textTop + renderer.getFontAscenderSize(kListFont) - renderer.getFontAscenderSize(kText10Font);
+    renderer.drawText(kText10Font, width - kListValueInset - renderer.getTextWidth(kText10Font, status), statusTop,
                       status);
   }
   screen.frame().hit(fui::makeRect(0, top, width, kRowHeight), ACTION_ROW, static_cast<int16_t>(value),
@@ -1031,8 +1030,10 @@ void CardsActivity::buildCard(UiScreen& screen) {
   // The bar runs to the screen bottom; the key line keys to the hint band.
   const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
   const int panelTop = touch ? height - games::ui::kActionBarHeight : safe.y + safe.height;
-  const int noteLine = renderer.getLineHeight(kDenseFont);
-  const int noteTop = hintCaptionTop(renderer, kDenseFont, panelTop);
+  // The games' caption role over the bar, the hint face over the keys.
+  const int noteFont = touch ? kText10Font : kDenseFont;
+  const int noteLine = renderer.getLineHeight(noteFont);
+  const int noteTop = hintCaptionTop(renderer, noteFont, panelTop);
   const int zoneBottom = noteTop - noteLine - kNoteGap;
   const int frontBottom = touch ? kFrontBottomTouch : kFrontBottomButtons;
 
@@ -1061,28 +1062,6 @@ void CardsActivity::buildCard(UiScreen& screen) {
     }
     slots[1] = {&icon_show_24, tr(STR_CARDS_SHOW)};
   } else {
-    drawRule(renderer, 60, frontBottom + 12, width - 120);
-    const int zoneTop = frontBottom + 12 + kRuleWidth + 12;
-    const int zone = zoneBottom - 10 - zoneTop;
-    Block answer;
-    Block extra;
-    answer.text = sideText(*fields, 1);
-    extra.text = sideText(*fields, 2);
-    extra.style = EpdFontFamily::ITALIC;
-    int total = 0;
-    // The example only where a line of it still fits.
-    for (const auto& fonts : kBackFonts) {
-      layoutBlock(renderer, answer, fonts[0], zone, scratch);
-      layoutBlock(renderer, extra, fonts[1], zone - answer.height() - kAnswerGap, scratch, false);
-      total = answer.height() + (extra.lines.count > 0 ? kAnswerGap + extra.height() : 0);
-      if (!answer.lines.overflow && !extra.lines.overflow && total <= zone) break;
-    }
-    // An example with no room left is cut too: the answer says so.
-    if (extra.lines.count == 0 && *extra.text) answer.lines.overflow = true;
-    int y = zoneTop + std::max(0, (zone - total) / 2);
-    drawBlock(renderer, answer, y, scratch);
-    if (extra.lines.count > 0) drawBlock(renderer, extra, y + answer.height() + kAnswerGap, scratch);
-
     const cards::CardState state = store->currentState();
     const StrId labels[3] = {StrId::STR_CARDS_AGAIN, StrId::STR_CARDS_GOOD, StrId::STR_CARDS_EASY};
     const freeink::Icon* icons[3] = {&icon_bar_restart_24, &icon_good_24, &icon_easy_24};
@@ -1106,12 +1085,12 @@ void CardsActivity::buildCard(UiScreen& screen) {
     }
     // Breaks only between pairs; the last line sits on noteTop.
     const int maxWidth = width - 2 * kSidePadding;
-    const int separator = renderer.getTextWidth(kDenseFont, " · ");
+    const int separator = renderer.getTextWidth(noteFont, " · ");
     bool breakBefore[4] = {};
     int lineWidth = 0;
     int breaks = 0;
     for (int i = 0; i < count; i++) {
-      const int partWidth = renderer.getTextWidth(kDenseFont, order[i]);
+      const int partWidth = renderer.getTextWidth(noteFont, order[i]);
       if (i > 0 && lineWidth + separator + partWidth > maxWidth) {
         breakBefore[i] = true;
         breaks++;
@@ -1120,18 +1099,41 @@ void CardsActivity::buildCard(UiScreen& screen) {
         lineWidth += (i > 0 ? separator : 0) + partWidth;
       }
     }
+    drawRule(renderer, 60, frontBottom + 12, width - 120);
+    const int zoneTop = frontBottom + 12 + kRuleWidth + 12;
+    // A third line of intervals takes its room from the answer.
+    const int zone = zoneBottom - std::max(0, breaks - 1) * noteLine - 10 - zoneTop;
+    Block answer;
+    Block extra;
+    answer.text = sideText(*fields, 1);
+    extra.text = sideText(*fields, 2);
+    extra.style = EpdFontFamily::ITALIC;
+    int total = 0;
+    // The example only where a line of it still fits.
+    for (const auto& fonts : kBackFonts) {
+      layoutBlock(renderer, answer, fonts[0], zone, scratch);
+      layoutBlock(renderer, extra, fonts[1], zone - answer.height() - kAnswerGap, scratch, false);
+      total = answer.height() + (extra.lines.count > 0 ? kAnswerGap + extra.height() : 0);
+      if (!answer.lines.overflow && !extra.lines.overflow && total <= zone) break;
+    }
+    // An example with no room left is cut too: the answer says so.
+    if (extra.lines.count == 0 && *extra.text) answer.lines.overflow = true;
+    int y = zoneTop + std::max(0, (zone - total) / 2);
+    drawBlock(renderer, answer, y, scratch);
+    if (extra.lines.count > 0) drawBlock(renderer, extra, y + answer.height() + kAnswerGap, scratch);
+
     y = noteTop - breaks * noteLine;
     scratch[0] = '\0';
     for (int i = 0; i < count; i++) {
       if (breakBefore[i]) {
-        renderer.drawText(kDenseFont, kSidePadding, y, scratch);
+        renderer.drawText(noteFont, kSidePadding, y, scratch);
         y += noteLine;
         scratch[0] = '\0';
       }
       const size_t used = strlen(scratch);
       snprintf(scratch + used, kNameBytes - used, "%s%s", used > 0 ? " · " : "", order[i]);
     }
-    renderer.drawText(kDenseFont, kSidePadding, y, scratch);
+    renderer.drawText(noteFont, kSidePadding, y, scratch);
   }
   if (!touch) return;
 

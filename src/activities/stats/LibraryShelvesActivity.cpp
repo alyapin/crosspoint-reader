@@ -21,7 +21,6 @@
 namespace fui = freeink::ui;
 using namespace setka;
 using statsui::kRowTextX;
-using statsui::kSelectionBarX;
 
 namespace {
 constexpr fui::ActionId ACTION_TAB = 1;
@@ -30,7 +29,7 @@ constexpr fui::ActionId ACTION_MENU = 3;
 constexpr fui::ActionId ACTION_DISMISS = 4;
 
 constexpr int kBookRowHeight = 112;
-constexpr int kShelfRowHeight = kNavRowHeight;
+constexpr int kShelfRowHeight = kListPitch;
 constexpr int kCoverWidth = 60;
 constexpr int kCoverHeight = 88;
 constexpr int kTabGap = 26;
@@ -39,8 +38,10 @@ constexpr int kTabGapMin = 10;
 constexpr int kTabBarGap = 6;
 // Gap before the active tab: its bar, plus air on both sides.
 constexpr int kTabBarRun = kSelectionBarWidth + 2 * kTabBarGap;
-// The other gaps carry a thin divider, so the labels do not read as one phrase.
+// The other gaps carry a thin divider, so the labels do not read as one phrase;
+// the X4 draws the tab row of Все книги, without them.
 constexpr int kTabDividerHeight = 16;
+constexpr bool kTabDividers = !FREEINK_DEVICE_X4;
 // Rows kept per status tab, newest first: each holds its path and title.
 constexpr size_t kMaxRows = FREEINK_MCU_C3 ? 80 : 200;
 
@@ -444,7 +445,7 @@ void LibraryShelvesActivity::loop() {
 
 int LibraryShelvesActivity::drawTabs(UiScreen& screen, const int stripTop, const int width) {
   constexpr int kStripPad = 12;
-  const int firstX = kSelectionBarX + kSelectionBarWidth + kTabBarGap;
+  const int firstX = kListBarX + kSelectionBarWidth + kTabBarGap;
   const int room = width - firstX - kSidePadding;
   // Regular labels plus the widest SemiBold gain pick the font, so it does not
   // change with the active tab; the text role never drops to the caption.
@@ -488,7 +489,7 @@ int LibraryShelvesActivity::drawTabs(UiScreen& screen, const int stripTop, const
     renderer.drawText(font, x, textTop, label, true, style);
     screen.frame().hit(fui::makeRect(x - tabGap / 2, stripTop, labelWidth + tabGap, stripHeight), ACTION_TAB,
                        static_cast<int16_t>(i), fui::InputTouch);
-    if (i + 1 < TabCount && i + 1 != tab) {
+    if (kTabDividers && i + 1 < TabCount && i + 1 != tab) {
       renderer.fillRect(x + labelWidth + tabGap / 2, textTop + (lineHeight - kTabDividerHeight) / 2, 1,
                         kTabDividerHeight, true);
     }
@@ -508,7 +509,7 @@ void LibraryShelvesActivity::drawBookRow(UiScreen& screen, const int index, cons
   const int coverY = rowTop + (kBookRowHeight - kRuleWidth - kCoverHeight) / 2;
   covers.draw(renderer, book.thumb, book.title.c_str(), kRowTextX, coverY, kCoverWidth, kCoverHeight);
   if (buttonsUsed && focus == index && menu == Menu::None) {
-    drawSelectionBar(renderer, kSelectionBarX, coverY, kCoverHeight);
+    drawSelectionBar(renderer, kListBarX, coverY, kCoverHeight);
   }
   const int textX = kRowTextX + kCoverWidth + 16;
   const int textWidth = width - textX - kSidePadding;
@@ -610,8 +611,8 @@ void LibraryShelvesActivity::draw(UiScreen& screen) {
     }
     const bool focused = buttonsUsed && focus == i && menu == Menu::None;
     if (i == static_cast<int>(shelfRows.size())) {
-      statsui::drawIconRow(renderer, screen.target(), &icon_plus_24, tr(STR_SHELF_NEW), nullptr, kRowTextX, rowTop,
-                           width - kRowTextX - kSidePadding, rowHeight, focused);
+      statsui::drawIconRow(renderer, screen.target(), &icon_plus_24, tr(STR_SHELF_NEW), nullptr, kListIconX, rowTop,
+                           width - kListIconX - kListValueInset, rowHeight, focused);
     } else {
       const ShelfRow& shelf = shelfRows[i];
       char countText[32];
@@ -619,8 +620,8 @@ void LibraryShelvesActivity::draw(UiScreen& screen) {
                I18N.get(statsui::plural(shelf.books, StrId::STR_STATS_BOOKS_ONE, StrId::STR_STATS_BOOKS_FEW,
                                         StrId::STR_STATS_BOOKS_MANY)),
                static_cast<unsigned>(shelf.books));
-      statsui::drawIconRow(renderer, screen.target(), &icon_library_24, shelf.name.c_str(), countText, kRowTextX,
-                           rowTop, width - kRowTextX - kSidePadding, rowHeight, focused);
+      statsui::drawIconRow(renderer, screen.target(), &icon_library_24, shelf.name.c_str(), countText, kListIconX,
+                           rowTop, width - kListIconX - kListValueInset, rowHeight, focused);
     }
     screen.frame().hit(fui::makeRect(0, rowTop, width, rowHeight), ACTION_ROW, static_cast<int16_t>(i),
                        fui::InputTouch | fui::InputLongPress);

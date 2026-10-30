@@ -66,7 +66,9 @@ void SettingsListActivity::buildScreen(UiScreen& screen) {
   props.count = static_cast<uint16_t>(rowItems_.size());
   props.action = ACTION_ROW;
   props.inputMask = fui::InputTouch;  // physical buttons stay in loop()
-  props.rowHeight = setka::kNavRowHeight;
+  props.rowHeight = setka::kListPitch;
+  // The face of the rows the Setka screens draw (setka::kListFont).
+  if (setka::kListFont == UI_10_FONT_ID) props.labelText = screen.theme().smallText;
   syncListViewport(screen, props);
   screen.list(props);
 }

@@ -85,6 +85,21 @@ class UiListActivity : public Activity, protected UiAppHost {
   void syncListViewport(UiScreen& screen, freeink::ui::ListProps& props, int selectionOffset = 0);
   // Move the selection to index and pull the viewport to it.
   void moveSelectionTo(int index);
+  // Wrapped labels grow rows, so fewer rows can fit than the fixed-height
+  // estimate ListNav plans with. list() reports the real layout back
+  // (ListNav::onListRendered); when the selection landed past the drawn rows
+  // the nav advanced the viewport and asked for another build. This runs those
+  // builds, each from a clear screen with `chrome` drawn first. Bounded: top
+  // strictly advances toward the selection each pass. render() calls it;
+  // screens with their own render call it right after renderUi().
+  template <typename Chrome>
+  void rebuildWhileFollowing(Chrome&& chrome) {
+    for (int pass = 0; activeNav().consumeRebuildNeeded() && pass < 8; ++pass) {
+      renderer.clearScreen();
+      chrome();
+      renderUi();
+    }
+  }
 
   // --- shared state ----------------------------------------------------------
   // Selection + viewport (selected/top/visibleRows/followOnBuild). Access via

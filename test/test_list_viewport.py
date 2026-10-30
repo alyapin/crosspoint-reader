@@ -119,6 +119,48 @@ int main() {
       assert(activity.nav.top <= selection && selection < activity.nav.top + activity.nav.drawnRows);
     }
   }
+
+  // A selected last whole row whose new text wraps grows in place; the next
+  // render follows it without the selection moving.
+  {
+    UiListActivity activity;
+    activity.count = 12;
+    UiScreen screen;
+    screen.height = 190;
+    screen.rowHeight = 30;
+    fui::ListItem items[12];
+    for (auto& item : items) item.label = "Short";
+    BoldTarget target;
+    fui::DeviceContext device;
+    device.width = 200;
+    device.height = 200;
+    fui::InputSnapshot input;
+    fui::InteractionBuffer<32> interactions;
+    const auto render = [&] {
+      for (int pass = 0; pass < 8; ++pass) {
+        fui::ListProps props;
+        props.items = items;
+        props.count = 12;
+        props.rowHeight = 30;
+        props.sidePadding = 0;
+        props.labelText.maxLines = 2;
+        props.boldSelected = true;
+        activity.syncListViewport(screen, props);
+        interactions.clear();
+        target.lowest = 0;
+        fui::Frame<32> frame(target, device, input, interactions);
+        fui::list(frame, {0, 0, 160, 190}, props);
+        if (!activity.nav.consumeRebuildNeeded()) break;
+      }
+    };
+    activity.nav.requestSelection(5);
+    render();
+    assert(activity.nav.top == 0 && activity.nav.drawnRows == 6);
+    items[5].label = "Eighteen chars.";  // two lines in SemiBold: 50 px
+    render();
+    assert(target.lowest <= 190);
+    assert(activity.nav.top <= 5 && 5 < activity.nav.top + activity.nav.drawnRows);
+  }
 }
 """
 with tempfile.TemporaryDirectory() as directory:

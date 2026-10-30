@@ -16,7 +16,9 @@
 #include "WifiCredentialStore.h"
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
+#include "components/icons/listIcons.h"
 #include "components/icons/signalIcons.h"
+#include "components/setka/SetkaStyle.h"
 #include "fontIds.h"
 #include "util/PluginEvents.h"
 
@@ -24,8 +26,8 @@ namespace fui = freeink::ui;
 
 namespace {
 constexpr fui::ActionId ACTION_ROW = 1;
-constexpr fui::ActionId ACTION_SCAN = 2;
 constexpr fui::ActionId ACTION_PROMPT = 3;
+constexpr unsigned long kForgetHoldMs = 1000;
 }  // namespace
 
 WifiSelectionActivity::WifiSelectionActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
@@ -37,12 +39,13 @@ void WifiSelectionActivity::onRowEvent(const fui::ActionEvent& event, void* user
   if (self->state != WifiSelectionState::NETWORK_LIST) return;
   if (event.value < 0 || event.value >= static_cast<int16_t>(self->networks.size())) return;
   self->selectedNetworkIndex = static_cast<size_t>(event.value);
-  // Long-press a saved network to forget it (mirrors the Left-button hold in loop()).
+  // Long-press a saved network to forget it (as holding Confirm does in loop()).
   if (event.longPress) {
     if (self->networks[self->selectedNetworkIndex].hasSavedPassword) {
       self->selectedSSID = self->networks[self->selectedNetworkIndex].ssid;
       self->state = WifiSelectionState::FORGET_PROMPT;
       self->forgetPromptSelection = 0;  // Default to "Cancel"
+      self->forgetFromList = true;
       self->app.clearTapFlash();
       self->requestUpdate();
     }
@@ -52,13 +55,6 @@ void WifiSelectionActivity::onRowEvent(const fui::ActionEvent& event, void* user
   // flash would gray an unrelated row.
   self->app.clearTapFlash();
   self->selectNetwork(static_cast<int>(self->selectedNetworkIndex));
-}
-
-void WifiSelectionActivity::onScanEvent(const fui::ActionEvent&, void* user) {
-  auto* self = static_cast<WifiSelectionActivity*>(user);
-  if (self->state != WifiSelectionState::NETWORK_LIST) return;
-  self->app.clearTapFlash();  // the scan screen replaces this one
-  self->startWifiScan();
 }
 
 void WifiSelectionActivity::onPromptEvent(const fui::ActionEvent& event, void* user) {
@@ -85,7 +81,7 @@ void WifiSelectionActivity::onPromptEvent(const fui::ActionEvent& event, void* u
         network->hasSavedPassword = false;
       }
     }
-    self->startWifiScan();
+    self->closeForgetPrompt(self->forgetPromptSelection == 1);
   }
 }
 
@@ -121,7 +117,6 @@ void WifiSelectionActivity::onEnter() {
   listNav.reset();
   resetUi();
   app.on(ACTION_ROW, &WifiSelectionActivity::onRowEvent, this);
-  app.on(ACTION_SCAN, &WifiSelectionActivity::onScanEvent, this);
   app.on(ACTION_PROMPT, &WifiSelectionActivity::onPromptEvent, this);
   app.setScreen(&WifiSelectionActivity::listScreen, this);
 
@@ -168,11 +163,15 @@ void WifiSelectionActivity::onExit() {
 void WifiSelectionActivity::startWifiScan(const bool autoScan) {
   autoConnecting = autoScan;
   manualNetworkListRequested = false;
-  listNav.reset();
-  state = WifiSelectionState::SCANNING;
-  networks.clear();
-  // The cached rows point into the cleared networks' strings; drop them too.
-  networkRowItems.clear();
+  {
+    // The render task reads the list and its row items.
+    RenderLock lock(*this);
+    listNav.reset();
+    state = WifiSelectionState::SCANNING;
+    networks.clear();
+    // The cached rows point into the cleared networks' strings; drop them too.
+    networkRowItems.clear();
+  }
   requestUpdate();
 
   // Set WiFi mode to station
@@ -193,17 +192,23 @@ void WifiSelectionActivity::processWifiScanResults() {
   }
 
   if (scanResult == WIFI_SCAN_FAILED) {
-    networks.clear();
-    realNetworkCount = 0;
-    appendHiddenNetworkEntry();
-    rebuildNetworkRowItems();
-    autoConnecting = false;
-    state = WifiSelectionState::NETWORK_LIST;
-    selectedNetworkIndex = 0;
+    {
+      // The render task reads the list and its row items.
+      RenderLock lock(*this);
+      networks.clear();
+      realNetworkCount = 0;
+      appendHiddenNetworkEntry();
+      rebuildNetworkRowItems();
+      autoConnecting = false;
+      state = WifiSelectionState::NETWORK_LIST;
+      selectedNetworkIndex = 0;
+    }
     requestUpdate();
     return;
   }
 
+  // The render task reads the list and its row items while they are rebuilt.
+  RenderLock lock(*this);
   // Scan complete, process results — deduplicate in-place, keeping strongest signal
   networks.clear();
   networks.reserve(scanResult);
@@ -244,6 +249,9 @@ void WifiSelectionActivity::processWifiScanResults() {
   realNetworkCount = networks.size();
   appendHiddenNetworkEntry();
   rebuildNetworkRowItems();
+  // The shorter list may no longer hold the old selection.
+  if (selectedNetworkIndex >= networks.size()) selectedNetworkIndex = 0;
+  lock.unlock();
 
   WiFi.scanDelete();
 
@@ -265,7 +273,24 @@ void WifiSelectionActivity::appendHiddenNetworkEntry() {
   placeholder.isEncrypted = true;  // Treated as encrypted; an empty password still connects open APs
   placeholder.hasSavedPassword = false;
   placeholder.isHiddenPlaceholder = true;
+  networks.push_back(placeholder);
+  // The last row scans again.
+  placeholder.isHiddenPlaceholder = false;
+  placeholder.isRescanPlaceholder = true;
   networks.push_back(std::move(placeholder));
+}
+
+// Forgetting scans again for the new order. Cancel goes back to the list the
+// prompt was opened from, or scans again after a failed connection.
+void WifiSelectionActivity::closeForgetPrompt(const bool forgot) {
+  if (!forgot && forgetFromList) {
+    state = WifiSelectionState::NETWORK_LIST;
+    // The Confirm that chose Cancel is still down; its release must not connect.
+    manualNetworkListRequested = mappedInput.isPressed(MappedInputManager::Button::Confirm);
+    requestUpdate();
+    return;
+  }
+  startWifiScan();
 }
 
 // Derives networkRowItems from `networks`. Called whenever `networks` changes
@@ -277,12 +302,14 @@ void WifiSelectionActivity::rebuildNetworkRowItems() {
   for (size_t i = 0; i < networks.size(); i++) {
     const auto& network = networks[i];
     fui::ListItem item;
-    item.label = network.isHiddenPlaceholder ? tr(STR_ADD_HIDDEN_NETWORK) : network.ssid.c_str();
+    item.label = network.isHiddenPlaceholder   ? tr(STR_ADD_HIDDEN_NETWORK)
+                 : network.isRescanPlaceholder ? tr(STR_WIFI_SCAN_AGAIN)
+                                               : network.ssid.c_str();
     // Signal strength leads the row, a lock trails it on secured networks.
     item.icon = signalIcon(network);
     if (network.hasSavedPassword) item.value = tr(STR_NETWORK_SAVED);
     static const fui::BitmapRef lock = fui::bitmapFromIcon(icon_wifi_lock_16);
-    if (network.isEncrypted && !network.isHiddenPlaceholder) item.valueIcon = &lock;
+    if (network.isEncrypted && !network.isHiddenPlaceholder && !network.isRescanPlaceholder) item.valueIcon = &lock;
     item.actionValue = static_cast<int16_t>(i);
     networkRowItems.push_back(item);
   }
@@ -298,6 +325,10 @@ void WifiSelectionActivity::selectNetwork(const int index) {
   // Synthetic "Add hidden network..." entry: prompt the user to type the SSID first
   if (network.isHiddenPlaceholder) {
     promptHiddenSsid();
+    return;
+  }
+  if (network.isRescanPlaceholder) {
+    startWifiScan();
     return;
   }
 
@@ -696,11 +727,9 @@ void WifiSelectionActivity::loop() {
           network->hasSavedPassword = false;
         }
       }
-      // Go back to network list (whether Cancel or Forget network was selected)
-      startWifiScan();
+      closeForgetPrompt(forgetPromptSelection == 1);
     } else if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
-      // Skip forgetting, go back to network list
-      startWifiScan();
+      closeForgetPrompt(false);
     }
     return;
   }
@@ -723,9 +752,12 @@ void WifiSelectionActivity::loop() {
         autoConnecting = false;
         state = WifiSelectionState::FORGET_PROMPT;
         forgetPromptSelection = 0;  // Default to "Cancel"
+        forgetFromList = false;
       } else {
-        // Go back to network list on failure for non-saved credentials
+        // Go back to network list on failure for non-saved credentials; the
+        // list waits out a held Confirm, so its release does not select again.
         state = WifiSelectionState::NETWORK_LIST;
+        manualNetworkListRequested = mappedInput.isPressed(MappedInputManager::Button::Confirm);
       }
       requestUpdate();
       return;
@@ -747,6 +779,19 @@ void WifiSelectionActivity::loop() {
       return;
     }
 
+    // Holding Confirm on a saved network offers to forget it; on other rows it does nothing.
+    // Either way the release is consumed.
+    if (mappedInput.wasLongPressed(MappedInputManager::Button::Confirm, kForgetHoldMs)) {
+      if (!networks.empty() && networks[selectedNetworkIndex].hasSavedPassword) {
+        selectedSSID = networks[selectedNetworkIndex].ssid;
+        state = WifiSelectionState::FORGET_PROMPT;
+        forgetPromptSelection = 0;  // Default to "Cancel"
+        forgetFromList = true;
+        requestUpdate();
+      }
+      return;
+    }
+
     // Check for Confirm button to select network or rescan
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
       if (!networks.empty()) {
@@ -755,23 +800,6 @@ void WifiSelectionActivity::loop() {
         startWifiScan();
       }
       return;
-    }
-
-    if (mappedInput.wasPressed(MappedInputManager::Button::Right)) {
-      startWifiScan();
-      return;
-    }
-
-    const bool leftPressed = mappedInput.wasPressed(MappedInputManager::Button::Left);
-    if (leftPressed) {
-      const bool hasSavedPassword = !networks.empty() && networks[selectedNetworkIndex].hasSavedPassword;
-      if (hasSavedPassword) {
-        selectedSSID = networks[selectedNetworkIndex].ssid;
-        state = WifiSelectionState::FORGET_PROMPT;
-        forgetPromptSelection = 0;  // Default to "Cancel"
-        requestUpdate();
-        return;
-      }
     }
 
     // Touch goes through the FreeInkApp: render() registered the row hit
@@ -808,6 +836,7 @@ void WifiSelectionActivity::loop() {
 
 freeink::ui::BitmapRef WifiSelectionActivity::signalIcon(const WifiNetworkInfo& network) {
   if (network.isHiddenPlaceholder) return fui::bitmapFromIcon(icon_network_add_24);
+  if (network.isRescanPlaceholder) return fui::bitmapFromIcon(icon_refresh_cw_24);
   if (network.rssi >= -60) return fui::bitmapFromIcon(icon_wifi_full_24);
   if (network.rssi >= -70) return fui::bitmapFromIcon(icon_wifi_high_24);
   return fui::bitmapFromIcon(icon_wifi_low_24);
@@ -825,17 +854,7 @@ void WifiSelectionActivity::render(RenderLock&&) {
   auto& theme = UITheme::getInstance();
   auto metrics = theme.getMetrics();
   Rect screen = theme.getScreenSafeArea(renderer, true, false);
-
-  // Draw header
-  // STR_NETWORKS_FOUND is ~37 bytes once the Arabic translation is substituted,
-  // so 32 truncated it. See ClockSyncActivity for the same class of bug.
-  char countStr[64];
-  snprintf(countStr, sizeof(countStr), tr(STR_NETWORKS_FOUND), realNetworkCount);
-  // drawHeader self-insets by the board's viewable margins, so it takes the
-  // full-width rect at metrics.topPadding that every other caller uses; the
-  // safe-area `screen` would inset it twice.
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.headerHeight},
-                 tr(STR_WIFI_NETWORKS), countStr);
+  drawListHeader();
 
   switch (state) {
     case WifiSelectionState::AUTO_CONNECTING:
@@ -895,21 +914,6 @@ void WifiSelectionActivity::buildListScreen(UiScreen& screen) {
 
   if (networks.empty()) {
     screen.centeredText(tr(STR_NO_NETWORKS), screen.theme().bodyText);
-    if (mappedInput.hasTouch()) {
-      // Touch has no OK button to rescan with; offer the retry on screen instead
-      // of the "Press OK" hint renderNetworkList draws for button boards.
-      const auto& theme = screen.theme();
-      const fui::Rect body = screen.body();
-      const int16_t buttonWidth = static_cast<int16_t>(body.width / 2);
-      const fui::Rect buttonRect{static_cast<int16_t>(body.x + (body.width - buttonWidth) / 2),
-                                 static_cast<int16_t>(body.y + body.height * 2 / 3), buttonWidth, theme.rowHeight};
-      fui::ButtonProps scan;
-      scan.label = tr(STR_RETRY);
-      scan.action = ACTION_SCAN;
-      scan.inputMask = fui::InputTouch;
-      scan.text = theme.bodyText;
-      fui::button(screen.frame(), buttonRect, scan);
-    }
     return;
   }
 
@@ -990,20 +994,36 @@ void WifiSelectionActivity::buildPromptDialog(UiScreen& screen) {
   fui::optionDialog(screen.frame(), fui::centeredRect(body, fui::Size{width, height}), props);
 }
 
+void WifiSelectionActivity::drawListHeader() {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  // STR_NETWORKS_FOUND is ~37 bytes once the Arabic translation is substituted,
+  // so 32 truncated it. See ClockSyncActivity for the same class of bug.
+  char countStr[64];
+  snprintf(countStr, sizeof(countStr), tr(STR_NETWORKS_FOUND), realNetworkCount);
+  // drawHeader self-insets by the board's viewable margins, so it takes the
+  // full-width rect at metrics.topPadding that every other caller uses; the
+  // safe-area `screen` would inset it twice.
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.headerHeight},
+                 tr(STR_WIFI_NETWORKS), countStr);
+}
+
 void WifiSelectionActivity::renderNetworkList(const Rect* screen, const ThemeMetrics* metrics) {
   renderUi();
-  if (networks.empty() && !mappedInput.hasTouch()) {
-    // Below the centered "no networks" line the app drew. Touch boards get an
-    // on-screen Retry button from the screen builder instead of this hint.
-    const auto height = renderer.getLineHeight(UI_10_FONT_ID);
-    const auto top = screen->y + (screen->height - height) / 2;
-    UITheme::drawCenteredText(renderer, *screen, SMALL_FONT_ID, top + height + 10, tr(STR_PRESS_OK_SCAN));
+  // Rows taller than the fixed-height estimate: the follow asks for another
+  // build until the selection is drawn (as UiListActivity::render does).
+  for (int pass = 0; listNav.consumeRebuildNeeded() && pass < 8; ++pass) {
+    renderer.clearScreen();
+    drawListHeader();
+    renderUi();
+  }
+  // A saved network is forgotten by holding Confirm; the caption says so on the caption line.
+  if (!mappedInput.hasTouch() && !networks.empty() && networks[selectedNetworkIndex].hasSavedPassword) {
+    renderer.drawText(SMALL_FONT_ID, screen->x + metrics->contentSidePadding,
+                      setka::hintCaptionTop(renderer, SMALL_FONT_ID, screen->y + screen->height),
+                      tr(STR_WIFI_HOLD_TO_FORGET));
   }
 
-  const bool hasSavedPassword = !networks.empty() && networks[selectedNetworkIndex].hasSavedPassword;
-  const char* forgetLabel = hasSavedPassword ? tr(STR_FORGET_BUTTON) : "";
-
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_CONNECT), forgetLabel, tr(STR_RETRY));
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_CONNECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 }
 

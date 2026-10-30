@@ -41,6 +41,14 @@ constexpr int kOtherCoverPercent = 85;
 constexpr int kTabBarHeight = 86;
 constexpr int kTabIconSize = 32;
 constexpr int kTabIconGap = 4;
+// The X4 starts the current book's row on the cover edge, its bar 6 px clear in the side padding.
+#if FREEINK_DEVICE_X4
+constexpr int kBookRowX = kSidePadding;
+constexpr int kBookBarX = kSidePadding - 6 - kSelectionBarWidth;
+#else
+constexpr int kBookRowX = kRowTextX;
+constexpr int kBookBarX = kSelectionBarX;
+#endif
 
 struct TabSpec {
   StrId label;
@@ -287,7 +295,7 @@ void SetkaHomeActivity::drawBooks(UiScreen& screen, const int top, const int bot
   const int line10 = renderer.getLineHeight(kText10Font);
   const int line12 = renderer.getLineHeight(kText12Font);
   const int digitsHeight = heroCapHeight(renderer, kDigitsFont);
-  const int textWidth = width - kRowTextX - kSidePadding;
+  const int textWidth = width - kBookRowX - kSidePadding;
   const char* title = slots[0].book.title.c_str();
 
   // The current cover is as tall as the mockup's where it fits, and shrinks
@@ -340,19 +348,19 @@ void SetkaHomeActivity::drawBooks(UiScreen& screen, const int top, const int bot
   const int ruleY = digitsTop + digitsHeight + kGap;
   drawRule(renderer, 0, ruleY, width);
   const int rowTop = ruleY + kRuleWidth + kGap;
-  if (focused == 0) drawSelectionBar(renderer, kSelectionBarX, rowTop, rowHeight);
+  if (focused == 0) drawSelectionBar(renderer, kBookBarX, rowTop, rowHeight);
   if (twoLineTitle) {
     int lineTop = rowTop;
     for (const auto& line : renderer.wrappedText(kText12Font, title, textWidth, 2, kSemiBold)) {
-      renderer.drawText(kText12Font, kRowTextX, lineTop, line.c_str(), true, kSemiBold);
+      renderer.drawText(kText12Font, kBookRowX, lineTop, line.c_str(), true, kSemiBold);
       lineTop += line12;
     }
   } else {
-    renderer.drawText(kText12Font, kRowTextX, rowTop,
+    renderer.drawText(kText12Font, kBookRowX, rowTop,
                       renderer.truncatedText(kText12Font, title, textWidth, kSemiBold).c_str(), true, kSemiBold);
   }
   if (!currentSubtitle.empty()) {
-    renderer.drawText(kText10Font, kRowTextX, rowTop + titleHeight,
+    renderer.drawText(kText10Font, kBookRowX, rowTop + titleHeight,
                       renderer.truncatedText(kText10Font, currentSubtitle.c_str(), textWidth).c_str());
   }
   screen.frame().hit(fui::makeRect(0, ruleY + kRuleWidth, width, rowHeight + 2 * kGap), ACTION_BOOK, 0,
@@ -369,8 +377,8 @@ void SetkaHomeActivity::drawEmpty(UiScreen& screen, const int top, const int wid
   const int ruleY = y + kGap;
   drawRule(renderer, 0, ruleY, width);
   const int rowTop = ruleY + kRuleWidth + kGap;
-  if (focus == 0) drawSelectionBar(renderer, kSelectionBarX, rowTop, line12);
-  renderer.drawText(kText12Font, kRowTextX, rowTop, tr(STR_OPEN_LIBRARY), true, kSemiBold);
+  if (focus == 0) drawSelectionBar(renderer, kBookBarX, rowTop, line12);
+  renderer.drawText(kText12Font, kBookRowX, rowTop, tr(STR_OPEN_LIBRARY), true, kSemiBold);
   screen.frame().hit(fui::makeRect(0, ruleY + kRuleWidth, width, line12 + 2 * kGap), ACTION_OPEN_LIBRARY, 0,
                      fui::InputTouch);
 }

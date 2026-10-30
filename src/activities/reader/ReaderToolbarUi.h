@@ -30,7 +30,7 @@ class ReaderToolbarUi : public UiAppHost {
     bool panel = false;  // false = toolbar, true = a Contents/Text/More panel
     // Toolbar
     const char* chapterTitle = nullptr;
-    const char* pageInfo = nullptr;  // "12/40   51%"
+    const char* pageInfo = nullptr;  // "12 of 40 · 51%"
     int progressPermille = 0;        // 0..1000 book progress (scrub handle)
     // Panel
     const char* panelTitle = nullptr;

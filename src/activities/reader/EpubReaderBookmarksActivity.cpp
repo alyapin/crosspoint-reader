@@ -297,10 +297,11 @@ void EpubReaderBookmarksActivity::render(RenderLock&&) {
   renderer.clearScreen();
   drawChrome();
   renderUi();
+  rebuildWhileFollowing([this] { drawChrome(); });
 
   if (confirmPopup.processRender(renderer, mappedInput)) return;
 
-  const auto confirmLabel = bookmarks.size() > 0 ? tr(STR_SELECT) : "";
+  const auto confirmLabel = bookmarks.size() > 0 ? tr(STR_OPEN) : "";
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), confirmLabel, tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 

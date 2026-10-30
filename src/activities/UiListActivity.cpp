@@ -220,6 +220,11 @@ void UiListActivity::syncListViewport(UiScreen& screen, fui::ListProps& props, c
   const int prevTop = n.top;
   const bool trusted = n.trusts(listCount());
   const int drawn = n.drawnRows;
+  // While the selected row is on screen every build follows it, so a row that
+  // grew in place (a new value wraps its label) cannot slip below the last
+  // whole row. A swipe still moves the viewport off the selection.
+  const int selectedRow = n.selected.load() - selectionOffset;
+  if (trusted && drawn > 0 && selectedRow >= prevTop && selectedRow < prevTop + drawn) n.followOnBuild = true;
 
   screen.syncListViewport(n, props, listCount(), selectionOffset);
 
@@ -252,16 +257,7 @@ void UiListActivity::render(RenderLock&&) {
   renderer.clearScreen();
   drawChrome();
   renderUi();
-  // Wrapped labels grow rows, so fewer rows can fit than the fixed-height
-  // estimate ListNav plans with. list() reports the real layout back
-  // (ListNav::onListRendered); when the selection landed past the drawn rows
-  // the nav advanced the viewport and asked for another build. Bounded: top
-  // strictly advances toward the selection each pass.
-  for (int pass = 0; activeNav().consumeRebuildNeeded() && pass < 8; ++pass) {
-    renderer.clearScreen();
-    drawChrome();
-    renderUi();
-  }
+  rebuildWhileFollowing([this] { drawChrome(); });
   drawFooter();
   renderer.displayBuffer();
 }
