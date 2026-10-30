@@ -952,7 +952,6 @@ STR_2048_SCORE: "score"
 STR_2048_BEST: "Best"
 STR_2048_SWIPE_HINT: "Swipe any way"
 STR_2048_SIDE_HINT: "Side buttons: up, down"
-STR_2048_UNDO_KEY: "Undo"
 STR_2048_WON: "You made 2048"
 STR_2048_NO_MOVES: "No moves left"
 

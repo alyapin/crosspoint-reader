@@ -186,7 +186,8 @@ void BaseTheme::drawProgressBar(const GfxRenderer& renderer, Rect rect, const si
 }
 
 // Centre hint labels by text height on one line. A label too wide for its box
-// needs shorter copy; meanwhile it is cut with an ellipsis, never broken mid-word.
+// sets 1 px tighter between letters first; one still too wide needs shorter
+// copy, and meanwhile it is cut with an ellipsis, never broken mid-word.
 void BaseTheme::drawHintLabel(const GfxRenderer& renderer, int fontId, const char* label, const int x,
                               const int boxWidth, const int boxTop, const int boxHeight) {
 #if SOVA_UNBOUNDED_UI
@@ -194,10 +195,26 @@ void BaseTheme::drawHintLabel(const GfxRenderer& renderer, int fontId, const cha
   fontId = GOLOS_8_FONT_ID;
 #endif
   constexpr int textPadding = 4;  // keeps the label off the button's border
-  const std::string text = renderer.truncatedText(fontId, label, boxWidth - textPadding * 2);
-  const int textWidth = renderer.getTextWidth(fontId, text.c_str());
+  const int room = boxWidth - textPadding * 2;
+  int8_t tracking = 0;
+  std::string cut;
+  const char* text = label;
+  int textWidth = renderer.getTextWidth(fontId, label);
+  if (textWidth > room) {
+    const int tight = textWidth + renderer.getTextAdvanceX(fontId, label, EpdFontFamily::REGULAR, -1) -
+                      renderer.getTextAdvanceX(fontId, label, EpdFontFamily::REGULAR);
+    if (tight <= room) {
+      tracking = -1;
+      textWidth = tight;
+    } else {
+      cut = renderer.truncatedText(fontId, label, room);
+      text = cut.c_str();
+      textWidth = renderer.getTextWidth(fontId, text);
+    }
+  }
   const int textY = boxTop + std::max(1, (boxHeight - renderer.getTextHeight(fontId)) / 2);
-  renderer.drawText(fontId, x + (boxWidth - 1 - textWidth) / 2, textY, text.c_str());
+  renderer.drawText(fontId, x + (boxWidth - 1 - textWidth) / 2, textY, text, true, EpdFontFamily::REGULAR,
+                    BidiUtils::BidiBaseDir::AUTO, tracking);
 }
 
 void BaseTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const char* btn2, const char* btn3,

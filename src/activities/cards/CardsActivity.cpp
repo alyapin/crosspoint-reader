@@ -838,7 +838,7 @@ void CardsActivity::buildList(UiScreen& screen) {
   const int noteWidth = renderer.getScreenWidth() - 2 * kSidePadding;
   const int formatLines = textLines(renderer, kCaptionFont, formats, noteWidth, 2);
   const int noteTop = hintCaptionTop(renderer, kCaptionFont, height) - formatLines * captionLine;
-  const int first = headerBottom() + 14;
+  const int first = headerBottom() + UITheme::getInstance().getMetrics().verticalSpacing;
   const int rows = std::max(1, (noteTop - 8 - first) / kRowHeight);
   if (focus < listTop) listTop = focus;
   if (focus >= listTop + rows) listTop = focus - rows + 1;

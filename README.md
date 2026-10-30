@@ -1,32 +1,40 @@
 # Sova
 
-Sova («Сова») is a personal fork of [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader), the open-source e-reader firmware. It targets two Xteink readers: the X4 Pro (ESP32-S3, touch, frontlight) and the plain X4 (ESP32-C3, buttons only); the X4 build also carries the X3 board profile. Upstream features are listed in the [CrossPoint README](https://github.com/crosspoint-reader/crosspoint-reader#what-can-crosspoint-do). This file covers what the fork adds. For using the device, see the [user guide](./USER_GUIDE.md).
+Sova («Сова») is a personal fork of [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader), the open-source e-reader firmware. It targets two Xteink readers: the X4 Pro (ESP32-S3, touch, frontlight) and the plain X4 (ESP32-C3, buttons only); the X4 build also carries the X3 board profile. Upstream features are listed in the [CrossPoint README](https://github.com/crosspoint-reader/crosspoint-reader#what-can-crosspoint-do). This file covers what the fork adds. For using the device, see the [user guide](./USER_GUIDE.md); its [Sova features](./USER_GUIDE.md#8-sova-features) section covers the screens listed here.
 
 ## What Sova adds
 
 Reading:
 
-- Reader footer with the page number in the whole book and the reading time left. Pages not laid out yet are estimated and marked with `≈`; reading speed is learned from your page turns.
+- Reader footer with the page number in the whole book and the reading time left. Pages not laid out yet are estimated and marked with `~`; reading speed is learned from your page turns.
+- Battery in the reader footer: Settings → Reader → Customise Status Bar → Battery, off by default.
 - FB2 and FB2.ZIP books, converted once into an EPUB inside the book's cache.
 - Reading statistics on a Home tab: today's minutes against a daily goal, streak and record, a 12-week calendar, books finished and hours read this year.
 - Library tabs by status (Reading, Finished, Paused) and shelves you create, rename and delete.
 - A right-edge swipe sets the frontlight brightness while reading (X4 Pro, Edge Swipe Brightness setting).
 
-Games, under More → Games, with touch on the X4 Pro and buttons on the X4, saved to the SD card:
+Games, under More → Games, with touch on the X4 Pro and buttons on the X4, saved to the SD card. The X4 Pro has 12, the X4 has 9:
 
 - Chess against the computer (levels 1 to 5) or a friend, with clocks and four piece sets.
 - Sudoku, Minesweeper and Klondike solitaire.
-- Scanwords. Puzzles are files in `/scanwords/` on the card, made with `tools/scanword` (samples in `tools/scanword/samples`).
+- Scanwords. Puzzles are files in `/scanwords/` on the card, made with `tools/scanword` (samples in `tools/scanword/samples`); without that folder the game has no puzzles.
 - 2048 and the 15 puzzle.
-- Hangman and 5 letters (a Russian Wordle) on built-in word lists; hangman has a separate mode with crude words.
-- More games are in progress on separate branches.
+- Hangman and 5 letters (a Russian Wordle) on built-in word lists; hangman has a separate mode with strong language.
+- Reversi and Russian draughts, against the computer (three levels) or a second player.
+- Nonograms, 10 × 10 and 15 × 15: random puzzles made on the device, and pictures read from `/nonograms/` on the card. `tools/nonogram/generator.py` writes that folder from `tools/nonogram/pictures.txt`.
 - The X4 build leaves out the keyboard games (scanwords, hangman, 5 letters): they take too many key presses.
+- On the X4 the games run on the buttons: Back pauses a game and opens its menu, a held direction button repeats its step, and a held Confirm flags a cell in Minesweeper or draws a line in Nonograms.
+
+Flashcards, under More → Flashcards:
+
+- Leitner decks in `/Карточки` on the card, copied there or sent over LocalSend: `.tsv`, `.csv` and Anki's «Notes in Plain Text» export (`.txt`), including Anki cloze notes. Depending on its box, a card comes back after 1 to 120 days.
+- Each answer is graded Again, Good or Easy; on the X4 that is Left, Confirm and Right, and holding Back undoes the last answer.
 
 Books and screens:
 
-- Receive books over LocalSend: More → Receive books shows the device as «Сова» with a 4-digit code, and you accept or decline each transfer. The receiver runs only while that screen is open.
+- Receive books over LocalSend: More → Receive books shows the device as «Сова» with a 4-digit code, and you accept or decline each transfer. Books go to `/Книги` (or the OPDS download folder, if one is set), flashcard decks to `/Карточки`. The receiver runs only while that screen is open.
 - An owl on the boot screen and on the built-in Dark and Light sleep screens.
-- Sleep image picker: Settings → Display → Sleep image shows a thumbnail grid of the BMPs in `/sleep` and `/.sleep`, with a full-screen preview.
+- Sleep image picker: Settings → Display → Sleep image shows a thumbnail grid of the BMPs in `/sleep` and `/.sleep`, with a full-screen preview. The first tile, Random («Любая» in Russian), goes back to a random picture.
 - Setka, a 1-bit UI style for the screens the fork adds, drawn in Unbounded on both devices. The rules are in [.claude/skills/ui-style/SKILL.md](./.claude/skills/ui-style/SKILL.md).
 
 Battery:
@@ -93,6 +101,7 @@ More developer docs: [contributing](./docs/contributing/README.md), [touch and U
 - LocalSend HTTP code ported from [bigbag/papyrix-reader](https://github.com/bigbag/papyrix-reader), MIT.
 - Fonts in `lib/EpdFont/builtinFonts/source/`: Unbounded, Golos Text, Noto Sans, Noto Serif, Noto Sans Arabic, Noto Sans Hebrew and OpenDyslexic under the SIL Open Font License 1.1; Ubuntu under the Ubuntu Font Licence 1.0.
 - Scanword clues and answers are derived from the Russian Wiktionary (CC BY-SA 4.0), ranked with wordfreq (CC BY-SA 4.0) and pymorphy3 / OpenCorpora data. The puzzles are shared under CC BY-SA 4.0; see `tools/scanword/samples/ATTRIBUTION.txt`. The hangman and 5 letters word lists come from the same sources; see `tools/hangman/ATTRIBUTION.txt` and `tools/five-letters/ATTRIBUTION.txt`.
+- The random nonograms follow the generator of Pattern from Simon Tatham's Portable Puzzle Collection (MIT). The nonogram pictures were drawn for Sova and are MIT-licensed; see `tools/nonogram/ATTRIBUTION.txt`.
 
 The firmware is MIT-licensed; see [LICENSE](./LICENSE).
 

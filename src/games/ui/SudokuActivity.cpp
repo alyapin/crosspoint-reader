@@ -268,7 +268,7 @@ uint32_t SudokuActivity::idleSleepBudgetMs() const {
 const char* SudokuActivity::confirmHint() const {
   if (area == Area::Bar) return nullptr;
   if (game.isLocked(selected)) return "";
-  // Verbs, as the other boards' Confirm hints; «Пометить» does not fit the 72 px label.
+  // Verbs, as the other boards' Confirm hints.
   return notesMode ? tr(STR_SUDOKU_MARK_KEY) : tr(STR_SUDOKU_WRITE_KEY);
 }
 

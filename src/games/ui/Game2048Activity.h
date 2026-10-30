@@ -32,7 +32,7 @@ class Game2048Activity final : public GameScreen {
   void onTouch(const freeink::ui::ActionEvent& event, int x, int y) override;
   void onKey(int dx, int dy, bool confirm) override;
   bool onBack() override;
-  const char* confirmHint() const override { return game.canUndo() ? tr(STR_2048_UNDO_KEY) : ""; }
+  const char* confirmHint() const override { return game.canUndo() ? tr(STR_GAMES_UNDO) : ""; }
 
   void slide(g2048::Dir dir);
   void runBar(int slot);

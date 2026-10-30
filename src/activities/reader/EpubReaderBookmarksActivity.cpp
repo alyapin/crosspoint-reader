@@ -65,7 +65,7 @@ void EpubReaderBookmarksActivity::rebuildBookmarkRowItems() {
     fui::ListItem item;
     item.label = bookmark.name.empty() ? bookmark.summary.c_str() : bookmark.name.c_str();
     item.subtitle = bookmarkSubtitles.back().c_str();
-    item.icon = listIconFor(UIIcon::Bookmark, 32);  // subtitle rows carry the larger icon
+    item.icon = listIconFor(UIIcon::Bookmark, setka::kSubtitleRowIcon);
     item.actionValue = static_cast<int16_t>(bookmarkRowItems.size());
     bookmarkRowItems.push_back(item);
   }
@@ -252,9 +252,10 @@ void EpubReaderBookmarksActivity::drawChrome() {
 void EpubReaderBookmarksActivity::buildScreen(UiScreen& screen) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-  // Content: the safe area minus the title band render() paints.
+  const Rect header = UITheme::getInstance().getHeaderRect(renderer, true, false);
+  // Content: the safe area below the title band drawChrome() paints.
   screen.setContentMarginFromScreen(fui::Insets{
-      static_cast<int16_t>(safe.y + metrics.topPadding + metrics.headerHeight),
+      static_cast<int16_t>(header.y + header.height),
       static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width)),
       static_cast<int16_t>(renderer.getScreenHeight() - (safe.y + safe.height)), static_cast<int16_t>(safe.x)});
   screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
@@ -286,6 +287,10 @@ void EpubReaderBookmarksActivity::buildScreen(UiScreen& screen) {
   props.action = ACTION_ROW;
   // Tap opens; long-press shows bookmark actions (physical buttons stay in loop()).
   props.inputMask = fui::InputTouch | fui::InputLongPress;
+#if FREEINK_DEVICE_X4
+  // The deck rows' caption face keeps a bookmark in the 56 px list pitch.
+  props.subtitleText.font = fui::GfxRendererTarget::FONT_LABEL;
+#endif
   syncListViewport(screen, props);
 #if FREEINK_CAP_TOUCH
   configureSwipeDelete(screen, props);
