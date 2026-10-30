@@ -1280,8 +1280,9 @@ void ScanwordActivity::drawKeyboard(UiScreen& screen) const {
                                         {&icon_scanword_check_24, tr(STR_SCANWORD_CHECK), false, ACTION_CHECK, 0},
                                         {&icon_scanword_hint_24, tr(STR_SCANWORD_HINT), false, ACTION_HINT, 0},
                                         {&icon_scanword_done_24, tr(STR_SCANWORD_DONE), false, ACTION_DONE, 0}};
+  // Four equal cells: this bar has no Меню to keep in the right third.
   games::ui::drawActionBar(renderer, screen, keysTop + games::ui::kKeyboardHeight, acts,
-                           static_cast<int>(std::size(acts)), -1, kTap);
+                           static_cast<int>(std::size(acts)), -1, kTap, true);
 }
 
 void ScanwordActivity::drawLetterStrip(const int top) const {

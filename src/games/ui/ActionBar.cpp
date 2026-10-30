@@ -54,7 +54,7 @@ void drawStatus(const GfxRenderer& renderer, const int right, const int y, const
 }
 
 void drawActionBar(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, const int top, const ActionSlot* slots,
-                   const int count, const int focused, const uint16_t input) {
+                   const int count, const int focused, const uint16_t input, const bool equalCells) {
   const int width = renderer.getScreenWidth();
   // Ends above the button hints on button boards.
   const int bottom = renderer.getScreenHeight() - UITheme::getInstance().getMetrics().buttonHintsHeight;
@@ -65,9 +65,10 @@ void drawActionBar(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, con
   // A short bar closes the gap under the icon first.
   const int gap = std::clamp((cellHeight - kIconSize - captionHeight) / 3, 0, kIconGap);
   const int iconTop = cellTop + (cellHeight - kIconSize - gap - captionHeight) / 2;
-  // The last slot takes the right third on every bar; a fourth slot shares the two thirds left of it.
-  const int split = count > kBarCells ? width - width / kBarCells : width;
-  const int shared = count > kBarCells ? count - 1 : count;
+  // The last slot takes the right third; a fourth slot shares the two thirds left of it.
+  const bool menuCell = count > kBarCells && !equalCells;
+  const int split = menuCell ? width - width / kBarCells : width;
+  const int shared = menuCell ? count - 1 : count;
   for (int i = 0; i < count; ++i) {
     const int x0 = i < shared ? i * split / shared : split;
     const int x1 = i < shared ? (i + 1) * split / shared : width;
