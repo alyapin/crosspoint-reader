@@ -21,7 +21,6 @@
 namespace fui = freeink::ui;
 using namespace setka;
 using statsui::kRowTextX;
-using statsui::kSelectionBarX;
 
 namespace {
 constexpr fui::ActionId ACTION_TAB = 1;
@@ -39,8 +38,10 @@ constexpr int kTabGapMin = 10;
 constexpr int kTabBarGap = 6;
 // Gap before the active tab: its bar, plus air on both sides.
 constexpr int kTabBarRun = kSelectionBarWidth + 2 * kTabBarGap;
-// The other gaps carry a thin divider, so the labels do not read as one phrase.
+// The other gaps carry a thin divider, so the labels do not read as one phrase;
+// the X4 draws the tab row of Все книги, without them.
 constexpr int kTabDividerHeight = 16;
+constexpr bool kTabDividers = !FREEINK_DEVICE_X4;
 // Rows kept per status tab, newest first: each holds its path and title.
 constexpr size_t kMaxRows = FREEINK_MCU_C3 ? 80 : 200;
 
@@ -444,7 +445,7 @@ void LibraryShelvesActivity::loop() {
 
 int LibraryShelvesActivity::drawTabs(UiScreen& screen, const int stripTop, const int width) {
   constexpr int kStripPad = 12;
-  const int firstX = kSelectionBarX + kSelectionBarWidth + kTabBarGap;
+  const int firstX = kListBarX + kSelectionBarWidth + kTabBarGap;
   const int room = width - firstX - kSidePadding;
   // Regular labels plus the widest SemiBold gain pick the font, so it does not
   // change with the active tab; the text role never drops to the caption.
@@ -488,7 +489,7 @@ int LibraryShelvesActivity::drawTabs(UiScreen& screen, const int stripTop, const
     renderer.drawText(font, x, textTop, label, true, style);
     screen.frame().hit(fui::makeRect(x - tabGap / 2, stripTop, labelWidth + tabGap, stripHeight), ACTION_TAB,
                        static_cast<int16_t>(i), fui::InputTouch);
-    if (i + 1 < TabCount && i + 1 != tab) {
+    if (kTabDividers && i + 1 < TabCount && i + 1 != tab) {
       renderer.fillRect(x + labelWidth + tabGap / 2, textTop + (lineHeight - kTabDividerHeight) / 2, 1,
                         kTabDividerHeight, true);
     }
