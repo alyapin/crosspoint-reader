@@ -65,7 +65,7 @@ void EpubReaderBookmarksActivity::rebuildBookmarkRowItems() {
     fui::ListItem item;
     item.label = bookmark.name.empty() ? bookmark.summary.c_str() : bookmark.name.c_str();
     item.subtitle = bookmarkSubtitles.back().c_str();
-    item.icon = listIconFor(UIIcon::Bookmark, 32);  // subtitle rows carry the larger icon
+    item.icon = listIconFor(UIIcon::Bookmark, setka::kSubtitleRowIcon);
     item.actionValue = static_cast<int16_t>(bookmarkRowItems.size());
     bookmarkRowItems.push_back(item);
   }
@@ -286,6 +286,10 @@ void EpubReaderBookmarksActivity::buildScreen(UiScreen& screen) {
   props.action = ACTION_ROW;
   // Tap opens; long-press shows bookmark actions (physical buttons stay in loop()).
   props.inputMask = fui::InputTouch | fui::InputLongPress;
+#if FREEINK_DEVICE_X4
+  // The deck rows' caption face keeps a bookmark in the 56 px list pitch.
+  props.subtitleText.font = fui::GfxRendererTarget::FONT_LABEL;
+#endif
   syncListViewport(screen, props);
 #if FREEINK_CAP_TOUCH
   configureSwipeDelete(screen, props);
