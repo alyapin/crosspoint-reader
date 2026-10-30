@@ -2840,7 +2840,9 @@ void EpubReaderActivity::renderOverlay() {
     const float chapterProgress =
         pageCount > 0 ? static_cast<float>(section->currentPage + 1) / static_cast<float>(pageCount) : 0.0f;
     const float bookProgress = epub->calculateProgress(currentSpineIndex, chapterProgress);
-    pageInfo = std::to_string(section->currentPage + 1) + "/" + std::to_string(pageCount) + "   " +
+    char position[24];
+    snprintf(position, sizeof(position), tr(STR_POSITION_OF), section->currentPage + 1, pageCount);
+    pageInfo = std::string(position) + " \xC2\xB7 " +
                std::to_string(clampPercent(static_cast<int>(bookProgress * 100.0f + 0.5f))) + "%";
     model.chapterTitle = chapterTitle.c_str();
     model.pageInfo = pageInfo.c_str();

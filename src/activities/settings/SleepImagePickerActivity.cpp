@@ -170,7 +170,7 @@ void SleepImagePickerActivity::buildScreen(UiScreen& screen) {
   int nameWidth = width - 2 * kSidePadding;
   if (pageCount() > 1) {
     char pages[16];
-    snprintf(pages, sizeof(pages), "%d/%d", page + 1, pageCount());
+    snprintf(pages, sizeof(pages), tr(STR_POSITION_OF), page + 1, pageCount());
     const int pagesWidth = renderer.getTextWidth(kText12Font, pages);
     renderer.drawText(kText12Font, width - kSidePadding - pagesWidth, geo.footerTextTop, pages);
     nameWidth -= pagesWidth + kGap;
@@ -243,8 +243,7 @@ bool SleepImagePickerActivity::generateNextThumb() {
 void SleepImagePickerActivity::render(RenderLock&&) {
   renderer.clearScreen();
   renderUi();
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), focus == 0 ? tr(STR_SELECT) : tr(STR_OPEN), tr(STR_DIR_LEFT),
-                                            tr(STR_DIR_RIGHT));
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);  // no-op on touch boards
   renderer.displayBuffer(entryRefresh.exchange(false) ? cadence.entry() : cadence.update());
   // Fill the visible page lazily: one thumbnail per pass, each shown as it lands.

@@ -21,6 +21,7 @@ struct WifiNetworkInfo {
   bool isEncrypted;
   bool hasSavedPassword;             // Whether we have saved credentials for this network
   bool isHiddenPlaceholder = false;  // Synthetic "Add hidden network..." list entry
+  bool isRescanPlaceholder = false;  // Synthetic "Scan again" last entry
 };
 
 // WiFi selection states
@@ -82,7 +83,8 @@ class WifiSelectionActivity final : public Activity, private UiAppHost {
   // Whether we are attempting to auto-connect or auto-scan saved networks.
   bool autoConnecting = false;
 
-  // True from the Confirm press that stops auto-connect until that button is released.
+  // True from the Confirm press that stops auto-connect, or leaves a failed connection for the
+  // list, until that button is released.
   bool manualNetworkListRequested = false;
 
   // Saved SSIDs already attempted during the current auto-connect session.
@@ -91,6 +93,8 @@ class WifiSelectionActivity final : public Activity, private UiAppHost {
   // Save/forget prompt selection (0 = Yes, 1 = No)
   int savePromptSelection = 0;
   int forgetPromptSelection = 0;
+  // The forget prompt came from a hold on the list (not a failed connection): Cancel returns there.
+  bool forgetFromList = false;
 
   // Connection timeout
   static constexpr unsigned long CONNECTION_TIMEOUT_MS = 15000;
@@ -106,7 +110,6 @@ class WifiSelectionActivity final : public Activity, private UiAppHost {
 
   static void listScreen(UiScreen& screen, void* user);
   static void onRowEvent(const freeink::ui::ActionEvent& event, void* user);
-  static void onScanEvent(const freeink::ui::ActionEvent& event, void* user);
   static void onPromptEvent(const freeink::ui::ActionEvent& event, void* user);
   void buildListScreen(UiScreen& screen);
   void buildPromptDialog(UiScreen& screen);
@@ -121,6 +124,7 @@ class WifiSelectionActivity final : public Activity, private UiAppHost {
   void startWifiScan(bool autoScan = false);
   void processWifiScanResults();
   void appendHiddenNetworkEntry();
+  void closeForgetPrompt(bool forgot);
   void selectNetwork(int index);
   void promptHiddenSsid();
   void promptPasswordEntry();

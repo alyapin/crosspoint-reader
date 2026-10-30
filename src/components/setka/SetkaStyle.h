@@ -54,6 +54,26 @@ constexpr int kMinTouch = 44;
 // label + value row (settings).
 constexpr int kNavRowHeight = 64;
 constexpr int kListRowHeight = 56;
+// Rows the screens draw themselves. The X4 takes the stock lists' geometry
+// inside its bezel: bar at 13, a label or an icon at 35 (an icon's label at 69),
+// 56 px rows in the settings face, values ending 23 px from the right edge.
+#if FREEINK_DEVICE_X4
+constexpr int kListBarX = 13;
+constexpr int kListTextX = 35;
+constexpr int kListIconX = 35;
+constexpr int kListIconGap = 10;
+constexpr int kListValueInset = 23;
+constexpr int kListPitch = kListRowHeight;
+constexpr int kListFont = kText10Font;
+#else
+constexpr int kListBarX = kSelectionBarX;
+constexpr int kListTextX = kRowTextX;
+constexpr int kListIconX = kRowTextX;
+constexpr int kListIconGap = 16;
+constexpr int kListValueInset = kSidePadding;
+constexpr int kListPitch = kNavRowHeight;
+constexpr int kListFont = kText12Font;
+#endif
 // Game boards: "‹ Выйти" and the game status under the status line, then the board.
 constexpr int kGameTopLineY = 40;
 constexpr int kGameBoardTop = 84;
