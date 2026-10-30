@@ -767,7 +767,8 @@ int ScanwordActivity::gridLeft() const { return (renderer.getScreenWidth() - puz
 
 // Touch boards rest the grid on the bar: its rule is the grid's bottom edge. Button boards keep it under the top line.
 int ScanwordActivity::gridTop() const {
-  return touchBoard() ? bottom() - kActionHeight - puzzle->height() * cellHeight() : kGridTop;
+  // On touch the grid rests on the bar; with the keyboard up it keeps the top so more rows stay in view.
+  return touchBoard() && !keyboardOpen ? bottom() - kActionHeight - puzzle->height() * cellHeight() : kGridTop;
 }
 
 int ScanwordActivity::gridBottom() const { return gridTop() + puzzle->height() * cellHeight(); }
