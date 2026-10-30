@@ -285,6 +285,8 @@ void WifiSelectionActivity::appendHiddenNetworkEntry() {
 void WifiSelectionActivity::closeForgetPrompt(const bool forgot) {
   if (!forgot && forgetFromList) {
     state = WifiSelectionState::NETWORK_LIST;
+    // The Confirm that chose Cancel is still down; its release must not connect.
+    manualNetworkListRequested = mappedInput.isPressed(MappedInputManager::Button::Confirm);
     requestUpdate();
     return;
   }
