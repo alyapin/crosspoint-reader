@@ -765,7 +765,12 @@ int ScanwordActivity::bottom() const {
 
 int ScanwordActivity::gridLeft() const { return (renderer.getScreenWidth() - puzzle->width() * cellWidth()) / 2; }
 
-int ScanwordActivity::gridBottom() const { return kGridTop + puzzle->height() * cellHeight(); }
+// Touch boards rest the grid on the bar: its rule is the grid's bottom edge. Button boards keep it under the top line.
+int ScanwordActivity::gridTop() const {
+  return touchBoard() ? bottom() - kActionHeight - puzzle->height() * cellHeight() : kGridTop;
+}
+
+int ScanwordActivity::gridBottom() const { return gridTop() + puzzle->height() * cellHeight(); }
 
 int ScanwordActivity::keyboardTop() const {
   return renderer.getScreenHeight() - kStripHeight - games::ui::kKeyboardHeight - kActionHeight;
@@ -773,14 +778,14 @@ int ScanwordActivity::keyboardTop() const {
 
 uint16_t ScanwordActivity::cellAt(const int x, const int y) const {
   const int col = (x - gridLeft()) / cellWidth();
-  const int row = (y - kGridTop) / cellHeight();
-  if (x < gridLeft() || y < kGridTop || col >= puzzle->width() || row >= puzzle->height()) return scanword::MAX_CELLS;
+  const int row = (y - gridTop()) / cellHeight();
+  if (x < gridLeft() || y < gridTop() || col >= puzzle->width() || row >= puzzle->height()) return scanword::MAX_CELLS;
   return static_cast<uint16_t>(row * puzzle->width() + col);
 }
 
 void ScanwordActivity::cellOrigin(const uint16_t cell, int& x, int& y) const {
   x = gridLeft() + (cell % puzzle->width()) * cellWidth();
-  y = kGridTop + (cell / puzzle->width()) * cellHeight();
+  y = gridTop() + (cell / puzzle->width()) * cellHeight();
 }
 
 // --- render task ------------------------------------------------------------------
@@ -1022,8 +1027,9 @@ void ScanwordActivity::drawGrid(UiScreen& screen, const int visibleBottom) const
   const int h = cellHeight();
   const int left = gridLeft();
   const int right = left + puzzle->width() * w;
+  const int top = gridTop();
   // Whole rows only: a row cut by the keyboard reads as broken.
-  const int bottom = std::min(gridBottom(), kGridTop + (visibleBottom - kGridTop) / h * h);
+  const int bottom = std::min(gridBottom(), top + (visibleBottom - top) / h * h);
   for (uint16_t cell = 0; cell < puzzle->cellCount(); ++cell) {
     int x = 0;
     int y = 0;
@@ -1033,10 +1039,10 @@ void ScanwordActivity::drawGrid(UiScreen& screen, const int visibleBottom) const
   const int lastX = std::min(right, renderer.getScreenWidth() - 1);
   for (int c = 0; c <= puzzle->width(); ++c) {
     const int x = std::min(left + c * w, lastX);
-    renderer.drawLine(x, kGridTop, x, bottom);
+    renderer.drawLine(x, top, x, bottom);
   }
-  for (int r = 0; kGridTop + r * h <= bottom; ++r) {
-    renderer.drawLine(left, kGridTop + r * h, lastX, kGridTop + r * h);
+  for (int r = 0; top + r * h <= bottom; ++r) {
+    renderer.drawLine(left, top + r * h, lastX, top + r * h);
   }
   const bool showSelection = (!touchBoard() || keyboardOpen) && !game->solved();
   if (showSelection) drawSelection();
@@ -1044,7 +1050,7 @@ void ScanwordActivity::drawGrid(UiScreen& screen, const int visibleBottom) const
   if (bottom + 2 < visibleBottom) {
     renderer.fillRect(0, bottom + 2, renderer.getScreenWidth(), visibleBottom - bottom - 2, false);
   }
-  screen.frame().hit(fui::makeRect(left, kGridTop, right - left, bottom - kGridTop), ACTION_GRID, 0, kTap);
+  screen.frame().hit(fui::makeRect(left, top, right - left, bottom - top), ACTION_GRID, 0, kTap);
 }
 
 void ScanwordActivity::drawCell(const uint16_t cell, const int x, const int y) const {
