@@ -65,7 +65,7 @@ void drawActionBar(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, con
   // A short bar closes the gap under the icon first.
   const int gap = std::clamp((cellHeight - kIconSize - captionHeight) / 3, 0, kIconGap);
   const int iconTop = cellTop + (cellHeight - kIconSize - gap - captionHeight) / 2;
-  // The right cell is the same on every bar; more slots share the cells left of it.
+  // The last slot takes the right third on every bar; a fourth slot shares the two thirds left of it.
   const int split = count > kBarCells ? width - width / kBarCells : width;
   const int shared = count > kBarCells ? count - 1 : count;
   for (int i = 0; i < count; ++i) {

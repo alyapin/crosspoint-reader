@@ -12,10 +12,11 @@ namespace games::ui {
 
 // The action bar at the bottom of every game screen (ui-style Setka): a 2 px
 // rule, then three cells without dividers, each a 24 px icon over a Light
-// caption. A bar of four keeps its last slot (Меню) in the right cell and
-// splits the rest. A mode that is on gets the 4 px inset frame of a selected
-// cell; key focus gets the 10 px bar left of the icon, as on the Home tabs. A
-// slot without a label stays empty.
+// caption. The last slot always takes the right third (Меню, or Готово on the
+// Сканворд keyboard); a bar of four splits the other two thirds among the rest.
+// A mode that is on gets the 4 px inset frame of a selected cell; key focus gets
+// the 10 px bar left of the icon, as on the Home tabs. A slot without a label
+// stays empty.
 struct ActionSlot {
   const freeink::Icon* icon = nullptr;
   const char* label = nullptr;
