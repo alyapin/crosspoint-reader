@@ -170,7 +170,7 @@ void SleepImagePickerActivity::buildScreen(UiScreen& screen) {
   int nameWidth = width - 2 * kSidePadding;
   if (pageCount() > 1) {
     char pages[16];
-    snprintf(pages, sizeof(pages), "%d/%d", page + 1, pageCount());
+    snprintf(pages, sizeof(pages), tr(STR_POSITION_OF), page + 1, pageCount());
     const int pagesWidth = renderer.getTextWidth(kText12Font, pages);
     renderer.drawText(kText12Font, width - kSidePadding - pagesWidth, geo.footerTextTop, pages);
     nameWidth -= pagesWidth + kGap;
