@@ -27,6 +27,7 @@ class SudokuActivity final : public GameScreen {
   static constexpr freeink::ui::ActionId ACTION_PAD = ACTION_USER;  // value = digit
 
   bool restore() override;
+  bool isOver() const override { return game.isSolved(); }
   void saveGame() override;
   void pauseGame() override { game.pause(); }
   void resumeGame() override { game.resume(); }
@@ -41,7 +42,8 @@ class SudokuActivity final : public GameScreen {
   const char* confirmHint() const override;
   int32_t shownMinutes() const override;
 
-  void barActions(Action (&out)[SLOTS]) const;
+  // The bar's slot count.
+  int barActions(Action (&out)[SLOTS]) const;
   void runAction(Action action);
   void enterDigit(int digit);
   bool padKeyShown(int digit) const;

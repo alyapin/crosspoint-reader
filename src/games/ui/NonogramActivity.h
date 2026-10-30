@@ -37,6 +37,7 @@ class NonogramActivity final : public GameScreen {
   };
 
   bool restore() override;
+  bool isOver() const override { return boardShown() && game.isSolved(); }
   void saveGame() override;
   void pauseGame() override { game.pause(); }
   void resumeGame() override;

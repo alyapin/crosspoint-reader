@@ -29,6 +29,7 @@ constexpr int kGallowsMax = 250;
 constexpr int kGapMin = 16;
 constexpr int kSlotPitchMax = 60;
 constexpr int kLetterCap = 28;
+constexpr int kLetterSide = 5;  // room beside the widest letter in its slot: its ink keeps 4 px
 constexpr int kUnderline = 3;
 constexpr int kStroke = 4;
 constexpr int kFigureStroke = 3;
@@ -128,14 +129,11 @@ void HangmanActivity::runAction(const Action action) {
     case Action::Hint:
       if (game.hint()) markChanged();
       break;
-    case Action::Menu:
-      if (game.isOver()) {
-        openNewGame();
-      } else {
-        openGameMenu();
-      }
+    case Action::NewGame:
+      openNewGame();
       break;
-    case Action::None:
+    case Action::Menu:
+      openGameMenu();
       break;
   }
 }
@@ -164,6 +162,7 @@ void HangmanActivity::onTouch(const fui::ActionEvent& event, const int x, const 
 
 bool HangmanActivity::barShown(const int slot) const {
   if (slot == static_cast<int>(Action::Hint)) return game.canHint();
+  if (slot == static_cast<int>(Action::NewGame)) return game.isOver();
   return slot == static_cast<int>(Action::Menu);
 }
 
@@ -249,9 +248,9 @@ void HangmanActivity::build(UiScreen& screen) {
   }
 
   BarItem items[BAR_SLOTS];
-  if (barShown(0)) items[0] = {&icon_bar_hint_24, tr(STR_HANGMAN_HINT), false, BarItem::Repeat};
-  items[2] = {over ? &icon_bar_new_game_24 : &icon_menu_24, over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU), false,
-              over ? BarItem::NewGame : BarItem::Menu};
+  if (barShown(0)) items[0] = {&icon_bar_hint_24, tr(STR_HANGMAN_HINT), false, BarItem::Action};
+  if (over) items[1] = {&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame};
+  items[2] = {&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 
@@ -303,7 +302,8 @@ void HangmanActivity::drawClue(const int left, const int top) const {
   }
 }
 
-// Letter slots on underlines; a lost round shows the missed letters framed, like the untried keys.
+// Letter slots on underlines; a lost round shows the missed letters framed, like the untried keys. The letters
+// share one size, the cap height unless the widest letter (Ж, Щ, Ю) would then crowd its slot.
 void HangmanActivity::drawWord(const int baseline) const {
   const int count = game.length();
   const int pitch = std::min(kSlotPitchMax, (renderer.getScreenWidth() - 2 * kSidePadding) / std::max(count, 1));
@@ -313,6 +313,19 @@ void HangmanActivity::drawWord(const int baseline) const {
   int32_t refAdvance = 0;
   int refTop = 0;
   const bool metrics = renderer.getCodepointMetrics(kText12Font, 0x41D, kSemiBold, refAdvance, refTop) && refTop > 0;
+  int32_t widest = 0;
+  for (uint8_t letter = 1; metrics && widestAdvance == 0 && letter <= hangman::LETTER_COUNT; ++letter) {
+    int32_t advance = 0;
+    int top = 0;
+    if (renderer.getCodepointMetrics(kText12Font, hangman::letterCodepoint(letter), kSemiBold, advance, top)) {
+      widest = std::max(widest, advance);
+    }
+  }
+  if (widestAdvance == 0) widestAdvance = widest;
+  int scale = metrics ? cap * 256 / refTop : 0;
+  if (widestAdvance > 0) {
+    scale = std::min(scale, static_cast<int>((slot - 2 * kLetterSide) * 256 * 16 / widestAdvance));
+  }
   const bool lost = game.status() == hangman::Status::Lost;
   for (int i = 0; i < count; ++i) {
     const int x = left + i * pitch;
@@ -325,7 +338,6 @@ void HangmanActivity::drawWord(const int baseline) const {
     int32_t advance = 0;
     int glyphTop = 0;
     if (!metrics || !renderer.getCodepointMetrics(kText12Font, cp, kSemiBold, advance, glyphTop)) continue;
-    const int scale = cap * 256 / refTop;
     const int glyphWidth = static_cast<int>(advance * scale / (256 * 16));
     renderer.drawScaledCodepoint(kText12Font, cp, kSemiBold, x + (slot - glyphWidth) / 2, baseline - 10, scale);
   }

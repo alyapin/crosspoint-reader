@@ -24,7 +24,8 @@ constexpr int kTileGap = 8;
 constexpr int kTileRule = 2;
 constexpr int kFrameInset = 4;
 constexpr int kBoard = fifteen::SIDE * kTile + (fifteen::SIDE - 1) * kTileGap;
-constexpr int kLastSlot = GameScreen::BAR_SLOTS - 1;
+constexpr int kNewGameSlot = 1;  // once solved
+constexpr int kMenuSlot = 2;
 
 // "37 ходов": Russian picks the form by the number; English uses the last two the same.
 void movesText(const int n, char* out, const size_t cap) {
@@ -95,15 +96,15 @@ void FifteenActivity::afterSlide() {
   if (game.isSolved()) {
     newBest = best.record(game.moveCount(), game.elapsedMs());
     if (newBest) bestPending = true;
-    if (cursor >= 0 && hasBar()) barFocus = kLastSlot;
+    if (cursor >= 0 && hasBar()) barFocus = kNewGameSlot;
   }
   markChanged();
 }
 
-void FifteenActivity::runBar() {
-  if (game.isSolved()) {
+void FifteenActivity::runBar(const int slot) {
+  if (slot == kNewGameSlot && game.isSolved()) {
     openNewGame();
-  } else {
+  } else if (slot == kMenuSlot) {
     openGameMenu();
   }
 }
@@ -114,7 +115,7 @@ void FifteenActivity::onTouch(const fui::ActionEvent& event, const int x, const 
       if (const int cell = cellAt(x, y); cell >= 0) slideAt(cell);
       break;
     case ACTION_BAR:
-      if (event.value == kLastSlot) runBar();
+      runBar(event.value);
       break;
     default:
       break;
@@ -125,12 +126,14 @@ void FifteenActivity::onKey(const int dx, const int dy, const bool confirm) {
   const int before[] = {cursor, barFocus};
   if (barFocus >= 0) {
     if (confirm) {
-      runBar();
+      runBar(barFocus);
+    } else if (dx != 0 && game.isSolved()) {
+      barFocus = barFocus == kMenuSlot ? kNewGameSlot : kMenuSlot;
     } else if (dy < 0 && !game.isSolved()) {
       barFocus = -1;
     }
   } else if (game.isSolved()) {
-    if (hasBar()) barFocus = kLastSlot;
+    if (hasBar()) barFocus = kNewGameSlot;
   } else if (!hasBar()) {
     // Button boards: an arrow slides the tile beside the gap that way.
     if (game.slideToward(dx, dy)) afterSlide();
@@ -148,7 +151,7 @@ void FifteenActivity::onKey(const int dx, const int dy, const bool confirm) {
     } else if (dy > 0 && y < fifteen::SIDE - 1) {
       cursor += fifteen::SIDE;
     } else if (dy > 0 && hasBar()) {
-      barFocus = kLastSlot;
+      barFocus = kMenuSlot;
     }
   }
   const int after[] = {cursor, barFocus};
@@ -205,11 +208,15 @@ void FifteenActivity::build(UiScreen& screen) {
       snprintf(record, sizeof(record), tr(STR_FIFTEEN_BEST), moves, clock);
     }
     drawResult(games::ui::captionTop(renderer, BOARD_TOP + kBoard, kText12Font), line, record);
+  } else if (!hasBar()) {
+    // The side buttons slide up and down, as in 2048.
+    renderer.drawText(kText10Font, kSidePadding, games::ui::captionTop(renderer, BOARD_TOP + kBoard, kText10Font),
+                      tr(STR_2048_SIDE_HINT));
   }
 
   BarItem items[BAR_SLOTS];
-  items[kLastSlot] = game.isSolved() ? BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame}
-                                     : BarItem{&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
+  if (game.isSolved()) items[kNewGameSlot] = {&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame};
+  items[kMenuSlot] = {&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 

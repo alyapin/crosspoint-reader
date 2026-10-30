@@ -25,11 +25,11 @@ using reversi::SIZE;
 using reversi::Status;
 
 namespace {
+constexpr int kNewGameSlot = 1;  // once over
 constexpr int kMenuSlot = 2;
 constexpr int kSliceMs = 20;
 constexpr int kDiscInset = 7;
 constexpr int kDot = 10;
-constexpr int kCursorInset = 4;
 constexpr int kLineGap = 10;
 constexpr int kCountDisc = 14;  // as Шашки's count discs
 constexpr int kCountGap = 8;
@@ -120,18 +120,16 @@ void ReversiActivity::runBar(const int slot) {
   if (slot == 0) {
     engine.cancel();
     if (game.undo()) changed();
+  } else if (slot == kNewGameSlot) {
+    openNewGame();
   } else if (slot == kMenuSlot) {
-    if (game.isOver()) {
-      openNewGame();
-    } else {
-      openGameMenu();
-    }
+    openGameMenu();
   }
 }
 
 bool ReversiActivity::barShown(const int slot) const {
   if (slot == 0) return game.canUndo();
-  return slot == kMenuSlot;
+  return slot == kMenuSlot || game.isOver();
 }
 
 // Keys walk the legal moves, then the bar where it is shown, and wrap.
@@ -219,7 +217,7 @@ void ReversiActivity::build(UiScreen& screen) {
     // The level as the picker names it.
     const StrId levels[] = {StrId::STR_SUDOKU_EASY_LOWER, StrId::STR_SUDOKU_MEDIUM_LOWER, StrId::STR_SUDOKU_HARD_LOWER};
     const int level = std::clamp(static_cast<int>(game.mode()), 0, static_cast<int>(std::size(levels)) - 1);
-    drawTopLine(screen, {{tr(STR_CHESS_COMPUTER), nullptr}, {I18N.get(levels[level]), nullptr}}, false);
+    drawTopLine(screen, {{tr(STR_GAMES_COMPUTER_LOWER), nullptr}, {I18N.get(levels[level]), nullptr}}, false);
   } else {
     drawTopLine(screen, {{tr(STR_GAMES_TWO_PLAYERS), nullptr}}, false);
   }
@@ -228,10 +226,10 @@ void ReversiActivity::build(UiScreen& screen) {
   const int cell = width / SIZE;
   const int side = cell * SIZE;
   const int left = (width - side) / 2;
+  const auto rule = [cell, side](const int i) { return std::clamp(i * cell - kRuleWidth / 2, 0, side - kRuleWidth); };
   for (int i = 0; i <= SIZE; ++i) {
-    const int offset = std::clamp(i * cell - kRuleWidth / 2, 0, side - kRuleWidth);
-    renderer.fillRect(left + offset, BOARD_TOP, kRuleWidth, side, true);
-    renderer.fillRect(left, BOARD_TOP + offset, side, kRuleWidth, true);
+    renderer.fillRect(left + rule(i), BOARD_TOP, kRuleWidth, side, true);
+    renderer.fillRect(left, BOARD_TOP + rule(i), side, kRuleWidth, true);
   }
   const uint64_t moves = playerToMove() ? game.moves() : 0;
   const int last = !vs || game.lastMover() == Disc::White ? game.lastMove() : -1;
@@ -248,18 +246,21 @@ void ReversiActivity::build(UiScreen& screen) {
     }
   }
   if (cursor >= 0 && barFocus < 0 && (moves >> cursor & 1)) {
-    drawCellFrame(renderer, left + cursor % SIZE * cell + kCursorInset, BOARD_TOP + cursor / SIZE * cell + kCursorInset,
-                  cell - 2 * kCursorInset, cell - 2 * kCursorInset);
+    // On the cell's rules, as the other boards' cursors.
+    const int column = cursor % SIZE;
+    const int row = cursor / SIZE;
+    drawCellFrame(renderer, left + rule(column), BOARD_TOP + rule(row), rule(column + 1) - rule(column) + kRuleWidth,
+                  rule(row + 1) - rule(row) + kRuleWidth);
   }
   screen.frame().hit(fui::makeRect(left, BOARD_TOP, side, side), ACTION_BOARD, 0, shellInput());
 
   drawStatus(games::ui::captionTop(renderer, BOARD_TOP + side, kText12Font));
 
   BarItem items[BAR_SLOTS];
-  if (barShown(0)) items[0] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false, BarItem::Repeat};
+  if (barShown(0)) items[0] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false, BarItem::Action};
   const bool over = game.isOver();
-  items[kMenuSlot] = {over ? &icon_bar_new_game_24 : &icon_menu_24, over ? tr(STR_GAMES_NEW_GAME) : tr(STR_GAMES_MENU),
-                      false, over ? BarItem::NewGame : BarItem::Menu};
+  if (over) items[kNewGameSlot] = {&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame};
+  items[kMenuSlot] = {&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 
