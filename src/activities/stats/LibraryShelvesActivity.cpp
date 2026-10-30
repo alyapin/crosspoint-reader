@@ -14,6 +14,7 @@
 
 #include "ShelfActivity.h"
 #include "activities/util/KeyboardEntryActivity.h"
+#include "components/UITheme.h"
 #include "components/icons/listIcons.h"
 #include "statsIcons.h"
 #include "util/ButtonNavigator.h"
@@ -597,7 +598,11 @@ void LibraryShelvesActivity::draw(UiScreen& screen) {
   const int width = bands.width;
   const int listTop = drawTabs(screen, bands.contentTop, width);
   const int rowHeight = tab == TabShelves ? kShelfRowHeight : kBookRowHeight;
-  const int visible = std::max(1, (bands.contentBottom - listTop) / rowHeight);
+  // Button boards name the book hold menu on the caption line, as Все книги does; the rows stop above it.
+  const bool holdCaption = !mappedInput.hasTouch() && tab != TabShelves;
+  const int captionTop = hintCaptionTop(renderer, kCaptionFont, bands.contentBottom);
+  const int rowsBottom = holdCaption ? captionTop : bands.contentBottom;
+  const int visible = std::max(1, (rowsBottom - listTop) / rowHeight);
   visibleRows = visible;
   const int count = rowCount();
   if (count == 0) {
@@ -626,6 +631,10 @@ void LibraryShelvesActivity::draw(UiScreen& screen) {
     screen.frame().hit(fui::makeRect(0, rowTop, width, rowHeight), ACTION_ROW, static_cast<int16_t>(i),
                        fui::InputTouch | fui::InputLongPress);
   }
+  if (holdCaption && focus >= 0 && focus < count && menu == Menu::None) {
+    renderer.drawText(kCaptionFont, UITheme::getContentArea(renderer).x + kSidePadding, captionTop,
+                      tr(STR_LIBRARY_HOLD_OPTIONS));
+  }
   if (menu != Menu::None) drawMenu(screen, listTop, bands.contentBottom, width);
 }
 
@@ -647,7 +656,8 @@ bool LibraryShelvesActivity::generateMissingThumbs() {
 void LibraryShelvesActivity::render(RenderLock&&) {
   renderer.clearScreen();
   renderUi();
-  statsui::drawHints(renderer, mappedInput, focus < 0 ? tr(STR_SHELF_TAB_NEXT) : tr(STR_SELECT));
+  const char* confirmLabel = focus < 0 ? tr(STR_SHELF_TAB_NEXT) : tab == TabShelves ? tr(STR_SELECT) : tr(STR_OPEN);
+  statsui::drawHints(renderer, mappedInput, confirmLabel);
   renderer.displayBuffer(entryRefresh ? cadence.entry() : cadence.update());
   entryRefresh = false;
   // Visible covers without a thumb at this height get one, then a single repaint.
