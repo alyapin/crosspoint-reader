@@ -1144,7 +1144,7 @@ void ChessActivity::buildList(UiScreen& screen) {
 
 void ChessActivity::buildCustomTime(UiScreen& screen) {
   const int width = renderer.getScreenWidth();
-  const int textOffset = (kRowHeight - renderer.getLineHeight(kText12Font)) / 2;
+  const int textOffset = (kRowHeight - renderer.getLineHeight(kListFont)) / 2;
   const freeink::Icon* icons[] = {&icon_minutes_24, &icon_increment_24};
   const char* labels[] = {tr(STR_CHESS_MINUTES), tr(STR_CHESS_INCREMENT)};
   const int values[] = {kBaseMinutes[customBase], kIncrementSeconds[customIncrement]};
@@ -1162,14 +1162,14 @@ void ChessActivity::buildCustomTime(UiScreen& screen) {
     drawRow(screen, top, i, icons[i], labels[i]);
     char value[8];
     snprintf(value, sizeof(value), "%d", values[i]);
-    drawCentered(renderer, kText12Font, valueX, kStepperSize, textTop, value, kSemiBold);
+    drawCentered(renderer, kListFont, valueX, kStepperSize, textTop, value, kSemiBold);
     if (!atMin[i]) {
-      drawCentered(renderer, kText12Font, minusX, kStepperSize, textTop, "\xE2\x88\x92", kSemiBold);
+      drawCentered(renderer, kListFont, minusX, kStepperSize, textTop, "\xE2\x88\x92", kSemiBold);
       screen.frame().hit(fui::makeRect(minusX, stepTop, kStepperSize, kStepperSize), ACTION_STEP,
                          static_cast<int16_t>(i * 2), fui::InputTouch);
     }
     if (!atMax[i]) {
-      drawCentered(renderer, kText12Font, plusX, kStepperSize, textTop, "+", kSemiBold);
+      drawCentered(renderer, kListFont, plusX, kStepperSize, textTop, "+", kSemiBold);
       screen.frame().hit(fui::makeRect(plusX, stepTop, kStepperSize, kStepperSize), ACTION_STEP,
                          static_cast<int16_t>(i * 2 + 1), fui::InputTouch);
     }
