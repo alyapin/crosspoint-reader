@@ -55,4 +55,6 @@ class HangmanActivity final : public GameScreen {
   int barFocus = -1;
   uint8_t chosenList = 0;
   bool listPending = false;  // chosenList to write on the next save
+  mutable int32_t widestAdvance =
+      0;  // render task only: the alphabet's widest letter (12.4 fixed point), measured once
 };

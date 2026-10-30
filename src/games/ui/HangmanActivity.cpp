@@ -314,15 +314,18 @@ void HangmanActivity::drawWord(const int baseline) const {
   int refTop = 0;
   const bool metrics = renderer.getCodepointMetrics(kText12Font, 0x41D, kSemiBold, refAdvance, refTop) && refTop > 0;
   int32_t widest = 0;
-  for (uint8_t letter = 1; metrics && letter <= hangman::LETTER_COUNT; ++letter) {
+  for (uint8_t letter = 1; metrics && widestAdvance == 0 && letter <= hangman::LETTER_COUNT; ++letter) {
     int32_t advance = 0;
     int top = 0;
     if (renderer.getCodepointMetrics(kText12Font, hangman::letterCodepoint(letter), kSemiBold, advance, top)) {
       widest = std::max(widest, advance);
     }
   }
+  if (widestAdvance == 0) widestAdvance = widest;
   int scale = metrics ? cap * 256 / refTop : 0;
-  if (widest > 0) scale = std::min(scale, static_cast<int>((slot - 2 * kLetterSide) * 256 * 16 / widest));
+  if (widestAdvance > 0) {
+    scale = std::min(scale, static_cast<int>((slot - 2 * kLetterSide) * 256 * 16 / widestAdvance));
+  }
   const bool lost = game.status() == hangman::Status::Lost;
   for (int i = 0; i < count; ++i) {
     const int x = left + i * pitch;
