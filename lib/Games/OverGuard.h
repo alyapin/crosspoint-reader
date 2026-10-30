@@ -9,7 +9,8 @@ namespace games {
 // starts the hold.
 class OverGuard {
  public:
-  static constexpr uint32_t kHoldMs = 1000;
+  // Longer than a half refresh (1720 ms): the hold starts when the loop sees the end, about when that refresh starts.
+  static constexpr uint32_t kHoldMs = 2500;
 
   // A game shown as it already is (restored, opened): no hold.
   void reset(const bool over) {
