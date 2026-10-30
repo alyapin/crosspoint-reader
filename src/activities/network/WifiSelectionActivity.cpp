@@ -39,7 +39,7 @@ void WifiSelectionActivity::onRowEvent(const fui::ActionEvent& event, void* user
   if (self->state != WifiSelectionState::NETWORK_LIST) return;
   if (event.value < 0 || event.value >= static_cast<int16_t>(self->networks.size())) return;
   self->selectedNetworkIndex = static_cast<size_t>(event.value);
-  // Long-press a saved network to forget it (mirrors the Left-button hold in loop()).
+  // Long-press a saved network to forget it (as holding Confirm does in loop()).
   if (event.longPress) {
     if (self->networks[self->selectedNetworkIndex].hasSavedPassword) {
       self->selectedSSID = self->networks[self->selectedNetworkIndex].ssid;
