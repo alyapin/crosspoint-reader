@@ -106,6 +106,8 @@ void GameScreen::openGameMenu() {
   const bool keys = !hasBar();
   const bool over = newGameSlot() >= 0;
   if (keys && !over) addMenuRow(rows, count, kRowContinue, {tr(STR_GAMES_CONTINUE), &icon_start_24});
+  // A finished game leads with Новая игра.
+  if (over) addMenuRow(rows, count, kRowNewGame, {tr(STR_GAMES_NEW_GAME), &icon_bar_new_game_24});
   for (int i = 0; keys && i < shownCount; ++i) {
     const BarItem& item = shownBar[i];
     if (item.label == nullptr || item.kind == BarItem::Menu || item.kind == BarItem::NewGame) continue;
@@ -114,8 +116,8 @@ void GameScreen::openGameMenu() {
     addMenuRow(rows, count, static_cast<int8_t>(i), {item.label, item.icon, nullptr, check});
   }
   addOwnRows(rows, count);
-  addMenuRow(rows, count, kRowNewGame, {tr(STR_GAMES_NEW_GAME), &icon_bar_new_game_24});
   if (!over) {
+    addMenuRow(rows, count, kRowNewGame, {tr(STR_GAMES_NEW_GAME), &icon_bar_new_game_24});
     addMenuRow(rows, count, kRowFinish, {resigns() ? tr(STR_CHESS_RESIGN) : tr(STR_GAMES_FINISH), &icon_finish_24});
   }
   if (keys) addMenuRow(rows, count, kRowLeave, {tr(STR_GAMES_LEAVE), &icon_exit_24});

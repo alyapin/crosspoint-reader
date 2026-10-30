@@ -12,11 +12,11 @@ namespace games::ui {
 
 // The action bar at the bottom of every game screen (ui-style Setka): a 2 px
 // rule, then three cells without dividers, each a 24 px icon over a Light
-// caption. The last slot always takes the right third (Меню, or Готово on the
-// Сканворд keyboard); a bar of four splits the other two thirds among the rest.
-// A mode that is on gets the 4 px inset frame of a selected cell; key focus gets
-// the 10 px bar left of the icon, as on the Home tabs. A slot without a label
-// stays empty.
+// caption. The last slot (Меню) always takes the right third; a game bar of four
+// splits the other two thirds among the rest, a bar without Меню (the Сканворд
+// keyboard) asks for equal cells. A mode that is on gets the 4 px inset frame of
+// a selected cell; key focus gets the 10 px bar left of the icon, as on the Home
+// tabs. A slot without a label stays empty.
 struct ActionSlot {
   const freeink::Icon* icon = nullptr;
   const char* label = nullptr;
@@ -30,7 +30,7 @@ constexpr int kActionBarHeight = 70;  // the rule included
 // Draws the bar from `top` (its rule) down to the button hints (the screen bottom on touch boards)
 // and adds a hit per shown slot.
 void drawActionBar(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, int top, const ActionSlot* slots,
-                   int count, int focused, uint16_t input);
+                   int count, int focused, uint16_t input, bool equalCells = false);
 
 // One part of a game's status at the right of the top line: a word label in Regular, then its number
 // (a count, "1 из 6", "<1 мин") in SemiBold; either may be nullptr. Parts are joined by " · ".

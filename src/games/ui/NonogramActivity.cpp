@@ -337,7 +337,7 @@ void NonogramActivity::onKey(const int dx, const int dy, const bool confirm) {
 }
 
 const char* NonogramActivity::confirmHint() const {
-  if (stroking) return "";
+  if (stroking) return tr(STR_GAMES_DONE);
   if (!boardShown() || !game.inProgress() || barFocus >= 0 || cursor < 0) return nullptr;
   return tr(STR_NONOGRAM_MARK);
 }

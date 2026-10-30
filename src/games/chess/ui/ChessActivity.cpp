@@ -38,13 +38,12 @@ constexpr fui::ActionId ACTION_PROMOTE = 7;
 constexpr fui::ActionId ACTION_NEW_GAME = 8;
 constexpr fui::ActionId ACTION_FLIP = 9;
 
-// List screens: the CrossPoint 2.0 header and row pitch, Setka selection bar.
+// List screens: the CrossPoint 2.0 header, then the rows of the other game menus (setka::kList*).
 constexpr int kHeaderTop = kGameTopLineY;  // game view top line, under the status line
-constexpr int kBarX = kSidePadding - kSelectionBarWidth;
-constexpr int kRowHeight = setka::kNavRowHeight;
+constexpr int kExitStatusGap = 40;         // the least room between "‹ Выйти" and the status
+constexpr int kRowHeight = setka::kListPitch;
 constexpr int kRowGap = 0;
 constexpr int kIconSize = 24;
-constexpr int kIconGap = 16;
 constexpr int kStepperSize = 56;
 constexpr int kCustomDoneRow = 2;
 
@@ -781,15 +780,16 @@ int ChessActivity::listRows(Row* out) const {
     out[n++] = Row::Pieces;
     out[n++] = Row::Start;
   } else if (view == View::Menu) {
-    // The games' one menu form (GameScreen::openGameMenu).
+    // The games' one menu form (GameScreen::openGameMenu); a finished game leads with Новая игра.
     const bool keys = !hasBar();
     const bool over = match->game().isOver();
     if (keys && !over) out[n++] = Row::Continue;
+    if (over) out[n++] = Row::NewGame;
     if (keys && match->canUndo()) out[n++] = Row::Undo;
     if (keys) out[n++] = Row::Flip;
     if (!over) out[n++] = Row::Draw;
     out[n++] = Row::Pieces;
-    out[n++] = Row::NewGame;
+    if (!over) out[n++] = Row::NewGame;
     if (!over) out[n++] = Row::Resign;
     if (keys) out[n++] = Row::Exit;
   }
@@ -1102,20 +1102,20 @@ int ChessActivity::listTop() const {
 void ChessActivity::drawRow(UiScreen& screen, const int top, const int index, const freeink::Icon* icon,
                             const char* label) const {
   const bool focused = index == focus;
-  if (focused) drawSelectionBar(renderer, kBarX, top, kRowHeight);
-  int x = kRowTextX;
+  if (focused) drawSelectionBar(renderer, kListBarX, top, kRowHeight);
+  int x = kListTextX;
   if (icon != nullptr) {
-    screen.target().bitmap(fui::makeRect(x, top + (kRowHeight - kIconSize) / 2, kIconSize, kIconSize),
+    screen.target().bitmap(fui::makeRect(kListIconX, top + (kRowHeight - kIconSize) / 2, kIconSize, kIconSize),
                            fui::bitmapFromIcon(*icon), fui::BitmapMode::Center);
-    x += kIconSize + kIconGap;
+    x = kListIconX + kIconSize + kListIconGap;
   }
-  renderer.drawText(kText12Font, x, top + (kRowHeight - renderer.getLineHeight(kText12Font)) / 2, label, true,
+  renderer.drawText(kListFont, x, top + (kRowHeight - renderer.getLineHeight(kListFont)) / 2, label, true,
                     focused ? kSemiBold : EpdFontFamily::REGULAR);
 }
 
 void ChessActivity::buildList(UiScreen& screen) {
   const int width = renderer.getScreenWidth();
-  const int textOffset = (kRowHeight - renderer.getLineHeight(kText12Font)) / 2;
+  const int textOffset = (kRowHeight - renderer.getLineHeight(kListFont)) / 2;
   const int count = rowCount();
   for (int i = 0; i < count; ++i) {
     const int top = listTop() + i * (kRowHeight + kRowGap);
@@ -1124,7 +1124,7 @@ void ChessActivity::buildList(UiScreen& screen) {
     if (row.preview >= 0) {
       const auto set = static_cast<chess::ui::PieceSet>(row.preview);
       constexpr int kPreviewGap = 8;
-      int x = width - kSidePadding;
+      int x = width - kListValueInset;
       for (int k = static_cast<int>(std::size(kPreviewKinds)) - 1; k >= 0; --k) {
         const auto& bitmap =
             chess::ui::pieceBitmap(set, chess::ui::PieceColor::White, kPreviewKinds[k], chess::ui::PieceSize::Small);
@@ -1135,8 +1135,8 @@ void ChessActivity::buildList(UiScreen& screen) {
     } else if (row.value[0] != '\0') {
       // The row value role: small text on the label's baseline.
       const int valueTop =
-          top + textOffset + renderer.getFontAscenderSize(kText12Font) - renderer.getFontAscenderSize(kText10Font);
-      drawRightAligned(renderer, kText10Font, width - kSidePadding, valueTop, row.value);
+          top + textOffset + renderer.getFontAscenderSize(kListFont) - renderer.getFontAscenderSize(kText10Font);
+      drawRightAligned(renderer, kText10Font, width - kListValueInset, valueTop, row.value);
     }
     screen.frame().hit(fui::makeRect(0, top, width, kRowHeight), ACTION_ROW, static_cast<int16_t>(i), fui::InputTouch);
   }
@@ -1152,7 +1152,7 @@ void ChessActivity::buildCustomTime(UiScreen& screen) {
   const bool atMax[] = {customBase + 1 == static_cast<int>(std::size(kBaseMinutes)),
                         customIncrement + 1 == static_cast<int>(std::size(kIncrementSeconds))};
   // [−] value [+] at the right edge.
-  const int plusX = width - kSidePadding - kStepperSize;
+  const int plusX = width - kListValueInset - kStepperSize;
   const int valueX = plusX - kStepperSize;
   const int minusX = valueX - kStepperSize;
   int top = listTop();
@@ -1232,9 +1232,10 @@ void ChessActivity::drawTopLine(UiScreen& screen) const {
     status[count++] = {far == chess::WHITE ? tr(STR_CHESS_WHITE) : tr(STR_CHESS_BLACK), nullptr};
   }
   if (timed) status[count++] = {nullptr, clock};
-  // With a clock, too long beside "‹ Выйти": the level without "компьютер", then the clock alone.
-  const int room = width - kSidePadding - exitWidth;
-  if (timed && vs && games::ui::statusWidth(renderer, status, count) > room) {
+  // The status keeps kExitStatusGap from "‹ Выйти": too long, the level drops "компьютер", then with a clock
+  // the clock stands alone.
+  const int room = exitWidth > 0 ? width - exitWidth - kExitStatusGap : width - kSidePadding;
+  if (vs && games::ui::statusWidth(renderer, status, count) > room) {
     std::copy(status + 1, status + count, status);
     --count;
   }
@@ -1340,7 +1341,7 @@ void ChessActivity::drawClockPanel() const {
   const int capTop = kPanelTop + 22;
   const int capHeight = heroCapHeight(renderer, kHeroFont) * scale256 / 256;
   const bool heroToMove = match->isHumanTurn() && match->game().sideToMove() == hero;
-  if (heroToMove) drawSelectionBar(renderer, kBarX, capTop, capHeight);
+  if (heroToMove) drawSelectionBar(renderer, kSelectionBarX, capTop, capHeight);
   int x = kSidePadding;
   if (scale256 == 256) {
     x += drawHeroNumber(renderer, kHeroFont, x, capTop, clock);
