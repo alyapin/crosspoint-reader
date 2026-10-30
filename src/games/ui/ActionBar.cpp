@@ -107,7 +107,10 @@ int drawCaption(const GfxRenderer& renderer, int y, const char* text) {
       fit = end;
       if (text[end] == '\0') break;
     }
-    if (fit == 0) fit = std::min(strlen(text), sizeof(line) - 1);
+    if (fit == 0) {
+      fit = std::min(strlen(text), sizeof(line) - 1);
+      while (fit > 1 && (static_cast<uint8_t>(text[fit]) & 0xC0) == 0x80) --fit;  // not inside a UTF-8 character
+    }
     memcpy(line, text, fit);
     line[fit] = '\0';
     renderer.drawText(kText10Font, kSidePadding, y, line);
