@@ -1,6 +1,6 @@
 # CrossPoint User Guide
 
-Welcome to the **CrossPoint** firmware. This guide outlines the hardware controls, navigation, and reading features of the device.
+Welcome to the **CrossPoint** firmware. This guide outlines the hardware controls, navigation, and reading features of the device. The screens that Sova adds are described in [Sova Features](#8-sova-features).
 
 - [CrossPoint User Guide](#crosspoint-user-guide)
   - [1. Hardware Overview](#1-hardware-overview)
@@ -52,6 +52,15 @@ Welcome to the **CrossPoint** firmware. This guide outlines the hardware control
     - [5.3 Clippings and Highlights](#53-clippings-and-highlights)
   - [6. Current Limitations \& Roadmap](#6-current-limitations--roadmap)
   - [7. Troubleshooting Issues \& Escaping Bootloop](#7-troubleshooting-issues--escaping-bootloop)
+  - [8. Sova Features](#8-sova-features)
+    - [8.1 Statistics](#81-statistics)
+    - [8.2 Library Tabs and Shelves](#82-library-tabs-and-shelves)
+    - [8.3 Receiving Books and Decks (LocalSend)](#83-receiving-books-and-decks-localsend)
+    - [8.4 Flashcards](#84-flashcards)
+    - [8.5 Games](#85-games)
+    - [8.6 Sleep Picture](#86-sleep-picture)
+    - [8.7 Battery in the Reader Footer](#87-battery-in-the-reader-footer)
+    - [8.8 Online Fonts](#88-online-fonts)
 
 ## 1. Hardware Overview
 
@@ -381,7 +390,7 @@ Settings are grouped into **System**, **Display**, **Reader**, **Controls**, **L
 
 - **Language**: Set the UI language. CrossPoint supports 32 languages: English, Spanish, French, German, Czech, Brazilian Portuguese, European Portuguese, Russian, Swedish, Romanian, Catalan, Ukrainian, Belarusian, Italian, Polish, Finnish, Danish, Dutch, Turkish, Kazakh, Hungarian, Lithuanian, Slovenian, Valencian, Hebrew, Arabic, Slovak, Bosnian, Vietnamese, Norwegian Bokmål, Indonesian, and Orangutan.
 
-- **Online fonts**: Browse and download font families from the online catalog over Wi-Fi, and delete installed ones. See [Custom Fonts (SD Card)](#38-custom-fonts-sd-card) for more information.
+- **Online fonts** (**Settings → Reader**): Browse and download font families from the online catalog over Wi-Fi, and delete installed ones. See [Online Fonts](#88-online-fonts) and [Custom Fonts (SD Card)](#38-custom-fonts-sd-card) for more information.
 
 #### 3.6.5 OPDS Servers (Multiple Libraries)
 
@@ -602,7 +611,7 @@ To use custom sleep images, set the sleep screen mode to **Custom** or **Cover +
 
 - **Multiple Images (recommended):** Create a `.sleep` directory in the root of the SD card and place any number of `.bmp` images inside. One will be randomly selected each time the device sleeps. (A directory named `sleep` is also accepted as a fallback.)
 - **Single Image:** Place a file named `sleep.bmp` in the root directory. This takes priority over the `.sleep`/`sleep` directories.
-- **Pick one picture:** **Settings → Display → Sleep image** shows thumbnails of the `.sleep`/`sleep` pictures. Open one and choose **Set** to show it on every sleep; it then takes priority over `sleep.bmp`. If it disappears, a random picture is used. **Random** restores the random choice.
+- **Pick one picture:** **Settings → Display → Sleep image**; see [Sleep Picture](#86-sleep-picture).
 
 #### Transparent overlay images
 
@@ -825,3 +834,96 @@ Press **Ctrl-C** or close the graph window to exit.
 If the device is stuck in a bootloop, press and release the Reset button. Then, press and hold on to the configured Back button and the Power Button to boot to the Home Screen.
 
 There can be issues with broken cache or config. In this case, delete the `.crosspoint` directory on your SD card (or consider deleting only `settings.json`, `state.json`, or `epub_*` cache directories in the `.crosspoint/` folder).
+
+---
+
+## 8. Sova Features
+
+Sova adds these screens and settings to CrossPoint on the X4 Pro and the X4. Its Home screen shows the books you are reading and four tabs: **Library**, **Statistics**, **More** and **Settings**.
+
+### 8.1 Statistics
+
+**Home → Statistics** shows today's reading minutes against your daily goal, your current streak and your record, a calendar of the last 12 weeks, and the books finished and hours read this year. A day counts toward a streak after 5 minutes of reading.
+
+Set the goal in **Settings → Reader → Daily Reading Goal**: 5 to 180 minutes in steps of 5, 30 by default. Reading is counted by date, which the device gets over Wi-Fi or from its clock where it has one. Until it knows the date, a note takes the place of the calendar and the yearly totals.
+
+### 8.2 Library Tabs and Shelves
+
+**Home → Library** sorts the books you have opened into four tabs: **Reading**, **Finished**, **Paused** and **Shelves**. A book goes to **Reading** when you first open it and to **Finished** when you read to its end.
+
+Long-press a book (on the X4, select it and hold **Confirm** for about a second) to change its status with **Back to reading**, **Mark as finished** or **Put aside** (to **Paused**), or to choose **Add to shelf…**. That list puts a check by the shelves the book is on: select a shelf to add or remove the book, or **New shelf** to make one.
+
+In **Shelves**, **New shelf** creates a shelf (up to 32), and a long press on a shelf offers **Rename** and **Delete**. Deleting a shelf keeps its books. Open a shelf to see its covers: the **+** tile adds a book you have opened before, and a long press on a cover offers **Remove from shelf**.
+
+### 8.3 Receiving Books and Decks (LocalSend)
+
+**Home → More → Receive books** takes files sent from the LocalSend app on a phone or computer:
+
+1. Open the screen and choose a Wi-Fi network.
+2. The screen shows the device as «Сова», the network name and a 4-digit code.
+3. In LocalSend on the same network, send the files to «Сова» and enter the code. After three wrong codes, sending is blocked for 30 seconds.
+4. On the device, choose **Accept** or **Decline**.
+
+The device takes `.epub`, `.fb2`, `.fb2.zip`, `.txt`, `.md`, `.xtc` and `.xtch` books and `.tsv` and `.csv` decks, up to 256 MB per file. Books go to `/Книги`, or to the **Download folder** set in **Settings → Connectivity → OPDS Servers**. Decks (`.tsv`, `.csv`, and `.txt` files that start with an Anki export header) go to `/Карточки` for [Flashcards](#84-flashcards); a deck sent again replaces the old one. Files are received only while this screen is open.
+
+### 8.4 Flashcards
+
+**Home → More → Flashcards** lists the decks in `/Карточки` and how many cards are due today.
+
+**Adding decks.** A deck is a text file with one card per line: the front, the answer and an optional example, separated by tabs. Copy it to `/Карточки` on the SD card, upload it there in **[File Transfer](#35-file-transfer-screen)**, or send it over [LocalSend](#83-receiving-books-and-decks-localsend). The device reads:
+
+- `.tsv` files;
+- `.csv` files with tab, `;` or `,` between fields;
+- `.txt` files exported from Anki as **Notes in Plain Text**.
+
+Files can be UTF-8 or Windows-1251. In Anki cloze notes (`{{c1::…}}`), the front shows `[…]` in place of each deletion and the back shows the full text. A deck holds up to 2,000 cards and 4 MB; split a larger one into parts. When you edit a deck, a card keeps its progress as long as its front (or its Anki GUID) stays the same.
+
+**Studying.** Open a deck and choose **Start**. **New per day** sets how many new cards each day brings: 5, 10 (default), 20 or 30. After you see the answer, grade the card:
+
+- **Again** puts it in box 1 and shows it again later in the same session.
+- **Good** moves it one box up, **Easy** two.
+
+Cards in boxes 1 to 7 come back after 1, 3, 7, 14, 30, 60 and 120 days. A study day starts at 04:00. If the device does not know the date yet, nothing comes due: connect to Wi-Fi once.
+
+On the X4 Pro, tap the card to see the answer, then tap **Again**, **Good** or **Easy**; **Undo** takes back the last answer. On the X4:
+
+| Action                 | Button                          |
+| ---------------------- | ------------------------------- |
+| Show the answer        | **Confirm**                     |
+| Again                  | **Left**                        |
+| Good                   | **Confirm**                     |
+| Easy                   | **Right**                       |
+| Undo the last answer   | Hold **Back** on the next card  |
+| End the session        | **Back**                        |
+
+### 8.5 Games
+
+**Home → More → Games** has 12 games on the X4 Pro, played by touch, and 9 on the X4, which leaves out the keyboard games (Scanwords, Hangman, 5 letters). Two games read puzzles from the SD card: Scanwords need the `scanwords` folder in the card root, and the Nonograms pictures need the `nonograms` folder. Random nonograms are made on the device.
+
+On the X4 the games use the buttons:
+
+- **Left**, **Right**, **Side Up** and **Side Down** move the cursor. Hold one to keep moving.
+- **Confirm** acts on the selection; the button hints name the action.
+- In Minesweeper, hold **Confirm** to put or remove a flag.
+- In Nonograms, **Confirm** steps a cell through fill, cross and empty. Hold it to draw a line: the cells you move over get the same mark. Press **Confirm** (**Done**) or **Back** to end the line.
+- **Back** pauses the game and opens its menu. If a cell, card or piece is selected, the first **Back** only clears the selection. During a game the menu opens on **Continue**, so **Back** and then **Confirm** return to the game. It also lists the game's own options, **New game** and **Exit**. **End game** asks first and deletes the game's save; chess, draughts and reversi offer **Resign** instead.
+
+### 8.6 Sleep Picture
+
+**Settings → Display → Sleep image** shows thumbnails of the BMP pictures in `/.sleep` and `/sleep`. Open one to see it full screen, then choose **Set** (**Confirm** on the X4) to show it on every sleep, or **Back** to return. The first tile, **Random** («Любая» in Russian), goes back to a random picture from those folders.
+
+Either choice switches **Sleep Screen** to **Custom**, unless it is already **Custom** or **Cover + Custom**. A set picture takes priority over `sleep.bmp`; if its file is gone, a random picture is used. With **Random**, `sleep.bmp` is shown only when the folders have no picture.
+
+### 8.7 Battery in the Reader Footer
+
+The reader footer shows the page number in the whole book and the reading time left. A page number marked `~` is an estimate: that part of the book is not laid out yet. To add the battery to the footer, turn on **Settings → Reader → Customise Status Bar → Battery**; it is off by default. The percentage next to it follows **Settings → Display → Hide Battery %**.
+
+### 8.8 Online Fonts
+
+**Settings → Reader → Online fonts** downloads font families from the CrossPoint font catalog and deletes installed ones. It needs Wi-Fi: the screen first asks for a network, then loads the list.
+
+- If the list is grouped by script, choose **All fonts** or a script first. Selecting a family that is not installed downloads it.
+- Installed families are marked **Installed**. Selecting one asks **Delete?** before removing it.
+- A family marked **Update** has a newer version; selecting it downloads that version. **Download All** and **Update All** act on the whole list shown.
+
+Installed families appear in **Settings → Reader → Text Settings → Reader Font Family**.
