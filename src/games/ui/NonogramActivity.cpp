@@ -278,7 +278,12 @@ void NonogramActivity::onKey(const int dx, const int dy, const bool confirm) {
   const int before[] = {cursor, keyCursor ? 1 : 0, barFocus};
   if (!boardShown()) {
     if (!hasBar()) return;  // Confirm runs Новая игра (GameScreen)
-    barFocus = kNewGameSlot;
+    // The first key shows the focus on Новая игра; then Left/Right reach Меню.
+    if (barFocus < 0) {
+      barFocus = kNewGameSlot;
+    } else if (dx != 0) {
+      barFocus = nextBarSlot(barFocus, dx);
+    }
     if (confirm) runBar(barFocus);
   } else if (barFocus >= 0) {
     if (confirm) {
