@@ -101,17 +101,20 @@ void SudokuActivity::pickerChosen(const int row, bool) {
 
 // --- input -------------------------------------------------------------------
 
-void SudokuActivity::barActions(Action (&out)[SLOTS]) const {
+// Four slots while playing; a solved grid has the three of the other games' bars.
+int SudokuActivity::barActions(Action (&out)[SLOTS]) const {
   for (Action& a : out) a = Action::None;
   if (game.isSolved()) {
-    out[3] = Action::NewGame;
-    return;
+    out[1] = Action::NewGame;
+    out[2] = Action::Menu;
+    return 3;
   }
   out[0] = Action::Notes;
   const bool erasable = !game.isLocked(selected) && (game.value(selected) != 0 || game.notes(selected) != 0);
   if (erasable) out[1] = Action::Erase;
   if (game.canUndo()) out[2] = Action::Undo;
   out[3] = Action::Menu;
+  return SLOTS;
 }
 
 void SudokuActivity::runAction(const Action action) {
@@ -160,8 +163,8 @@ void SudokuActivity::onTouch(const fui::ActionEvent& event, const int x, const i
       break;
     case ACTION_BAR: {
       Action actions[SLOTS];
-      barActions(actions);
-      if (event.value >= 0 && event.value < SLOTS) runAction(actions[event.value]);
+      const int count = barActions(actions);
+      if (event.value >= 0 && event.value < count) runAction(actions[event.value]);
       break;
     }
     default:
@@ -172,7 +175,7 @@ void SudokuActivity::onTouch(const fui::ActionEvent& event, const int x, const i
 void SudokuActivity::onKey(const int dx, const int dy, const bool confirm) {
   const int before[] = {static_cast<int>(area), selected, padFocus, barFocus, notesMode ? 1 : 0};
   Action actions[SLOTS];
-  barActions(actions);
+  int slots = barActions(actions);
   // Next shown pad key / bar slot from `from` in direction `step`; `from` itself when none.
   auto nextKey = [this](const int from, const int step) {
     for (int i = 1; i <= sudoku::SIZE; ++i) {
@@ -181,9 +184,9 @@ void SudokuActivity::onKey(const int dx, const int dy, const bool confirm) {
     }
     return from;
   };
-  auto nextSlot = [&actions](const int from, const int step) {
-    for (int i = 1; i <= SLOTS; ++i) {
-      const int s = (from + step * i + SLOTS * 2) % SLOTS;
+  auto nextSlot = [&actions, &slots](const int from, const int step) {
+    for (int i = 1; i <= slots; ++i) {
+      const int s = (from + step * i + slots * 2) % slots;
       if (actions[s] != Action::None) return s;
     }
     return from;
@@ -196,7 +199,7 @@ void SudokuActivity::onKey(const int dx, const int dy, const bool confirm) {
   auto toBar = [&] {
     if (!hasBar()) return;
     area = Area::Bar;
-    if (actions[barFocus] == Action::None) barFocus = nextSlot(barFocus, 1);
+    if (barFocus >= slots || actions[barFocus] == Action::None) barFocus = nextSlot(barFocus, 1);
   };
 
   switch (area) {
@@ -241,7 +244,7 @@ void SudokuActivity::onKey(const int dx, const int dy, const bool confirm) {
       if (confirm) {
         runAction(actions[barFocus]);
         // The action may hide its own slot (Стереть on a cleared cell, the last undo).
-        barActions(actions);
+        slots = barActions(actions);
         if (area == Area::Bar && actions[barFocus] == Action::None) barFocus = nextSlot(barFocus, 1);
       } else if (dx != 0) {
         barFocus = nextSlot(barFocus, dx);
@@ -304,12 +307,17 @@ void SudokuActivity::build(UiScreen& screen) {
     drawResult(games::ui::captionTop(renderer, BOARD_TOP + kGridSize, kText12Font), line);
   } else {
     drawPad(screen);
+    // Touch boards name the notes mode under the pad, as Японские name Крестик.
+    if (notesMode && hasBar()) {
+      games::ui::drawCaption(renderer, games::ui::captionTop(renderer, kPadTop + kKeyHeight, kText10Font),
+                             tr(STR_SUDOKU_NOTES_HINT));
+    }
   }
 
   Action actions[SLOTS];
-  barActions(actions);
+  const int slots = barActions(actions);
   BarItem items[SLOTS];
-  for (int i = 0; i < SLOTS; ++i) {
+  for (int i = 0; i < slots; ++i) {
     switch (actions[i]) {
       case Action::Notes:
         items[i] = {&icon_bar_notes_24, tr(STR_SUDOKU_NOTES), notesMode, BarItem::Mode};
@@ -318,7 +326,7 @@ void SudokuActivity::build(UiScreen& screen) {
         items[i] = {&icon_bar_erase_24, tr(STR_SUDOKU_ERASE), false};
         break;
       case Action::Undo:
-        items[i] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false, BarItem::Repeat};
+        items[i] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false, BarItem::Action};
         break;
       case Action::Menu:
         items[i] = {&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
@@ -330,7 +338,7 @@ void SudokuActivity::build(UiScreen& screen) {
         break;
     }
   }
-  drawBar(screen, items, area == Area::Bar ? barFocus : -1);
+  drawBar(screen, items, slots, area == Area::Bar ? barFocus : -1);
 }
 
 void SudokuActivity::drawGrid() const {

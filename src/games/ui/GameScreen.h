@@ -1,6 +1,7 @@
 #pragma once
 
 #include <I18n.h>
+#include <OverGuard.h>
 
 #include <atomic>
 #include <cstddef>
@@ -61,9 +62,8 @@ class GameScreen : public Activity, protected UiAppHost {
   static constexpr freeink::ui::ActionId ACTION_USER = 5;
 
   struct BarItem {
-    // Mode: a toggle; Repeat: a harmless action worth repeating (undo, hint, flip), which the game menu
-    // reopens on; Menu, NewGame (the game is over): the slot the game menu leaves out.
-    enum Kind : uint8_t { Action, Mode, Repeat, Menu, NewGame };
+    // Mode: a toggle; Menu, NewGame (the game is over): the slot the game menu leaves out.
+    enum Kind : uint8_t { Action, Mode, Menu, NewGame };
     const freeink::Icon* icon = nullptr;
     const char* label = nullptr;  // nullptr hides the slot
     bool active = false;          // a mode that is on: inset frame
@@ -74,6 +74,8 @@ class GameScreen : public Activity, protected UiAppHost {
 
   // Restores the saved game; false when there is none.
   virtual bool restore() = 0;
+  // Won, lost or solved. Straight after it turns, the new-game control ignores a press (games::OverGuard).
+  virtual bool isOver() const = 0;
   virtual void saveGame() = 0;
   virtual void pauseGame() = 0;
   virtual void resumeGame() = 0;
@@ -156,6 +158,7 @@ class GameScreen : public Activity, protected UiAppHost {
   static void screenFn(UiScreen& screen, void* user);
   void confirmFinish();
   bool applyKeys();
+  bool newGameHeld(int slot);
   void drawMode(UiScreen& screen, const BarItem* items, int count) const;
   void addMenuRow(GamePickerActivity::Row* rows, int& count, int8_t id, const GamePickerActivity::Row& row);
   void addOwnRows(GamePickerActivity::Row* rows, int& count);
@@ -167,10 +170,10 @@ class GameScreen : public Activity, protected UiAppHost {
   mutable BarItem shownBar[MAX_BAR_SLOTS];  // the last drawBar(), for the game menu
   mutable int shownCount = 0;
   int8_t menuIds[GamePickerActivity::MAX_ROWS] = {};  // the open menu's rows (GameScreen.cpp MenuRow)
-  int8_t lastMenuRow = -1;                            // the last mode or Repeat action chosen there
   setka::RefreshCadence cadence;                      // render task only
   std::atomic<uint8_t> repaint{RepaintEntry};
-  games::ui::BoardKeys keys;  // loop task only
+  games::ui::BoardKeys keys;   // loop task only
+  games::OverGuard overGuard;  // loop task only
   int32_t clockShown = -1;
   bool savePending = false;
 };

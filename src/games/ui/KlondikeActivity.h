@@ -17,11 +17,14 @@ class KlondikeActivity final : public GameScreen {
  public:
   KlondikeActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
+  uint32_t idleSleepBudgetMs() const override;
+
  private:
   static constexpr freeink::ui::ActionId ACTION_PILE = ACTION_USER;  // value = pile
   static constexpr int kNone = -1;
 
   bool restore() override;
+  bool isOver() const override { return game.isWon(); }
   void saveGame() override;
   void pauseGame() override { game.pause(); }
   void resumeGame() override { game.resume(); }
@@ -32,6 +35,7 @@ class KlondikeActivity final : public GameScreen {
   void onTouch(const freeink::ui::ActionEvent& event, int x, int y) override;
   void onKey(int dx, int dy, bool confirm) override;
   bool onBack() override;
+  int32_t shownMinutes() const override;
   const char* backHint() const override {
     return pickPile != kNone || hintPile != kNone || noMoves ? tr(STR_CANCEL) : nullptr;
   }

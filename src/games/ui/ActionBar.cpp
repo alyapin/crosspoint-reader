@@ -4,6 +4,7 @@
 #include <GfxRenderer.h>
 
 #include <algorithm>
+#include <cstring>
 
 #include "components/UITheme.h"
 #include "components/setka/SetkaStyle.h"
@@ -14,9 +15,11 @@ using namespace setka;
 namespace games::ui {
 
 namespace {
+constexpr int kBarCells = 3;
 constexpr int kIconSize = 24;
 constexpr int kIconGap = 4;
 constexpr int kResultLineGap = 4;
+constexpr size_t kCaptionBytes = 160;
 constexpr const char* kStatusJoin = "\xC2\xB7";  // between spaces: a trailing space adds no width
 
 // Walks the status left to right from `x`; draws when `draw`. Returns the x after it.
@@ -62,11 +65,12 @@ void drawActionBar(const GfxRenderer& renderer, UiAppHost::UiScreen& screen, con
   // A short bar closes the gap under the icon first.
   const int gap = std::clamp((cellHeight - kIconSize - captionHeight) / 3, 0, kIconGap);
   const int iconTop = cellTop + (cellHeight - kIconSize - gap - captionHeight) / 2;
-  const bool dividers = std::count_if(slots, slots + count, [](const ActionSlot& s) { return s.label; }) > 1;
+  // The last slot takes the right third on every bar; a fourth slot shares the two thirds left of it.
+  const int split = count > kBarCells ? width - width / kBarCells : width;
+  const int shared = count > kBarCells ? count - 1 : count;
   for (int i = 0; i < count; ++i) {
-    const int x0 = i * width / count;
-    const int x1 = (i + 1) * width / count;
-    if (i > 0 && dividers) renderer.fillRect(x0, cellTop, 1, cellHeight, true);
+    const int x0 = i < shared ? i * split / shared : split;
+    const int x1 = i < shared ? (i + 1) * split / shared : width;
     const ActionSlot& slot = slots[i];
     if (slot.label == nullptr) continue;
     const int iconX = x0 + (x1 - x0 - kIconSize) / 2;
@@ -87,6 +91,34 @@ int captionTop(const GfxRenderer& renderer, const int edge, const int font) {
   int cap = 0;
   if (!renderer.getCodepointMetrics(font, 0x41D, EpdFontFamily::REGULAR, advance, cap)) cap = 0;
   return edge + kCaptionGap - (renderer.getFontAscenderSize(font) - cap);
+}
+
+int drawCaption(const GfxRenderer& renderer, int y, const char* text) {
+  const int room = renderer.getScreenWidth() - 2 * kSidePadding;
+  char line[kCaptionBytes];
+  while (*text != '\0') {
+    // The longest run of whole words that fits; a first word too wide stands alone.
+    size_t fit = 0;
+    for (size_t end = 0; end < sizeof(line); ++end) {
+      if (text[end] != ' ' && text[end] != '\0') continue;
+      memcpy(line, text, end);
+      line[end] = '\0';
+      if (fit > 0 && renderer.getTextWidth(kText10Font, line) > room) break;
+      fit = end;
+      if (text[end] == '\0') break;
+    }
+    if (fit == 0) {
+      fit = std::min(strlen(text), sizeof(line) - 1);
+      while (fit > 1 && (static_cast<uint8_t>(text[fit]) & 0xC0) == 0x80) --fit;  // not inside a UTF-8 character
+    }
+    memcpy(line, text, fit);
+    line[fit] = '\0';
+    renderer.drawText(kText10Font, kSidePadding, y, line);
+    y += renderer.getLineHeight(kText10Font);
+    text += fit;
+    while (*text == ' ') ++text;
+  }
+  return y;
 }
 
 int drawResult(const GfxRenderer& renderer, const int top, const char* result, const char* detail, const char* cue) {

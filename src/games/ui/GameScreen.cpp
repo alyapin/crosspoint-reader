@@ -42,6 +42,7 @@ void GameScreen::onEnter() {
   {
     RenderLock lock(*this);
     hasGame = restore();
+    overGuard.reset(hasGame && isOver());
     if (hasGame) resumeGame();
     clockShown = shownMinutes();
   }
@@ -108,8 +109,9 @@ void GameScreen::openGameMenu() {
   for (int i = 0; keys && i < shownCount; ++i) {
     const BarItem& item = shownBar[i];
     if (item.label == nullptr || item.kind == BarItem::Menu || item.kind == BarItem::NewGame) continue;
-    const char* status = item.kind != BarItem::Mode ? nullptr : item.active ? tr(STR_GAMES_ON) : tr(STR_GAMES_OFF);
-    addMenuRow(rows, count, static_cast<int8_t>(i), {item.label, item.icon, status});
+    // A mode shows its state as a checkbox, like Косынка's Только решаемые.
+    const int8_t check = item.kind == BarItem::Mode ? static_cast<int8_t>(item.active) : -1;
+    addMenuRow(rows, count, static_cast<int8_t>(i), {item.label, item.icon, nullptr, check});
   }
   addOwnRows(rows, count);
   addMenuRow(rows, count, kRowNewGame, {tr(STR_GAMES_NEW_GAME), &icon_bar_new_game_24});
@@ -134,9 +136,10 @@ void GameScreen::addOwnRows(GamePickerActivity::Row* rows, int& count) {
 }
 
 void GameScreen::showMenu(const char* title, const GamePickerActivity::Row* rows, const int count) {
-  // Button boards reopen on the last mode or Repeat action chosen here (another undo is one Confirm), else on
-  // Продолжить; touch boards start on Новая игра, so a stray key never resigns or offers a draw.
-  const int8_t start = hasBar() ? static_cast<int8_t>(kRowNewGame) : lastMenuRow;
+  // Button boards open on Продолжить, so Back then Confirm always returns to the game; touch boards and a finished
+  // game (no Продолжить, and Back then Confirm must not undo the last move) start on Новая игра, so a stray key never
+  // resigns or offers a draw.
+  const int8_t start = hasBar() || newGameSlot() >= 0 ? kRowNewGame : kRowContinue;
   const int found = static_cast<int>(std::find(menuIds, menuIds + count, start) - menuIds);
   auto menu =
       makeUniqueNoThrow<GamePickerActivity>(renderer, mappedInput, title, rows, count, found < count ? found : 0);
@@ -152,9 +155,6 @@ void GameScreen::showMenu(const char* title, const GamePickerActivity::Row* rows
     const auto* choice = std::get_if<MenuResult>(&result.data);
     const bool chosen = !result.isCancelled && choice != nullptr && choice->action >= 0 && choice->action < count;
     const int row = chosen ? menuIds[choice->action] : kRowContinue;
-    const bool repeatable =
-        row >= 0 && row < shownCount && (shownBar[row].kind == BarItem::Mode || shownBar[row].kind == BarItem::Repeat);
-    lastMenuRow = static_cast<int8_t>(repeatable ? row : kRowContinue);
     if (row == kRowFinish) {
       confirmFinish();
       return;
@@ -202,6 +202,8 @@ bool GameScreen::applyKeys() {
       case games::BoardKey::Confirm:
         break;
     }
+    // A doubled Confirm on the move that ended the game does nothing.
+    if (overGuard.holds(isOver(), nowMs())) return;
     const int over = !hasBar() ? newGameSlot() : -1;
     if (over >= 0) {
       runBarSlot(over);
@@ -216,6 +218,14 @@ void GameScreen::runBarSlot(const int slot) {
   event.action = ACTION_BAR;
   event.value = static_cast<int16_t>(slot);
   onTouch(event, 0, 0);
+}
+
+// Straight after the end, a tap on Новая игра does nothing; on a bar drawn before the end (no Новая игра yet) any
+// slot may sit where it appears.
+bool GameScreen::newGameHeld(const int slot) {
+  if (!overGuard.holds(isOver(), nowMs())) return false;
+  const int shown = newGameSlot();
+  return shown < 0 || slot == shown;
 }
 
 int GameScreen::newGameSlot() const {
@@ -265,6 +275,7 @@ void GameScreen::requestRepaint(const Repaint kind) {
 
 void GameScreen::loop() {
   if (!hasGame) return;
+  overGuard.track(isOver(), nowMs());
   keys.read(mappedInput, false, !hasBar() && holdsConfirm());
   if (const auto touch = routeTouch(mappedInput, wantsLongPress())) {
     RenderLock lock(*this);
@@ -274,6 +285,7 @@ void GameScreen::loop() {
       leave();
       return;
     }
+    if (touch.event.action == ACTION_BAR && newGameHeld(touch.event.value)) return;
     onTouch(touch.event, touch.snap.touchX, touch.snap.touchY);
     return;
   }

@@ -21,6 +21,7 @@ class FifteenActivity final : public GameScreen {
 
  private:
   bool restore() override;
+  bool isOver() const override { return game.isSolved(); }
   void saveGame() override;
   void pauseGame() override { game.pause(); }
   void resumeGame() override { game.resume(); }
@@ -37,7 +38,7 @@ class FifteenActivity final : public GameScreen {
   void startGame();
   void slideAt(int cell);
   void afterSlide();
-  void runBar();
+  void runBar(int slot);
   int cellAt(int x, int y) const;
   int boardLeft() const;
   void drawTile(int cell, int left) const;

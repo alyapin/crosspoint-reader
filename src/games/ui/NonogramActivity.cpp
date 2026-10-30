@@ -33,6 +33,8 @@ constexpr int kNoticeGap = 10;
 constexpr int kBoardGap = 8;  // above the bar rule
 constexpr int kClueFrame = 2;
 constexpr int kStroke = 2;
+constexpr int kCursorGap = 3;    // white between the key cursor and a filled cell's fill
+constexpr int kNewGameSlot = 1;  // once solved, or without a board
 
 // Ids run 1..255, so a valid pack of 15x15 pictures stays under 75 KB.
 constexpr size_t kPackMax = 96 * 1024;
@@ -125,7 +127,7 @@ void NonogramActivity::pickerChosen(const int row, bool) {
   newBest = false;
   keyCursor = !mappedInput.hasTouch();
   cursor = keyCursor && game.hasPuzzle() ? game.side() / 2 * game.side() + game.side() / 2 : -1;
-  barFocus = keyCursor && !boardShown() && hasBar() ? BAR_SLOTS - 1 : -1;
+  barFocus = keyCursor && !boardShown() && hasBar() ? kNewGameSlot : -1;
 }
 
 NonogramActivity::Notice NonogramActivity::loadPicture(const int side) {
@@ -207,15 +209,16 @@ void NonogramActivity::apply(const int cell, const Mark mark) {
     newBest = record.recordTime(game.source(), game.side(), game.elapsedMs());
     if (game.source() == nonogram::Source::Picture) record.markSolved(game.pictureId());
     recordPending = true;
-    if (keyCursor && hasBar()) barFocus = BAR_SLOTS - 1;
+    if (keyCursor && hasBar()) barFocus = kNewGameSlot;
   }
   markChanged();
 }
 
 bool NonogramActivity::barShown(const int slot) const {
-  // Крестик (touch) and Отменить while playing, Меню (Новая игра once solved or without a board) always.
-  if (slot == 0) return hasBar() && boardShown() && game.inProgress();
-  if (slot == 1) return boardShown() && game.canUndo();
+  // Крестик (touch) and Отменить while playing, Новая игра once solved or without a board, Меню always.
+  const bool playing = boardShown() && game.inProgress();
+  if (slot == 0) return hasBar() && playing;
+  if (slot == kNewGameSlot) return !playing || game.canUndo();
   return slot == 2;
 }
 
@@ -232,15 +235,15 @@ void NonogramActivity::runBar(const int slot) {
   if (slot == 0) {
     crossMode = !crossMode;
     requestRepaint(RepaintUpdate);
-  } else if (slot == 1) {
+  } else if (slot == kNewGameSlot && !(boardShown() && game.inProgress())) {
+    openNewGame();
+  } else if (slot == kNewGameSlot) {
     if (game.undo()) {
       checkShown = false;
       markChanged();
     }
-  } else if (boardShown() && game.inProgress()) {
-    openGameMenu();
   } else {
-    openNewGame();
+    openGameMenu();
   }
 }
 
@@ -275,7 +278,12 @@ void NonogramActivity::onKey(const int dx, const int dy, const bool confirm) {
   const int before[] = {cursor, keyCursor ? 1 : 0, barFocus};
   if (!boardShown()) {
     if (!hasBar()) return;  // Confirm runs Новая игра (GameScreen)
-    barFocus = BAR_SLOTS - 1;
+    // The first key shows the focus on Новая игра; then Left/Right reach Меню.
+    if (barFocus < 0) {
+      barFocus = kNewGameSlot;
+    } else if (dx != 0) {
+      barFocus = nextBarSlot(barFocus, dx);
+    }
     if (confirm) runBar(barFocus);
   } else if (barFocus >= 0) {
     if (confirm) {
@@ -457,10 +465,12 @@ void NonogramActivity::build(UiScreen& screen) {
 
   BarItem items[BAR_SLOTS];
   if (barShown(0)) items[0] = {&icon_bar_cross_24, tr(STR_NONOGRAM_CROSS), crossMode, BarItem::Mode};
-  if (barShown(1)) items[1] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false, BarItem::Repeat};
-  items[2] = boardShown() && game.inProgress()
-                 ? BarItem{&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu}
-                 : BarItem{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame};
+  if (!(boardShown() && game.inProgress())) {
+    items[kNewGameSlot] = {&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, BarItem::NewGame};
+  } else if (barShown(kNewGameSlot)) {
+    items[kNewGameSlot] = {&icon_bar_undo_24, tr(STR_GAMES_UNDO), false, BarItem::Action};
+  }
+  items[2] = {&icon_menu_24, tr(STR_GAMES_MENU), false, BarItem::Menu};
   drawBar(screen, items, barFocus);
 }
 
@@ -535,11 +545,17 @@ void NonogramActivity::drawGrid(const Layout& l) const {
     renderer.fillRect(l.gridLeft + i * size - offset, l.gridTop - offset, width, span + 2 * offset + 1, true);
     renderer.fillRect(l.gridLeft - offset, l.gridTop + i * size - offset, span + 2 * offset + 1, width, true);
   }
-  // A tapped cell is framed only while white; the key cursor shows on any cell, in white on a filled one.
+  // A tapped cell is framed only while white; the key cursor shows on any cell, the same frame on the cell's
+  // rules, and on a filled one a white gap inside it.
   const bool filled = cursor >= 0 && game.mark(cursor) == nonogram::Filled;
   if (cursor >= 0 && barFocus < 0 && !solved && (keyCursor || !filled)) {
-    renderer.drawRect(l.gridLeft + cursor % n * size, l.gridTop + cursor / n * size, size + 1, size + 1,
-                      kCellFrameWidth, !filled);
+    const int x = l.gridLeft + cursor % n * size;
+    const int y = l.gridTop + cursor / n * size;
+    renderer.drawRect(x, y, size + 1, size + 1, kCellFrameWidth, true);
+    if (filled) {
+      renderer.drawRect(x + kCellFrameWidth, y + kCellFrameWidth, size + 1 - 2 * kCellFrameWidth,
+                        size + 1 - 2 * kCellFrameWidth, kCursorGap, false);
+    }
   }
 }
 

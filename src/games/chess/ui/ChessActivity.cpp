@@ -232,6 +232,7 @@ void ChessActivity::onEnter() {
   }
   prefs = chess::ui::loadPrefs();
   if (chesssave::load(*match, esp_random())) {
+    overGuard.reset(match->game().isOver());
     inGame = true;
     setView(View::Game);
   } else {
@@ -274,6 +275,7 @@ void ChessActivity::requestRepaint(const Repaint kind) {
 
 void ChessActivity::loop() {
   if (!match) return;
+  overGuard.track(match->game().isOver(), nowMs());
   if (view == View::Game) {
     {
       RenderLock lock(RenderLock::Mode::Try);
@@ -324,8 +326,8 @@ int ChessActivity::gameActions(GameAction* out) const {
   int n = 0;
   if (!hasBar()) return n;
   if (match->canUndo()) out[n++] = GameAction::Undo;
-  out[n++] = GameAction::Flip;
-  out[n++] = match->game().isOver() ? GameAction::NewGame : GameAction::Menu;
+  out[n++] = match->game().isOver() ? GameAction::NewGame : GameAction::Flip;
+  out[n++] = GameAction::Menu;
   return n;
 }
 
@@ -339,7 +341,8 @@ ChessActivity::GameAction ChessActivity::focusedAction() const {
 void ChessActivity::runAction(const GameAction action) {
   switch (action) {
     case GameAction::NewGame:
-      setView(View::Setup);
+      // Not straight after the move that ended the game: a doubled press keeps the result on screen.
+      if (!overGuard.holds(match->game().isOver(), nowMs())) setView(View::Setup);
       break;
     case GameAction::Undo:
       if (match->undo()) afterPly();
@@ -389,8 +392,8 @@ void ChessActivity::gameKey(const int dx, const int dy, const bool confirm) {
   GameAction actions[kMaxActions];
   const int ring = kCells + gameActions(actions);
   if (cursor < 0) {
-    // The first key shows the cursor; on a finished game it lands on Новая игра.
-    cursor = match->game().isOver() ? ring - 1 : kStartCursor;
+    // The first key shows the cursor; on a finished game it lands on Новая игра, before Меню.
+    cursor = match->game().isOver() ? ring - 2 : kStartCursor;
     requestRepaint(RepaintUpdate);
     return;
   }
@@ -520,11 +523,11 @@ void ChessActivity::setView(const View next) {
   } else if (next == View::CustomTime) {
     focus = kCustomDoneRow;
   } else if (next == View::Menu) {
-    // As the other games: touch and a finished game start on Новая игра (no stray tap resigns); keys reopen on
-    // the game action chosen here last, else Продолжить.
+    // As the other games: touch and a finished game start on Новая игра (no stray tap resigns); keys start on
+    // Продолжить.
     Row rows[kMaxRows];
     const int count = listRows(rows);
-    const Row start = mappedInput.hasTouch() || match->game().isOver() ? Row::NewGame : lastMenuRow;
+    const Row start = mappedInput.hasTouch() || match->game().isOver() ? Row::NewGame : Row::Continue;
     const Row* found = std::find(rows, rows + count, start);
     if (found == rows + count) found = std::find(rows, rows + count, Row::NewGame);
     focus = found < rows + count ? static_cast<int>(found - rows) : 0;
@@ -574,11 +577,6 @@ void ChessActivity::activateRow(const int index) {
   }
   Row rows[kMaxRows];
   if (index < 0 || index >= listRows(rows)) return;
-  if (view == View::Menu) {
-    // Keys reopen the menu on a game action chosen here last.
-    const Row row = rows[index];
-    lastMenuRow = row == Row::Undo || row == Row::Flip || row == Row::Pieces ? row : Row::Continue;
-  }
   switch (rows[index]) {
     case Row::Start:
       startGame();
@@ -1228,13 +1226,13 @@ void ChessActivity::drawTopLine(UiScreen& screen) const {
   int count = 0;
   const bool vs = match->settings().mode == chess::Mode::VsComputer;
   if (vs) {
-    status[count++] = {tr(STR_CHESS_COMPUTER), nullptr};
+    status[count++] = {tr(STR_GAMES_COMPUTER_LOWER), nullptr};
     status[count++] = {tr(STR_GAMES_LEVEL), level};
   } else if (timed) {
     status[count++] = {far == chess::WHITE ? tr(STR_CHESS_WHITE) : tr(STR_CHESS_BLACK), nullptr};
   }
   if (timed) status[count++] = {nullptr, clock};
-  // With a clock, too long beside "‹ Выйти": the level without "Компьютер", then the clock alone.
+  // With a clock, too long beside "‹ Выйти": the level without "компьютер", then the clock alone.
   const int room = width - kSidePadding - exitWidth;
   if (timed && vs && games::ui::statusWidth(renderer, status, count) > room) {
     std::copy(status + 1, status + count, status);
@@ -1466,15 +1464,15 @@ void ChessActivity::drawActions(UiScreen& screen) const {
   const bool over = match->game().isOver();
   games::ui::ActionSlot slots[] = {
       {&icon_undo_move_24, tr(STR_GAMES_UNDO), false, ACTION_UNDO, 0},
-      {&icon_flip_24, tr(STR_CHESS_FLIP_SHORT), false, ACTION_FLIP, 0},
       over ? games::ui::ActionSlot{&icon_bar_new_game_24, tr(STR_GAMES_NEW_GAME), false, ACTION_NEW_GAME, 0}
-           : games::ui::ActionSlot{&icon_menu_24, tr(STR_CHESS_MENU), false, ACTION_MENU, 0},
+           : games::ui::ActionSlot{&icon_flip_24, tr(STR_CHESS_FLIP_SHORT), false, ACTION_FLIP, 0},
+      {&icon_menu_24, tr(STR_CHESS_MENU), false, ACTION_MENU, 0},
   };
   if (!match->canUndo()) slots[0].label = nullptr;
-  const int focusedSlot = focused == GameAction::Undo   ? 0
-                          : focused == GameAction::Flip ? 1
-                          : focused == GameAction::None ? -1
-                                                        : 2;
+  const int focusedSlot = focused == GameAction::Undo                                     ? 0
+                          : focused == GameAction::Flip || focused == GameAction::NewGame ? 1
+                          : focused == GameAction::None                                   ? -1
+                                                                                          : 2;
   games::ui::drawActionBar(renderer, screen, actionsTop(), slots, static_cast<int>(std::size(slots)), focusedSlot,
                            fui::InputTouch);
 }

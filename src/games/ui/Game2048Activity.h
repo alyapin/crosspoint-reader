@@ -21,6 +21,7 @@ class Game2048Activity final : public GameScreen {
 
  private:
   bool restore() override;
+  bool isOver() const override { return game.isOver(); }
   void saveGame() override;
   void pauseGame() override {}
   void resumeGame() override {}
