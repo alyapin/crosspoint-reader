@@ -779,15 +779,16 @@ int ChessActivity::listRows(Row* out) const {
     out[n++] = Row::Pieces;
     out[n++] = Row::Start;
   } else if (view == View::Menu) {
-    // The games' one menu form (GameScreen::openGameMenu).
+    // The games' one menu form (GameScreen::openGameMenu); a finished game leads with Новая игра.
     const bool keys = !hasBar();
     const bool over = match->game().isOver();
     if (keys && !over) out[n++] = Row::Continue;
+    if (over) out[n++] = Row::NewGame;
     if (keys && match->canUndo()) out[n++] = Row::Undo;
     if (keys) out[n++] = Row::Flip;
     if (!over) out[n++] = Row::Draw;
     out[n++] = Row::Pieces;
-    out[n++] = Row::NewGame;
+    if (!over) out[n++] = Row::NewGame;
     if (!over) out[n++] = Row::Resign;
     if (keys) out[n++] = Row::Exit;
   }

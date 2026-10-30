@@ -110,9 +110,9 @@ class GameScreen : public Activity, protected UiAppHost {
 
   void openPicker(const char* title, const GamePickerActivity::Row* rows, int count, int selected, int toggleRow = -1,
                   bool toggleOn = false);
-  // The game menu, titled with the game: on button boards Продолжить and the bar's
-  // actions first; the game's own rows, Новая игра, then while the game runs
-  // Завершить (or Сдаться), which asks first; button boards end with Выйти.
+  // The game menu, titled with the game: on button boards Продолжить (Новая игра once the game is over) and the
+  // bar's actions first; the game's own rows, then while the game runs Новая игра and Завершить (or Сдаться),
+  // which asks first; button boards end with Выйти.
   void openGameMenu();
   void requestRepaint(Repaint kind);
   // Touch boards: "‹ Выйти" and the action bar; button boards play by keys alone.
