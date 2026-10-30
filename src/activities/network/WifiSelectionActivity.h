@@ -92,6 +92,8 @@ class WifiSelectionActivity final : public Activity, private UiAppHost {
   // Save/forget prompt selection (0 = Yes, 1 = No)
   int savePromptSelection = 0;
   int forgetPromptSelection = 0;
+  // The forget prompt came from a hold on the list (not a failed connection): Cancel returns there.
+  bool forgetFromList = false;
 
   // Connection timeout
   static constexpr unsigned long CONNECTION_TIMEOUT_MS = 15000;
@@ -121,6 +123,7 @@ class WifiSelectionActivity final : public Activity, private UiAppHost {
   void startWifiScan(bool autoScan = false);
   void processWifiScanResults();
   void appendHiddenNetworkEntry();
+  void closeForgetPrompt(bool forgot);
   void selectNetwork(int index);
   void promptHiddenSsid();
   void promptPasswordEntry();

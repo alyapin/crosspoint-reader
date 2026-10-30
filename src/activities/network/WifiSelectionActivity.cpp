@@ -45,6 +45,7 @@ void WifiSelectionActivity::onRowEvent(const fui::ActionEvent& event, void* user
       self->selectedSSID = self->networks[self->selectedNetworkIndex].ssid;
       self->state = WifiSelectionState::FORGET_PROMPT;
       self->forgetPromptSelection = 0;  // Default to "Cancel"
+      self->forgetFromList = true;
       self->app.clearTapFlash();
       self->requestUpdate();
     }
@@ -80,7 +81,7 @@ void WifiSelectionActivity::onPromptEvent(const fui::ActionEvent& event, void* u
         network->hasSavedPassword = false;
       }
     }
-    self->startWifiScan();
+    self->closeForgetPrompt(self->forgetPromptSelection == 1);
   }
 }
 
@@ -277,6 +278,17 @@ void WifiSelectionActivity::appendHiddenNetworkEntry() {
   placeholder.isHiddenPlaceholder = false;
   placeholder.isRescanPlaceholder = true;
   networks.push_back(std::move(placeholder));
+}
+
+// Forgetting scans again for the new order. Cancel goes back to the list the
+// prompt was opened from, or scans again after a failed connection.
+void WifiSelectionActivity::closeForgetPrompt(const bool forgot) {
+  if (!forgot && forgetFromList) {
+    state = WifiSelectionState::NETWORK_LIST;
+    requestUpdate();
+    return;
+  }
+  startWifiScan();
 }
 
 // Derives networkRowItems from `networks`. Called whenever `networks` changes
@@ -713,11 +725,9 @@ void WifiSelectionActivity::loop() {
           network->hasSavedPassword = false;
         }
       }
-      // Go back to network list (whether Cancel or Forget network was selected)
-      startWifiScan();
+      closeForgetPrompt(forgetPromptSelection == 1);
     } else if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
-      // Skip forgetting, go back to network list
-      startWifiScan();
+      closeForgetPrompt(false);
     }
     return;
   }
@@ -740,6 +750,7 @@ void WifiSelectionActivity::loop() {
         autoConnecting = false;
         state = WifiSelectionState::FORGET_PROMPT;
         forgetPromptSelection = 0;  // Default to "Cancel"
+        forgetFromList = false;
       } else {
         // Go back to network list on failure for non-saved credentials
         state = WifiSelectionState::NETWORK_LIST;
@@ -771,6 +782,7 @@ void WifiSelectionActivity::loop() {
         selectedSSID = networks[selectedNetworkIndex].ssid;
         state = WifiSelectionState::FORGET_PROMPT;
         forgetPromptSelection = 0;  // Default to "Cancel"
+        forgetFromList = true;
         requestUpdate();
       }
       return;
