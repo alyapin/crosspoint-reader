@@ -219,7 +219,6 @@ constexpr uint8_t MAX_EMPTY_LINES = 2;
 constexpr const char* STYLE_CSS =
     "p{text-indent:1.5em;margin:0}"
     "h1,h2,h3,h4,h5,h6{text-align:center;text-indent:0}"
-    ".subtitle{text-align:center;font-weight:bold;text-indent:0}"
     // Insets go on the wrappers, so a text-author lines up under its epigraph or cite.
     "div.epigraph{margin-left:30%}"
     "p.epigraph{font-style:italic;text-indent:0}"
