@@ -18,6 +18,7 @@ class FakeStore : public Fb2Cache::Store {
   int budget = -1;
   bool convertFails = false;
   bool clearFails = false;
+  bool sameOutput = false;  // the conversion comes out as the old one
   int conversions = 0;
 
   bool exists(const char* name) override { return files.count(name) != 0; }
@@ -31,7 +32,7 @@ class FakeStore : public Fb2Cache::Store {
   bool convert(const char* name) override {
     conversions++;
     if (convertFails || !step()) return false;
-    files[name] = "new";
+    files[name] = sameOutput ? "old" : "new";
     return true;
   }
   bool clearDerived() override {
@@ -50,6 +51,9 @@ class FakeStore : public Fb2Cache::Store {
   float savedFraction(const char* archive) override {
     // From book.bin, or from the old archive's own directory.
     return files.count("progress.bin") && (files.count("book.bin") || files.count(archive)) ? 0.4f : -1.0f;
+  }
+  bool sameLayout(const char* a, const char* b) override {
+    return files.count(a) && files.count(b) && files[a] == files[b];
   }
   size_t read(const char* name, char* buf, const size_t size) override {
     const auto it = files.find(name);
@@ -143,6 +147,39 @@ TEST(Fb2Cache, MigratesKeepingThePosition) {
   const std::map<std::string, std::string> expected = {
       {CURRENT, "new"}, {"progress.bin", "old"}, {"fb2.pos", PENDING}, {"fb2.src", CURRENT}};
   EXPECT_EQ(store.files, expected);
+}
+
+TEST(Fb2Cache, LayoutIsEveryFileButTheToc) {
+  Fb2Cache::Layout old, reordered, retitled, changed, fewer;
+  for (Fb2Cache::Layout* layout : {&old, &changed, &fewer}) layout->add("OEBPS/s1.xhtml", 1, 100);
+  old.add("OEBPS/s2.xhtml", 2, 200);
+  old.add("OEBPS/toc.ncx", 3, 300);
+  reordered.add("OEBPS/s2.xhtml", 2, 200);
+  reordered.add("OEBPS/s1.xhtml", 1, 100);
+  retitled = reordered;
+  retitled.add("OEBPS/toc.ncx", 4, 400);
+  changed.add("OEBPS/s2.xhtml", 5, 200);
+  EXPECT_TRUE(old == reordered);
+  EXPECT_TRUE(old == retitled);
+  EXPECT_FALSE(old == changed);
+  EXPECT_FALSE(old == fewer);
+}
+
+TEST(Fb2Cache, KeepsTheExactPositionWhenTheBookComesOutTheSame) {
+  // Only the TOC changed, say: the saved page and the bookmarks point at the same text, so no
+  // fraction is left to move them (MigratesKeepingThePosition: a changed book leaves one).
+  FakeStore store = openedByOldConverter();
+  store.sameOutput = true;
+  EXPECT_EQ(prepare(store, true), CURRENT);
+  const std::map<std::string, std::string> expected = {{CURRENT, "old"}, {"progress.bin", "old"}, {"fb2.src", CURRENT}};
+  EXPECT_EQ(store.files, expected);
+
+  // A fraction an earlier migration left is for a position saved before it: it stays.
+  FakeStore earlier = openedByOldConverter();
+  earlier.sameOutput = true;
+  earlier.files["fb2.pos"] = "0.250000 1\n";
+  EXPECT_EQ(prepare(earlier, true), CURRENT);
+  EXPECT_EQ(earlier.files.count("fb2.pos"), 1u);
 }
 
 TEST(Fb2Cache, MigratesFromThePreviousVersion) {

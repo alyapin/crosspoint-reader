@@ -120,6 +120,18 @@ class Fb2Store final : public Fb2Cache::Store {
     return ok;
   }
   float savedFraction(const char* archive) override { return fractionOf(cachePath, path(archive)); }
+  bool sameLayout(const char* a, const char* b) override {
+    Fb2Cache::Layout layouts[2];
+    const char* archives[2] = {a, b};
+    for (int i = 0; i < 2; i++) {
+      const std::string archive = path(archives[i]);
+      ZipFile zip(archive);
+      const bool read = zip.enumerateFileEntries([&](const std::string_view name, const uint32_t crc,
+                                                     const uint32_t size) { layouts[i].add(name, crc, size); });
+      if (!read) return false;
+    }
+    return layouts[0] == layouts[1];
+  }
   size_t read(const char* name, char* buf, const size_t size) override { return readSmallFile(path(name), buf, size); }
   bool write(const char* name, const char* data, const size_t len) override {
     return writeSmallFile(path(name), data, len);
