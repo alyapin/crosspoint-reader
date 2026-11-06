@@ -18,6 +18,7 @@
 #include "ClipSelectionActivity.h"
 #include "EpubReaderMenuActivity.h"
 #include "LinkNoteTitle.h"
+#include "PageTurnQueue.h"
 #include "ProgressMapper.h"
 #include "ReaderActivity.h"
 #include "ReaderToolbarUi.h"
@@ -37,7 +38,7 @@ class EpubReaderActivity final : public ReaderActivity {
   std::optional<uint32_t> pendingOffsetJump;
   unsigned long lastPageTurnTime = 0UL;
   unsigned long pageTurnDuration = 0UL;
-  int8_t pendingManualTurn = 0;
+  PageTurnQueue pendingTurns;
   bool pendingManualTurnTouch = false;
   bool pendingPercentJump = false;
   float pendingSpineProgress = 0.0f;
@@ -158,6 +159,8 @@ class EpubReaderActivity final : public ReaderActivity {
   // At the last pager tick some chapter was still uncounted for this layout.
   bool pagerHasWork = true;
   void bookPagerTick();
+  // Makes the queued page turns, all before the next render; a new chapter is laid out first.
+  void applyQueuedTurns();
   void stopBookPager();
   // A background build failed in this spine. The error would likely recur, so from then on the
   // spine is built only as far as the reader goes; pages from earlier build steps stay readable.
