@@ -91,6 +91,10 @@ class Fb2ToEpub {
   static constexpr size_t MAX_TOC_ENTRIES = 4096;
   static constexpr size_t MAX_LABEL_BYTES = 200;
   static constexpr size_t MAX_BOLD_TITLE_CHARS = 80;
+  // The book's own contents page, read to case TOC labels as it does: its first lines, so many
+  // and in so many bytes of their letters and digits.
+  static constexpr size_t MAX_CONTENTS_LINES = 128;
+  static constexpr size_t MAX_CONTENTS_BYTES = 4096;
   static constexpr size_t MAX_AUTHORS = 16;
   static constexpr size_t MAX_METADATA_BYTES = 512;
 
@@ -120,10 +124,14 @@ class Fb2ToEpub {
   // picks them, the writing pass sets them as titles. A book with titles is measured again
   // without them, so it converts as it would without this.
   struct BoldTitle {
-    uint32_t section;  // main-body section, counted from 1
+    uint32_t section;   // main-body section, counted from 1
+    uint16_t entry;     // its TOC entry
+    uint16_t capitals;  // where the entry's label is in capitals, cased later as the contents page has it
     uint8_t lines;
   };
+  static constexpr uint16_t NO_CAPITALS = UINT16_MAX;
   std::vector<BoldTitle> boldTitles;
+  std::string contents;  // the contents page: each line's letters and digits, a line each
   bool findBoldTitles = true;
   bool sectionTitles = false;  // a main-body section has a <title>
   const Binary* cover = nullptr;

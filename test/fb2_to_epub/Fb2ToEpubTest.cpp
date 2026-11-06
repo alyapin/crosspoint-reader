@@ -411,7 +411,7 @@ TEST(Fb2ToEpub, LeavesABoldTableOfContentsAlone) {
   const std::string& ncx = out.files["OEBPS/toc.ncx"];
   EXPECT_TRUE(contains(ncx,
                        "<text>ОГЛАВЛЕНИЕ</text></navLabel><content src=\"s1.xhtml\"/></navPoint>"
-                       "<navPoint id=\"n2\" playOrder=\"2\"><navLabel><text>ВВЕДЕНИЕ</text>"))
+                       "<navPoint id=\"n2\" playOrder=\"2\"><navLabel><text>Введение</text>"))
       << ncx;
   EXPECT_FALSE(contains(ncx, "Часть"));
   EXPECT_TRUE(contains(out.files["OEBPS/s1.xhtml"],
@@ -495,6 +495,35 @@ TEST(Fb2ToEpub, NestsTheChaptersOfAFlatBoldTitledBook) {
   MapOutput titledOut;
   ASSERT_TRUE(converter.convert(titled, titledOut));
   EXPECT_EQ(outline(titledOut.files["OEBPS/toc.ncx"]), "1 Часть первая\n1 Глава 1\n");
+}
+
+TEST(Fb2ToEpub, CasesTocLabelsAsTheBooksContentsPage) {
+  // The contents page comes last here; listed with page numbers, a part's name in capitals.
+  const std::string contents =
+      "<section><p><strong>Содержание</strong></p><p>Введение ........ 5</p><p><strong>Часть первая</strong></p>"
+      "<p>ПЕРВЫЕ ДНИ</p><p>Глава 14. Маленькие Эйнштейны против телевизора 245</p><p>Глава 3. Сказано кратко</p>"
+      "</section></body>";
+  std::string book =
+      boldTitledBook({"ВВЕДЕНИЕ", "Часть первая|ПЕРВЫЕ ДНИ", "Глава 14|МАЛЕНЬКИЕ ЭЙНШТЕЙНЫ ПРОТИВ ТЕЛЕВИЗОРА",
+                      "Глава 15|ВЕЛИКИЙ НОВГОРОД", "КРАТКО"});
+  book.replace(book.find("</body>"), 7, contents);
+  StringInput input(book);
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  // Not listed, or listed in capitals: sentence case. A match inside a longer title: as it is.
+  EXPECT_EQ(outline(out.files["OEBPS/toc.ncx"]),
+            "1 Введение\n1 Часть первая. Первые дни\n2 Глава 14. Маленькие Эйнштейны против телевизора\n"
+            "2 Глава 15. Великий новгород\n1 КРАТКО\n1 Содержание\n");
+
+  // Only the page's first MAX_CONTENTS_LINES lines are read.
+  std::string longContents = "<section><p><strong>ОГЛАВЛЕНИЕ</strong></p>";
+  for (size_t i = 0; i < Fb2ToEpub::MAX_CONTENTS_LINES; i++) longContents += "<p>Строка " + std::to_string(i) + "</p>";
+  longContents += "<p>Глава 14. Маленькие Эйнштейны против телевизора</p></section>";
+  StringInput longInput(boldTitledBook({"Глава 14|МАЛЕНЬКИЕ ЭЙНШТЕЙНЫ ПРОТИВ ТЕЛЕВИЗОРА"}).insert(19, longContents));
+  MapOutput longOut;
+  ASSERT_TRUE(converter.convert(longInput, longOut));
+  EXPECT_TRUE(contains(longOut.files["OEBPS/toc.ncx"], "<text>Глава 14. Маленькие эйнштейны против телевизора</text>"));
 }
 
 TEST(Fb2ToEpub, KeepsBoldLinesAsTextInBooksWithTitles) {
