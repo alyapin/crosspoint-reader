@@ -251,6 +251,22 @@ uint32_t toLowerLetter(const uint32_t c) {
   return c;
 }
 
+// Lower case with ё as е, for comparing words whatever their case.
+uint32_t foldLetter(const uint32_t c) {
+  const uint32_t lower = toLowerLetter(c);
+  return lower == 0x451 ? 0x435 : lower;
+}
+
+// Appends a character below U+0800, as all the letters a case change gives are.
+void appendShortUtf8(std::string& s, const uint32_t c) {
+  if (c < 0x80) {
+    s += static_cast<char>(c);
+  } else {
+    s += static_cast<char>(0xC0 | (c >> 6));
+    s += static_cast<char>(0x80 | (c & 0x3F));
+  }
+}
+
 // Two lines of a heading as one TOC label: "Глава 1" and "ПЕРВЫЕ ТРИ ДНЯ" make "Глава 1. Первые
 // три дня"; lines not all in capitals stay as they are, as in "Часть 1 · Начало".
 void joinTitleLines(std::string& label, const std::string& second) {
@@ -268,13 +284,71 @@ void joinTitleLines(std::string& label, const std::string& second) {
     capital = (capital && !isUpperLetter(c)) || c == '.' || c == '!' || c == '?' || c == 0x2026;
     if (lower == c) {
       label.append(bytes, n);
-    } else if (lower < 0x80) {
-      label += static_cast<char>(lower);
     } else {
-      label += static_cast<char>(0xC0 | (lower >> 6));
-      label += static_cast<char>(0x80 | (lower & 0x3F));
+      appendShortUtf8(label, lower);
     }
   });
+}
+
+// A heading's number, its second word in lower case: "3", "iv", "первая", "three" or "fourth".
+// 0 for any other word.
+unsigned headingNumber(const std::string& word) {
+  if (word.empty() || word.size() > 24) return 0;
+  if (std::all_of(word.begin(), word.end(), [](const char c) { return c >= '0' && c <= '9'; })) {
+    return word.size() <= 4 ? static_cast<unsigned>(strtoul(word.c_str(), nullptr, 10)) : 0;
+  }
+  if (word.find_first_not_of("ivxlc") == std::string::npos) {
+    int value = 0, largest = 0;
+    for (auto it = word.rbegin(); it != word.rend(); ++it) {
+      const int v = *it == 'i' ? 1 : *it == 'v' ? 5 : *it == 'x' ? 10 : *it == 'l' ? 50 : 100;
+      value += v < largest ? -v : v;
+      largest = std::max(largest, v);
+    }
+    return value > 0 ? static_cast<unsigned>(value) : 0;
+  }
+  // Stems, so every gender and case of the word matches; the teens before the units they start with.
+  static constexpr const char* RU[] = {"одиннадцат", "двенадцат", "тринадцат",   "четырнадцат", "пятнадцат",
+                                       "шестнадцат", "семнадцат", "восемнадцат", "девятнадцат", "двадцат",
+                                       "перв",       "втор",      "трет",        "четв",        "пят",
+                                       "шест",       "седьм",     "восьм",       "девят",       "десят"};
+  static constexpr unsigned RU_VALUES[] = {11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  for (size_t i = 0; i < sizeof(RU) / sizeof(RU[0]); i++) {
+    if (word.compare(0, strlen(RU[i]), RU[i]) == 0) return RU_VALUES[i];
+  }
+  static constexpr const char* EN[][2] = {{"one", "first"},     {"two", "second"},      {"three", "third"},
+                                          {"four", "fourth"},   {"five", "fifth"},      {"six", "sixth"},
+                                          {"seven", "seventh"}, {"eight", "eighth"},    {"nine", "ninth"},
+                                          {"ten", "tenth"},     {"eleven", "eleventh"}, {"twelve", "twelfth"}};
+  for (size_t i = 0; i < sizeof(EN) / sizeof(EN[0]); i++) {
+    if (word == EN[i][0] || word == EN[i][1]) return static_cast<unsigned>(i + 1);
+  }
+  return 0;
+}
+
+enum class Heading : uint8_t { Other, Group, Chapter };
+
+// "Часть первая" or "Part II" opens a group of chapters; "Глава 3" or "Chapter three" is a
+// chapter, numbered in `number`.
+Heading headingKind(const std::string& label, unsigned& number) {
+  std::string words[2];
+  size_t word = 0;
+  forEachChar(label, [&](const uint32_t c, const char*, int) {
+    if (word > 1) return;
+    if (isUpperLetter(c) || isLowerLetter(c) || (c >= '0' && c <= '9')) {
+      appendShortUtf8(words[word], foldLetter(c));
+    } else if (!words[word].empty()) {
+      word++;
+    }
+  });
+  number = headingNumber(words[1]);
+  if (number == 0) return Heading::Other;
+  for (const char* group : {"часть", "книга", "part", "book"}) {
+    if (words[0] == group) return Heading::Group;
+  }
+  for (const char* chapter : {"глава", "chapter"}) {
+    if (words[0] == chapter) return Heading::Chapter;
+  }
+  return Heading::Other;
 }
 
 // The inline styles a bold title line may carry: a link, an image or a note marker makes it text.
@@ -1509,6 +1583,7 @@ bool Fb2ToEpub::convert(Input& input, Output& out) {
     if (!measure || !measure->run(input) || measure->notRoot || !measure->sawRoot || fileCount == 0) return false;
     if (!sectionTitles || boldTitles.empty()) break;
   }
+  if (!boldTitles.empty()) shapeBoldToc();
   const uint16_t measuredFiles = fileCount;
   if (!meta.coverId.empty()) {
     const auto it = binaries.find(meta.coverId);
@@ -1535,6 +1610,25 @@ bool Fb2ToEpub::convert(Input& input, Output& out) {
   if (!write || !write->run(input) || write->outputError || fileCount != measuredFiles) return false;
 
   return writeOpf(out) && writeNcx(out);
+}
+
+// A book of bold titles (calibre's) has its parts and chapters as sibling sections: its TOC
+// nests each "Глава N" under the "Часть" before it, until a heading of another kind.
+void Fb2ToEpub::shapeBoldToc() {
+  uint8_t group = 0;  // depth of the entry the chapters after it nest under, 0: none
+  for (TocEntry& e : toc) {
+    if (e.depth < group) group = 0;
+    if (group && e.depth > group) continue;  // nested already
+    unsigned number = 0;
+    const Heading kind = headingKind(e.label, number);
+    if (kind == Heading::Group) {
+      group = e.depth;
+    } else if (kind == Heading::Chapter) {
+      if (group == e.depth) e.depth++;
+    } else {
+      group = 0;
+    }
+  }
 }
 
 bool Fb2ToEpub::writeOpf(Output& out) const {

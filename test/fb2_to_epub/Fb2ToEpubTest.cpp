@@ -435,6 +435,59 @@ TEST(Fb2ToEpub, NamesThePagesBeforeTheFirstBoldTitle) {
       << out.files["OEBPS/toc.ncx"];
 }
 
+// The TOC as "depth label" lines.
+std::string outline(const std::string& ncx) {
+  std::string out;
+  int depth = 0;
+  for (size_t at = ncx.find("<navMap>"); at < ncx.size();) {
+    if (ncx.compare(at, 10, "<navPoint ") == 0) {
+      depth++;
+      const size_t text = ncx.find("<text>", at) + 6;
+      out += std::to_string(depth) + " " + ncx.substr(text, ncx.find("</text>", text) - text) + "\n";
+      at = text;
+    } else if (ncx.compare(at, 11, "</navPoint>") == 0) {
+      depth--;
+      at += 11;
+    } else {
+      at++;
+    }
+  }
+  return out;
+}
+
+std::string boldTitledBook(const std::vector<std::string>& headings) {
+  std::string book = "<FictionBook><body>";
+  for (const std::string& heading : headings) {
+    book += "<section>";
+    for (size_t start = 0, end; start <= heading.size(); start = end + 1) {
+      end = std::min(heading.find('|', start), heading.size());
+      book += "<p><strong>" + heading.substr(start, end - start) + "</strong></p>";
+    }
+    book += "<p>текст</p></section>";
+  }
+  return book + "</body></FictionBook>";
+}
+
+TEST(Fb2ToEpub, NestsTheChaptersOfAFlatBoldTitledBook) {
+  // calibre leaves parts and chapters as sibling sections.
+  StringInput input(boldTitledBook({"ВВЕДЕНИЕ", "Часть первая|ПЕРВЫЕ ДНИ", "Глава 1|ПЕРВЫЕ ТРИ ДНЯ", "Глава 2",
+                                    "Книга II", "Глава 3", "ЭПИЛОГ", "Глава 4", "Part One", "Chapter 1"}));
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  EXPECT_EQ(outline(out.files["OEBPS/toc.ncx"]),
+            "1 ВВЕДЕНИЕ\n1 Часть первая. Первые дни\n2 Глава 1. Первые три дня\n2 Глава 2\n1 Книга II\n2 Глава 3\n"
+            "1 ЭПИЛОГ\n1 Глава 4\n1 Part One\n2 Chapter 1\n");
+
+  // Real titles keep the book's own structure.
+  StringInput titled(
+      "<FictionBook><body><section><title><p>Часть первая</p></title><p>т</p></section>"
+      "<section><title><p>Глава 1</p></title><p>т</p></section></body></FictionBook>");
+  MapOutput titledOut;
+  ASSERT_TRUE(converter.convert(titled, titledOut));
+  EXPECT_EQ(outline(titledOut.files["OEBPS/toc.ncx"]), "1 Часть первая\n1 Глава 1\n");
+}
+
 TEST(Fb2ToEpub, KeepsBoldLinesAsTextInBooksWithTitles) {
   // One title anywhere and no bold line is a title: the book converts as if they were not bold.
   const std::string book =

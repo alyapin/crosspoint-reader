@@ -139,6 +139,7 @@ class Fb2ToEpub {
   bool bareMarkers() const { return !noteLinks && bareMarkerRun >= MIN_MARKER_RUN; }
   bool bracketMarkers() const { return !noteLinks && bracketMarkerRun >= MIN_MARKER_RUN; }
 
+  void shapeBoldToc();
   bool writeOpf(Output& out) const;
   bool writeNcx(Output& out) const;
 };
