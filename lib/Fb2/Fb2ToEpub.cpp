@@ -576,11 +576,12 @@ struct Fb2ToEpub::Pass {
       emitOpen("p", "note-title", id);
       push(Kind::Title, "</p>");
     } else {
-      // A poem's or stanza's title sits a level below its section's.
+      // A poem's or stanza's title sits a level below its section's. Past h4 the reader sets
+      // headings smaller than the text, so deeper titles stay at h4.
       const int level = sectionDepth + 1 + (wrapped() ? 1 : 0);
-      tag[1] = static_cast<char>('0' + (level > 6 ? 6 : level));
+      tag[1] = static_cast<char>('0' + (level > 4 ? 4 : level));
       emitOpen(tag, "title", id);
-      static constexpr const char* CLOSE[] = {"</h1>", "</h2>", "</h3>", "</h4>", "</h5>", "</h6>"};
+      static constexpr const char* CLOSE[] = {"</h1>", "</h2>", "</h3>", "</h4>"};
       push(Kind::Title, CLOSE[tag[1] - '1']);
     }
     titleLines = 0;

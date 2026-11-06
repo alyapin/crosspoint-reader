@@ -264,6 +264,18 @@ TEST(Fb2ToEpub, KeepsConsecutiveTitlesOnOnePage) {
   EXPECT_TRUE(contains(out.files["OEBPS/s2.xhtml"], "<div class=\"section\" id=\"ch1\">"));
 }
 
+TEST(Fb2ToEpub, KeepsDeepTitlesAtTextSize) {
+  StringInput input(
+      "<FictionBook><body><section><section><section><section><title><p>4</p></title><poem><title><p>П</p>"
+      "</title><stanza><v>в</v></stanza></poem></section></section></section></section></body></FictionBook>");
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  const std::string& s1 = out.files["OEBPS/s1.xhtml"];
+  EXPECT_TRUE(contains(s1, "<h4 class=\"title\">4</h4><div class=\"poem\"><h4 class=\"title\">П</h4>"));
+  EXPECT_TRUE(wellFormed(s1));
+}
+
 TEST(Fb2ToEpub, LeavesNoteMarkersOutOfTocLabels) {
   StringInput input(
       "<FictionBook xmlns:l=\"x\"><body><section><title><p>5. Против академиков<a l:href=\"#n1\" "
