@@ -800,9 +800,14 @@ struct Fb2ToEpub::Pass {
     } else if (strcmp(name, "poem") == 0) {
       startWrapper("div", "poem", id, "</div>");
     } else if (strcmp(name, "stanza") == 0) {
-      tocPending = false;
-      emitOpen("div", "stanza", id);
-      push(Kind::Stanza, "</div>");
+      if (textDepth > 0) {
+        // Inside a verse or paragraph (malformed FB2) it cannot open a paragraph of its own.
+        startWrapper("div", "stanza", id, "</div>");
+      } else {
+        tocPending = false;
+        emitOpen("div", "stanza", id);
+        push(Kind::Stanza, "</div>");
+      }
     } else if (strcmp(name, "annotation") == 0) {
       startWrapper("div", "annotation", id, "</div>", "annotation");
     } else if (strcmp(name, "table") == 0) {

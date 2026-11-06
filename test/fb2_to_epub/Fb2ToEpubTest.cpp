@@ -437,6 +437,24 @@ TEST(Fb2ToEpub, SetsAStanzaAsOneParagraph) {
   EXPECT_TRUE(wellFormed(s1));
 }
 
+TEST(Fb2ToEpub, KeepsOddStanzasWellFormed) {
+  const char* bodies[] = {
+      "<poem><stanza><v>a<stanza><v>b</v></stanza></v><v>c</v></stanza></poem>",  // in a verse
+      "<poem><stanza><v>a</v><stanza><v>b</v></stanza><v>c</v></stanza></poem>",  // in a stanza
+      "<p>a<stanza><v>b</v></stanza>c</p><stanza><v>d</v><empty-line/><v>e</v></stanza>",
+      "<title><p>a<stanza><v>b</v></stanza></p></title><stanza><title><p>c</p></title></stanza>",
+  };
+  for (const char* body : bodies) {
+    StringInput input(std::string("<FictionBook><body><section>") + body + "</section></body></FictionBook>");
+    MapOutput out;
+    Fb2ToEpub converter;
+    ASSERT_TRUE(converter.convert(input, out)) << body;
+    const std::string& s1 = out.files["OEBPS/s1.xhtml"];
+    EXPECT_TRUE(wellFormed(s1)) << body << "\n" << s1;
+    EXPECT_TRUE(contains(s1, "b")) << s1;
+  }
+}
+
 TEST(Fb2ToEpub, SetsSubtitlesAsHeadings) {
   StringInput input(
       "<FictionBook><body><section><p>до</p><subtitle>* * *</subtitle><p>после</p></section></body>"
