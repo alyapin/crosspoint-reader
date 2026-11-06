@@ -633,14 +633,12 @@ struct Fb2ToEpub::Pass {
   void startLink(const XML_Char** atts) {
     if (!fileOpen) openFile();
     const char* type = attribute(atts, "type");
-    const Kind kind = type && strcmp(type, "note") == 0 ? Kind::NoteLink : Kind::Inline;
+    const bool note = type && strcmp(type, "note") == 0;
+    // Note markers are raised, as in print: at the baseline "word2" reads as one word.
+    const bool raise = note && !inSup();
     const char* href = attribute(atts, "href");
-    if (!href || !*href) {
-      push(kind);
-      return;
-    }
     buf.clear();
-    if (href[0] == '#') {
+    if (href && href[0] == '#') {
       const auto it = self.idFile.find(href + 1);
       if (it != self.idFile.end()) {
         char file[24];
@@ -650,17 +648,21 @@ struct Fb2ToEpub::Pass {
         appendEscaped(buf, href, strlen(href), true);
         buf += "\">";
       }
-    } else {
+    } else if (href && *href) {
       buf = "<a href=\"";
       appendEscaped(buf, href, strlen(href), true);
       buf += "\">";
     }
-    if (buf.empty()) {
-      push(kind);
-      return;
-    }
-    emit(buf);
-    push(kind, "</a>");
+    const bool link = !buf.empty();
+    if (raise) buf += "<sup>";
+    if (!buf.empty()) emit(buf);
+    const char* close = link ? (raise ? "</sup></a>" : "</a>") : (raise ? "</sup>" : nullptr);
+    push(note ? Kind::NoteLink : Kind::Inline, close);
+  }
+
+  bool inSup() const {
+    return std::any_of(stack.begin(), stack.end(),
+                       [](const Frame& f) { return f.close && strcmp(f.close, "</sup>") == 0; });
   }
 
   void startText(const char* tag, const char* cls, const char* id, const char* close) {

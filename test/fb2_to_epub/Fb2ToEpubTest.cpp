@@ -198,11 +198,26 @@ TEST(Fb2ToEpub, ResolvesNoteLinksIntoTheNotesFile) {
   MapOutput out;
   Fb2ToEpub converter;
   ASSERT_TRUE(converter.convert(input, out));
-  EXPECT_TRUE(contains(out.files["OEBPS/s2.xhtml"], "<a href=\"s4.xhtml#n1\">[1]</a>"));
+  EXPECT_TRUE(contains(out.files["OEBPS/s2.xhtml"], "<a href=\"s4.xhtml#n1\"><sup>[1]</sup></a>"));
 
   const std::string& notes = out.files["OEBPS/s4.xhtml"];
   EXPECT_TRUE(contains(notes, "<h1 class=\"title\">Примечания</h1>"));
   EXPECT_TRUE(contains(notes, "<div class=\"section\" id=\"n1\"><p class=\"note-title\">1</p><p>Текст сноски</p>"));
+}
+
+TEST(Fb2ToEpub, RaisesNoteMarkers) {
+  StringInput input(
+      "<FictionBook xmlns:l=\"x\"><body><section><p>слово<a l:href=\"#n1\" type=\"note\">2</a>, "
+      "<sup><a l:href=\"#n1\" type=\"note\">3</a></sup>, <a l:href=\"#nx\" type=\"note\">4</a>, "
+      "<a l:href=\"#n1\">ссылка</a></p></section></body><body name=\"notes\"><section id=\"n1\"><p>сноска</p>"
+      "</section></body></FictionBook>");
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  // Already raised notes are not raised twice; a note with no target is raised without a link.
+  EXPECT_TRUE(contains(out.files["OEBPS/s1.xhtml"],
+                       "слово<a href=\"s2.xhtml#n1\"><sup>2</sup></a>, <sup><a href=\"s2.xhtml#n1\">3</a></sup>, "
+                       "<sup>4</sup>, <a href=\"s2.xhtml#n1\">ссылка</a></p>"));
 }
 
 TEST(Fb2ToEpub, BuildsNestedTocWithAnchors) {
@@ -259,7 +274,7 @@ TEST(Fb2ToEpub, LeavesNoteMarkersOutOfTocLabels) {
   ASSERT_TRUE(converter.convert(input, out));
   EXPECT_TRUE(contains(out.files["OEBPS/toc.ncx"], "<text>5. Против академиков</text>"));
   // The heading keeps its marker and link.
-  EXPECT_TRUE(contains(out.files["OEBPS/s1.xhtml"], "академиков<a href=\"s2.xhtml#n1\">[31]</a></h2>"));
+  EXPECT_TRUE(contains(out.files["OEBPS/s1.xhtml"], "академиков<a href=\"s2.xhtml#n1\"><sup>[31]</sup></a></h2>"));
 }
 
 TEST(Fb2ToEpub, DecodesCoverAndDeclaresIt) {
