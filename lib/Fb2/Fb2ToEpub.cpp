@@ -737,7 +737,8 @@ struct Fb2ToEpub::Pass {
         startText("p", "v", id, "</p>");
       }
     } else if (strcmp(name, "subtitle") == 0) {
-      startText("p", "subtitle", id, "</p>");
+      // A heading, as the reader's paragraph alignment and indent override CSS on paragraphs: "* * *" stays centered.
+      startText("h4", "subtitle", id, "</h4>");
     } else if (strcmp(name, "text-author") == 0) {
       startText("p", "text-author", id, "</p>");
     } else if (strcmp(name, "date") == 0) {
