@@ -155,7 +155,13 @@ class EpubReaderActivity final : public ReaderActivity {
   uint32_t pagerLayoutKey = 0;
   // Layout the open chapter's section was loaded or built for.
   uint32_t sectionLayoutKey = 0;
+#if BOARD_HAS_PSRAM
   static constexpr unsigned long PAGER_IDLE_MS = 3000;
+#else
+  // On the C3 (no PSRAM) a pager chapter start or end can outlast a click and does not stop for a
+  // press: quick paging never meets one.
+  static constexpr unsigned long PAGER_IDLE_MS = 10000;
+#endif
   // At the last pager tick some chapter was still uncounted for this layout.
   bool pagerHasWork = true;
   void bookPagerTick();
