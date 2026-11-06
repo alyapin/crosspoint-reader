@@ -1738,8 +1738,14 @@ void Fb2ToEpub::shapeBoldToc() {
   }
   uint8_t group = 0;  // depth of the entry the chapters after it nest under, 0: none
   uint8_t other = 0;  // depth of the heading of another kind just before, 0: none
+  uint8_t moved = 0;  // depth a chapter was moved in from: its sections, deeper, follow it
   unsigned lastChapter = 0;
   for (TocEntry& e : toc) {
+    if (moved && e.depth > moved) {
+      e.depth++;
+      continue;
+    }
+    moved = 0;
     if (e.depth < group) group = 0;
     if (group && e.depth > group) continue;  // nested already
     unsigned number = 0;
@@ -1749,7 +1755,7 @@ void Fb2ToEpub::shapeBoldToc() {
       other = 0;
     } else if (kind == Heading::Chapter) {
       if (!group && other == e.depth && number <= lastChapter) group = other;
-      if (group == e.depth) e.depth++;
+      if (group == e.depth) moved = e.depth++;
       other = 0;
       lastChapter = number;
     } else {

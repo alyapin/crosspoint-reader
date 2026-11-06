@@ -488,6 +488,18 @@ TEST(Fb2ToEpub, NestsTheChaptersOfAFlatBoldTitledBook) {
             "1 Часть 1\n2 Глава 1\n2 Глава 2\n1 БИБЛИОГРАФИЯ\n2 Глава 1. Первые дни\n2 Глава 2. Дома\n"
             "1 ПРИМЕЧАНИЯ\n2 Глава 1\n1 ПОСЛЕСЛОВИЕ\n1 Глава 3\n");
 
+  // A chapter moved in takes its own sections along.
+  StringInput sections(
+      "<FictionBook><body><section><p><strong>Часть первая</strong></p></section>"
+      "<section><p><strong>Глава 1</strong></p><p>т</p><section><p><strong>Раздел 1.1</strong></p><p>т</p>"
+      "<section><p><strong>Пункт</strong></p><p>т</p></section></section><section><p><strong>Раздел 1.2</strong>"
+      "</p><p>т</p></section></section><section><p><strong>Глава "
+      "2</strong></p><p>т</p></section></body></FictionBook>");
+  MapOutput sectionsOut;
+  ASSERT_TRUE(converter.convert(sections, sectionsOut));
+  EXPECT_EQ(outline(sectionsOut.files["OEBPS/toc.ncx"]),
+            "1 Часть первая\n2 Глава 1\n3 Раздел 1.1\n4 Пункт\n3 Раздел 1.2\n2 Глава 2\n");
+
   // Real titles keep the book's own structure.
   StringInput titled(
       "<FictionBook><body><section><title><p>Часть первая</p></title><p>т</p></section>"
