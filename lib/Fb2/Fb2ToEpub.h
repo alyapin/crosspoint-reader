@@ -25,7 +25,7 @@ class Fb2ToEpub {
  public:
   // Bump when the output changes the book's files: books converted before are
   // converted again on their next open, and the reading position moves over.
-  static constexpr uint8_t FORMAT_VERSION = 2;
+  static constexpr uint8_t FORMAT_VERSION = 3;
 
   // Receives the EPUB's files one at a time, in package order.
   class Output {
@@ -90,6 +90,11 @@ class Fb2ToEpub {
   static constexpr size_t MAX_BINARIES = 2048;
   static constexpr size_t MAX_TOC_ENTRIES = 4096;
   static constexpr size_t MAX_LABEL_BYTES = 200;
+  static constexpr size_t MAX_BOLD_TITLE_CHARS = 80;
+  // The book's own contents page, read to case TOC labels as it does: its first lines, so many
+  // and in so many bytes of their letters and digits.
+  static constexpr size_t MAX_CONTENTS_LINES = 128;
+  static constexpr size_t MAX_CONTENTS_BYTES = 4096;
   static constexpr size_t MAX_AUTHORS = 16;
   static constexpr size_t MAX_METADATA_BYTES = 512;
 
@@ -113,6 +118,22 @@ class Fb2ToEpub {
   std::unordered_map<std::string, Binary> binaries;
   std::vector<TocEntry> toc;
   uint16_t fileCount = 0;
+
+  // A book without <title>s (calibre writes headings as bold paragraphs) gets them from its
+  // sections' opening lines: one or two short paragraphs wholly in <strong>. The measuring pass
+  // picks them, the writing pass sets them as titles. A book with titles is measured again
+  // without them, so it converts as it would without this.
+  struct BoldTitle {
+    uint32_t section;   // main-body section, counted from 1
+    uint16_t entry;     // its TOC entry
+    uint16_t capitals;  // where the entry's label is in capitals, cased later as the contents page has it
+    uint8_t lines;
+  };
+  static constexpr uint16_t NO_CAPITALS = UINT16_MAX;
+  std::vector<BoldTitle> boldTitles;
+  std::string contents;  // the contents page: each line's letters and digits, a line each
+  bool findBoldTitles = true;
+  bool sectionTitles = false;  // a main-body section has a <title>
   const Binary* cover = nullptr;
   bool coverInBody = false;  // the main body opens with the cover image
   bool coverPage() const { return cover && !coverInBody; }
@@ -126,6 +147,7 @@ class Fb2ToEpub {
   bool bareMarkers() const { return !noteLinks && bareMarkerRun >= MIN_MARKER_RUN; }
   bool bracketMarkers() const { return !noteLinks && bracketMarkerRun >= MIN_MARKER_RUN; }
 
+  void shapeBoldToc();
   bool writeOpf(Output& out) const;
   bool writeNcx(Output& out) const;
 };

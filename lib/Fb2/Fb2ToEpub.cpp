@@ -208,6 +208,239 @@ void truncateUtf8(std::string& s, size_t max) {
 
 bool idFits(const char* id) { return strlen(id) <= Fb2ToEpub::MAX_ID_BYTES; }
 
+// Calls f(character, its bytes, their count) for each UTF-8 character of s.
+template <typename F>
+void forEachChar(const std::string& s, F f) {
+  for (size_t i = 0; i < s.size();) {
+    const int n = std::min(utf8Length(s[i]), static_cast<int>(s.size() - i));
+    f(decodeUtf8(s.data() + i, n), s.data() + i, n);
+    i += n;
+  }
+}
+
+// A line short enough for a heading, with a letter, that does not end as a sentence or a clause
+// does: "Глава 1" or "Я ДОЛЖНА ЗАБРАТЬ РЕБЕНКА ДОМОЙ?..", not "Он ушёл." or "Итак:".
+bool titleLike(const std::string& s) {
+  size_t chars = 0;
+  bool letter = false;
+  uint32_t last = 0, beforeLast = 0;  // closing quotes and parentheses aside
+  forEachChar(s, [&](const uint32_t c, const char*, int) {
+    chars++;
+    letter = letter || isUpperLetter(c) || isLowerLetter(c);
+    if (!isCloser(c)) {
+      beforeLast = last;
+      last = c;
+    }
+  });
+  if (!letter || chars > Fb2ToEpub::MAX_BOLD_TITLE_CHARS || last == ',' || last == ';' || last == ':') return false;
+  return last != '.' || beforeLast == '.' || beforeLast == '?' || beforeLast == '!';
+}
+
+bool allCapitals(const std::string& s) {
+  bool upper = false, lower = false;
+  forEachChar(s, [&](const uint32_t c, const char*, int) {
+    upper = upper || isUpperLetter(c);
+    lower = lower || isLowerLetter(c);
+  });
+  return upper && !lower;
+}
+
+uint32_t toLowerLetter(const uint32_t c) {
+  if ((c >= 'A' && c <= 'Z') || (c >= 0x410 && c <= 0x42F)) return c + 0x20;
+  if (c >= 0x400 && c <= 0x40F) return c + 0x50;  // Ё and the like
+  return c;
+}
+
+// Lower case with ё as е, for comparing words whatever their case.
+uint32_t foldLetter(const uint32_t c) {
+  const uint32_t lower = toLowerLetter(c);
+  return lower == 0x451 ? 0x435 : lower;
+}
+
+uint32_t toUpperLetter(const uint32_t c) {
+  if ((c >= 'a' && c <= 'z') || (c >= 0x430 && c <= 0x44F)) return c - 0x20;
+  if (c >= 0x450 && c <= 0x45F) return c - 0x50;
+  return c;
+}
+
+bool isLetterOrDigit(const uint32_t c) { return isUpperLetter(c) || isLowerLetter(c) || (c >= '0' && c <= '9'); }
+
+// The letters and digits of s, as they are: "Глава 14. Маленькие" gives "Глава14Маленькие".
+std::string lettersOf(const std::string& s) {
+  std::string out;
+  forEachChar(s, [&](const uint32_t c, const char* bytes, const int n) {
+    if (isLetterOrDigit(c)) out.append(bytes, n);
+  });
+  return out;
+}
+
+// Appends a character below U+0800, as all the letters a case change gives are.
+void appendShortUtf8(std::string& s, const uint32_t c) {
+  if (c < 0x80) {
+    s += static_cast<char>(c);
+  } else {
+    s += static_cast<char>(0xC0 | (c >> 6));
+    s += static_cast<char>(0x80 | (c & 0x3F));
+  }
+}
+
+// Two lines of a heading as one TOC label: "Глава 1" and "ПЕРВЫЕ ТРИ ДНЯ" make "Глава 1. Первые
+// три дня"; lines not all in capitals stay as they are, as in "Часть 1 · Начало". Returns where
+// the second line starts in the label.
+size_t joinTitleLines(std::string& label, const std::string& second) {
+  if (!allCapitals(second)) {
+    label += " \xC2\xB7 ";
+    label += second;
+    return label.size() - second.size();
+  }
+  const char end = label.empty() ? '.' : label.back();
+  const bool ellipsis = label.size() >= 3 && label.compare(label.size() - 3, 3, "\xE2\x80\xA6") == 0;
+  label += end == '.' || end == '!' || end == '?' || end == ':' || ellipsis ? " " : ". ";
+  const size_t start = label.size();
+  bool capital = true;  // a sentence's first letter, as in "Вакцинация? Да, пожалуйста"
+  forEachChar(second, [&](const uint32_t c, const char* bytes, const int n) {
+    const uint32_t lower = capital ? c : toLowerLetter(c);
+    capital = (capital && !isUpperLetter(c)) || c == '.' || c == '!' || c == '?' || c == 0x2026;
+    if (lower == c) {
+      label.append(bytes, n);
+    } else {
+      appendShortUtf8(label, lower);
+    }
+  });
+  return start;
+}
+
+bool isContentsTitle(const std::string& line) {
+  std::string key;
+  forEachChar(line, [&](const uint32_t c, const char*, int) {
+    if (isUpperLetter(c) || isLowerLetter(c)) appendShortUtf8(key, foldLetter(c));
+  });
+  for (const char* title : {"оглавление", "содержание", "contents", "tableofcontents"}) {
+    if (key == title) return true;
+  }
+  return false;
+}
+
+// `a`, as many bytes as `b` has, holds the same letters and digits whatever their case.
+bool sameLetters(const char* a, const std::string& b) {
+  for (size_t i = 0; i < b.size();) {
+    const int n = utf8Length(b[i]);
+    if (utf8Length(a[i]) != n || foldLetter(decodeUtf8(a + i, n)) != foldLetter(decodeUtf8(b.data() + i, n))) {
+      return false;
+    }
+    i += n;
+  }
+  return true;
+}
+
+// Cases `label` from byte `from` on as the book's contents page does, when one of its lines ends
+// with the same letters and digits, a page number aside: "Глава 14. Маленькие эйнштейны против
+// телевизора" takes "Эйнштейны" from the line "Глава 14. Маленькие Эйнштейны против телевизора".
+// A line in capitals tells nothing, nor one the match starts in lower case, inside a longer title.
+void caseAsContents(std::string& label, const size_t from, const std::string& contents) {
+  if (from >= label.size()) return;
+  const std::string key = lettersOf(label.substr(from));
+  if (key.size() < 4) return;
+  for (size_t start = 0, end; start < contents.size(); start = end + 1) {
+    end = contents.find('\n', start);
+    size_t numberless = end;
+    while (numberless > start && contents[numberless - 1] >= '0' && contents[numberless - 1] <= '9') numberless--;
+    for (const size_t last : {end, numberless}) {
+      if (last - start < key.size()) continue;
+      const char* match = contents.data() + last - key.size();
+      if ((static_cast<uint8_t>(*match) & 0xC0) == 0x80 || !sameLetters(match, key)) continue;
+      const std::string model(match, key.size());
+      const uint32_t first = decodeUtf8(model.data(), utf8Length(model[0]));
+      if (!allCapitals(model) && !isLowerLetter(first)) {
+        std::string out = label.substr(0, from);
+        size_t at = 0;
+        forEachChar(label.substr(from), [&](const uint32_t c, const char* bytes, const int n) {
+          uint32_t cased = c;
+          if (isLetterOrDigit(c)) {
+            const int m = utf8Length(model[at]);
+            const uint32_t like = decodeUtf8(model.data() + at, m);
+            at += m;
+            cased = isLowerLetter(like) ? toLowerLetter(c) : isUpperLetter(like) ? toUpperLetter(c) : c;
+          }
+          if (cased == c) {
+            out.append(bytes, n);
+          } else {
+            appendShortUtf8(out, cased);
+          }
+        });
+        label.swap(out);
+        return;
+      }
+    }
+  }
+}
+
+// A heading's number, its second word in lower case: "3", "iv", "первая", "three" or "fourth".
+// 0 for any other word.
+unsigned headingNumber(const std::string& word) {
+  if (word.empty() || word.size() > 24) return 0;
+  if (std::all_of(word.begin(), word.end(), [](const char c) { return c >= '0' && c <= '9'; })) {
+    return word.size() <= 4 ? static_cast<unsigned>(strtoul(word.c_str(), nullptr, 10)) : 0;
+  }
+  if (word.find_first_not_of("ivxlc") == std::string::npos) {
+    int value = 0, largest = 0;
+    for (auto it = word.rbegin(); it != word.rend(); ++it) {
+      const int v = *it == 'i' ? 1 : *it == 'v' ? 5 : *it == 'x' ? 10 : *it == 'l' ? 50 : 100;
+      value += v < largest ? -v : v;
+      largest = std::max(largest, v);
+    }
+    return value > 0 ? static_cast<unsigned>(value) : 0;
+  }
+  // Stems, so every gender and case of the word matches; the teens before the units they start with.
+  static constexpr const char* RU[] = {"одиннадцат", "двенадцат", "тринадцат",   "четырнадцат", "пятнадцат",
+                                       "шестнадцат", "семнадцат", "восемнадцат", "девятнадцат", "двадцат",
+                                       "перв",       "втор",      "трет",        "четв",        "пят",
+                                       "шест",       "седьм",     "восьм",       "девят",       "десят"};
+  static constexpr unsigned RU_VALUES[] = {11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  for (size_t i = 0; i < sizeof(RU) / sizeof(RU[0]); i++) {
+    if (word.compare(0, strlen(RU[i]), RU[i]) == 0) return RU_VALUES[i];
+  }
+  static constexpr const char* EN[][2] = {{"one", "first"},     {"two", "second"},      {"three", "third"},
+                                          {"four", "fourth"},   {"five", "fifth"},      {"six", "sixth"},
+                                          {"seven", "seventh"}, {"eight", "eighth"},    {"nine", "ninth"},
+                                          {"ten", "tenth"},     {"eleven", "eleventh"}, {"twelve", "twelfth"}};
+  for (size_t i = 0; i < sizeof(EN) / sizeof(EN[0]); i++) {
+    if (word == EN[i][0] || word == EN[i][1]) return static_cast<unsigned>(i + 1);
+  }
+  return 0;
+}
+
+enum class Heading : uint8_t { Other, Group, Chapter };
+
+// "Часть первая" or "Part II" opens a group of chapters; "Глава 3" or "Chapter three" is a
+// chapter, numbered in `number`.
+Heading headingKind(const std::string& label, unsigned& number) {
+  std::string words[2];
+  size_t word = 0;
+  forEachChar(label, [&](const uint32_t c, const char*, int) {
+    if (word > 1) return;
+    if (isUpperLetter(c) || isLowerLetter(c) || (c >= '0' && c <= '9')) {
+      appendShortUtf8(words[word], foldLetter(c));
+    } else if (!words[word].empty()) {
+      word++;
+    }
+  });
+  number = headingNumber(words[1]);
+  if (number == 0) return Heading::Other;
+  for (const char* group : {"часть", "книга", "part", "book"}) {
+    if (words[0] == group) return Heading::Group;
+  }
+  for (const char* chapter : {"глава", "chapter"}) {
+    if (words[0] == chapter) return Heading::Chapter;
+  }
+  return Heading::Other;
+}
+
+// The inline styles a bold title line may carry: a link, an image or a note marker makes it text.
+bool isLineStyle(const char* name) {
+  return strcmp(name, "strong") == 0 || strcmp(name, "emphasis") == 0 || strcmp(name, "strikethrough") == 0;
+}
+
 constexpr const char* XHTML_HEAD =
     "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
     "<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><title></title>"
@@ -355,6 +588,24 @@ struct Fb2ToEpub::Pass {
   // instead of breaking before each.
   bool tocShareable = false;
   std::string lastTocAnchor;
+
+  // Bold opening lines standing in for a section's title (Fb2ToEpub::boldTitles). Measuring, a
+  // paragraph at a section's start is tried as one and judged when it ends; writing sets the
+  // lines the measuring pass chose as a title.
+  uint32_t mainSections = 0;
+  uint8_t boldSeek = 0;    // measuring: 1 looks for a first line, 2 a second, 3 a third (a list, not a title)
+  bool boldProbe = false;  // measuring: the open paragraph is being tried
+  bool probeFails = false;
+  bool probeBold = false;
+  std::string probeText;
+  size_t nextBold = 0;              // writing: the next of self.boldTitles
+  uint8_t boldLines = 0;            // writing: lines of this section's title not yet ended
+  const char* boldClose = nullptr;  // writing: the end tag of the title open
+  // Measuring: the book's own contents page, its first section titled so, read into self.contents.
+  bool contentsSeen = false;
+  uint8_t contentsDepth = 0;  // its section's depth while open, 0 otherwise
+  size_t contentsLines = 0;
+  std::string contentsLine;
 
   // Current content file.
   bool fileOpen = false;
@@ -576,6 +827,7 @@ struct Fb2ToEpub::Pass {
     tocPending = notesBody;
     tocDepth = 1;
     tocAnchor.clear();
+    boldSeek = 0;
     push(Kind::Body);
   }
 
@@ -625,22 +877,33 @@ struct Fb2ToEpub::Pass {
       tocPending = true;
       tocDepth = sectionDepth;
       tocAnchor = tocShareable ? lastTocAnchor : (startsFile ? "" : id);
+      mainSections++;
+      if (measuring()) {
+        boldSeek = self.findBoldTitles && !self.sectionTitles ? 1 : 0;
+      } else if (nextBold < self.boldTitles.size() && self.boldTitles[nextBold].section == mainSections) {
+        boldLines = self.boldTitles[nextBold++].lines;
+      }
     }
   }
 
+  // A poem's or stanza's title sits a level below its section's. Past h4 the reader sets
+  // headings smaller than the text, so deeper titles stay at h4.
+  int titleLevel() const {
+    const int level = sectionDepth + 1 + (wrapped() ? 1 : 0);
+    return level > 4 ? 4 : level;
+  }
+  static constexpr const char* TITLE_CLOSE[] = {"</h1>", "</h2>", "</h3>", "</h4>"};
+
   void startTitle(const char* id) {
-    char tag[4] = "h1";
+    if (!notesBody && stack.back().kind == Kind::Section) self.sectionTitles = true;
     if (notesBody && sectionDepth > 0) {
       emitOpen("p", "note-title", id);
       push(Kind::Title, "</p>");
     } else {
-      // A poem's or stanza's title sits a level below its section's. Past h4 the reader sets
-      // headings smaller than the text, so deeper titles stay at h4.
-      const int level = sectionDepth + 1 + (wrapped() ? 1 : 0);
-      tag[1] = static_cast<char>('0' + (level > 4 ? 4 : level));
+      const int level = titleLevel();
+      const char tag[3] = {'h', static_cast<char>('0' + level), '\0'};
       emitOpen(tag, "title", id);
-      static constexpr const char* CLOSE[] = {"</h1>", "</h2>", "</h3>", "</h4>"};
-      push(Kind::Title, CLOSE[tag[1] - '1']);
+      push(Kind::Title, TITLE_CLOSE[level - 1]);
     }
     titleLines = 0;
     tocLabel.clear();
@@ -655,6 +918,92 @@ struct Fb2ToEpub::Pass {
     self.toc.push_back({fileNo, tocDepth, tocAnchor, tocLabel});
     tocShareable = true;
     lastTocAnchor = tocAnchor;
+  }
+
+  // Measuring: what opens a section decides whether its first paragraphs are its title.
+  void seekBold(const char* name) {
+    if (textDepth > 0) {
+      if (boldProbe && !isLineStyle(name)) probeFails = true;
+      return;
+    }
+    if (stack.back().kind != Kind::Section) return;
+    if (strcmp(name, "p") == 0) {
+      boldProbe = true;
+      probeFails = probeBold = false;
+      probeText.clear();
+    } else if (boldSeek > 1 || strcmp(name, "empty-line") != 0) {
+      boldSeek = 0;
+    }
+  }
+
+  // Measuring: a paragraph tried as a title line ends. True when it is one.
+  bool endProbe() {
+    boldProbe = false;
+    collapseSpaces(probeText);
+    // One the file would split after stays text, as the writing pass splits there.
+    const bool line = !probeFails && probeBold && titleLike(probeText) && !(canSplit() && fileText >= MAX_FILE_BYTES);
+    if (!line || boldSeek == 3 || (boldSeek == 1 && self.toc.size() >= MAX_TOC_ENTRIES)) {
+      if (line && boldSeek == 3) {
+        // A third bold line in a row: a list, not a title.
+        self.boldTitles.pop_back();
+        self.toc.pop_back();
+      }
+      boldSeek = 0;
+      return false;
+    }
+    if (boldSeek == 1) {
+      const uint16_t capitals = allCapitals(probeText) ? 0 : NO_CAPITALS;
+      self.boldTitles.push_back({mainSections, static_cast<uint16_t>(self.toc.size()), capitals, 1});
+      self.toc.push_back({fileNo, tocDepth, tocAnchor, probeText});
+      if (!contentsSeen && isContentsTitle(probeText)) {
+        contentsSeen = true;
+        contentsDepth = sectionDepth;
+      }
+    } else {
+      BoldTitle& title = self.boldTitles.back();
+      title.lines = 2;
+      const size_t second = joinTitleLines(self.toc.back().label, probeText);
+      if (title.capitals == NO_CAPITALS && allCapitals(probeText)) title.capitals = static_cast<uint16_t>(second);
+    }
+    truncateUtf8(self.toc.back().label, MAX_LABEL_BYTES);
+    boldSeek++;
+    tocShareable = true;
+    lastTocAnchor = tocAnchor;
+    return true;
+  }
+
+  void addContentsLine() {
+    const std::string line = lettersOf(contentsLine);
+    contentsLine.clear();
+    if (line.empty() || line.size() > MAX_LABEL_BYTES || contentsLines >= MAX_CONTENTS_LINES ||
+        self.contents.size() + line.size() + 1 > MAX_CONTENTS_BYTES) {
+      return;
+    }
+    self.contents += line;
+    self.contents += '\n';
+    contentsLines++;
+  }
+
+  // Writing: a section's first paragraph opens the title the measuring pass found for it. It
+  // has no element of its own: its lines are the paragraphs.
+  void startBoldTitle(const char* id) {
+    const int level = titleLevel();
+    const char tag[3] = {'h', static_cast<char>('0' + level), '\0'};
+    emitOpen(tag, "title", id);
+    boldClose = TITLE_CLOSE[level - 1];
+    openKinds[static_cast<int>(Kind::Title)]++;
+    tocPending = false;
+    titleLines = 1;
+    resetMarkerScan();
+    textDepth++;
+    push(Kind::Line);
+  }
+
+  void endBoldTitle() {
+    emit(boldClose);
+    boldClose = nullptr;
+    boldLines = 0;
+    openKinds[static_cast<int>(Kind::Title)]--;
   }
 
   void startImage(const XML_Char** atts) {
@@ -720,6 +1069,11 @@ struct Fb2ToEpub::Pass {
     push(note ? Kind::NoteLink : Kind::Inline, close);
   }
 
+  bool inBold() const {
+    return std::any_of(stack.begin(), stack.end(),
+                       [](const Frame& f) { return f.close && strcmp(f.close, "</strong>") == 0; });
+  }
+
   bool inSup() const {
     return std::any_of(stack.begin(), stack.end(),
                        [](const Frame& f) { return f.close && strcmp(f.close, "</sup>") == 0; });
@@ -727,6 +1081,7 @@ struct Fb2ToEpub::Pass {
 
   void startText(const char* tag, const char* cls, const char* id, const char* close) {
     tocPending = false;  // a section's title comes first; a later one belongs to a poem or stanza
+    if (contentsDepth) contentsLine.clear();
     for (auto it = stack.rbegin(); !cls && it != stack.rend(); ++it) {
       if (it->kind == Kind::Wrapper) cls = it->paraClass;
     }
@@ -777,6 +1132,11 @@ struct Fb2ToEpub::Pass {
     const char* id = attribute(atts, "id");
     const bool verse = strcmp(name, "v") == 0;
     if (verses && textDepth == 0 && !verse) endVerses();  // a title or subtitle among the verses
+    if (boldSeek > 0) seekBold(name);
+    if (boldLines > 0 && !open(Kind::Title) && strcmp(name, "p") == 0 && stack.back().kind == Kind::Section) {
+      startBoldTitle(id);
+      return;
+    }
     if (open(Kind::Title)) {
       if (strcmp(name, "p") == 0) {
         if (titleLines++ > 0) {
@@ -894,6 +1254,10 @@ struct Fb2ToEpub::Pass {
         sectionDivs = 0;
         return;
       case Kind::Section:
+        if (boldClose) endBoldTitle();  // cut short by an XML error
+        boldSeek = 0;
+        boldLines = 0;
+        if (sectionDepth == contentsDepth) contentsDepth = 0;
         sectionDepth--;
         sectionDivs--;
         // The file may have been split after this section's last paragraph.
@@ -901,6 +1265,7 @@ struct Fb2ToEpub::Pass {
         return;
       case Kind::Line:
         textDepth--;
+        if (boldClose && --boldLines == 0) endBoldTitle();
         return;
       case Kind::Stanza:
         endVerses();
@@ -913,6 +1278,8 @@ struct Fb2ToEpub::Pass {
       case Kind::TextBlock:
         emit(frame.close);
         textDepth--;
+        if (boldProbe && endProbe()) return;  // a title line: no split under it
+        if (contentsDepth) addContentsLine();
         if (canSplit() && fileText >= MAX_FILE_BYTES) closeFile();
         return;
       default:
@@ -1103,10 +1470,16 @@ struct Fb2ToEpub::Pass {
     }
     emit(buf);
     fileText += static_cast<size_t>(len);
-    if (std::any_of(s, s + len, [](const char c) { return !isXmlSpace(c); })) {
+    const bool text = std::any_of(s, s + len, [](const char c) { return !isXmlSpace(c); });
+    if (text) {
       fileHasContent = true;
       bodyContent = true;
       emptyLines = 0;
+    }
+    if (contentsDepth) appendBounded(contentsLine, s, static_cast<size_t>(len), 2 * MAX_LABEL_BYTES);
+    if (boldProbe) {
+      appendBounded(probeText, s, static_cast<size_t>(len), 2 * MAX_LABEL_BYTES);
+      if (text) (inBold() ? probeBold : probeFails) = true;
     }
     if (!open(Kind::Title)) tocShareable = false;
     if (open(Kind::Title) && tocPending && !open(Kind::NoteLink)) {
@@ -1306,20 +1679,26 @@ bool Fb2ToEpub::readMetadata(Input& input, Metadata& out) {
 }
 
 bool Fb2ToEpub::convert(Input& input, Output& out) {
-  meta = Metadata{};
-  idFile.clear();
-  binaries.clear();
-  toc.clear();
-  cover = nullptr;
-  coverInBody = false;
-  noteLinks = false;
-  bareMarkerRun = bracketMarkerRun = 0;
-
-  {
+  // A book found to have both titles and bold lines taken for them is measured again without.
+  for (findBoldTitles = true;; findBoldTitles = false) {
+    meta = Metadata{};
+    idFile.clear();
+    binaries.clear();
+    toc.clear();
+    boldTitles.clear();
+    contents.clear();
+    sectionTitles = false;
+    cover = nullptr;
+    coverInBody = false;
+    noteLinks = false;
+    bareMarkerRun = bracketMarkerRun = 0;
     fileCount = 0;
     auto measure = makeUniqueNoThrow<Pass>(*this, nullptr);
     if (!measure || !measure->run(input) || measure->notRoot || !measure->sawRoot || fileCount == 0) return false;
+    if (!sectionTitles || boldTitles.empty()) break;
   }
+  if (!boldTitles.empty()) shapeBoldToc();
+  std::string().swap(contents);
   const uint16_t measuredFiles = fileCount;
   if (!meta.coverId.empty()) {
     const auto it = binaries.find(meta.coverId);
@@ -1346,6 +1725,44 @@ bool Fb2ToEpub::convert(Input& input, Output& out) {
   if (!write || !write->run(input) || write->outputError || fileCount != measuredFiles) return false;
 
   return writeOpf(out) && writeNcx(out);
+}
+
+// A book of bold titles (calibre's) has its parts and chapters as sibling sections: its TOC
+// nests each "Глава N" under the "Часть" before it, until a heading of another kind. Chapters
+// numbered from the start again right after such a heading ("Библиография", then "Глава 1",
+// "Глава 2"...) nest under it, so the chapter list is not repeated at the top level. Labels in
+// capitals take the case of the book's contents page where it lists them.
+void Fb2ToEpub::shapeBoldToc() {
+  for (const BoldTitle& title : boldTitles) {
+    if (title.capitals != NO_CAPITALS) caseAsContents(toc[title.entry].label, title.capitals, contents);
+  }
+  uint8_t group = 0;  // depth of the entry the chapters after it nest under, 0: none
+  uint8_t other = 0;  // depth of the heading of another kind just before, 0: none
+  uint8_t moved = 0;  // depth a chapter was moved in from: its sections, deeper, follow it
+  unsigned lastChapter = 0;
+  for (TocEntry& e : toc) {
+    if (moved && e.depth > moved) {
+      e.depth++;
+      continue;
+    }
+    moved = 0;
+    if (e.depth < group) group = 0;
+    if (group && e.depth > group) continue;  // nested already
+    unsigned number = 0;
+    const Heading kind = headingKind(e.label, number);
+    if (kind == Heading::Group) {
+      group = e.depth;
+      other = 0;
+    } else if (kind == Heading::Chapter) {
+      if (!group && other == e.depth && number <= lastChapter) group = other;
+      if (group == e.depth) moved = e.depth++;
+      other = 0;
+      lastChapter = number;
+    } else {
+      group = 0;
+      other = e.depth;
+    }
+  }
 }
 
 bool Fb2ToEpub::writeOpf(Output& out) const {
@@ -1438,7 +1855,10 @@ bool Fb2ToEpub::writeNcx(Output& out) const {
   const std::string noAnchor;
   const std::string bookLabel = meta.title.empty() ? std::string("1") : meta.title;
   if (coverPage()) navPoint(0, 1, noAnchor, bookLabel);
-  if (toc.empty()) navPoint(1, 1, noAnchor, bookLabel);
+  // So do the pages before the first bold title: calibre puts the cover and title pages in the body.
+  if (toc.empty() || (!boldTitles.empty() && !coverPage() && toc.front().file > 1)) {
+    navPoint(1, 1, noAnchor, bookLabel);
+  }
   for (const TocEntry& e : toc) navPoint(e.file, e.depth, e.anchor, e.label);
   for (; openDepth > 0; openDepth--) w.put("</navPoint>");
   w.put("</navMap></ncx>");

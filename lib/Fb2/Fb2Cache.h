@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 
 // The converted EPUB of an FB2 book in its cache directory, and its replacement
 // when the converter changes.
@@ -15,7 +16,9 @@
 // Power lost at any step leaves a book that opens, old or new, and a position
 // that still applies. A migration that fails or dies (a book too big for the
 // heap, a full card) is not tried again on the next open: an attempt marker
-// sends the reader to the old archive until the cache is deleted.
+// sends the reader to the old archive until the cache is deleted. A conversion
+// that comes out with the same files, the TOC aside, keeps the exact position
+// and bookmarks instead.
 namespace Fb2Cache {
 
 constexpr const char* NEXT = "fb2.next.epub";  // a conversion not yet in place
@@ -33,6 +36,18 @@ uint8_t archiveVersion(const char* name);
 // the source record and attempt markers.
 bool survivesClear(const char* name);
 
+// What a position or bookmark in an archive points into: every file but the
+// TOC, by name, CRC-32 and size as its ZIP central directory lists them, in any order.
+class Layout {
+ public:
+  void add(std::string_view name, uint32_t crc, uint32_t size);
+  bool operator==(const Layout& other) const { return sum == other.sum && files == other.files; }
+
+ private:
+  uint64_t sum = 0;
+  uint32_t files = 0;
+};
+
 // One book's cache directory; names are relative to it.
 class Store {
  public:
@@ -46,6 +61,8 @@ class Store {
   virtual bool clearDerived() = 0;
   // The saved reading position as a fraction of `archive`'s book; < 0 without one.
   virtual float savedFraction(const char* archive) = 0;
+  // Whether two archives have the same Layout; false when one cannot be read.
+  virtual bool sameLayout(const char* a, const char* b) = 0;
   // Small files: the bytes read (0 when missing), whether all were written.
   virtual size_t read(const char* name, char* buf, size_t size) = 0;
   virtual bool write(const char* name, const char* data, size_t len) = 0;

@@ -32,6 +32,22 @@ uint8_t archiveVersion(const char* name) {
   return 0;
 }
 
+void Layout::add(const std::string_view name, const uint32_t crc, const uint32_t size) {
+  if (name == "OEBPS/toc.ncx") return;
+  uint64_t h = 14695981039346656037ull;  // FNV-1a of the name
+  for (const char c : name) {
+    h ^= static_cast<uint8_t>(c);
+    h *= 1099511628211ull;
+  }
+  h ^= static_cast<uint64_t>(crc) << 32 | size;
+  // Mixed (splitmix64), so summing the files in any order does not cancel them out.
+  h += 0x9E3779B97F4A7C15ull;
+  h = (h ^ (h >> 30)) * 0xBF58476D1CE4E5B9ull;
+  h = (h ^ (h >> 27)) * 0x94D049BB133111EBull;
+  sum += h ^ (h >> 31);
+  files++;
+}
+
 bool survivesClear(const char* name) {
   const size_t len = strlen(name);
   const bool attempt = strncmp(name, "fb2.v", 5) == 0 && len > 4 && strcmp(name + len - 4, ".try") == 0;
@@ -97,7 +113,9 @@ const char* prepare(Store& store, const bool mayConvert, char* out, const size_t
     return readOld();
   }
 
+  bool earlierPending = false;
   if (oldVersion != 0) {
+    earlierPending = store.exists(PENDING);
     // 1. The position, while the old layout can still place it. Without one (an
     // interrupted attempt already removed the spine) an earlier fb2.pos stays.
     const float fraction = store.savedFraction(old);
@@ -109,6 +127,9 @@ const char* prepare(Store& store, const bool mayConvert, char* out, const size_t
   }
   // 3. The new book beside the old one, which stays readable if this fails.
   if (!store.convert(NEXT)) return readOld();
+  // The same files but the TOC: the saved page and the bookmarks still hold, exactly, so the
+  // fraction goes. One an earlier migration left stays, for a position saved before it.
+  if (oldVersion != 0 && !earlierPending && store.sameLayout(old, NEXT)) removeIfThere(store, PENDING);
   // 4. What the reader built from the old archive no longer matches.
   if (!store.clearDerived()) return readOld();
   // 5. The rename is the stamp.

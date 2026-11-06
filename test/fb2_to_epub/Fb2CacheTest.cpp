@@ -18,6 +18,7 @@ class FakeStore : public Fb2Cache::Store {
   int budget = -1;
   bool convertFails = false;
   bool clearFails = false;
+  bool sameOutput = false;  // the conversion comes out as the old one
   int conversions = 0;
 
   bool exists(const char* name) override { return files.count(name) != 0; }
@@ -31,7 +32,7 @@ class FakeStore : public Fb2Cache::Store {
   bool convert(const char* name) override {
     conversions++;
     if (convertFails || !step()) return false;
-    files[name] = "new";
+    files[name] = sameOutput ? "old" : "new";
     return true;
   }
   bool clearDerived() override {
@@ -50,6 +51,9 @@ class FakeStore : public Fb2Cache::Store {
   float savedFraction(const char* archive) override {
     // From book.bin, or from the old archive's own directory.
     return files.count("progress.bin") && (files.count("book.bin") || files.count(archive)) ? 0.4f : -1.0f;
+  }
+  bool sameLayout(const char* a, const char* b) override {
+    return files.count(a) && files.count(b) && files[a] == files[b];
   }
   size_t read(const char* name, char* buf, const size_t size) override {
     const auto it = files.find(name);
@@ -88,6 +92,17 @@ std::string prepare(FakeStore& store, const bool mayConvert) {
   return archive ? archive : "";
 }
 
+std::string archive(const uint8_t version) {
+  char name[16];
+  return Fb2Cache::archiveName(version, name, sizeof(name));
+}
+
+const std::string CURRENT = archive(Fb2ToEpub::FORMAT_VERSION);
+const std::string NEWER = archive(Fb2ToEpub::FORMAT_VERSION + 1);
+const std::string ATTEMPT = [] {
+  char name[16];
+  return std::string(Fb2Cache::attemptName(Fb2ToEpub::FORMAT_VERSION, name, sizeof(name)));
+}();
 const std::string PENDING = "0.400000 1\n";
 
 TEST(Fb2Cache, NamesCarryTheVersion) {
@@ -121,16 +136,67 @@ TEST(Fb2Cache, OnlyTheReaderConverts) {
   EXPECT_EQ(old.files["fb2.src"], "fb2.epub");
   EXPECT_EQ(old.conversions, 0);
 
-  EXPECT_EQ(prepare(fresh, true), "fb2.v2.epub");
-  EXPECT_EQ(fresh.files["fb2.v2.epub"], "new");
-  EXPECT_EQ(fresh.files["fb2.src"], "fb2.v2.epub");
+  EXPECT_EQ(prepare(fresh, true), CURRENT);
+  EXPECT_EQ(fresh.files[CURRENT], "new");
+  EXPECT_EQ(fresh.files["fb2.src"], CURRENT);
 }
 
 TEST(Fb2Cache, MigratesKeepingThePosition) {
   FakeStore store = openedByOldConverter();
-  EXPECT_EQ(prepare(store, true), "fb2.v2.epub");
+  EXPECT_EQ(prepare(store, true), CURRENT);
   const std::map<std::string, std::string> expected = {
-      {"fb2.v2.epub", "new"}, {"progress.bin", "old"}, {"fb2.pos", PENDING}, {"fb2.src", "fb2.v2.epub"}};
+      {CURRENT, "new"}, {"progress.bin", "old"}, {"fb2.pos", PENDING}, {"fb2.src", CURRENT}};
+  EXPECT_EQ(store.files, expected);
+}
+
+TEST(Fb2Cache, LayoutIsEveryFileButTheToc) {
+  Fb2Cache::Layout old, reordered, retitled, changed, fewer;
+  for (Fb2Cache::Layout* layout : {&old, &changed, &fewer}) layout->add("OEBPS/s1.xhtml", 1, 100);
+  old.add("OEBPS/s2.xhtml", 2, 200);
+  old.add("OEBPS/toc.ncx", 3, 300);
+  reordered.add("OEBPS/s2.xhtml", 2, 200);
+  reordered.add("OEBPS/s1.xhtml", 1, 100);
+  retitled = reordered;
+  retitled.add("OEBPS/toc.ncx", 4, 400);
+  changed.add("OEBPS/s2.xhtml", 5, 200);
+  EXPECT_TRUE(old == reordered);
+  EXPECT_TRUE(old == retitled);
+  EXPECT_FALSE(old == changed);
+  EXPECT_FALSE(old == fewer);
+}
+
+TEST(Fb2Cache, KeepsTheExactPositionWhenTheBookComesOutTheSame) {
+  // Only the TOC changed, say: the saved page and the bookmarks point at the same text, so no
+  // fraction is left to move them (MigratesKeepingThePosition: a changed book leaves one).
+  FakeStore store = openedByOldConverter();
+  store.sameOutput = true;
+  EXPECT_EQ(prepare(store, true), CURRENT);
+  const std::map<std::string, std::string> expected = {{CURRENT, "old"}, {"progress.bin", "old"}, {"fb2.src", CURRENT}};
+  EXPECT_EQ(store.files, expected);
+
+  // A fraction an earlier migration left is for a position saved before it: it stays.
+  FakeStore earlier = openedByOldConverter();
+  earlier.sameOutput = true;
+  earlier.files["fb2.pos"] = "0.250000 1\n";
+  EXPECT_EQ(prepare(earlier, true), CURRENT);
+  EXPECT_EQ(earlier.files.count("fb2.pos"), 1u);
+}
+
+TEST(Fb2Cache, MigratesFromThePreviousVersion) {
+  const uint8_t previous = Fb2ToEpub::FORMAT_VERSION - 1;
+  FakeStore store;
+  for (const char* name : DERIVED) store.files[name] = "old";
+  store.files[archive(previous)] = "old";
+  store.files["progress.bin"] = "old";
+  store.files["fb2.src"] = archive(previous);
+  // Home and the sleep screen keep reading it; the reader converts, keeping the position.
+  EXPECT_EQ(prepare(store, false), archive(previous));
+  EXPECT_EQ(store.conversions, 0);
+  EXPECT_EQ(prepare(store, true), CURRENT);
+  const std::map<std::string, std::string> expected = {{CURRENT, "new"},
+                                                       {"progress.bin", "old"},
+                                                       {"fb2.pos", "0.400000 " + std::to_string(previous) + "\n"},
+                                                       {"fb2.src", CURRENT}};
   EXPECT_EQ(store.files, expected);
 }
 
@@ -140,7 +206,7 @@ TEST(Fb2Cache, AFailedMigrationIsNotRetriedOnEveryOpen) {
   EXPECT_EQ(prepare(store, true), "fb2.epub");
   EXPECT_EQ(store.files["book.bin"], "old");
   EXPECT_EQ(store.files["fb2.pos"], PENDING);
-  EXPECT_EQ(store.files.count("fb2.v2.try"), 1u);
+  EXPECT_EQ(store.files.count(ATTEMPT), 1u);
 
   // A conversion that died leaves its partial file; it goes without converting again.
   store.convertFails = false;
@@ -150,9 +216,9 @@ TEST(Fb2Cache, AFailedMigrationIsNotRetriedOnEveryOpen) {
   EXPECT_EQ(store.files.count(Fb2Cache::NEXT_TMP), 0u);
 
   // Deleting the cache is the retry: here, without the marker.
-  store.files.erase("fb2.v2.try");
-  EXPECT_EQ(prepare(store, true), "fb2.v2.epub");
-  EXPECT_EQ(store.files.count("fb2.v2.try"), 0u);
+  store.files.erase(ATTEMPT);
+  EXPECT_EQ(prepare(store, true), CURRENT);
+  EXPECT_EQ(store.files.count(ATTEMPT), 0u);
 }
 
 TEST(Fb2Cache, SurvivesPowerLossAtEveryStep) {
@@ -174,18 +240,18 @@ TEST(Fb2Cache, SurvivesPowerLossAtEveryStep) {
     for (const char* derived : DERIVED) {
       if (store.files.count(derived)) EXPECT_EQ(store.files[derived], source) << derived;
     }
-    if (store.files.count("fb2.v2.try")) EXPECT_EQ(store.conversions, conversions);
+    if (store.files.count(ATTEMPT)) EXPECT_EQ(store.conversions, conversions);
 
     // Deleting the attempt, as «Delete cache» does, lets the next open finish with the position.
-    store.files.erase("fb2.v2.try");
-    EXPECT_EQ(prepare(store, true), "fb2.v2.epub");
+    store.files.erase(ATTEMPT);
+    EXPECT_EQ(prepare(store, true), CURRENT);
     EXPECT_EQ(store.files.count("fb2.epub"), 0u);
     EXPECT_EQ(store.files.count(Fb2Cache::NEXT), 0u);
     EXPECT_EQ(store.files["fb2.pos"], PENDING);
     EXPECT_EQ(store.files.count("book.bin"), 0u);
-    EXPECT_EQ(store.files["fb2.src"], "fb2.v2.epub");
+    EXPECT_EQ(store.files["fb2.src"], CURRENT);
     if (finished) {
-      EXPECT_EQ(first, "fb2.v2.epub");
+      EXPECT_EQ(first, CURRENT);
       break;
     }
   }
@@ -193,25 +259,25 @@ TEST(Fb2Cache, SurvivesPowerLossAtEveryStep) {
 
 TEST(Fb2Cache, CleansUpAfterAnInterruptedRename) {
   FakeStore store;
-  store.files = {{"fb2.epub", "old"},     {"fb2.v2.epub", "new"},       {"fb2.pos", PENDING},      {"fb2.v2.try", ""},
-                 {Fb2Cache::NEXT, "new"}, {Fb2Cache::NEXT_TMP, "part"}, {"fb2.src", "fb2.v2.epub"}};
-  EXPECT_EQ(prepare(store, false), "fb2.v2.epub");
-  const std::map<std::string, std::string> expected = {
-      {"fb2.v2.epub", "new"}, {"fb2.pos", PENDING}, {"fb2.src", "fb2.v2.epub"}};
+  store.files = {{"fb2.epub", "old"}, {CURRENT, "new"},        {"fb2.pos", PENDING},
+                 {ATTEMPT, ""},       {Fb2Cache::NEXT, "new"}, {Fb2Cache::NEXT_TMP, "part"},
+                 {"fb2.src", CURRENT}};
+  EXPECT_EQ(prepare(store, false), CURRENT);
+  const std::map<std::string, std::string> expected = {{CURRENT, "new"}, {"fb2.pos", PENDING}, {"fb2.src", CURRENT}};
   EXPECT_EQ(store.files, expected);
 }
 
 TEST(Fb2Cache, ClearsCachesBuiltFromAnotherArchive) {
   // Converted by another board's firmware, then read here from a different archive.
   FakeStore store;
-  store.files = {{"fb2.v2.epub", "new"}, {"book.bin", "v3"}, {"sections", "v3"}, {"fb2.src", "fb2.v3.epub"}};
+  store.files = {{CURRENT, "new"}, {"book.bin", "v3"}, {"sections", "v3"}, {"fb2.src", NEWER}};
   // A clear that fails leaves the record as it was, to be tried again.
   store.clearFails = true;
-  EXPECT_EQ(prepare(store, false), "fb2.v2.epub");
-  EXPECT_EQ(store.files["fb2.src"], "fb2.v3.epub");
+  EXPECT_EQ(prepare(store, false), CURRENT);
+  EXPECT_EQ(store.files["fb2.src"], NEWER);
   store.clearFails = false;
-  EXPECT_EQ(prepare(store, false), "fb2.v2.epub");
-  const std::map<std::string, std::string> expected = {{"fb2.v2.epub", "new"}, {"fb2.src", "fb2.v2.epub"}};
+  EXPECT_EQ(prepare(store, false), CURRENT);
+  const std::map<std::string, std::string> expected = {{CURRENT, "new"}, {"fb2.src", CURRENT}};
   EXPECT_EQ(store.files, expected);
 }
 
