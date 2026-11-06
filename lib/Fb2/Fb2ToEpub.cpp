@@ -185,8 +185,10 @@ constexpr const char* STYLE_CSS =
     "p{text-indent:1.5em;margin:0}"
     "h1,h2,h3,h4,h5,h6{text-align:center;text-indent:0}"
     ".subtitle{text-align:center;font-weight:bold;text-indent:0}"
-    "p.epigraph{margin-left:30%;font-style:italic;text-indent:0}"
-    "p.cite{margin-left:1.5em;margin-right:1.5em}"
+    // Insets go on the wrappers, so a text-author lines up under its epigraph or cite.
+    "div.epigraph{margin-left:30%}"
+    "p.epigraph{font-style:italic;text-indent:0}"
+    "blockquote.cite{margin-left:1.5em;margin-right:1.5em}"
     "p.annotation{font-style:italic}"
     ".poem{margin-left:1.5em}"
     ".v{text-indent:0}"

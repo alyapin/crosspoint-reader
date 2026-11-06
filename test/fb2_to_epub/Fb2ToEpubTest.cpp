@@ -173,6 +173,8 @@ TEST(Fb2ToEpub, MapsContentMarkup) {
   EXPECT_TRUE(contains(s1, "<h1 class=\"title\">Лев Толстой<br/>Тестовая книга</h1>"));
   EXPECT_TRUE(contains(
       s1, "<div class=\"epigraph\"><p class=\"epigraph\">Эпиграф &amp; цитата</p><p class=\"text-author\">Кто-то</p>"));
+  // The epigraph's inset holds for its author line too.
+  EXPECT_TRUE(contains(out.files["OEBPS/style.css"], "div.epigraph{margin-left:30%}"));
   EXPECT_FALSE(contains(s1, "Аннотация"));
 
   // The top-level section opens a file of its own after the body title.
