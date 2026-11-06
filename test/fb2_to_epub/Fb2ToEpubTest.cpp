@@ -220,45 +220,70 @@ TEST(Fb2ToEpub, RaisesNoteMarkers) {
                        "<sup>4</sup>, <a href=\"s2.xhtml#n1\">ссылка</a></p>"));
 }
 
+// Text a plain-text marker rule must leave alone, in any book.
+const std::string LOOKALIKES =
+    "<p>Win32, IPv6, Python3, mp3, HTML5, CSS3, DDR4 и COVID19. CaCO3 и Ca(OH)2. Ник Shadow77, массив x[1], "
+    "ход Кf3. СО2, витамин К2, IQ5. В 2013 году, 11,4 или 16,1. Года2013. 1990-х. Глава 12. Р. e702–е770.</p>"
+    "<p>H<sub>2</sub>O, 20<sup>th</sup>, <a l:href=\"http://x.org/r1\">www.region10.org</a>, <code>a[1]</code>, "
+    "http://www.region10.org/r1 и [3] отдельно.</p>";
+
+// calibre's FB2 of «Всё хорошо!»: source references as bare digits after the last word, editor's notes
+// as glued "[N]", both numbered in runs, with no links or ids.
+std::string calibreLikeBook(const std::string& extra = "") {
+  return "<FictionBook xmlns:l=\"x\"><body><section>"
+         "<p>на пару часов1. По данным СВДС2, «Спокойная и уверенная»3, в сна)4. Конец взрослым?»5</p>"
+         "<p>Проведут скрининг[1]. В возрасте[2] — и <emphasis>слово</emphasis>6. Обрезания[3], выписки[4], "
+         "контактах[5]. Заболевших 86 человек[6]<sup>, </sup>7.</p>"
+         "<p><strong>[1]</strong> Неонатальный скрининг. <strong>2.</strong> Список</p>" +
+         LOOKALIKES + extra + "</section></body></FictionBook>";
+}
+
 TEST(Fb2ToEpub, RaisesNoteMarkersLeftAsPlainText) {
-  // calibre's FB2 of «Всё хорошо!» keeps source references as bare digits after the last word and
-  // editor's notes as glued "[N]", with no links or ids.
-  const std::string doc =
-      "<FictionBook xmlns:l=\"x\"><body><section>"
-      "<p>на пару часов1. По данным СВДС20, MMR7 и LactMed31. «Спокойная и уверенная»1, в сна)15.</p>"
-      "<p>Проведут скрининг[1]. В возрасте[8] — и <emphasis>слово</emphasis>12. Конец взрослым?»20</p>"
-      "<p>заболевших 86 человек[26]<sup>, </sup>1.</p>"
-      "<p><strong>[1]</strong> Неонатальный скрининг. <strong>2.</strong> Список</p>"
-      "<p>В 2013 году, 11,4 или 16,1; СО2. Витамин К2. IQ5. Р. e702–е770. Года2013. 1990-х. Глава 12.</p>"
-      "<p>H<sub>2</sub>O, 20<sup>th</sup>, <a l:href=\"http://x.org/r1\">www.region10.org</a>, "
-      "<code>a[1]</code>, http://www.region10.org/r1 и [3] отдельно.</p>"
-      "</section></body></FictionBook>";
+  const std::string doc = calibreLikeBook();
   for (const size_t chunk : {size_t{1}, size_t{7}, doc.size()}) {
     StringInput input(doc, chunk);
     MapOutput out;
     Fb2ToEpub converter;
     ASSERT_TRUE(converter.convert(input, out));
     const std::string& s1 = out.files["OEBPS/s1.xhtml"];
-    EXPECT_TRUE(contains(s1,
-                         "<p>на пару часов<sup>1</sup>. По данным СВДС<sup>20</sup>, MMR<sup>7</sup> и "
-                         "LactMed<sup>31</sup>. «Спокойная и уверенная»<sup>1</sup>, в сна)<sup>15</sup>.</p>"))
+    EXPECT_TRUE(
+        contains(s1,
+                 "<p>на пару часов<sup>1</sup>. По данным СВДС<sup>2</sup>, «Спокойная и уверенная»<sup>3</sup>, "
+                 "в сна)<sup>4</sup>. Конец взрослым?»<sup>5</sup></p>"))
         << chunk << "\n"
         << s1;
     EXPECT_TRUE(contains(s1,
-                         "<p>Проведут скрининг<sup>[1]</sup>. В возрасте<sup>[8]</sup> — и <em>слово</em>"
-                         "<sup>12</sup>. Конец взрослым?»<sup>20</sup></p>"))
+                         "<p>Проведут скрининг<sup>[1]</sup>. В возрасте<sup>[2]</sup> — и <em>слово</em><sup>6</sup>. "
+                         "Обрезания<sup>[3]</sup>, выписки<sup>[4]</sup>, контактах<sup>[5]</sup>. Заболевших 86 "
+                         "человек<sup>[6]</sup><sup>, </sup><sup>7</sup>.</p>"))
         << chunk;
-    EXPECT_TRUE(contains(s1, "<p>заболевших 86 человек<sup>[26]</sup><sup>, </sup><sup>1</sup>.</p>")) << chunk;
-    // Labels opening a note or a list item, real numbers and digits already set apart stay as they are.
+    // Labels opening a note or a list item, look-alikes and digits already set apart stay as they are.
     EXPECT_TRUE(contains(s1, "<p><strong>[1]</strong> Неонатальный скрининг. <strong>2.</strong> Список</p>"));
-    EXPECT_TRUE(contains(
-        s1, "<p>В 2013 году, 11,4 или 16,1; СО2. Витамин К2. IQ5. Р. e702–е770. Года2013. 1990-х. Глава 12.</p>"));
-    EXPECT_TRUE(contains(s1,
-                         "<p>H<sub>2</sub>O, 20<sup>th</sup>, <a href=\"http://x.org/r1\">www.region10.org</a>, "
-                         "<code>a[1]</code>, http://www.region10.org/r1 и [3] отдельно.</p>"))
-        << chunk;
+    std::string lookalikes = LOOKALIKES;
+    for (size_t at; (at = lookalikes.find("l:href")) != std::string::npos;) lookalikes.replace(at, 6, "href");
+    EXPECT_TRUE(contains(s1, lookalikes)) << chunk << "\n" << s1;
     EXPECT_TRUE(wellFormed(s1));
   }
+}
+
+TEST(Fb2ToEpub, LeavesDigitsAloneInOrdinaryBooks) {
+  // A book with real note links raises those and nothing else.
+  StringInput linked(calibreLikeBook("<p>сноска<a l:href=\"#n1\" type=\"note\">[1]</a></p>"));
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(linked, out));
+  const std::string& s1 = out.files["OEBPS/s1.xhtml"];
+  EXPECT_TRUE(contains(s1, "<p>на пару часов1. По данным СВДС2, «Спокойная и уверенная»3, в сна)4."));
+  EXPECT_TRUE(contains(s1, "Проведут скрининг[1]. В возрасте[2]"));
+  EXPECT_TRUE(contains(s1, "<sup>[1]</sup>"));  // the note link
+
+  // Without a run of numbered markers, glued digits are ordinary text.
+  StringInput plain("<FictionBook><body><section><p>на пару часов1, слово7, скрининг[1] и [2]. Win32, Кf3.</p>" +
+                    LOOKALIKES.substr(0, LOOKALIKES.find("</p>") + 4) + "</section></body></FictionBook>");
+  MapOutput plainOut;
+  Fb2ToEpub plainConverter;
+  ASSERT_TRUE(plainConverter.convert(plain, plainOut));
+  EXPECT_FALSE(contains(plainOut.files["OEBPS/s1.xhtml"], "<sup>"));
 }
 
 TEST(Fb2ToEpub, BuildsNestedTocWithAnchors) {

@@ -161,6 +161,7 @@ int utf8Length(const char lead) {
   return c < 0xC0 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
 }
 
+bool isLatinLetter(const uint32_t c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); }
 bool isUpperLetter(const uint32_t c) { return (c >= 'A' && c <= 'Z') || (c >= 0x400 && c <= 0x42F); }
 bool isLowerLetter(const uint32_t c) { return (c >= 'a' && c <= 'z') || (c >= 0x430 && c <= 0x45F); }
 bool isTextSpace(const uint32_t c) { return c == ' ' || c == '\n' || c == '\r' || c == '\t' || c == 0xA0; }
@@ -330,15 +331,21 @@ struct Fb2ToEpub::Pass {
   bool verses = false;  // a stanza's paragraph is open
 
   // Note markers a converter (calibre) left as plain text: "часов1." or "скрининг[1]". Digits are
-  // held back until what follows shows whether they are a marker, which is then raised.
+  // held back until what follows shows whether they are a marker, which is then raised. The
+  // measuring pass only counts them: the write pass raises each form only in a book whose
+  // markers number up in runs and that has no real note links (Fb2ToEpub::bareMarkers).
   uint8_t letters = 0;       // letters right before the current position
   bool lowerLetter = false;  // ... one of them lowercase
+  bool latinWord = false;    // ... one of them Latin, as in "Win32" or "Кf3"
+  bool afterLatin = false;   // the last character is a Latin letter
   bool afterCloser = false;  // the last character closes a quote, parenthesis or superscript
   bool glued = false;        // the last character is not a space
   bool path = false;         // the current word has a '/', as a URL does
   bool heldBracket = false;  // a '[' is held
   char held[3];              // digits held
   uint8_t heldLen = 0;
+  uint16_t bareNext = 1, bracketNext = 1;  // the next number a run of markers expects
+  uint16_t bareRun = 0, bracketRun = 0;
   bool tocPending = false;
   uint8_t tocDepth = 0;
   std::string tocAnchor;
@@ -686,6 +693,7 @@ struct Fb2ToEpub::Pass {
     if (!fileOpen) openFile();
     const char* type = exactAttribute(atts, "type");
     const bool note = type && strcmp(type, "note") == 0;
+    if (note) self.noteLinks = true;
     // Note markers are raised, as in print: at the baseline "word2" reads as one word.
     const bool raise = note && !inSup();
     const char* href = attribute(atts, "href");
@@ -954,7 +962,7 @@ struct Fb2ToEpub::Pass {
 
   void resetMarkerScan() {
     letters = 0;
-    lowerLetter = afterCloser = glued = path = false;
+    lowerLetter = latinWord = afterLatin = afterCloser = glued = path = false;
   }
 
   // Digits a link, <sup>, <sub> or <code> already sets apart stay as they are.
@@ -966,14 +974,18 @@ struct Fb2ToEpub::Pass {
 
   void noteChar(const uint32_t c) {
     const bool lower = isLowerLetter(c);
+    const bool latin = isLatinLetter(c);
     if (lower || isUpperLetter(c)) {
       if (letters < UINT8_MAX) letters++;
       lowerLetter = lowerLetter || lower;
+      latinWord = latinWord || latin;
     } else {
       letters = 0;
-      lowerLetter = false;
+      lowerLetter = latinWord = false;
     }
-    afterCloser = isCloser(c);
+    // "Ca(OH)2" is a formula, "сна)15" a marker.
+    afterCloser = isCloser(c) && !afterLatin;
+    afterLatin = latin;
     glued = !isTextSpace(c);
     if (!glued) {
       path = false;
@@ -983,10 +995,11 @@ struct Fb2ToEpub::Pass {
   }
 
   // Appends one character to buf, holding back digits that may be a note marker. A bare marker
-  // follows a word of two letters or more (three when all capitals, so "СО2" stays) or a closing
-  // quote, and ends at a space, punctuation or an element boundary; a bracketed one is glued to the
-  // text before it. Numbers of four digits, such as years, never qualify.
-  void scanMarker(const char* p, const int n, const uint32_t c, const bool detect) {
+  // follows a Cyrillic word of two letters or more (three when all capitals, so "СО2" stays) or
+  // a closing quote, and ends at a space, punctuation or an element boundary; a bracketed one is
+  // glued to text other than a Latin letter. Numbers of four digits, such as years, and digits
+  // after Latin letters ("Win32", "mp3", "x[1]") never qualify.
+  void scanMarker(const char* p, const int n, const uint32_t c, const bool bare, const bool bracket) {
     const bool digit = c >= '0' && c <= '9';
     if (heldBracket || heldLen > 0) {
       if (digit && heldLen < sizeof(held)) {
@@ -1001,12 +1014,12 @@ struct Fb2ToEpub::Pass {
       }
       if (closes) return;
     }
-    if (detect && !path && digit && (afterCloser || (letters >= 2 && (lowerLetter || letters >= 3)))) {
+    if (bare && !path && digit && (afterCloser || (letters >= 2 && !latinWord && (lowerLetter || letters >= 3)))) {
       held[0] = static_cast<char>(c);
       heldLen = 1;
       return;
     }
-    if (detect && !path && c == '[' && glued) {
+    if (bracket && !path && c == '[' && glued && !afterLatin) {
       heldBracket = true;
       return;
     }
@@ -1015,6 +1028,7 @@ struct Fb2ToEpub::Pass {
   }
 
   void raiseHeld() {
+    if (measuring()) countMarker();
     buf += "<sup>";
     if (heldBracket) buf += '[';
     buf.append(held, heldLen);
@@ -1037,6 +1051,23 @@ struct Fb2ToEpub::Pass {
       noteChar(static_cast<uint8_t>(held[i]));
     }
     heldLen = 0;
+  }
+
+  // Markers numbered 1, 2, 3... with nothing out of step between them; a 1 starts a new run, as
+  // the numbering restarts per chapter.
+  void countMarker() {
+    unsigned value = 0;
+    for (uint8_t i = 0; i < heldLen; i++) value = value * 10 + static_cast<unsigned>(held[i] - '0');
+    uint16_t& next = heldBracket ? bracketNext : bareNext;
+    uint16_t& run = heldBracket ? bracketRun : bareRun;
+    if (value == next) {
+      run++;
+    } else {
+      run = value == 1 ? 1 : 0;
+    }
+    next = static_cast<uint16_t>(run + 1);
+    uint16_t& best = heldBracket ? self.bracketMarkerRun : self.bareMarkerRun;
+    best = std::max(best, run);
   }
 
   // An element starts or ends: a bare marker held so far is complete, a bracketed one is not.
@@ -1062,10 +1093,12 @@ struct Fb2ToEpub::Pass {
     }
     if (textDepth <= 0 || !open(Kind::Body)) return;
     buf.clear();
-    const bool detect = !open(Kind::Title) && !setApart();
+    const bool inText = !open(Kind::Title) && !setApart();
+    const bool bare = inText && (measuring() || self.bareMarkers());
+    const bool bracket = inText && (measuring() || self.bracketMarkers());
     for (int i = 0; i < len;) {
       const int n = std::min(utf8Length(s[i]), len - i);
-      scanMarker(s + i, n, decodeUtf8(s + i, n), detect);
+      scanMarker(s + i, n, decodeUtf8(s + i, n), bare, bracket);
       i += n;
     }
     emit(buf);
@@ -1139,6 +1172,8 @@ bool Fb2ToEpub::convert(Input& input, Output& out) {
   toc.clear();
   cover = nullptr;
   coverInBody = false;
+  noteLinks = false;
+  bareMarkerRun = bracketMarkerRun = 0;
 
   {
     fileCount = 0;

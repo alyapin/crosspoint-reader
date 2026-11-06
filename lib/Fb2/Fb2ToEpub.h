@@ -111,6 +111,15 @@ class Fb2ToEpub {
   bool coverInBody = false;  // the main body opens with the cover image
   bool coverPage() const { return cover && !coverInBody; }
 
+  // Plain-text note markers ("часов1.", "скрининг[1]") are raised only in a book that
+  // has no real note links and numbers them in a run at least this long.
+  static constexpr uint16_t MIN_MARKER_RUN = 5;
+  bool noteLinks = false;
+  uint16_t bareMarkerRun = 0;
+  uint16_t bracketMarkerRun = 0;
+  bool bareMarkers() const { return !noteLinks && bareMarkerRun >= MIN_MARKER_RUN; }
+  bool bracketMarkers() const { return !noteLinks && bracketMarkerRun >= MIN_MARKER_RUN; }
+
   bool writeOpf(Output& out) const;
   bool writeNcx(Output& out) const;
 };
