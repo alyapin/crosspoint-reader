@@ -174,7 +174,10 @@ std::string extractCover(const std::string& fb2Path, const std::string& dir) {
     extension = Fb2ToEpub::readCover(input, *out);
   }
   if (!extension) {
-    if (!out->path.empty()) Storage.remove(out->path.c_str());
+    if (!out->path.empty()) {
+      out->endFile();  // a truncated binary leaves the file open
+      Storage.remove(out->path.c_str());
+    }
     return {};
   }
   return out->path;
