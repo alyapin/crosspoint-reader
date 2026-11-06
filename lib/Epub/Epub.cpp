@@ -1,6 +1,9 @@
 #include "Epub.h"
 
 #include <Fb2Archive.h>
+#include <Fb2Cache.h>
+#include <Fb2Position.h>
+#include <Fb2ToEpub.h>
 #include <FsHelpers.h>
 #include <GifImageLayout.h>
 #include <GifLimitedWriter.h>
@@ -28,14 +31,148 @@
 
 Epub::Epub(std::string filepath, const std::string& cacheDir) : filepath(std::move(filepath)) {
   cachePath = cacheDir + "/epub_" + std::to_string(std::hash<std::string>{}(this->filepath));
-  archivePath = FsHelpers::hasFb2Extension(this->filepath) ? cachePath + "/fb2.epub" : this->filepath;
+  if (FsHelpers::hasFb2Extension(this->filepath)) {
+    char name[16];
+    archivePath = cachePath + "/" + Fb2Cache::archiveName(Fb2ToEpub::FORMAT_VERSION, name, sizeof(name));
+  } else {
+    archivePath = this->filepath;
+  }
 }
 
-// FB2 is read as an EPUB transcoded once into the cache on first use.
-bool Epub::ensureArchive() const {
-  if (archivePath == filepath || Storage.exists(archivePath.c_str())) return true;
-  setupCacheDir();
-  return Fb2Archive::convert(filepath, archivePath);
+namespace {
+constexpr const char* FB2_PENDING = "/fb2.pos";
+constexpr const char* FB2_PROGRESS = "/progress.bin";
+
+size_t readSmallFile(const std::string& path, char* buf, const size_t size) {
+  HalFile file;
+  if (!Storage.openFileForRead("EBP", path, file)) return 0;
+  const int n = file.read(buf, size);
+  return n > 0 ? static_cast<size_t>(n) : 0;
+}
+
+bool writeSmallFile(const std::string& path, const char* data, const size_t len) {
+  HalFile file;
+  if (!Storage.openFileForWrite("EBP", path, file)) return false;
+  return file.write(data, len) == len && file.close();
+}
+
+// The saved position as a fraction of `archive`'s book: its spine sizes from
+// book.bin, or, when an interrupted migration already removed that, from the
+// archive itself, laid out as the converter writes it (cover.xhtml, s1.xhtml...).
+float fractionOf(const std::string& cachePath, const std::string& archive) {
+  uint8_t data[10];
+  const size_t n = readSmallFile(cachePath + FB2_PROGRESS, reinterpret_cast<char*>(data), sizeof(data));
+  Fb2Position::Saved pos;
+  if (!Fb2Position::parseProgress(data, n, pos)) return -1.0f;
+  {
+    auto spine = makeUniqueNoThrow<BookMetadataCache>(cachePath);
+    if (spine && spine->load()) {
+      return Fb2Position::bookFraction(pos, spine->getSpineCount(),
+                                       [&](const int i) { return spine->getCumulativeSize(i); });
+    }
+  }
+  constexpr int MAX_FALLBACK_ITEMS = 1024;  // sizes are looked up per call
+  auto zip = makeUniqueNoThrow<ZipFile>(archive);
+  if (!zip || !zip->open()) return -1.0f;
+  size_t size = 0;
+  const bool cover = zip->getInflatedFileSize("OEBPS/cover.xhtml", &size);
+  const auto itemSize = [&](const int i) -> size_t {
+    char name[32];
+    const int file = cover ? i : i + 1;
+    if (file == 0) snprintf(name, sizeof(name), "OEBPS/cover.xhtml");
+    if (file > 0) snprintf(name, sizeof(name), "OEBPS/s%d.xhtml", file);
+    size_t bytes = 0;
+    return zip->getInflatedFileSize(name, &bytes) ? bytes : 0;
+  };
+  int count = 0;
+  while (count < MAX_FALLBACK_ITEMS && itemSize(count) > 0) count++;
+  if (count == 0 || count == MAX_FALLBACK_ITEMS) return -1.0f;
+  return Fb2Position::bookFraction(pos, count, [&](const int last) {
+    size_t total = 0;
+    for (int i = 0; i <= last; i++) total += itemSize(i);
+    return total;
+  });
+}
+
+// An FB2 book's cache directory as Fb2Cache sees it.
+class Fb2Store final : public Fb2Cache::Store {
+ public:
+  Fb2Store(const std::string& fb2Path, const std::string& cachePath) : fb2Path(fb2Path), cachePath(cachePath) {}
+  bool exists(const char* name) override { return Storage.exists(path(name).c_str()); }
+  bool remove(const char* name) override { return Storage.remove(path(name).c_str()); }
+  bool rename(const char* from, const char* to) override {
+    return Storage.rename(path(from).c_str(), path(to).c_str());
+  }
+  bool convert(const char* name) override { return Fb2Archive::convert(fb2Path, path(name)); }
+  bool clearDerived() override {
+    HalFile dir = Storage.open(cachePath.c_str());
+    if (!dir || !dir.isDirectory()) return false;
+    bool ok = true;
+    char name[64];
+    for (HalFile entry = dir.openNextFile(); entry; entry = dir.openNextFile()) {
+      entry.getName(name, sizeof(name));
+      const bool isDir = entry.isDirectory();
+      entry.close();
+      if (Fb2Cache::survivesClear(name)) continue;
+      const std::string full = path(name);
+      ok = (isDir ? Storage.removeDir(full.c_str()) : Storage.remove(full.c_str())) && ok;
+    }
+    return ok;
+  }
+  float savedFraction(const char* archive) override { return fractionOf(cachePath, path(archive)); }
+  size_t read(const char* name, char* buf, const size_t size) override { return readSmallFile(path(name), buf, size); }
+  bool write(const char* name, const char* data, const size_t len) override {
+    return writeSmallFile(path(name), data, len);
+  }
+
+ private:
+  std::string path(const char* name) const { return cachePath + "/" + name; }
+  const std::string& fb2Path;
+  const std::string& cachePath;
+};
+}  // namespace
+
+// FB2 is read as an EPUB converted into the cache (see Fb2Cache). Only the reader
+// converts (`mayConvert`): there the framebuffer is lent to it and a popup shows.
+// Elsewhere an older archive is read as it is, and a book never opened has none.
+bool Epub::ensureArchive(const bool mayConvert) {
+  if (!isFb2()) return true;
+  if (mayConvert) setupCacheDir();
+  Fb2Store store(filepath, cachePath);
+  char name[16];
+  const char* archive = Fb2Cache::prepare(store, mayConvert, name, sizeof(name));
+  if (!archive) return false;
+  archivePath = cachePath + "/" + archive;
+  return true;
+}
+
+bool Epub::fb2NeedsConversion() const { return isFb2() && !Storage.exists(archivePath.c_str()); }
+
+uint8_t Epub::fb2ArchiveVersion() const {
+  if (!isFb2()) return 0;
+  const size_t slash = archivePath.find_last_of('/');
+  return Fb2Cache::archiveVersion(archivePath.c_str() + (slash == std::string::npos ? 0 : slash + 1));
+}
+
+bool Epub::saveFb2Position(const float fraction, const uint8_t version) const {
+  char buf[32];
+  const size_t n = Fb2Position::formatPending(buf, sizeof(buf), fraction, version);
+  return n > 0 && writeSmallFile(cachePath + FB2_PENDING, buf, n);
+}
+
+bool Epub::peekFb2Position(float& fraction, uint8_t& version) const {
+  if (!isFb2()) return false;
+  char buf[32];
+  const size_t n = readSmallFile(cachePath + FB2_PENDING, buf, sizeof(buf));
+  return n > 0 && Fb2Position::parsePending(buf, n, fraction, version);
+}
+
+// Removed, or emptied when it cannot be: an empty fb2.pos is no position, so an
+// old fraction is never applied over positions saved since.
+bool Epub::clearFb2Position() const {
+  if (!isFb2()) return true;
+  const std::string path = cachePath + FB2_PENDING;
+  return Storage.remove(path.c_str()) || !Storage.exists(path.c_str()) || writeSmallFile(path, "", 0);
 }
 
 bool Epub::findContentOpfFile(std::string* contentOpfFile, ZipFile* sharedZip) const {
@@ -469,11 +606,11 @@ bool Epub::openProtection() {
   return true;
 }
 
-bool Epub::load(const bool buildIfMissing, const bool skipLoadingCss) {
+bool Epub::load(const bool buildIfMissing, const bool skipLoadingCss, const bool mayConvertFb2) {
   LOG_DBG("EBP", "Loading ePub: %s", filepath.c_str());
 
   if (archivePath != filepath && (buildIfMissing || Storage.exists((cachePath + "/book.bin").c_str())) &&
-      !ensureArchive()) {
+      !ensureArchive(mayConvertFb2)) {
     return false;
   }
   if (!openProtection()) return false;
@@ -985,6 +1122,25 @@ bool Epub::generateThumbBmpFromSource(int height) {
     if (companionCover.empty()) return false;
     setupCacheDir();
     return generateThumbBmpForCover(height, companionCover);
+  }
+  if (isFb2() && !ensureArchive()) {
+    // Never opened, so never converted: the cover comes straight from the FB2. A book
+    // without one the reader can draw is marked, as finding that out may mean reading
+    // all of a large book again on each visit; deleting the cache removes the mark.
+    const std::string noCover = cachePath + "/fb2.nocover";
+    if (Storage.exists(noCover.c_str())) return false;
+    setupCacheDir();
+    LOG_DBG("EBP", "Reading the cover of %s", filepath.c_str());
+    const std::string cover = Fb2Archive::extractCover(filepath, cachePath);
+    bool converted = false;
+    if (!cover.empty()) {
+      converted = Txt::convertCoverImageToBmp(cover, getThumbBmpPath(height), height);
+      Storage.remove(cover.c_str());
+      if (!converted) Storage.remove(getThumbBmpPath(height).c_str());
+    }
+    if (!converted && !writeSmallFile(noCover, "", 0))
+      LOG_ERR("EBP", "Could not mark %s as coverless", filepath.c_str());
+    return converted;
   }
   if (!ensureArchive()) return false;
   // Parser input and metadata outlive parsing but exceed the small task stack budget.

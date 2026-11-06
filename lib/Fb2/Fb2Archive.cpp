@@ -7,6 +7,8 @@
 #include <Logging.h>
 #include <Memory.h>
 #include <ZipFile.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 #include "Fb2ToEpub.h"
 #include "StoredZipWriter.h"
@@ -14,6 +16,11 @@
 namespace {
 
 constexpr size_t READ_CHUNK = 4096;
+
+// A pass over a large book runs for seconds: let the idle task feed the watchdog.
+void yieldEvery(uint32_t& chunks) {
+  if ((++chunks & 0x0F) == 0) vTaskDelay(1);
+}
 
 class FileInput : public Fb2ToEpub::Input {
  public:
@@ -27,11 +34,13 @@ class FileInput : public Fb2ToEpub::Input {
       LOG_ERR("FB2", "OOM: read buffer");
       return false;
     }
+    uint32_t chunks = 0;
     while (true) {
       const int n = file.read(chunk.get(), READ_CHUNK);
       if (n < 0) return false;
       if (n == 0) return true;
       if (!sink(ctx, chunk.get(), static_cast<size_t>(n))) return true;
+      yieldEvery(chunks);
     }
   }
 
@@ -65,12 +74,14 @@ class ZipInput : public Fb2ToEpub::Input {
     SinkPrint(Fb2ToEpub::Sink sink, void* ctx) : sink(sink), ctx(ctx) {}
     size_t write(uint8_t b) override { return write(&b, 1); }
     size_t write(const uint8_t* data, size_t len) override {
+      yieldEvery(chunks);
       return sink(ctx, reinterpret_cast<const char*>(data), len) ? len : 0;
     }
 
    private:
     Fb2ToEpub::Sink sink;
     void* ctx;
+    uint32_t chunks = 0;
   };
 
   const std::string& path;
@@ -88,6 +99,23 @@ class SdZipFile : public StoredZipWriter::File {
 };
 
 bool isZipped(const std::string& path) { return FsHelpers::checkFileExtension(path, ".zip"); }
+
+// The cover image, written where the EPUB path extracts its own: "<dir>/.cover.jpg" or ".png".
+class CoverFile : public Fb2ToEpub::Output {
+ public:
+  explicit CoverFile(const std::string& dir) : dir(dir) {}
+  bool beginFile(const char* name) override {
+    path = dir + "/." + name;
+    return Storage.openFileForWrite("FB2", path, file);
+  }
+  bool write(const char* data, size_t len) override { return file.write(data, len) == len; }
+  bool endFile() override { return file.close(); }
+  std::string path;
+
+ private:
+  const std::string& dir;
+  HalFile file;
+};
 
 bool convertFrom(Fb2ToEpub::Input& input, const std::string& tmpPath) {
   HalFile file;
@@ -132,6 +160,27 @@ bool convert(const std::string& fb2Path, const std::string& epubPath) {
   }
   LOG_DBG("FB2", "Converted %s in %lu ms", fb2Path.c_str(), static_cast<unsigned long>(millis() - start));
   return true;
+}
+
+std::string extractCover(const std::string& fb2Path, const std::string& dir) {
+  auto out = makeUniqueNoThrow<CoverFile>(dir);
+  if (!out) return {};
+  const char* extension;
+  if (isZipped(fb2Path)) {
+    ZipInput input(fb2Path);
+    extension = Fb2ToEpub::readCover(input, *out);
+  } else {
+    FileInput input(fb2Path);
+    extension = Fb2ToEpub::readCover(input, *out);
+  }
+  if (!extension) {
+    if (!out->path.empty()) {
+      out->endFile();  // a truncated binary leaves the file open
+      Storage.remove(out->path.c_str());
+    }
+    return {};
+  }
+  return out->path;
 }
 
 bool readMetadata(const std::string& fb2Path, std::string& title, std::string& author) {

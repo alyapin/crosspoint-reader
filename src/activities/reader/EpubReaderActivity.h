@@ -41,6 +41,8 @@ class EpubReaderActivity final : public ReaderActivity {
   PageTurnQueue pendingTurns;
   bool pendingManualTurnTouch = false;
   bool pendingPercentJump = false;
+  // A pending FB2 position (fb2.pos) applied at open; removed by the first saved position.
+  bool clearFb2PositionOnSave = false;
   float pendingSpineProgress = 0.0f;
   bool pendingScreenshot = false;
   bool pendingSyncSaveError = false;
@@ -208,6 +210,8 @@ class EpubReaderActivity final : public ReaderActivity {
   void rememberCurrentContentOffset();
   bool saveProgress(int spineIndex, int currentPage, int pageCount);
   void jumpToPercent(int percent);
+  bool locateBookBytes(size_t targetSize, int& spineIndex, float& spineProgress) const;
+  void restoreFb2Position(bool progressLoaded);
   void onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction action);
   int currentTocIndex() const;
   // Live section position, or the values cached before a child screen

@@ -151,9 +151,10 @@ TEST(Fb2ToEpub, WritesPackageInOrder) {
   ASSERT_TRUE(converter.convert(input, out));
   EXPECT_EQ(input.streams, 2);
 
-  const std::vector<std::string> expected = {
-      "mimetype",       "META-INF/container.xml", "OEBPS/style.css", "OEBPS/cover.xhtml", "OEBPS/s1.xhtml",
-      "OEBPS/s2.xhtml", "OEBPS/s3.xhtml",         "OEBPS/img0.jpg",  "OEBPS/content.opf", "OEBPS/toc.ncx"};
+  const std::vector<std::string> expected = {"mimetype",          "META-INF/container.xml", "OEBPS/style.css",
+                                             "OEBPS/cover.xhtml", "OEBPS/s1.xhtml",         "OEBPS/s2.xhtml",
+                                             "OEBPS/s3.xhtml",    "OEBPS/s4.xhtml",         "OEBPS/img0.jpg",
+                                             "OEBPS/content.opf", "OEBPS/toc.ncx"};
   EXPECT_EQ(out.order, expected);
   EXPECT_EQ(out.files["mimetype"], "application/epub+zip");
   for (const auto& [name, data] : out.files) {
@@ -172,17 +173,24 @@ TEST(Fb2ToEpub, MapsContentMarkup) {
   EXPECT_TRUE(contains(s1, "<h1 class=\"title\">Лев Толстой<br/>Тестовая книга</h1>"));
   EXPECT_TRUE(contains(
       s1, "<div class=\"epigraph\"><p class=\"epigraph\">Эпиграф &amp; цитата</p><p class=\"text-author\">Кто-то</p>"));
-  EXPECT_TRUE(contains(s1, "<div class=\"section\" id=\"fb2s1\"><h2 class=\"title\">Часть первая</h2>"));
-  EXPECT_TRUE(contains(s1, "<h3 class=\"title\">Глава 1</h3>"));
-  EXPECT_TRUE(contains(s1, "<em>курсив</em> и <strong>жирный</strong>"));
+  // The epigraph's inset holds for its author line too.
+  EXPECT_TRUE(contains(out.files["OEBPS/style.css"], "div.epigraph{margin-left:30%}"));
   EXPECT_FALSE(contains(s1, "Аннотация"));
 
-  // Глава 2 opens a file of its own, re-opening the enclosing section.
+  // The top-level section opens a file of its own after the body title.
   const std::string& s2 = out.files["OEBPS/s2.xhtml"];
-  EXPECT_TRUE(contains(s2, "<body><div class=\"section\"><div class=\"section\" id=\"fb2s3\"><h3"));
-  EXPECT_TRUE(contains(s2, "<div class=\"poem\"><h4 class=\"title\">Стих</h4><div class=\"stanza\"><p class=\"v\">"));
-  EXPECT_TRUE(contains(s2, "<p class=\"empty-line\">"));
-  EXPECT_TRUE(contains(s2, "<a href=\"http://example.com/?a=1&amp;b=2\">наружу</a>"));
+  EXPECT_TRUE(contains(s2, "<body><div class=\"section\" id=\"fb2s1\"><h2 class=\"title\">Часть первая</h2>"));
+  EXPECT_TRUE(contains(s2, "<h3 class=\"title\">Глава 1</h3>"));
+  EXPECT_TRUE(contains(s2, "<em>курсив</em> и <strong>жирный</strong>"));
+
+  // Глава 2 opens a file of its own, re-opening the enclosing section.
+  const std::string& s3 = out.files["OEBPS/s3.xhtml"];
+  EXPECT_TRUE(contains(s3, "<body><div class=\"section\"><div class=\"section\" id=\"fb2s3\"><h3"));
+  EXPECT_TRUE(contains(s3,
+                       "<div class=\"poem\"><h4 class=\"title\">Стих</h4><div class=\"stanza\"><p class=\"stanza\">"
+                       "Строка один<br/>Строка два</p></div></div>"));
+  EXPECT_TRUE(contains(s3, "<p class=\"empty-line\">"));
+  EXPECT_TRUE(contains(s3, "<a href=\"http://example.com/?a=1&amp;b=2\">наружу</a>"));
 }
 
 TEST(Fb2ToEpub, ResolvesNoteLinksIntoTheNotesFile) {
@@ -190,11 +198,92 @@ TEST(Fb2ToEpub, ResolvesNoteLinksIntoTheNotesFile) {
   MapOutput out;
   Fb2ToEpub converter;
   ASSERT_TRUE(converter.convert(input, out));
-  EXPECT_TRUE(contains(out.files["OEBPS/s1.xhtml"], "<a href=\"s3.xhtml#n1\">[1]</a>"));
+  EXPECT_TRUE(contains(out.files["OEBPS/s2.xhtml"], "<a href=\"s4.xhtml#n1\"><sup>[1]</sup></a>"));
 
-  const std::string& notes = out.files["OEBPS/s3.xhtml"];
+  const std::string& notes = out.files["OEBPS/s4.xhtml"];
   EXPECT_TRUE(contains(notes, "<h1 class=\"title\">Примечания</h1>"));
   EXPECT_TRUE(contains(notes, "<div class=\"section\" id=\"n1\"><p class=\"note-title\">1</p><p>Текст сноски</p>"));
+}
+
+TEST(Fb2ToEpub, RaisesNoteMarkers) {
+  StringInput input(
+      "<FictionBook xmlns:l=\"x\"><body><section><p>слово<a l:href=\"#n1\" l:type=\"simple\" type=\"note\">2</a>, "
+      "<sup><a l:href=\"#n1\" type=\"note\">3</a></sup>, <a l:href=\"#nx\" type=\"note\">4</a>, "
+      "<a l:href=\"#n1\">ссылка</a></p></section></body><body name=\"notes\"><section id=\"n1\"><p>сноска</p>"
+      "</section></body></FictionBook>");
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  // Already raised notes are not raised twice; a note with no target is raised without a link.
+  EXPECT_TRUE(contains(out.files["OEBPS/s1.xhtml"],
+                       "слово<a href=\"s2.xhtml#n1\"><sup>2</sup></a>, <sup><a href=\"s2.xhtml#n1\">3</a></sup>, "
+                       "<sup>4</sup>, <a href=\"s2.xhtml#n1\">ссылка</a></p>"));
+}
+
+// Text a plain-text marker rule must leave alone, in any book.
+const std::string LOOKALIKES =
+    "<p>Win32, IPv6, Python3, mp3, HTML5, CSS3, DDR4 и COVID19. CaCO3 и Ca(OH)2. Ник Shadow77, массив x[1], "
+    "ход Кf3. СО2, витамин К2, IQ5. В 2013 году, 11,4 или 16,1. Года2013. 1990-х. Глава 12. Р. e702–е770.</p>"
+    "<p>H<sub>2</sub>O, 20<sup>th</sup>, <a l:href=\"http://x.org/r1\">www.region10.org</a>, <code>a[1]</code>, "
+    "http://www.region10.org/r1 и [3] отдельно.</p>";
+
+// calibre's FB2 of «Всё хорошо!»: source references as bare digits after the last word, editor's notes
+// as glued "[N]", both numbered in runs, with no links or ids.
+std::string calibreLikeBook(const std::string& extra = "") {
+  return "<FictionBook xmlns:l=\"x\"><body><section>"
+         "<p>на пару часов1. По данным СВДС2, «Спокойная и уверенная»3, в сна)4. Конец взрослым?»5</p>"
+         "<p>Проведут скрининг[1]. В возрасте[2] — и <emphasis>слово</emphasis>6. Обрезания[3], выписки[4], "
+         "контактах[5]. Заболевших 86 человек[6]<sup>, </sup>7.</p>"
+         "<p><strong>[1]</strong> Неонатальный скрининг. <strong>2.</strong> Список</p>" +
+         LOOKALIKES + extra + "</section></body></FictionBook>";
+}
+
+TEST(Fb2ToEpub, RaisesNoteMarkersLeftAsPlainText) {
+  const std::string doc = calibreLikeBook();
+  for (const size_t chunk : {size_t{1}, size_t{7}, doc.size()}) {
+    StringInput input(doc, chunk);
+    MapOutput out;
+    Fb2ToEpub converter;
+    ASSERT_TRUE(converter.convert(input, out));
+    const std::string& s1 = out.files["OEBPS/s1.xhtml"];
+    EXPECT_TRUE(
+        contains(s1,
+                 "<p>на пару часов<sup>1</sup>. По данным СВДС<sup>2</sup>, «Спокойная и уверенная»<sup>3</sup>, "
+                 "в сна)<sup>4</sup>. Конец взрослым?»<sup>5</sup></p>"))
+        << chunk << "\n"
+        << s1;
+    EXPECT_TRUE(contains(s1,
+                         "<p>Проведут скрининг<sup>[1]</sup>. В возрасте<sup>[2]</sup> — и <em>слово</em><sup>6</sup>. "
+                         "Обрезания<sup>[3]</sup>, выписки<sup>[4]</sup>, контактах<sup>[5]</sup>. Заболевших 86 "
+                         "человек<sup>[6]</sup><sup>, </sup><sup>7</sup>.</p>"))
+        << chunk;
+    // Labels opening a note or a list item, look-alikes and digits already set apart stay as they are.
+    EXPECT_TRUE(contains(s1, "<p><strong>[1]</strong> Неонатальный скрининг. <strong>2.</strong> Список</p>"));
+    std::string lookalikes = LOOKALIKES;
+    for (size_t at; (at = lookalikes.find("l:href")) != std::string::npos;) lookalikes.replace(at, 6, "href");
+    EXPECT_TRUE(contains(s1, lookalikes)) << chunk << "\n" << s1;
+    EXPECT_TRUE(wellFormed(s1));
+  }
+}
+
+TEST(Fb2ToEpub, LeavesDigitsAloneInOrdinaryBooks) {
+  // A book with real note links raises those and nothing else.
+  StringInput linked(calibreLikeBook("<p>сноска<a l:href=\"#n1\" type=\"note\">[1]</a></p>"));
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(linked, out));
+  const std::string& s1 = out.files["OEBPS/s1.xhtml"];
+  EXPECT_TRUE(contains(s1, "<p>на пару часов1. По данным СВДС2, «Спокойная и уверенная»3, в сна)4."));
+  EXPECT_TRUE(contains(s1, "Проведут скрининг[1]. В возрасте[2]"));
+  EXPECT_TRUE(contains(s1, "<sup>[1]</sup>"));  // the note link
+
+  // Without a run of numbered markers, glued digits are ordinary text.
+  StringInput plain("<FictionBook><body><section><p>на пару часов1, слово7, скрининг[1] и [2]. Win32, Кf3.</p>" +
+                    LOOKALIKES.substr(0, LOOKALIKES.find("</p>") + 4) + "</section></body></FictionBook>");
+  MapOutput plainOut;
+  Fb2ToEpub plainConverter;
+  ASSERT_TRUE(plainConverter.convert(plain, plainOut));
+  EXPECT_FALSE(contains(plainOut.files["OEBPS/s1.xhtml"], "<sup>"));
 }
 
 TEST(Fb2ToEpub, BuildsNestedTocWithAnchors) {
@@ -207,16 +296,63 @@ TEST(Fb2ToEpub, BuildsNestedTocWithAnchors) {
                        "<navMap><navPoint id=\"n1\" playOrder=\"1\"><navLabel><text>Тестовая книга</text></navLabel>"
                        "<content src=\"cover.xhtml\"/></navPoint>"
                        "<navPoint id=\"n2\" playOrder=\"2\"><navLabel><text>Часть первая</text></navLabel>"
-                       "<content src=\"s1.xhtml#fb2s1\"/>"
+                       "<content src=\"s2.xhtml\"/>"
                        "<navPoint id=\"n3\" playOrder=\"3\"><navLabel><text>Глава 1</text></navLabel>"
-                       "<content src=\"s1.xhtml#fb2s2\"/></navPoint>"
+                       "<content src=\"s2.xhtml\"/></navPoint>"
                        "<navPoint id=\"n4\" playOrder=\"4\"><navLabel><text>Глава 2</text></navLabel>"
-                       "<content src=\"s2.xhtml\"/></navPoint></navPoint>"
+                       "<content src=\"s3.xhtml\"/></navPoint></navPoint>"
                        "<navPoint id=\"n5\" playOrder=\"5\"><navLabel><text>Примечания</text></navLabel>"
-                       "<content src=\"s3.xhtml\"/></navPoint></navMap>"))
+                       "<content src=\"s4.xhtml\"/></navPoint></navMap>"))
       << ncx;
   // The poem's title is not a chapter.
   EXPECT_FALSE(contains(ncx, "Стих"));
+}
+
+TEST(Fb2ToEpub, KeepsConsecutiveTitlesOnOnePage) {
+  // The reader breaks the page before every TOC anchor: a chapter opening right under its part's
+  // title shares the part's anchor, while a chapter after text keeps its own.
+  StringInput input(
+      "<FictionBook><body><section><p>до</p></section><section id=\"part\"><title><p>Часть</p></title>"
+      "<section id=\"book\"><title><p>Книга</p></title><section id=\"ch1\"><title><p>Глава 1</p></title>"
+      "<p>текст</p></section><section id=\"ch2\"><title><p>Глава 2</p></title><p>текст</p></section>"
+      "</section></section><section id=\"next\"><epigraph><p>эпиграф</p></epigraph>"
+      "<section id=\"ch3\"><title><p>Глава 3</p></title><p>текст</p></section></section></body></FictionBook>");
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  const std::string& ncx = out.files["OEBPS/toc.ncx"];
+  EXPECT_TRUE(contains(ncx, "<text>Часть</text></navLabel><content src=\"s2.xhtml\"/>")) << ncx;
+  EXPECT_TRUE(contains(ncx, "<text>Книга</text></navLabel><content src=\"s2.xhtml\"/>"));
+  EXPECT_TRUE(contains(ncx, "<text>Глава 1</text></navLabel><content src=\"s2.xhtml\"/>"));
+  EXPECT_TRUE(contains(ncx, "<text>Глава 2</text></navLabel><content src=\"s2.xhtml#ch2\"/>"));
+  EXPECT_TRUE(contains(ncx, "<text>Глава 3</text></navLabel><content src=\"s3.xhtml#ch3\"/>"));
+  // Ids stay in place for links.
+  EXPECT_TRUE(contains(out.files["OEBPS/s2.xhtml"], "<div class=\"section\" id=\"ch1\">"));
+}
+
+TEST(Fb2ToEpub, KeepsDeepTitlesAtTextSize) {
+  StringInput input(
+      "<FictionBook><body><section><section><section><section><title><p>4</p></title><poem><title><p>П</p>"
+      "</title><stanza><v>в</v></stanza></poem></section></section></section></section></body></FictionBook>");
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  const std::string& s1 = out.files["OEBPS/s1.xhtml"];
+  EXPECT_TRUE(contains(s1, "<h4 class=\"title\">4</h4><div class=\"poem\"><h4 class=\"title\">П</h4>"));
+  EXPECT_TRUE(wellFormed(s1));
+}
+
+TEST(Fb2ToEpub, LeavesNoteMarkersOutOfTocLabels) {
+  StringInput input(
+      "<FictionBook xmlns:l=\"x\"><body><section><title><p>5. Против академиков<a l:href=\"#n1\" "
+      "type=\"note\">[31]</a></p></title><p>текст</p></section></body><body name=\"notes\">"
+      "<section id=\"n1\"><p>сноска</p></section></body></FictionBook>");
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  EXPECT_TRUE(contains(out.files["OEBPS/toc.ncx"], "<text>5. Против академиков</text>"));
+  // The heading keeps its marker and link.
+  EXPECT_TRUE(contains(out.files["OEBPS/s1.xhtml"], "академиков<a href=\"s2.xhtml#n1\"><sup>[31]</sup></a></h2>"));
 }
 
 TEST(Fb2ToEpub, DecodesCoverAndDeclaresIt) {
@@ -235,6 +371,86 @@ TEST(Fb2ToEpub, DecodesCoverAndDeclaresIt) {
   EXPECT_TRUE(contains(opf, "<item id=\"img0\" href=\"img0.jpg\" media-type=\"image/jpeg\"/>"));
   EXPECT_TRUE(contains(opf, "<spine toc=\"ncx\"><itemref idref=\"cover\"/><itemref idref=\"s1\"/>"));
   EXPECT_TRUE(contains(out.files["OEBPS/cover.xhtml"], "<img src=\"img0.jpg\" alt=\"\"/>"));
+}
+
+TEST(Fb2ToEpub, SkipsTheCoverPageWhenTheBodyOpensWithTheCover) {
+  // calibre's output: the <coverpage> image again as the body's first content.
+  StringInput input(
+      "<FictionBook xmlns:l=\"x\"><description><title-info><book-title>К</book-title>"
+      "<coverpage><image l:href=\"#c.jpg\"/></coverpage></title-info></description>"
+      "<body><section><p>\n    <image l:href=\"#c.jpg\"/></p></section><section><p>текст</p></section></body>"
+      "<binary id=\"c.jpg\" content-type=\"image/jpeg\">" +
+      COVER_BASE64 + "</binary></FictionBook>");
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  EXPECT_EQ(out.files.count("OEBPS/cover.xhtml"), 0u);
+  EXPECT_TRUE(contains(out.files["OEBPS/s1.xhtml"], "<img src=\"img0.jpg\" alt=\"\"/>"));
+  const std::string& opf = out.files["OEBPS/content.opf"];
+  EXPECT_TRUE(contains(opf, "<meta name=\"cover\" content=\"img0\"/>"));
+  EXPECT_FALSE(contains(opf, "cover.xhtml"));
+  EXPECT_TRUE(contains(opf, "<spine toc=\"ncx\"><itemref idref=\"s1\"/>"));
+  EXPECT_FALSE(contains(out.files["OEBPS/toc.ncx"], "cover.xhtml"));
+  EXPECT_TRUE(wellFormed(opf));
+}
+
+std::string coverBook(const std::string& prefix, const std::string& binary, const bool binaryFirst,
+                      const std::string& encoding = "utf-8") {
+  const std::string body = "<body><section><p>текст</p></section></body>";
+  return "<?xml version=\"1.0\" encoding=\"" + encoding + "\"?><FictionBook xmlns:" + prefix +
+         "=\"http://www.w3.org/1999/xlink\"><description><title-info><book-title>T</book-title><coverpage>"
+         "<image " +
+         prefix + ":href=\"#cover.jpg\"/></coverpage></title-info></description>" +
+         (binaryFirst ? binary + body : body + binary) + "</FictionBook>";
+}
+
+const std::string COVER_BINARY = "<binary id=\"cover.jpg\" content-type=\"image/jpeg\">" + COVER_BASE64 + "</binary>";
+
+TEST(Fb2ToEpub, ReadsTheCoverWithoutConverting) {
+  for (const std::string prefix : {"l", "xlink"}) {
+    for (const bool binaryFirst : {false, true}) {
+      const std::string doc = coverBook(
+          prefix, "<binary id=\"other\" content-type=\"image/png\">AAAA</binary>" + COVER_BINARY, binaryFirst);
+      for (const size_t chunk : {size_t{1}, size_t{7}, size_t{4096}}) {
+        StringInput input(doc, chunk);
+        MapOutput out;
+        EXPECT_STREQ(Fb2ToEpub::readCover(input, out), "jpg") << prefix << binaryFirst << chunk;
+        EXPECT_EQ(out.order, std::vector<std::string>{"cover.jpg"});
+        EXPECT_EQ(out.files["cover.jpg"], COVER_BYTES);
+        EXPECT_FALSE(out.open);
+        // It stops after the cover's binary, before the body's text when that comes first.
+        if (binaryFirst && chunk < 4096) EXPECT_LT(input.consumed, doc.find("<p>"));
+      }
+    }
+  }
+}
+
+TEST(Fb2ToEpub, ReadsTheCoverOfAWindows1251Book) {
+  StringInput input(coverBook("l", COVER_BINARY, false, "windows-1251"));
+  MapOutput out;
+  EXPECT_STREQ(Fb2ToEpub::readCover(input, out), "jpg");
+  EXPECT_EQ(out.files["cover.jpg"], COVER_BYTES);
+}
+
+TEST(Fb2ToEpub, ReadsNoCoverWhenThereIsNone) {
+  MapOutput out;
+  const std::string noCoverpageDoc =
+      "<FictionBook><description><title-info><book-title>T</book-title></title-info>"
+      "</description><body>" +
+      repeat("<p>текст</p>", 1000) + "</body>" + COVER_BINARY + "</FictionBook>";
+  StringInput noCoverpage(noCoverpageDoc);
+  EXPECT_EQ(Fb2ToEpub::readCover(noCoverpage, out), nullptr);
+  // Without a <coverpage> it stops at the end of the header.
+  EXPECT_LT(noCoverpage.consumed, noCoverpageDoc.find("<body>") + 16);
+  StringInput missingBinary(
+      coverBook("l", "<binary id=\"other.jpg\" content-type=\"image/jpeg\">AAAA</binary>", false));
+  EXPECT_EQ(Fb2ToEpub::readCover(missingBinary, out), nullptr);
+  StringInput gif(coverBook("l", "<binary id=\"cover.jpg\" content-type=\"image/gif\">R0lG</binary>", false));
+  EXPECT_EQ(Fb2ToEpub::readCover(gif, out), nullptr);
+  StringInput truncated(
+      coverBook("l", COVER_BINARY, false).substr(0, coverBook("l", COVER_BINARY, false).find("</binary>")));
+  EXPECT_EQ(Fb2ToEpub::readCover(truncated, out), nullptr);
+  EXPECT_TRUE(out.order.empty() || out.order == std::vector<std::string>{"cover.jpg"});
 }
 
 TEST(Fb2ToEpub, InlineAndBlockImages) {
@@ -269,6 +485,113 @@ TEST(Fb2ToEpub, DecodesWindows1251) {
   EXPECT_TRUE(contains(out.files["OEBPS/toc.ncx"], "<text>Глава</text>"));
 }
 
+TEST(Fb2ToEpub, StartsEveryTopLevelSectionOnANewPage) {
+  // Short untitled front matter, as calibre writes it: each top-level section is a page of its own,
+  // while one holding only whitespace is no page.
+  StringInput input(
+      "<FictionBook><body><section><p> "
+      "</p></section><section><p>Титул</p></section><section><p>Посвящение</p></section>"
+      "<section><p>Введение</p><section><p>Сцена</p></section></section></body>"
+      "<body name=\"notes\"><section id=\"n1\"><p>1</p></section><section id=\"n2\"><p>2</p></section></body>"
+      "</FictionBook>");
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  EXPECT_TRUE(contains(out.files["OEBPS/s1.xhtml"], "Титул"));
+  EXPECT_TRUE(contains(out.files["OEBPS/s2.xhtml"], "Посвящение"));
+  // A short nested section and short notes still share a file.
+  EXPECT_TRUE(contains(out.files["OEBPS/s3.xhtml"], "<p>Введение</p><div class=\"section\" id=\"fb2s5\"><p>Сцена"));
+  EXPECT_TRUE(contains(out.files["OEBPS/s4.xhtml"], "<p>1</p></div><div class=\"section\" id=\"n2\">"));
+  EXPECT_EQ(out.files.count("OEBPS/s5.xhtml"), 0u);
+}
+
+TEST(Fb2ToEpub, SetsAStanzaAsOneParagraph) {
+  StringInput input(
+      "<FictionBook><body><section><poem><stanza><title><p>I</p></title><v>Мороз и <emphasis>солнце</emphasis>;"
+      "</v><v id=\"v2\">день чудесный!</v><subtitle>*</subtitle><v>Ещё ты дремлешь</v></stanza>"
+      "<stanza><v>Пора</v></stanza><v>вне строфы</v></poem></section></body></FictionBook>");
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  const std::string& s1 = out.files["OEBPS/s1.xhtml"];
+  EXPECT_TRUE(contains(s1,
+                       "<div class=\"stanza\"><h3 class=\"title\">I</h3><p class=\"stanza\">Мороз и <em>солнце</em>;"
+                       "<br/><a id=\"v2\"></a>день чудесный!</p><h4 class=\"subtitle\">*</h4><p class=\"stanza\">Ещё "
+                       "ты дремлешь</p></div>"
+                       "<div class=\"stanza\"><p class=\"stanza\">Пора</p></div><p class=\"v\">вне строфы</p>"))
+      << s1;
+  EXPECT_TRUE(wellFormed(s1));
+}
+
+TEST(Fb2ToEpub, KeepsOddStanzasWellFormed) {
+  const char* bodies[] = {
+      "<poem><stanza><v>a<stanza><v>b</v></stanza></v><v>c</v></stanza></poem>",  // in a verse
+      "<poem><stanza><v>a</v><stanza><v>b</v></stanza><v>c</v></stanza></poem>",  // in a stanza
+      "<p>a<stanza><v>b</v></stanza>c</p><stanza><v>d</v><empty-line/><v>e</v></stanza>",
+      "<title><p>a<stanza><v>b</v></stanza></p></title><stanza><title><p>c</p></title></stanza>",
+  };
+  for (const char* body : bodies) {
+    StringInput input(std::string("<FictionBook><body><section>") + body + "</section></body></FictionBook>");
+    MapOutput out;
+    Fb2ToEpub converter;
+    ASSERT_TRUE(converter.convert(input, out)) << body;
+    const std::string& s1 = out.files["OEBPS/s1.xhtml"];
+    EXPECT_TRUE(wellFormed(s1)) << body << "\n" << s1;
+    EXPECT_TRUE(contains(s1, "b")) << s1;
+  }
+}
+
+TEST(Fb2ToEpub, SetsSubtitlesAsHeadings) {
+  StringInput input(
+      "<FictionBook><body><section><p>до</p><subtitle>* * *</subtitle><p>после</p></section></body>"
+      "</FictionBook>");
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  EXPECT_TRUE(contains(out.files["OEBPS/s1.xhtml"], "<p>до</p><h4 class=\"subtitle\">* * *</h4><p>после</p>"));
+}
+
+TEST(Fb2ToEpub, CapsRunsOfEmptyLines) {
+  StringInput input("<FictionBook><body><section><p>Титул</p>" + repeat("<empty-line/>", 21) +
+                    "<p>Москва</p><empty-line/><p>2020</p><empty-line/><empty-line/></section><section>" +
+                    repeat("<empty-line/>", 3) + "<p>Посвящение</p></section></body></FictionBook>");
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  const std::string blank = "<p class=\"empty-line\">&#160;</p>";
+  EXPECT_TRUE(
+      contains(out.files["OEBPS/s1.xhtml"], "<p>Титул</p>" + blank + blank + "<p>Москва</p>" + blank + "<p>2020</p>"));
+  // A new page keeps its own top spacing after a run that ended the page before.
+  EXPECT_TRUE(contains(out.files["OEBPS/s2.xhtml"],
+                       "<body><div class=\"section\" id=\"fb2s2\">" + blank + blank + "<p>Посвящение</p>"));
+}
+
+TEST(Fb2ToEpub, BoundsPagesForShortSections) {
+  StringInput input("<FictionBook><body>" + repeat("<section><p>x</p></section>", 600) + "</body></FictionBook>",
+                    65536);
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  size_t files = 0;
+  for (const auto& [name, data] : out.files) {
+    if (name.ends_with(".xhtml")) files++;
+  }
+  EXPECT_EQ(files, Fb2ToEpub::MAX_OWN_PAGE_FILES);
+  EXPECT_TRUE(wellFormed(out.files["OEBPS/s512.xhtml"]));
+}
+
+TEST(Fb2ToEpub, SyntheticSectionIdsLeaveTheLinkTableAlone) {
+  // Untitled, id-less sections used to fill the id table and drop real targets after them.
+  StringInput input("<FictionBook xmlns:l=\"x\"><body><section><p><a l:href=\"#late\">ссылка</a></p>" +
+                        repeat("<section><p>.</p></section>", Fb2ToEpub::MAX_IDS) +
+                        "<p id=\"late\">цель</p></section></body></FictionBook>",
+                    65536);
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  EXPECT_TRUE(contains(out.files["OEBPS/s1.xhtml"], "#late\">ссылка</a>"));
+}
+
 TEST(Fb2ToEpub, SplitsAnOversizedSectionBetweenParagraphs) {
   const std::string para = "<p>" + repeat("слово ", 200) + "</p>";  // ~2.4 KB of text
   StringInput input("<FictionBook><body><section><section><title><p>Одна</p></title>" + repeat(para, 100) +
@@ -295,8 +618,8 @@ TEST(Fb2ToEpub, KeepsWhatPrecedesAnXmlError) {
   MapOutput out;
   Fb2ToEpub converter;
   ASSERT_TRUE(converter.convert(input, out));
-  ASSERT_EQ(out.files.count("OEBPS/s2.xhtml"), 1u);
-  EXPECT_TRUE(contains(out.files["OEBPS/s2.xhtml"], "Строка один"));
+  ASSERT_EQ(out.files.count("OEBPS/s3.xhtml"), 1u);
+  EXPECT_TRUE(contains(out.files["OEBPS/s3.xhtml"], "Строка один"));
   for (const auto& [name, data] : out.files) {
     if (name.ends_with(".xhtml") || name.ends_with(".opf") || name.ends_with(".ncx")) {
       EXPECT_TRUE(wellFormed(data)) << name << "\n" << data;
@@ -466,9 +789,9 @@ TEST(StoredZipWriter, HoldsAConvertedBook) {
   ASSERT_TRUE(converter.convert(input, zip));
   ASSERT_TRUE(zip.finish());
   const auto entries = readZip(file.data);
-  ASSERT_EQ(entries.size(), 10u);
+  ASSERT_EQ(entries.size(), 11u);
   EXPECT_EQ(entries[0].name, "mimetype");
-  EXPECT_EQ(entries[7].data, COVER_BYTES);
+  EXPECT_EQ(entries[8].data, COVER_BYTES);
 }
 
 }  // namespace

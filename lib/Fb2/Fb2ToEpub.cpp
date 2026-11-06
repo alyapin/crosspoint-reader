@@ -93,6 +93,16 @@ const char* attribute(const XML_Char** atts, const char* name) {
   return nullptr;
 }
 
+// Attribute by its full name: FB2 marks notes with a plain type="note", while
+// xlink:type="simple" on the same link must not hide it.
+const char* exactAttribute(const XML_Char** atts, const char* name) {
+  if (!atts) return nullptr;
+  for (int i = 0; atts[i]; i += 2) {
+    if (strcmp(atts[i], name) == 0) return atts[i + 1];
+  }
+  return nullptr;
+}
+
 const char* imageExtension(const char* contentType) {
   if (!contentType) return nullptr;
   if (iequals(contentType, "image/jpeg") || iequals(contentType, "image/jpg")) return "jpg";
@@ -135,12 +145,40 @@ void appendEscaped(std::string& out, const std::string& s, bool attr = false) {
   appendEscaped(out, s.data(), s.size(), attr);
 }
 
+bool isXmlSpace(const char c) { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
+
+// One UTF-8 character; expat hands over whole ones.
+uint32_t decodeUtf8(const char* s, const int n) {
+  const auto b = [s](const int i) { return static_cast<uint32_t>(static_cast<uint8_t>(s[i])); };
+  if (n == 2) return (b(0) & 0x1F) << 6 | (b(1) & 0x3F);
+  if (n == 3) return (b(0) & 0x0F) << 12 | (b(1) & 0x3F) << 6 | (b(2) & 0x3F);
+  if (n == 4) return (b(0) & 0x07) << 18 | (b(1) & 0x3F) << 12 | (b(2) & 0x3F) << 6 | (b(3) & 0x3F);
+  return b(0);
+}
+
+int utf8Length(const char lead) {
+  const auto c = static_cast<uint8_t>(lead);
+  return c < 0xC0 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
+}
+
+bool isLatinLetter(const uint32_t c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); }
+bool isUpperLetter(const uint32_t c) { return (c >= 'A' && c <= 'Z') || (c >= 0x400 && c <= 0x42F); }
+bool isLowerLetter(const uint32_t c) { return (c >= 'a' && c <= 'z') || (c >= 0x430 && c <= 0x45F); }
+bool isTextSpace(const uint32_t c) { return c == ' ' || c == '\n' || c == '\r' || c == '\t' || c == 0xA0; }
+// ")", "»" and "”": a note marker may follow a closing quote or parenthesis.
+bool isCloser(const uint32_t c) { return c == ')' || c == 0xBB || c == 0x201D; }
+// What may follow a bare marker: a space, punctuation or a closing quote, not a letter or another digit.
+bool endsMarker(const uint32_t c) {
+  return isTextSpace(c) || isCloser(c) || c == '.' || c == ',' || c == ';' || c == ':' || c == '!' || c == '?' ||
+         c == 0x2026;
+}
+
 void collapseSpaces(std::string& s) {
   std::string out;
   out.reserve(s.size());
   bool space = false;
   for (const char c : s) {
-    if (c == ' ' || c == '\n' || c == '\r' || c == '\t') {
+    if (isXmlSpace(c)) {
       space = !out.empty();
     } else {
       if (space) out += ' ';
@@ -176,15 +214,21 @@ constexpr const char* XHTML_HEAD =
     "<link rel=\"stylesheet\" type=\"text/css\" href=\"style.css\"/></head><body>";
 constexpr const char* XHTML_TAIL = "</body></html>";
 constexpr const char* SECTION_OPEN = "<div class=\"section\">";
+// calibre writes runs of 20 <empty-line/>s for vertical layout; past this they only push text onto blank pages.
+constexpr uint8_t MAX_EMPTY_LINES = 2;
 
 constexpr const char* STYLE_CSS =
     "p{text-indent:1.5em;margin:0}"
     "h1,h2,h3,h4,h5,h6{text-align:center;text-indent:0}"
-    ".subtitle{text-align:center;font-weight:bold;text-indent:0}"
-    "p.epigraph{margin-left:30%;font-style:italic;text-indent:0}"
-    "p.cite{margin-left:1.5em;margin-right:1.5em}"
+    // Insets go on the wrappers, so a text-author lines up under its epigraph or cite.
+    "div.epigraph{margin-left:30%}"
+    "p.epigraph{font-style:italic;text-indent:0}"
+    "blockquote.cite{margin-left:1.5em;margin-right:1.5em}"
     "p.annotation{font-style:italic}"
-    ".v{margin-left:1.5em;text-indent:0}"
+    ".poem{margin-left:1.5em}"
+    // The reader indents every first line unless its CSS indent is negative; -1px lines it up with the next verses.
+    "p.stanza{text-indent:-1px}"
+    ".v{text-indent:0}"
     ".text-author{text-align:right;font-style:italic;text-indent:0}"
     ".date{text-align:right;text-indent:0}"
     ".empty-line{text-indent:0}"
@@ -235,10 +279,12 @@ enum class Kind : uint8_t {
   Body,
   Section,
   Title,
-  TitleLine,
+  Line,       // a title's <p> or a stanza's <v>: text inside a paragraph its parent opened
   Wrapper,    // epigraph, cite, poem, ... : blocks splitting while open
+  Stanza,     // a wrapper whose <v>s are the lines of one paragraph
   TextBlock,  // p, v, subtitle, td, ... : character data is content
   Inline,
+  NoteLink,  // <a type="note">: its marker stays out of TOC labels
   Binary,
 };
 
@@ -275,20 +321,46 @@ struct Fb2ToEpub::Pass {
 
   // Bodies.
   bool notesBody = false;
+  bool bodyContent = false;  // text or an image seen in a body
+  uint8_t emptyLines = 0;    // <empty-line/>s since the last text or image
   uint8_t sectionDepth = 0;
   uint8_t sectionDivs = 0;  // section <div>s open in the output
   uint32_t sectionSerial = 0;
   int textDepth = 0;
   int titleLines = 0;
+  bool verses = false;  // a stanza's paragraph is open
+
+  // Note markers a converter (calibre) left as plain text: "часов1." or "скрининг[1]". Digits are
+  // held back until what follows shows whether they are a marker, which is then raised. The
+  // measuring pass only counts them: the write pass raises each form only in a book whose
+  // markers number up in runs and that has no real note links (Fb2ToEpub::bareMarkers).
+  uint8_t letters = 0;       // letters right before the current position
+  bool lowerLetter = false;  // ... one of them lowercase
+  bool latinWord = false;    // ... one of them Latin, as in "Win32" or "Кf3"
+  bool afterLatin = false;   // the last character is a Latin letter
+  bool afterCloser = false;  // the last character closes a quote, parenthesis or superscript
+  bool glued = false;        // the last character is not a space
+  bool path = false;         // the current word has a '/', as a URL does
+  bool heldBracket = false;  // a '[' is held
+  char held[3];              // digits held
+  uint8_t heldLen = 0;
+  uint16_t bareNext = 1, bracketNext = 1;  // the next number a run of markers expects
+  uint16_t bareRun = 0, bracketRun = 0;
   bool tocPending = false;
   uint8_t tocDepth = 0;
   std::string tocAnchor;
   std::string tocLabel;
+  // The last TOC entry's anchor while only titles follow it in its file. A section opening
+  // there takes the same anchor, so the reader keeps "Part" and "Chapter 1" on one page
+  // instead of breaking before each.
+  bool tocShareable = false;
+  std::string lastTocAnchor;
 
   // Current content file.
   bool fileOpen = false;
   uint16_t fileNo = 0;
-  size_t fileText = 0;  // character data only, so both passes split alike
+  size_t fileText = 0;          // character data only, so both passes split alike
+  bool fileHasContent = false;  // text or an image, not just open section markup
 
   // Binary being decoded.
   bool decoding = false;
@@ -314,6 +386,9 @@ struct Fb2ToEpub::Pass {
     fileNo = ++self.fileCount;
     fileOpen = true;
     fileText = 0;
+    fileHasContent = false;
+    tocShareable = false;
+    emptyLines = 0;  // a run before the break does not eat the new page's top spacing
     if (out) {
       char name[32];
       snprintf(name, sizeof(name), "OEBPS/s%u.xhtml", static_cast<unsigned>(fileNo));
@@ -338,7 +413,8 @@ struct Fb2ToEpub::Pass {
   void emit(const char* s) { emit(s, strlen(s)); }
   void emit(const std::string& s) { emit(s.data(), s.size()); }
 
-  bool canSplit() const { return fileOpen && textDepth == 0 && !open(Kind::Wrapper) && !open(Kind::Title); }
+  bool wrapped() const { return open(Kind::Wrapper) || open(Kind::Stanza); }
+  bool canSplit() const { return fileOpen && textDepth == 0 && !wrapped() && !open(Kind::Title); }
 
   void recordId(const char* id) {
     if (measuring() && id && *id && self.idFile.size() < MAX_IDS && idFits(id))
@@ -346,7 +422,7 @@ struct Fb2ToEpub::Pass {
   }
 
   // "<tag class="cls" id="id">", recording the id against the file it lands in.
-  void emitOpen(const char* tag, const char* cls, const char* id) {
+  void emitOpen(const char* tag, const char* cls, const char* id, const bool linkable = true) {
     buf = "<";
     buf += tag;
     if (cls) {
@@ -361,7 +437,7 @@ struct Fb2ToEpub::Pass {
     }
     buf += '>';
     if (!fileOpen) openFile();
-    recordId(id);
+    if (linkable) recordId(id);
     writeRaw(buf.data(), buf.size());
   }
 
@@ -371,6 +447,7 @@ struct Fb2ToEpub::Pass {
   }
 
   void startElement(const char* rawName, const XML_Char** atts) {
+    endHeld();
     const char* name = localName(rawName);
     if (stack.size() >= MAX_DEPTH || self.fileCount >= MAX_FILES) {
       // Pushed because Expat still ends an empty element after a stop.
@@ -528,21 +605,26 @@ struct Fb2ToEpub::Pass {
 
   void startSection(const char* id) {
     const size_t threshold = notesBody ? NOTES_SPLIT_BYTES : MAIN_SPLIT_BYTES;
-    if (canSplit() && fileText >= threshold) closeFile();
+    // A top-level section of the main body (chapter, part or front-matter page) opens a page of its own,
+    // titled or not, however short the one before it, until the book has MAX_OWN_PAGE_FILES files.
+    const bool ownPage = !notesBody && sectionDepth == 0 && fileHasContent && self.fileCount < MAX_OWN_PAGE_FILES;
+    if (canSplit() && (ownPage || fileText >= threshold)) closeFile();
     const bool startsFile = !fileOpen;
     char synthetic[16];
-    if (!id || !*id) {
+    const bool named = id && *id;
+    if (!named) {
       snprintf(synthetic, sizeof(synthetic), "fb2s%lu", static_cast<unsigned long>(++sectionSerial));
       id = synthetic;
     }
-    emitOpen("div", "section", id);
+    // Only TOC entries point at a synthetic id, and they carry it themselves: no link-table entry.
+    emitOpen("div", "section", id, named);
     sectionDivs++;
     sectionDepth++;
     push(Kind::Section, "</div>");
     if (!notesBody) {
       tocPending = true;
       tocDepth = sectionDepth;
-      tocAnchor = startsFile ? "" : id;
+      tocAnchor = tocShareable ? lastTocAnchor : (startsFile ? "" : id);
     }
   }
 
@@ -552,11 +634,12 @@ struct Fb2ToEpub::Pass {
       emitOpen("p", "note-title", id);
       push(Kind::Title, "</p>");
     } else {
-      // A poem's or stanza's title sits a level below its section's.
-      const int level = sectionDepth + 1 + (open(Kind::Wrapper) ? 1 : 0);
-      tag[1] = static_cast<char>('0' + (level > 6 ? 6 : level));
+      // A poem's or stanza's title sits a level below its section's. Past h4 the reader sets
+      // headings smaller than the text, so deeper titles stay at h4.
+      const int level = sectionDepth + 1 + (wrapped() ? 1 : 0);
+      tag[1] = static_cast<char>('0' + (level > 4 ? 4 : level));
       emitOpen(tag, "title", id);
-      static constexpr const char* CLOSE[] = {"</h1>", "</h2>", "</h3>", "</h4>", "</h5>", "</h6>"};
+      static constexpr const char* CLOSE[] = {"</h1>", "</h2>", "</h3>", "</h4>"};
       push(Kind::Title, CLOSE[tag[1] - '1']);
     }
     titleLines = 0;
@@ -570,15 +653,25 @@ struct Fb2ToEpub::Pass {
     if (!measuring() || tocLabel.empty() || self.toc.size() >= MAX_TOC_ENTRIES) return;
     truncateUtf8(tocLabel, MAX_LABEL_BYTES);
     self.toc.push_back({fileNo, tocDepth, tocAnchor, tocLabel});
+    tocShareable = true;
+    lastTocAnchor = tocAnchor;
   }
 
   void startImage(const XML_Char** atts) {
     // Open the file whether or not the image resolves, so both passes number files alike.
     if (!fileOpen) openFile();
+    fileHasContent = true;
+    tocShareable = false;
     push(Kind::Other);
     const char* href = attribute(atts, "href");
     const char* id = attribute(atts, "id");
     if (!href || href[0] != '#') return;
+    // Converters such as calibre repeat the <coverpage> image as the body's first content.
+    if (!bodyContent && !notesBody && !self.meta.coverId.empty() && self.meta.coverId == href + 1) {
+      self.coverInBody = true;
+    }
+    bodyContent = true;
+    emptyLines = 0;
     const auto it = self.binaries.find(href + 1);
     if (measuring() || it == self.binaries.end() || !it->second.extension) {
       recordId(id);
@@ -598,13 +691,14 @@ struct Fb2ToEpub::Pass {
 
   void startLink(const XML_Char** atts) {
     if (!fileOpen) openFile();
+    const char* type = exactAttribute(atts, "type");
+    const bool note = type && strcmp(type, "note") == 0;
+    if (note) self.noteLinks = true;
+    // Note markers are raised, as in print: at the baseline "word2" reads as one word.
+    const bool raise = note && !inSup();
     const char* href = attribute(atts, "href");
-    if (!href || !*href) {
-      push(Kind::Inline);
-      return;
-    }
     buf.clear();
-    if (href[0] == '#') {
+    if (href && href[0] == '#') {
       const auto it = self.idFile.find(href + 1);
       if (it != self.idFile.end()) {
         char file[24];
@@ -614,17 +708,21 @@ struct Fb2ToEpub::Pass {
         appendEscaped(buf, href, strlen(href), true);
         buf += "\">";
       }
-    } else {
+    } else if (href && *href) {
       buf = "<a href=\"";
       appendEscaped(buf, href, strlen(href), true);
       buf += "\">";
     }
-    if (buf.empty()) {
-      push(Kind::Inline);
-      return;
-    }
-    emit(buf);
-    push(Kind::Inline, "</a>");
+    const bool link = !buf.empty();
+    if (raise) buf += "<sup>";
+    if (!buf.empty()) emit(buf);
+    const char* close = link ? (raise ? "</sup></a>" : "</a>") : (raise ? "</sup>" : nullptr);
+    push(note ? Kind::NoteLink : Kind::Inline, close);
+  }
+
+  bool inSup() const {
+    return std::any_of(stack.begin(), stack.end(),
+                       [](const Frame& f) { return f.close && strcmp(f.close, "</sup>") == 0; });
   }
 
   void startText(const char* tag, const char* cls, const char* id, const char* close) {
@@ -633,6 +731,7 @@ struct Fb2ToEpub::Pass {
       if (it->kind == Kind::Wrapper) cls = it->paraClass;
     }
     emitOpen(tag, cls, id);
+    resetMarkerScan();
     textDepth++;
     push(Kind::TextBlock, close);
   }
@@ -644,6 +743,31 @@ struct Fb2ToEpub::Pass {
     push(Kind::Wrapper, close, paraClass);
   }
 
+  // A stanza's verses are the lines of one paragraph: as paragraphs of their own each would
+  // get the reader's paragraph spacing, first-line indent and justification.
+  void startVerse(const char* id) {
+    if (verses) {
+      emit("<br/>");
+      if (id && *id) {
+        // The reader keeps no anchor for an id on a <span>.
+        emitOpen("a", nullptr, id);
+        emit("</a>");
+      }
+    } else {
+      emitOpen("p", "stanza", id);
+      verses = true;
+    }
+    resetMarkerScan();
+    textDepth++;
+    push(Kind::Line);
+  }
+
+  void endVerses() {
+    if (!verses) return;
+    emit("</p>");
+    verses = false;
+  }
+
   void startInline(const char* tag, const char* close) {
     emit(tag);
     push(Kind::Inline, close);
@@ -651,6 +775,8 @@ struct Fb2ToEpub::Pass {
 
   void startContent(const char* name, const XML_Char** atts) {
     const char* id = attribute(atts, "id");
+    const bool verse = strcmp(name, "v") == 0;
+    if (verses && textDepth == 0 && !verse) endVerses();  // a title or subtitle among the verses
     if (open(Kind::Title)) {
       if (strcmp(name, "p") == 0) {
         if (titleLines++ > 0) {
@@ -659,7 +785,7 @@ struct Fb2ToEpub::Pass {
         }
         recordId(id);
         textDepth++;
-        push(Kind::TitleLine);
+        push(Kind::Line);
         return;
       }
       if (strcmp(name, "empty-line") == 0) {
@@ -674,16 +800,24 @@ struct Fb2ToEpub::Pass {
       startTitle(id);
     } else if (strcmp(name, "p") == 0) {
       startText("p", nullptr, id, "</p>");
-    } else if (strcmp(name, "v") == 0) {
-      startText("p", "v", id, "</p>");
+    } else if (verse) {
+      if (!stack.empty() && stack.back().kind == Kind::Stanza) {
+        startVerse(id);
+      } else {
+        startText("p", "v", id, "</p>");
+      }
     } else if (strcmp(name, "subtitle") == 0) {
-      startText("p", "subtitle", id, "</p>");
+      // A heading, as the reader's paragraph alignment and indent override CSS on paragraphs: "* * *" stays centered.
+      startText("h4", "subtitle", id, "</h4>");
     } else if (strcmp(name, "text-author") == 0) {
       startText("p", "text-author", id, "</p>");
     } else if (strcmp(name, "date") == 0) {
       startText("p", "date", id, "</p>");
     } else if (strcmp(name, "empty-line") == 0) {
-      emit("<p class=\"empty-line\">&#160;</p>");
+      if (emptyLines < MAX_EMPTY_LINES) {
+        emit("<p class=\"empty-line\">&#160;</p>");
+        emptyLines++;
+      }
       push(Kind::Other);
     } else if (strcmp(name, "epigraph") == 0) {
       startWrapper("div", "epigraph", id, "</div>", "epigraph");
@@ -692,7 +826,14 @@ struct Fb2ToEpub::Pass {
     } else if (strcmp(name, "poem") == 0) {
       startWrapper("div", "poem", id, "</div>");
     } else if (strcmp(name, "stanza") == 0) {
-      startWrapper("div", "stanza", id, "</div>");
+      if (textDepth > 0) {
+        // Inside a verse or paragraph (malformed FB2) it cannot open a paragraph of its own.
+        startWrapper("div", "stanza", id, "</div>");
+      } else {
+        tocPending = false;
+        emitOpen("div", "stanza", id);
+        push(Kind::Stanza, "</div>");
+      }
     } else if (strcmp(name, "annotation") == 0) {
       startWrapper("div", "annotation", id, "</div>", "annotation");
     } else if (strcmp(name, "table") == 0) {
@@ -724,10 +865,13 @@ struct Fb2ToEpub::Pass {
   }
 
   void endElement() {
+    endHeld();
     if (stack.empty()) return;
     const Frame frame = stack.back();
     stack.pop_back();
     openKinds[static_cast<int>(frame.kind)]--;
+    // Digits glued after a superscript continue it: "человек[26]<sup>, </sup>1".
+    if (frame.close && strcmp(frame.close, "</sup>") == 0) afterCloser = true;
 
     switch (frame.kind) {
       case Kind::Description:
@@ -755,8 +899,12 @@ struct Fb2ToEpub::Pass {
         // The file may have been split after this section's last paragraph.
         if (fileOpen) writeRaw(frame.close);
         return;
-      case Kind::TitleLine:
+      case Kind::Line:
         textDepth--;
+        return;
+      case Kind::Stanza:
+        endVerses();
+        emit(frame.close);
         return;
       case Kind::Title:
         emit(frame.close);
@@ -812,6 +960,128 @@ struct Fb2ToEpub::Pass {
     if (n > 0) writeRaw(chunk, n);
   }
 
+  void resetMarkerScan() {
+    letters = 0;
+    lowerLetter = latinWord = afterLatin = afterCloser = glued = path = false;
+  }
+
+  // Digits a link, <sup>, <sub> or <code> already sets apart stay as they are.
+  bool setApart() const {
+    return std::any_of(stack.begin(), stack.end(), [](const Frame& f) {
+      return f.close && (strstr(f.close, "</a>") || strstr(f.close, "</su") || strcmp(f.close, "</code>") == 0);
+    });
+  }
+
+  void noteChar(const uint32_t c) {
+    const bool lower = isLowerLetter(c);
+    const bool latin = isLatinLetter(c);
+    if (lower || isUpperLetter(c)) {
+      if (letters < UINT8_MAX) letters++;
+      lowerLetter = lowerLetter || lower;
+      latinWord = latinWord || latin;
+    } else {
+      letters = 0;
+      lowerLetter = latinWord = false;
+    }
+    // "Ca(OH)2" is a formula, "сна)15" a marker.
+    afterCloser = isCloser(c) && !afterLatin;
+    afterLatin = latin;
+    glued = !isTextSpace(c);
+    if (!glued) {
+      path = false;
+    } else if (c == '/') {
+      path = true;
+    }
+  }
+
+  // Appends one character to buf, holding back digits that may be a note marker. A bare marker
+  // follows a Cyrillic word of two letters or more (three when all capitals, so "СО2" stays) or
+  // a closing quote, and ends at a space, punctuation or an element boundary; a bracketed one is
+  // glued to text other than a Latin letter. Numbers of four digits, such as years, and digits
+  // after Latin letters ("Win32", "mp3", "x[1]") never qualify.
+  void scanMarker(const char* p, const int n, const uint32_t c, const bool bare, const bool bracket) {
+    const bool digit = c >= '0' && c <= '9';
+    if (heldBracket || heldLen > 0) {
+      if (digit && heldLen < sizeof(held)) {
+        held[heldLen++] = static_cast<char>(c);
+        return;
+      }
+      const bool closes = heldBracket && c == ']' && heldLen > 0;
+      if (closes || (!heldBracket && !digit && endsMarker(c))) {
+        raiseHeld();
+      } else {
+        releaseHeld();
+      }
+      if (closes) return;
+    }
+    if (bare && !path && digit && (afterCloser || (letters >= 2 && !latinWord && (lowerLetter || letters >= 3)))) {
+      held[0] = static_cast<char>(c);
+      heldLen = 1;
+      return;
+    }
+    if (bracket && !path && c == '[' && glued && !afterLatin) {
+      heldBracket = true;
+      return;
+    }
+    appendEscaped(buf, p, static_cast<size_t>(n));
+    noteChar(c);
+  }
+
+  void raiseHeld() {
+    if (measuring()) countMarker();
+    buf += "<sup>";
+    if (heldBracket) buf += '[';
+    buf.append(held, heldLen);
+    if (heldBracket) buf += ']';
+    buf += "</sup>";
+    heldBracket = false;
+    heldLen = 0;
+    resetMarkerScan();
+    glued = true;
+  }
+
+  void releaseHeld() {
+    if (heldBracket) {
+      buf += '[';
+      noteChar('[');
+      heldBracket = false;
+    }
+    for (uint8_t i = 0; i < heldLen; i++) {
+      buf += held[i];
+      noteChar(static_cast<uint8_t>(held[i]));
+    }
+    heldLen = 0;
+  }
+
+  // Markers numbered 1, 2, 3... with nothing out of step between them; a 1 starts a new run, as
+  // the numbering restarts per chapter.
+  void countMarker() {
+    unsigned value = 0;
+    for (uint8_t i = 0; i < heldLen; i++) value = value * 10 + static_cast<unsigned>(held[i] - '0');
+    uint16_t& next = heldBracket ? bracketNext : bareNext;
+    uint16_t& run = heldBracket ? bracketRun : bareRun;
+    if (value == next) {
+      run++;
+    } else {
+      run = value == 1 ? 1 : 0;
+    }
+    next = static_cast<uint16_t>(run + 1);
+    uint16_t& best = heldBracket ? self.bracketMarkerRun : self.bareMarkerRun;
+    best = std::max(best, run);
+  }
+
+  // An element starts or ends: a bare marker held so far is complete, a bracketed one is not.
+  void endHeld() {
+    if (!heldBracket && heldLen == 0) return;
+    buf.clear();
+    if (heldBracket) {
+      releaseHeld();
+    } else {
+      raiseHeld();
+    }
+    emit(buf);
+  }
+
   void characters(const XML_Char* s, const int len) {
     if (capture != Capture::None) {
       appendBounded(captured, s, static_cast<size_t>(len), 2 * MAX_METADATA_BYTES);
@@ -823,10 +1093,25 @@ struct Fb2ToEpub::Pass {
     }
     if (textDepth <= 0 || !open(Kind::Body)) return;
     buf.clear();
-    appendEscaped(buf, s, static_cast<size_t>(len));
+    const bool inText = !open(Kind::Title) && !setApart();
+    const bool bare = inText && (measuring() || self.bareMarkers());
+    const bool bracket = inText && (measuring() || self.bracketMarkers());
+    for (int i = 0; i < len;) {
+      const int n = std::min(utf8Length(s[i]), len - i);
+      scanMarker(s + i, n, decodeUtf8(s + i, n), bare, bracket);
+      i += n;
+    }
     emit(buf);
     fileText += static_cast<size_t>(len);
-    if (open(Kind::Title) && tocPending) appendBounded(tocLabel, s, static_cast<size_t>(len), 2 * MAX_LABEL_BYTES);
+    if (std::any_of(s, s + len, [](const char c) { return !isXmlSpace(c); })) {
+      fileHasContent = true;
+      bodyContent = true;
+      emptyLines = 0;
+    }
+    if (!open(Kind::Title)) tocShareable = false;
+    if (open(Kind::Title) && tocPending && !open(Kind::NoteLink)) {
+      appendBounded(tocLabel, s, static_cast<size_t>(len), 2 * MAX_LABEL_BYTES);
+    }
   }
 
   static void XMLCALL onStart(void* ud, const XML_Char* name, const XML_Char** atts) {
@@ -869,6 +1154,146 @@ struct Fb2ToEpub::Pass {
   }
 };
 
+namespace {
+
+// One pass over the book for its cover: the <coverpage> reference in
+// <title-info>, then the <binary> it names, base64-decoded straight into the
+// output in small chunks.
+struct CoverPass {
+  Fb2ToEpub::Output& out;
+  XML_Parser parser = nullptr;
+  int depth = 0;
+  bool description = false;
+  int titleInfoDepth = 0;  // depth of <title-info>, 0 outside it
+  bool coverpage = false;
+  char coverId[Fb2ToEpub::MAX_ID_BYTES + 1] = {};
+  const char* extension = nullptr;  // set once the cover binary opens
+  bool decoding = false;
+  bool done = false;
+  bool failed = false;
+  uint32_t bits = 0;
+  int bitCount = 0;
+
+  explicit CoverPass(Fb2ToEpub::Output& out) : out(out) {}
+
+  void start(const char* rawName, const XML_Char** atts) {
+    const char* name = localName(rawName);
+    depth++;
+    if (depth == 2 && strcmp(name, "description") == 0) {
+      description = true;
+    } else if (depth == 3 && strcmp(name, "title-info") == 0) {
+      titleInfoDepth = depth;
+    } else if (titleInfoDepth && depth == titleInfoDepth + 1 && strcmp(name, "coverpage") == 0) {
+      coverpage = true;
+    } else if (coverpage && strcmp(name, "image") == 0 && !coverId[0]) {
+      const char* href = attribute(atts, "href");
+      if (href && href[0] == '#' && idFits(href + 1)) snprintf(coverId, sizeof(coverId), "%s", href + 1);
+    } else if (depth == 2 && strcmp(name, "binary") == 0 && coverId[0]) {
+      const char* id = attribute(atts, "id");
+      if (!id || strcmp(id, coverId) != 0) return;
+      extension = imageExtension(attribute(atts, "content-type"));
+      // GIF covers have no thumbnail converter.
+      if (!extension || strcmp(extension, "gif") == 0 ||
+          !out.beginFile(strcmp(extension, "jpg") == 0 ? "cover.jpg" : "cover.png")) {
+        extension = nullptr;
+        stop(true);
+        return;
+      }
+      decoding = true;
+    }
+  }
+
+  void end() {
+    if (decoding) {
+      decoding = false;
+      if (!out.endFile()) failed = true;
+      stop(failed);
+      return;
+    }
+    if (depth == titleInfoDepth) titleInfoDepth = 0;
+    if (titleInfoDepth && depth == titleInfoDepth + 1) coverpage = false;
+    // No <coverpage> in the header: no cover, and the rest of the book need not be read.
+    if (depth == 2 && description) {
+      description = false;
+      if (!coverId[0]) stop(false);
+    }
+    depth--;
+  }
+
+  void text(const XML_Char* s, const int len) {
+    if (!decoding) return;
+    uint8_t chunk[128];
+    size_t n = 0;
+    for (int i = 0; i < len; i++) {
+      const char c = s[i];
+      int v;
+      if (c >= 'A' && c <= 'Z') {
+        v = c - 'A';
+      } else if (c >= 'a' && c <= 'z') {
+        v = c - 'a' + 26;
+      } else if (c >= '0' && c <= '9') {
+        v = c - '0' + 52;
+      } else if (c == '+' || c == '-') {
+        v = 62;
+      } else if (c == '/' || c == '_') {
+        v = 63;
+      } else {
+        continue;  // whitespace and '=' padding
+      }
+      bits = (bits << 6) | static_cast<uint32_t>(v);
+      bitCount += 6;
+      if (bitCount >= 8) {
+        bitCount -= 8;
+        chunk[n++] = static_cast<uint8_t>((bits >> bitCount) & 0xFF);
+        if (n == sizeof(chunk)) {
+          if (!out.write(reinterpret_cast<const char*>(chunk), n)) return stop(true);
+          n = 0;
+        }
+      }
+    }
+    if (n > 0 && !out.write(reinterpret_cast<const char*>(chunk), n)) stop(true);
+  }
+
+  void stop(const bool failure) {
+    failed = failed || failure;
+    done = true;
+    XML_StopParser(parser, XML_FALSE);
+  }
+
+  static void XMLCALL onStart(void* ud, const XML_Char* name, const XML_Char** atts) {
+    static_cast<CoverPass*>(ud)->start(name, atts);
+  }
+  static void XMLCALL onEnd(void* ud, const XML_Char*) { static_cast<CoverPass*>(ud)->end(); }
+  static void XMLCALL onText(void* ud, const XML_Char* s, int len) { static_cast<CoverPass*>(ud)->text(s, len); }
+  static bool feed(void* ctx, const char* data, size_t len) {
+    auto* pass = static_cast<CoverPass*>(ctx);
+    if (pass->done) return false;
+    if (XML_Parse(pass->parser, data, static_cast<int>(len), XML_FALSE) == XML_STATUS_ERROR) {
+      if (!pass->done) pass->stop(true);
+      return false;
+    }
+    return !pass->done;
+  }
+};
+
+}  // namespace
+
+const char* Fb2ToEpub::readCover(Input& input, Output& out) {
+  auto pass = makeUniqueNoThrow<CoverPass>(out);
+  if (!pass) return nullptr;
+  pass->parser = XML_ParserCreate(nullptr);
+  if (!pass->parser) return nullptr;
+  XML_SetUserData(pass->parser, pass.get());
+  XML_SetElementHandler(pass->parser, CoverPass::onStart, CoverPass::onEnd);
+  XML_SetCharacterDataHandler(pass->parser, CoverPass::onText);
+  XML_SetUnknownEncodingHandler(pass->parser, unknownEncoding, nullptr);
+  const bool streamed = input.stream(CoverPass::feed, pass.get());
+  XML_ParserFree(pass->parser);
+  // An unfinished binary (the input ended inside it) is no cover either.
+  const bool complete = streamed && pass->done && !pass->failed && pass->extension && !pass->decoding;
+  return complete ? pass->extension : nullptr;
+}
+
 bool Fb2ToEpub::readMetadata(Input& input, Metadata& out) {
   Fb2ToEpub converter;
   // Passes hold several strings and the element stack: heap, not the reader task's stack.
@@ -886,6 +1311,9 @@ bool Fb2ToEpub::convert(Input& input, Output& out) {
   binaries.clear();
   toc.clear();
   cover = nullptr;
+  coverInBody = false;
+  noteLinks = false;
+  bareMarkerRun = bracketMarkerRun = 0;
 
   {
     fileCount = 0;
@@ -903,7 +1331,7 @@ bool Fb2ToEpub::convert(Input& input, Output& out) {
       !writeWhole(out, "OEBPS/style.css", STYLE_CSS, strlen(STYLE_CSS))) {
     return false;
   }
-  if (cover) {
+  if (coverPage()) {
     std::string page = XHTML_HEAD;
     char img[64];
     snprintf(img, sizeof(img), "<div class=\"cover\"><img src=\"img%u.%s\" alt=\"\"/></div>",
@@ -946,7 +1374,9 @@ bool Fb2ToEpub::writeOpf(Output& out) const {
       "</metadata><manifest>"
       "<item id=\"ncx\" href=\"toc.ncx\" media-type=\"application/x-dtbncx+xml\"/>"
       "<item id=\"css\" href=\"style.css\" media-type=\"text/css\"/>");
-  if (cover) w.put("<item id=\"cover\" href=\"cover.xhtml\" media-type=\"application/xhtml+xml\"/>");
+  if (coverPage()) {
+    w.put("<item id=\"cover\" href=\"cover.xhtml\" media-type=\"application/xhtml+xml\"/>");
+  }
   for (unsigned i = 1; i <= fileCount; i++) {
     snprintf(line, sizeof(line), "<item id=\"s%u\" href=\"s%u.xhtml\" media-type=\"application/xhtml+xml\"/>", i, i);
     w.put(line);
@@ -959,7 +1389,7 @@ bool Fb2ToEpub::writeOpf(Output& out) const {
     w.put(line);
   }
   w.put("</manifest><spine toc=\"ncx\">");
-  if (cover) w.put("<itemref idref=\"cover\"/>");
+  if (coverPage()) w.put("<itemref idref=\"cover\"/>");
   for (unsigned i = 1; i <= fileCount; i++) {
     snprintf(line, sizeof(line), "<itemref idref=\"s%u\"/>", i);
     w.put(line);
@@ -1007,7 +1437,7 @@ bool Fb2ToEpub::writeNcx(Output& out) const {
   // File 0 is the cover page, titled with the book so the status bar has a name for it.
   const std::string noAnchor;
   const std::string bookLabel = meta.title.empty() ? std::string("1") : meta.title;
-  if (cover) navPoint(0, 1, noAnchor, bookLabel);
+  if (coverPage()) navPoint(0, 1, noAnchor, bookLabel);
   if (toc.empty()) navPoint(1, 1, noAnchor, bookLabel);
   for (const TocEntry& e : toc) navPoint(e.file, e.depth, e.anchor, e.label);
   for (; openDepth > 0; openDepth--) w.put("</navPoint>");

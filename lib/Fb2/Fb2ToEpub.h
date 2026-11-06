@@ -23,6 +23,10 @@
 // parser plus those tables: one entry per element id, binary and TOC entry.
 class Fb2ToEpub {
  public:
+  // Bump when the output changes the book's files: books converted before are
+  // converted again on their next open, and the reading position moves over.
+  static constexpr uint8_t FORMAT_VERSION = 2;
+
   // Receives the EPUB's files one at a time, in package order.
   class Output {
    public:
@@ -52,6 +56,12 @@ class Fb2ToEpub {
   // Reads <description> only and stops after it.
   static bool readMetadata(Input& input, Metadata& out);
 
+  // Writes the <coverpage> image into `out` as one file, "cover.jpg" or
+  // "cover.png", decoding its <binary> as it streams past, and stops there.
+  // Returns the extension, or nullptr without a cover, with an image the reader
+  // cannot draw, or on a read or write error. For covers of books not converted yet.
+  static const char* readCover(Input& input, Output& out);
+
   // Writes the whole EPUB into `out`. False when the input is not a
   // FictionBook with content, or when reading or `out` fails. A document cut
   // short by an XML error converts up to the error.
@@ -59,11 +69,16 @@ class Fb2ToEpub {
 
   const Metadata& metadata() const { return meta; }
 
-  // A <section> starts a new file once the current one holds this much text.
+  // A <section> starts a new file once the current one holds this much text;
+  // a top-level section of the main body starts one whenever the current file has content.
   static constexpr size_t MAIN_SPLIT_BYTES = 2 * 1024;
   static constexpr size_t NOTES_SPLIT_BYTES = 32 * 1024;
   // Past this, a file is also split between top-level paragraphs.
   static constexpr size_t MAX_FILE_BYTES = 96 * 1024;
+  // Short top-level sections stop getting a file of their own once the book has
+  // this many, so a book of thousands of them keeps the reader's per-file tables
+  // (spine, ZIP directory) small.
+  static constexpr uint16_t MAX_OWN_PAGE_FILES = 512;
 
   // Bounds on the per-book tables, far above real books. Past MAX_FILES or
   // MAX_DEPTH the book ends there, as at an XML error; ids, images, TOC entries
@@ -99,6 +114,17 @@ class Fb2ToEpub {
   std::vector<TocEntry> toc;
   uint16_t fileCount = 0;
   const Binary* cover = nullptr;
+  bool coverInBody = false;  // the main body opens with the cover image
+  bool coverPage() const { return cover && !coverInBody; }
+
+  // Plain-text note markers ("часов1.", "скрининг[1]") are raised only in a book that
+  // has no real note links and numbers them in a run at least this long.
+  static constexpr uint16_t MIN_MARKER_RUN = 5;
+  bool noteLinks = false;
+  uint16_t bareMarkerRun = 0;
+  uint16_t bracketMarkerRun = 0;
+  bool bareMarkers() const { return !noteLinks && bareMarkerRun >= MIN_MARKER_RUN; }
+  bool bracketMarkers() const { return !noteLinks && bracketMarkerRun >= MIN_MARKER_RUN; }
 
   bool writeOpf(Output& out) const;
   bool writeNcx(Output& out) const;
