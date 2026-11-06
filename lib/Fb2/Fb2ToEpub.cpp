@@ -137,6 +137,31 @@ void appendEscaped(std::string& out, const std::string& s, bool attr = false) {
 
 bool isXmlSpace(const char c) { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
 
+// One UTF-8 character; expat hands over whole ones.
+uint32_t decodeUtf8(const char* s, const int n) {
+  const auto b = [s](const int i) { return static_cast<uint32_t>(static_cast<uint8_t>(s[i])); };
+  if (n == 2) return (b(0) & 0x1F) << 6 | (b(1) & 0x3F);
+  if (n == 3) return (b(0) & 0x0F) << 12 | (b(1) & 0x3F) << 6 | (b(2) & 0x3F);
+  if (n == 4) return (b(0) & 0x07) << 18 | (b(1) & 0x3F) << 12 | (b(2) & 0x3F) << 6 | (b(3) & 0x3F);
+  return b(0);
+}
+
+int utf8Length(const char lead) {
+  const auto c = static_cast<uint8_t>(lead);
+  return c < 0xC0 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
+}
+
+bool isUpperLetter(const uint32_t c) { return (c >= 'A' && c <= 'Z') || (c >= 0x400 && c <= 0x42F); }
+bool isLowerLetter(const uint32_t c) { return (c >= 'a' && c <= 'z') || (c >= 0x430 && c <= 0x45F); }
+bool isTextSpace(const uint32_t c) { return c == ' ' || c == '\n' || c == '\r' || c == '\t' || c == 0xA0; }
+// ")", "»" and "”": a note marker may follow a closing quote or parenthesis.
+bool isCloser(const uint32_t c) { return c == ')' || c == 0xBB || c == 0x201D; }
+// What may follow a bare marker: a space, punctuation or a closing quote, not a letter or another digit.
+bool endsMarker(const uint32_t c) {
+  return isTextSpace(c) || isCloser(c) || c == '.' || c == ',' || c == ';' || c == ':' || c == '!' || c == '?' ||
+         c == 0x2026;
+}
+
 void collapseSpaces(std::string& s) {
   std::string out;
   out.reserve(s.size());
@@ -292,6 +317,17 @@ struct Fb2ToEpub::Pass {
   int textDepth = 0;
   int titleLines = 0;
   bool verses = false;  // a stanza's paragraph is open
+
+  // Note markers a converter (calibre) left as plain text: "часов1." or "скрининг[1]". Digits are
+  // held back until what follows shows whether they are a marker, which is then raised.
+  uint8_t letters = 0;       // letters right before the current position
+  bool lowerLetter = false;  // ... one of them lowercase
+  bool afterCloser = false;  // the last character closes a quote, parenthesis or superscript
+  bool glued = false;        // the last character is not a space
+  bool path = false;         // the current word has a '/', as a URL does
+  bool heldBracket = false;  // a '[' is held
+  char held[3];              // digits held
+  uint8_t heldLen = 0;
   bool tocPending = false;
   uint8_t tocDepth = 0;
   std::string tocAnchor;
@@ -392,6 +428,7 @@ struct Fb2ToEpub::Pass {
   }
 
   void startElement(const char* rawName, const XML_Char** atts) {
+    endHeld();
     const char* name = localName(rawName);
     if (stack.size() >= MAX_DEPTH || self.fileCount >= MAX_FILES) {
       // Pushed because Expat still ends an empty element after a stop.
@@ -672,6 +709,7 @@ struct Fb2ToEpub::Pass {
       if (it->kind == Kind::Wrapper) cls = it->paraClass;
     }
     emitOpen(tag, cls, id);
+    resetMarkerScan();
     textDepth++;
     push(Kind::TextBlock, close);
   }
@@ -693,6 +731,7 @@ struct Fb2ToEpub::Pass {
       emitOpen("p", "stanza", id);
       verses = true;
     }
+    resetMarkerScan();
     textDepth++;
     push(Kind::Line);
   }
@@ -795,10 +834,13 @@ struct Fb2ToEpub::Pass {
   }
 
   void endElement() {
+    endHeld();
     if (stack.empty()) return;
     const Frame frame = stack.back();
     stack.pop_back();
     openKinds[static_cast<int>(frame.kind)]--;
+    // Digits glued after a superscript continue it: "человек[26]<sup>, </sup>1".
+    if (frame.close && strcmp(frame.close, "</sup>") == 0) afterCloser = true;
 
     switch (frame.kind) {
       case Kind::Description:
@@ -887,6 +929,105 @@ struct Fb2ToEpub::Pass {
     if (n > 0) writeRaw(chunk, n);
   }
 
+  void resetMarkerScan() {
+    letters = 0;
+    lowerLetter = afterCloser = glued = path = false;
+  }
+
+  // Digits a link, <sup>, <sub> or <code> already sets apart stay as they are.
+  bool setApart() const {
+    return std::any_of(stack.begin(), stack.end(), [](const Frame& f) {
+      return f.close && (strstr(f.close, "</a>") || strstr(f.close, "</su") || strcmp(f.close, "</code>") == 0);
+    });
+  }
+
+  void noteChar(const uint32_t c) {
+    const bool lower = isLowerLetter(c);
+    if (lower || isUpperLetter(c)) {
+      if (letters < UINT8_MAX) letters++;
+      lowerLetter = lowerLetter || lower;
+    } else {
+      letters = 0;
+      lowerLetter = false;
+    }
+    afterCloser = isCloser(c);
+    glued = !isTextSpace(c);
+    if (!glued) {
+      path = false;
+    } else if (c == '/') {
+      path = true;
+    }
+  }
+
+  // Appends one character to buf, holding back digits that may be a note marker. A bare marker
+  // follows a word of two letters or more (three when all capitals, so "СО2" stays) or a closing
+  // quote, and ends at a space, punctuation or an element boundary; a bracketed one is glued to the
+  // text before it. Numbers of four digits, such as years, never qualify.
+  void scanMarker(const char* p, const int n, const uint32_t c, const bool detect) {
+    const bool digit = c >= '0' && c <= '9';
+    if (heldBracket || heldLen > 0) {
+      if (digit && heldLen < sizeof(held)) {
+        held[heldLen++] = static_cast<char>(c);
+        return;
+      }
+      const bool closes = heldBracket && c == ']' && heldLen > 0;
+      if (closes || (!heldBracket && !digit && endsMarker(c))) {
+        raiseHeld();
+      } else {
+        releaseHeld();
+      }
+      if (closes) return;
+    }
+    if (detect && !path && digit && (afterCloser || (letters >= 2 && (lowerLetter || letters >= 3)))) {
+      held[0] = static_cast<char>(c);
+      heldLen = 1;
+      return;
+    }
+    if (detect && !path && c == '[' && glued) {
+      heldBracket = true;
+      return;
+    }
+    appendEscaped(buf, p, static_cast<size_t>(n));
+    noteChar(c);
+  }
+
+  void raiseHeld() {
+    buf += "<sup>";
+    if (heldBracket) buf += '[';
+    buf.append(held, heldLen);
+    if (heldBracket) buf += ']';
+    buf += "</sup>";
+    heldBracket = false;
+    heldLen = 0;
+    resetMarkerScan();
+    glued = true;
+  }
+
+  void releaseHeld() {
+    if (heldBracket) {
+      buf += '[';
+      noteChar('[');
+      heldBracket = false;
+    }
+    for (uint8_t i = 0; i < heldLen; i++) {
+      buf += held[i];
+      noteChar(static_cast<uint8_t>(held[i]));
+    }
+    heldLen = 0;
+  }
+
+  // An element starts or ends: a bare marker held so far is complete, a bracketed one is not.
+  void endHeld() {
+    if (!heldBracket && heldLen == 0) return;
+    buf.clear();
+    if (heldBracket) {
+      releaseHeld();
+    } else {
+      raiseHeld();
+    }
+    emit(buf);
+  }
+
   void characters(const XML_Char* s, const int len) {
     if (capture != Capture::None) {
       appendBounded(captured, s, static_cast<size_t>(len), 2 * MAX_METADATA_BYTES);
@@ -898,7 +1039,12 @@ struct Fb2ToEpub::Pass {
     }
     if (textDepth <= 0 || !open(Kind::Body)) return;
     buf.clear();
-    appendEscaped(buf, s, static_cast<size_t>(len));
+    const bool detect = !open(Kind::Title) && !setApart();
+    for (int i = 0; i < len;) {
+      const int n = std::min(utf8Length(s[i]), len - i);
+      scanMarker(s + i, n, decodeUtf8(s + i, n), detect);
+      i += n;
+    }
     emit(buf);
     fileText += static_cast<size_t>(len);
     fileHasContent = true;

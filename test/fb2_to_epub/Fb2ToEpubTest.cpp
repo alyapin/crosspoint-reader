@@ -220,6 +220,47 @@ TEST(Fb2ToEpub, RaisesNoteMarkers) {
                        "<sup>4</sup>, <a href=\"s2.xhtml#n1\">ссылка</a></p>"));
 }
 
+TEST(Fb2ToEpub, RaisesNoteMarkersLeftAsPlainText) {
+  // calibre's FB2 of «Всё хорошо!» keeps source references as bare digits after the last word and
+  // editor's notes as glued "[N]", with no links or ids.
+  const std::string doc =
+      "<FictionBook xmlns:l=\"x\"><body><section>"
+      "<p>на пару часов1. По данным СВДС20, MMR7 и LactMed31. «Спокойная и уверенная»1, в сна)15.</p>"
+      "<p>Проведут скрининг[1]. В возрасте[8] — и <emphasis>слово</emphasis>12. Конец взрослым?»20</p>"
+      "<p>заболевших 86 человек[26]<sup>, </sup>1.</p>"
+      "<p><strong>[1]</strong> Неонатальный скрининг. <strong>2.</strong> Список</p>"
+      "<p>В 2013 году, 11,4 или 16,1; СО2. Витамин К2. IQ5. Р. e702–е770. Года2013. 1990-х. Глава 12.</p>"
+      "<p>H<sub>2</sub>O, 20<sup>th</sup>, <a l:href=\"http://x.org/r1\">www.region10.org</a>, "
+      "<code>a[1]</code>, http://www.region10.org/r1 и [3] отдельно.</p>"
+      "</section></body></FictionBook>";
+  for (const size_t chunk : {size_t{1}, size_t{7}, doc.size()}) {
+    StringInput input(doc, chunk);
+    MapOutput out;
+    Fb2ToEpub converter;
+    ASSERT_TRUE(converter.convert(input, out));
+    const std::string& s1 = out.files["OEBPS/s1.xhtml"];
+    EXPECT_TRUE(contains(s1,
+                         "<p>на пару часов<sup>1</sup>. По данным СВДС<sup>20</sup>, MMR<sup>7</sup> и "
+                         "LactMed<sup>31</sup>. «Спокойная и уверенная»<sup>1</sup>, в сна)<sup>15</sup>.</p>"))
+        << chunk << "\n"
+        << s1;
+    EXPECT_TRUE(contains(s1,
+                         "<p>Проведут скрининг<sup>[1]</sup>. В возрасте<sup>[8]</sup> — и <em>слово</em>"
+                         "<sup>12</sup>. Конец взрослым?»<sup>20</sup></p>"))
+        << chunk;
+    EXPECT_TRUE(contains(s1, "<p>заболевших 86 человек<sup>[26]</sup><sup>, </sup><sup>1</sup>.</p>")) << chunk;
+    // Labels opening a note or a list item, real numbers and digits already set apart stay as they are.
+    EXPECT_TRUE(contains(s1, "<p><strong>[1]</strong> Неонатальный скрининг. <strong>2.</strong> Список</p>"));
+    EXPECT_TRUE(contains(
+        s1, "<p>В 2013 году, 11,4 или 16,1; СО2. Витамин К2. IQ5. Р. e702–е770. Года2013. 1990-х. Глава 12.</p>"));
+    EXPECT_TRUE(contains(s1,
+                         "<p>H<sub>2</sub>O, 20<sup>th</sup>, <a href=\"http://x.org/r1\">www.region10.org</a>, "
+                         "<code>a[1]</code>, http://www.region10.org/r1 и [3] отдельно.</p>"))
+        << chunk;
+    EXPECT_TRUE(wellFormed(s1));
+  }
+}
+
 TEST(Fb2ToEpub, BuildsNestedTocWithAnchors) {
   StringInput input(sampleBook(LONG_TEXT));
   MapOutput out;
