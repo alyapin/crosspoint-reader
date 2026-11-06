@@ -178,6 +178,8 @@ constexpr const char* XHTML_HEAD =
     "<link rel=\"stylesheet\" type=\"text/css\" href=\"style.css\"/></head><body>";
 constexpr const char* XHTML_TAIL = "</body></html>";
 constexpr const char* SECTION_OPEN = "<div class=\"section\">";
+// calibre writes runs of 20 <empty-line/>s for vertical layout; past this they only push text onto blank pages.
+constexpr uint8_t MAX_EMPTY_LINES = 2;
 
 constexpr const char* STYLE_CSS =
     "p{text-indent:1.5em;margin:0}"
@@ -279,6 +281,7 @@ struct Fb2ToEpub::Pass {
   // Bodies.
   bool notesBody = false;
   bool bodyContent = false;  // text or an image seen in a body
+  uint8_t emptyLines = 0;    // <empty-line/>s since the last text or image
   uint8_t sectionDepth = 0;
   uint8_t sectionDivs = 0;  // section <div>s open in the output
   uint32_t sectionSerial = 0;
@@ -603,6 +606,7 @@ struct Fb2ToEpub::Pass {
       self.coverInBody = true;
     }
     bodyContent = true;
+    emptyLines = 0;
     const auto it = self.binaries.find(href + 1);
     if (measuring() || it == self.binaries.end() || !it->second.extension) {
       recordId(id);
@@ -709,7 +713,10 @@ struct Fb2ToEpub::Pass {
     } else if (strcmp(name, "date") == 0) {
       startText("p", "date", id, "</p>");
     } else if (strcmp(name, "empty-line") == 0) {
-      emit("<p class=\"empty-line\">&#160;</p>");
+      if (emptyLines < MAX_EMPTY_LINES) {
+        emit("<p class=\"empty-line\">&#160;</p>");
+        emptyLines++;
+      }
       push(Kind::Other);
     } else if (strcmp(name, "epigraph") == 0) {
       startWrapper("div", "epigraph", id, "</div>", "epigraph");
@@ -853,7 +860,10 @@ struct Fb2ToEpub::Pass {
     emit(buf);
     fileText += static_cast<size_t>(len);
     fileHasContent = true;
-    bodyContent = bodyContent || std::any_of(s, s + len, [](const char c) { return !isXmlSpace(c); });
+    if (std::any_of(s, s + len, [](const char c) { return !isXmlSpace(c); })) {
+      bodyContent = true;
+      emptyLines = 0;
+    }
     if (!open(Kind::Title)) tocShareable = false;
     if (open(Kind::Title) && tocPending && !open(Kind::NoteLink)) {
       appendBounded(tocLabel, s, static_cast<size_t>(len), 2 * MAX_LABEL_BYTES);

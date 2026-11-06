@@ -347,6 +347,17 @@ TEST(Fb2ToEpub, StartsEveryTopLevelSectionOnANewPage) {
   EXPECT_EQ(out.files.count("OEBPS/s5.xhtml"), 0u);
 }
 
+TEST(Fb2ToEpub, CapsRunsOfEmptyLines) {
+  StringInput input("<FictionBook><body><section><p>Титул</p>" + repeat("<empty-line/>", 21) +
+                    "<p>Москва</p><empty-line/><p>2020</p></section></body></FictionBook>");
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  const std::string blank = "<p class=\"empty-line\">&#160;</p>";
+  EXPECT_TRUE(
+      contains(out.files["OEBPS/s1.xhtml"], "<p>Титул</p>" + blank + blank + "<p>Москва</p>" + blank + "<p>2020</p>"));
+}
+
 TEST(Fb2ToEpub, SplitsAnOversizedSectionBetweenParagraphs) {
   const std::string para = "<p>" + repeat("слово ", 200) + "</p>";  // ~2.4 KB of text
   StringInput input("<FictionBook><body><section><section><title><p>Одна</p></title>" + repeat(para, 100) +
