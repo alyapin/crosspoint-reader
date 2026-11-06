@@ -115,6 +115,7 @@ add_subdirectory(ble_link_note_title)
 add_subdirectory(ble_chapter_build_gate)
 add_subdirectory(ble_remote_turn_gate)
 add_subdirectory(page_turn_queue)
+add_subdirectory(quiet_wait)
 
 add_subdirectory(${REPO_ROOT}/lib/BlePageTurner/test BlePageTurnerTests)
 

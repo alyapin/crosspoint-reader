@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "EndOfBookOptions.h"
+#include "QuietWait.h"
 #include "ReaderSession.h"
 #include "activities/Activity.h"
 #include "stats/ReadingTracker.h"
@@ -58,7 +59,11 @@ class ReaderActivity : public Activity {
   std::atomic<bool> pageRendered{false};
   bool bookRemembered = false;
   void markPageRendered() { pageRendered.store(true, std::memory_order_release); }
+  // The state file at once, so a wake lands in the book; recents, reading statistics and the open
+  // event one step per quiet frame later, since after a wake the reader presses at once.
   void rememberBookOnceRendered();
+  // Page turns pressed but not made yet.
+  virtual bool turnsQueued() const { return false; }
 
   explicit ReaderActivity(const char* name, GfxRenderer& renderer, MappedInputManager& mappedInput,
                           std::string bookPath, bool allowFastInitialRefresh);
@@ -137,6 +142,13 @@ class ReaderActivity : public Activity {
 
  private:
   void notePageShown(bool atEnd);
+  enum class OpenBookkeeping : uint8_t { Recents, Stats, Compact, Event, Done };
+  OpenBookkeeping openBookkeeping = OpenBookkeeping::Recents;
+  QuietWait openQuiet;
+  static constexpr uint32_t OPEN_BOOKKEEPING_QUIET_MS = 2500;
+  uint16_t openDay = 0;
+  int openProgressBp = 0;
+  void openBookkeepingStep();
   void takeReadingStats();
   bool writeReadingStats();
 };

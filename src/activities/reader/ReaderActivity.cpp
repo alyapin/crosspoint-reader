@@ -2,6 +2,7 @@
 
 #include <FontCacheManager.h>
 #include <FsHelpers.h>
+#include <HalGPIO.h>
 #include <HalStorage.h>
 #include <KOReaderDocumentId.h>
 #include <Memory.h>
@@ -99,16 +100,49 @@ void ReaderActivity::onEnter() {
 }
 
 void ReaderActivity::rememberBookOnceRendered() {
-  if (bookRemembered || !pageRendered.load(std::memory_order_acquire)) return;
-  bookRemembered = true;
-  APP_STATE.openEpubPath = bookPath;
-  APP_STATE.saveToFile();
-  RECENT_BOOKS.addBook(bookPath, getBookTitle(), getBookAuthor(), getBookThumbBmpPath());
-  statsBookId =
-      READING_STATS.openBook(bookPath, getBookTitle(), getBookAuthor(), stats::today(), getProgressBasisPoints());
-  READING_STATS.compactIfNeeded();
-  const pluginevents::Var openVars[] = {{"book", bookPath.c_str()}};
-  pluginevents::emit(pluginevents::Event::ReaderOpen, openVars, 1);
+  if (!pageRendered.load(std::memory_order_acquire)) return;
+  if (!bookRemembered) {
+    bookRemembered = true;
+    APP_STATE.openEpubPath = bookPath;
+    APP_STATE.saveToFile();
+    openDay = stats::today();
+    openProgressBp = getProgressBasisPoints();
+    openQuiet.start(millis());
+    return;
+  }
+  if (openBookkeeping == OpenBookkeeping::Done) return;
+  const bool busy = gpio.wasAnyPressed() || gpio.wasAnyReleased() || gpio.wasTouchActivity() || turnsQueued() ||
+                    RenderLock::peek() || gpio.rawInputActive();
+  if (openQuiet.elapsed(millis(), busy, OPEN_BOOKKEEPING_QUIET_MS)) openBookkeepingStep();
+}
+
+// Each step holds the loop on SD reads and writes; input is read between them.
+void ReaderActivity::openBookkeepingStep() {
+  switch (openBookkeeping) {
+    case OpenBookkeeping::Recents:
+      // A finished book the reader has already taken off the recents stays off.
+      if (!(SETTINGS.removeReadBooksFromRecents && isAtEndOfBook())) {
+        RECENT_BOOKS.addBook(bookPath, getBookTitle(), getBookAuthor(), getBookThumbBmpPath());
+      }
+      openBookkeeping = OpenBookkeeping::Stats;
+      break;
+    case OpenBookkeeping::Stats:
+      statsBookId = READING_STATS.openBook(bookPath, getBookTitle(), getBookAuthor(), openDay, openProgressBp);
+      openBookkeeping = OpenBookkeeping::Compact;
+      break;
+    case OpenBookkeeping::Compact:
+      READING_STATS.compactIfNeeded();
+      openBookkeeping = OpenBookkeeping::Event;
+      break;
+    case OpenBookkeeping::Event: {
+      const pluginevents::Var openVars[] = {{"book", bookPath.c_str()}};
+      pluginevents::emit(pluginevents::Event::ReaderOpen, openVars, 1);
+      openBookkeeping = OpenBookkeeping::Done;
+      break;
+    }
+    case OpenBookkeeping::Done:
+      break;
+  }
 }
 
 void ReaderActivity::onExit() {
@@ -150,7 +184,8 @@ void ReaderActivity::onExit() {
 void ReaderActivity::prepareForSleep() { flushReaderSession(); }
 
 void ReaderActivity::serviceReadingStats() {
-  if (!bookRemembered) return;
+  // Segments wait for the book's statistics id.
+  if (openBookkeeping != OpenBookkeeping::Done) return;
   if ((segmentUnsaved || finishUnsaved) && millis() - statsWriteFailedMs < STATS_RETRY_MS) return;
   {
     // Never wait for a page being drawn; the segment keeps until the next loop.
@@ -184,6 +219,7 @@ bool ReaderActivity::writeReadingStats() {
 void ReaderActivity::flushReaderSession() {
   readingTracker.close(millis());
   if (bookRemembered) {
+    while (openBookkeeping != OpenBookkeeping::Done) openBookkeepingStep();
     // A second pass writes the segment the tracker kept behind an unsaved one.
     for (int pass = 0; pass < 2; pass++) {
       takeReadingStats();
