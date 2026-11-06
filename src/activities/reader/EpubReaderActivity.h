@@ -188,6 +188,8 @@ class EpubReaderActivity final : public ReaderActivity {
   void rememberCurrentContentOffset();
   bool saveProgress(int spineIndex, int currentPage, int pageCount);
   void jumpToPercent(int percent);
+  bool locateBookBytes(size_t targetSize, int& spineIndex, float& spineProgress) const;
+  void restoreFb2Position(bool progressLoaded);
   void onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction action);
   int currentTocIndex() const;
   // Live section position, or the values cached before a child screen

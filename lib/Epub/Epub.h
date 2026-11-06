@@ -54,7 +54,8 @@ class Epub {
                        bool metadataOnly = false, ZipFile* sharedZip = nullptr);
   bool generateThumbBmpForCover(int height, const std::string& coverImageHref) const;
   bool openProtection();
-  bool ensureArchive() const;
+  bool ensureArchive(bool opening = false) const;
+  float savedFraction() const;
   bool parseTocNcxFile() const;
   bool parseTocNavFile() const;
   void discoverCssFilesFromZip();
@@ -69,6 +70,15 @@ class Epub {
   bool loadSyncMetadata(SyncMetadata& metadata);
   bool clearCache() const;
   void setupCacheDir() const;
+  // FB2 is read from an EPUB converted into the cache; the converter version that
+  // wrote it is stamped beside it (0: none). Opening a book converted by another
+  // version converts it again and leaves the reading position as a pending book
+  // fraction for the reader to take.
+  bool isFb2() const { return archivePath != filepath; }
+  uint8_t fb2ArchiveVersion() const;
+  bool fb2Outdated() const;
+  bool saveFb2Position(float fraction, uint8_t version) const;
+  bool takeFb2Position(float& fraction, uint8_t& version) const;
   const std::string& getCachePath() const;
   const std::string& getPath() const;
   // Empty unless the encrypted-entry accessor failed to open.

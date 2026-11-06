@@ -23,6 +23,10 @@
 // parser plus those tables: one entry per element id, binary and TOC entry.
 class Fb2ToEpub {
  public:
+  // Bump when the output changes the book's files: books converted before are
+  // converted again on their next open, and the reading position moves over.
+  static constexpr uint8_t FORMAT_VERSION = 2;
+
   // Receives the EPUB's files one at a time, in package order.
   class Output {
    public:

@@ -1,6 +1,8 @@
 add_executable(Fb2ToEpubTest
   Fb2ToEpubTest.cpp
+  Fb2PositionTest.cpp
   ${REPO_ROOT}/lib/Fb2/Fb2ToEpub.cpp
+  ${REPO_ROOT}/lib/Fb2/Fb2Position.cpp
   ${REPO_ROOT}/lib/Fb2/StoredZipWriter.cpp
   ${REPO_ROOT}/lib/miniz/src/miniz_impl.c
   ${REPO_ROOT}/lib/expat/xmlparse.c

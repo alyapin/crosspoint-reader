@@ -1,6 +1,7 @@
 #include "Epub.h"
 
 #include <Fb2Archive.h>
+#include <Fb2Position.h>
 #include <FsHelpers.h>
 #include <GifImageLayout.h>
 #include <GifLimitedWriter.h>
@@ -31,11 +32,86 @@ Epub::Epub(std::string filepath, const std::string& cacheDir) : filepath(std::mo
   archivePath = FsHelpers::hasFb2Extension(this->filepath) ? cachePath + "/fb2.epub" : this->filepath;
 }
 
-// FB2 is read as an EPUB transcoded once into the cache on first use.
-bool Epub::ensureArchive() const {
-  if (archivePath == filepath || Storage.exists(archivePath.c_str())) return true;
+namespace {
+constexpr const char* FB2_STAMP = "/fb2.ver";
+constexpr const char* FB2_PENDING = "/fb2.pos";
+
+size_t readSmallFile(const std::string& path, char* buf, const size_t size) {
+  HalFile file;
+  if (!Storage.openFileForRead("EBP", path, file)) return 0;
+  const int n = file.read(buf, size);
+  return n > 0 ? static_cast<size_t>(n) : 0;
+}
+
+bool writeSmallFile(const std::string& path, const char* data, const size_t len) {
+  HalFile file;
+  if (!Storage.openFileForWrite("EBP", path, file)) return false;
+  return file.write(data, len) == len && file.close();
+}
+}  // namespace
+
+// FB2 is read as an EPUB transcoded into the cache on first use. Opening a book
+// another converter version wrote converts it again (the files move, so the
+// reading position goes over as a book fraction); other callers use what is there.
+bool Epub::ensureArchive(const bool opening) const {
+  if (archivePath == filepath) return true;
+  const bool exists = Storage.exists(archivePath.c_str());
+  if (exists && !(opening && fb2Outdated())) return true;
   setupCacheDir();
-  return Fb2Archive::convert(filepath, archivePath);
+  if (exists) {
+    const float fraction = savedFraction();
+    const uint8_t version = fb2ArchiveVersion();
+    clearCache();
+    setupCacheDir();
+    if (fraction >= 0.0f && !saveFb2Position(fraction, version)) LOG_ERR("EBP", "Could not keep the FB2 position");
+    LOG_DBG("EBP", "FB2 converted by version %u, converting again", version);
+  }
+  if (!Fb2Archive::convert(filepath, archivePath)) return false;
+  char stamp[8];
+  const size_t n = Fb2Position::formatStamp(stamp, sizeof(stamp));
+  if (!writeSmallFile(cachePath + FB2_STAMP, stamp, n)) LOG_ERR("EBP", "Could not stamp %s", archivePath.c_str());
+  return true;
+}
+
+// The saved reading position as a fraction of the book, from this cache's progress
+// and spine; -1 without one.
+float Epub::savedFraction() const {
+  uint8_t data[10];
+  const size_t n = readSmallFile(cachePath + "/progress.bin", reinterpret_cast<char*>(data), sizeof(data));
+  Fb2Position::Saved pos;
+  if (!Fb2Position::parseProgress(data, n, pos)) return -1.0f;
+  // Holds book.bin open; released before the caller clears the cache.
+  auto spine = makeUniqueNoThrow<BookMetadataCache>(cachePath);
+  if (!spine || !spine->load()) return -1.0f;
+  return Fb2Position::bookFraction(pos, spine->getSpineCount(),
+                                   [&](const int i) { return spine->getCumulativeSize(i); });
+}
+
+uint8_t Epub::fb2ArchiveVersion() const {
+  char buf[8];
+  const size_t n = readSmallFile(cachePath + FB2_STAMP, buf, sizeof(buf));
+  return Fb2Position::parseStamp(buf, n);
+}
+
+bool Epub::fb2Outdated() const {
+  return isFb2() && Storage.exists(archivePath.c_str()) && Fb2Position::reconvert(fb2ArchiveVersion());
+}
+
+bool Epub::saveFb2Position(const float fraction, const uint8_t version) const {
+  char buf[32];
+  const size_t n = Fb2Position::formatPending(buf, sizeof(buf), fraction, version);
+  return n > 0 && writeSmallFile(cachePath + FB2_PENDING, buf, n);
+}
+
+// Reads the pending position and removes it, so it applies once.
+bool Epub::takeFb2Position(float& fraction, uint8_t& version) const {
+  if (!isFb2()) return false;
+  const std::string path = cachePath + FB2_PENDING;
+  char buf[32];
+  const size_t n = readSmallFile(path, buf, sizeof(buf));
+  if (n == 0) return false;
+  Storage.remove(path.c_str());
+  return Fb2Position::parsePending(buf, n, fraction, version);
 }
 
 bool Epub::findContentOpfFile(std::string* contentOpfFile, ZipFile* sharedZip) const {
@@ -473,7 +549,7 @@ bool Epub::load(const bool buildIfMissing, const bool skipLoadingCss) {
   LOG_DBG("EBP", "Loading ePub: %s", filepath.c_str());
 
   if (archivePath != filepath && (buildIfMissing || Storage.exists((cachePath + "/book.bin").c_str())) &&
-      !ensureArchive()) {
+      !ensureArchive(buildIfMissing)) {
     return false;
   }
   if (!openProtection()) return false;

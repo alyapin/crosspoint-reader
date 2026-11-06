@@ -3,6 +3,7 @@
 #include <BlePageTurner.h>
 #include <Epub/Page.h>
 #include <Epub/blocks/TextBlock.h>
+#include <Fb2Position.h>
 #include <FontCacheManager.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
@@ -251,7 +252,8 @@ bool EpubReaderActivity::loadBook() {
     return false;
   }
 
-  const bool uncached = !Storage.exists((loadedEpub->getCachePath() + "/book.bin").c_str());
+  const bool uncached =
+      !Storage.exists((loadedEpub->getCachePath() + "/book.bin").c_str()) || loadedEpub->fb2Outdated();
   if (uncached) {
     disableFastInitialRefresh();
     GUI.drawPopup(renderer, tr(STR_INDEXING));
@@ -281,10 +283,12 @@ bool EpubReaderActivity::loadBook() {
   bookFooter.open(*epub);
 
   HalFile f;
+  bool progressLoaded = false;
   if (Storage.openFileForRead("ERS", epub->getCachePath() + "/progress.bin", f)) {
     uint8_t data[10];
     int dataSize = f.read(data, sizeof(data));
     if (dataSize == 4 || dataSize == 6 || dataSize == 10) {
+      progressLoaded = true;
       currentSpineIndex = data[0] + (data[1] << 8);
       nextPageNumber = data[2] + (data[3] << 8);
       if (nextPageNumber == UINT16_MAX) {
@@ -311,6 +315,7 @@ bool EpubReaderActivity::loadBook() {
       LOG_DBG("ERS", "Opened for first time, navigating to text reference at index %d", textSpineIndex);
     }
   }
+  restoreFb2Position(progressLoaded);
 
   loadLinkStack();
   loadCachedBookmarks();
@@ -1131,23 +1136,10 @@ void EpubReaderActivity::jumpToPercent(int percent) {
       (bookSize / 100) * static_cast<size_t>(percent) + (bookSize % 100) * static_cast<size_t>(percent) / 100;
   if (percent >= 100) targetSize = bookSize - 1;
 
-  const int spineCount = epub->getSpineItemsCount();
-  if (spineCount == 0) return;
-
-  int targetSpineIndex = spineCount - 1;
-  size_t prevCumulative = 0;
-
-  const int found = epub->getSpineIndexForSize(targetSize);
-  if (found >= 0) {
-    targetSpineIndex = found;
-    prevCumulative = (found > 0) ? epub->getCumulativeSpineItemSize(found - 1) : 0;
-  }
-
-  const size_t cumulative = epub->getCumulativeSpineItemSize(targetSpineIndex);
-  const size_t spineSize = (cumulative > prevCumulative) ? (cumulative - prevCumulative) : 0;
-  pendingSpineProgress =
-      (spineSize == 0) ? 0.0f : static_cast<float>(targetSize - prevCumulative) / static_cast<float>(spineSize);
-  pendingSpineProgress = std::clamp(pendingSpineProgress, 0.0f, 1.0f);
+  int targetSpineIndex;
+  float spineProgress;
+  if (!locateBookBytes(targetSize, targetSpineIndex, spineProgress)) return;
+  pendingSpineProgress = spineProgress;
 
   {
     RenderLock lock;
@@ -1158,6 +1150,72 @@ void EpubReaderActivity::jumpToPercent(int percent) {
     section.reset();
   }
   requestUpdate();
+}
+
+// The spine item holding byte `targetSize` of the book, and how far into it that byte lies.
+bool EpubReaderActivity::locateBookBytes(const size_t targetSize, int& spineIndex, float& spineProgress) const {
+  const int spineCount = epub->getSpineItemsCount();
+  if (spineCount == 0) return false;
+
+  spineIndex = spineCount - 1;
+  size_t prevCumulative = 0;
+
+  const int found = epub->getSpineIndexForSize(targetSize);
+  if (found >= 0) {
+    spineIndex = found;
+    prevCumulative = (found > 0) ? epub->getCumulativeSpineItemSize(found - 1) : 0;
+  }
+
+  const size_t cumulative = epub->getCumulativeSpineItemSize(spineIndex);
+  const size_t spineSize = (cumulative > prevCumulative) ? (cumulative - prevCumulative) : 0;
+  spineProgress =
+      (spineSize == 0) ? 0.0f : static_cast<float>(targetSize - prevCumulative) / static_cast<float>(spineSize);
+  spineProgress = std::clamp(spineProgress, 0.0f, 1.0f);
+  return true;
+}
+
+// An FB2 converted again (by a newer converter, or after its cache was deleted) left its
+// reading position as a book fraction: open there, and move the bookmarks, whose spine
+// and page fields belonged to the old files. Clippings keep spine-relative anchors and
+// cannot follow.
+void EpubReaderActivity::restoreFb2Position(const bool progressLoaded) {
+  float fraction;
+  uint8_t version;
+  if (!epub->takeFb2Position(fraction, version)) return;
+  const size_t bookSize = epub->getBookSize();
+  if (bookSize == 0) return;
+  const auto bytesAt = [bookSize](const float f) {
+    return std::min(bookSize - 1, static_cast<size_t>(static_cast<double>(f) * static_cast<double>(bookSize)));
+  };
+
+  int spine;
+  float spineProgress;
+  if (Fb2Position::restoreByFraction(version, progressLoaded) &&
+      locateBookBytes(bytesAt(fraction), spine, spineProgress)) {
+    currentSpineIndex = spine;
+    nextPageNumber = 0;
+    cachedVisibleTextOffset.reset();
+    cachedChapterTotalPageCount = 0;
+    pendingSpineProgress = spineProgress;
+    pendingPercentJump = true;
+    LOG_DBG("ERS", "FB2 reconverted: reopening at %.4f (spine %d, %.3f)", static_cast<double>(fraction), spine,
+            static_cast<double>(spineProgress));
+  }
+
+  std::vector<BookmarkEntry> bookmarks;
+  if (!Fb2Position::bookmarksMoved(version) || !BookmarkFile::load(epub->getPath(), bookmarks)) return;
+  for (auto& bookmark : bookmarks) {
+    // Only the book fraction survives a reconversion; the reader resolves the rest from it.
+    bookmark.xpath.clear();
+    bookmark.hasVisibleTextOffset = false;
+    bookmark.visibleTextOffset = 0;
+    bookmark.computedChapterPageCount = 0;
+    bookmark.computedChapterProgress = 0;
+    if (locateBookBytes(bytesAt(std::clamp(bookmark.percentage, 0.0f, 1.0f)), spine, spineProgress)) {
+      bookmark.computedSpineIndex = static_cast<uint16_t>(spine);
+    }
+  }
+  if (!BookmarkFile::save(epub->getPath(), bookmarks)) LOG_ERR("ERS", "Could not move bookmarks after reconversion");
 }
 
 void EpubReaderActivity::applyProgressChange(const ProgressChangeResult& sync) {
@@ -1339,11 +1397,22 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
           uint16_t backupSpine = currentSpineIndex;
           uint16_t backupPage = section->currentPage;
           uint16_t backupPageCount = section->pageCount;
+          // An FB2 is converted again on the next open, maybe by a newer converter whose
+          // files differ: keep the book fraction too, for the reader to fall back on.
+          const bool fb2 = epub->isFb2();
+          const float fraction =
+              fb2 ? epub->calculateProgress(backupSpine,
+                                            backupPageCount > 0 ? static_cast<float>(backupPage) / backupPageCount : 0)
+                  : 0.0f;
+          const uint8_t fb2Version = fb2 ? epub->fb2ArchiveVersion() : 0;
           section.reset();
           epub->clearCache();
           epub->setupCacheDir();
           if (!saveProgress(backupSpine, backupPage, backupPageCount)) {
             LOG_ERR("ERS", "Failed to save progress before cache clear");
+          }
+          if (fb2 && !epub->saveFb2Position(fraction, fb2Version)) {
+            LOG_ERR("ERS", "Failed to save FB2 position before cache clear");
           }
         }
       }
