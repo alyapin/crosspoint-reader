@@ -9,6 +9,7 @@
 #include <HalDisplay.h>
 #include <HalFrontlight.h>
 #include <HalGPIO.h>
+#include <HalPowerManager.h>
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Logging.h>
@@ -483,6 +484,10 @@ void EpubReaderActivity::bookPagerTick() {
   pagerHasWork = pagerSection || bookFooter.nextSpineToPaginate(currentSpineIndex) >= 0;
   if (millis() - lastRenderCompleteMs < PAGER_IDLE_MS) return;
   if (buttonContactClosed() || anyButtonPressed() || pendingTurns.pending() || !buildTickHeapGate()) return;
+  if (!pagerHasWork) return;
+  // Input is read between parse steps only. At the C3's 10 MHz idle clock one step outlasts a click,
+  // which then goes unseen.
+  HalPowerManager::Lock fullSpeed;
 
   if (!pagerSection) {
     const int spine = bookFooter.nextSpineToPaginate(currentSpineIndex);
@@ -761,10 +766,11 @@ void EpubReaderActivity::loop() {
 
   {
     RenderLock lock(RenderLock::Mode::Try);
+    // Not while a contact is closed: a click let go during the prewarm is never debounced.
     if (lock.ownsLock() && section && !section->isBuilding() && renderer.hasFrameBuffer() &&
         lastRenderCompleteMs != 0 && millis() - lastRenderCompleteMs > IDLE_PREWARM_DEBOUNCE_MS &&
         ESP.getFreeHeap() > RENDER_MIN_FREE_HEAP && ESP.getMaxAllocHeap() > BACKGROUND_BUILD_MIN_MAX_ALLOC &&
-        (idlePrewarmSpine != currentSpineIndex || idlePrewarmPage != section->currentPage)) {
+        (idlePrewarmSpine != currentSpineIndex || idlePrewarmPage != section->currentPage) && !buttonContactClosed()) {
       idlePrewarmSpine = currentSpineIndex;
       idlePrewarmPage = section->currentPage;
       const int nextPage = section->currentPage + 1;
