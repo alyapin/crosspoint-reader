@@ -14,6 +14,8 @@
 #include "util/LightSleep.h"
 #include "util/ScreenshotInfo.h"
 
+class ReaderActivity;
+
 class Activity {
   friend class ActivityManager;
 
@@ -55,6 +57,11 @@ class Activity {
   // transitions so no filesystem code races a raw SD-card owner.
   virtual bool requiresExclusiveStorageLoop() const { return false; }
   virtual bool isReaderActivity() const { return false; }
+  // The book reader itself; nullptr for every other screen, including the
+  // reader's child screens that report isReaderActivity().
+  virtual ReaderActivity* asReader() { return nullptr; }
+  // This screen's content uses the swipe (logical px), so it is never an edge Back.
+  virtual bool claimsSwipe(int /*sx*/, int /*sy*/, int /*ex*/, int /*ey*/) { return false; }
   virtual bool acceptsRemoteInput() const { return false; }
   // Returns true when the activity schedules its own forced refresh.
   virtual bool handleForcedRefresh() { return false; }

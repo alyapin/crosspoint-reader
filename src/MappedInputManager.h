@@ -97,6 +97,11 @@ class MappedInputManager {
   // Set by ActivityManager every loop: Back on the screen in front would close
   // the open book (edgeBackSwipe's Except Reading scope).
   void setBackLeavesBook(const bool leaves) { backLeavesBook = leaves; }
+  // Set by ActivityManager every loop: the screen's content uses this frame's
+  // swipe (Activity::claimsSwipe), so it stays a swipe and never edge Back.
+  void setSwipeClaimed(const bool claimed) { swipeClaimed = claimed; }
+  // This frame's swipe in logical px, an edge Back one included.
+  bool decodeSwipe(int& sx, int& sy, int& ex, int& ey) const;
   // Home-key boards use a short Home-key tap to exit; their bottom-edge swipe
   // is intentionally unused. Other boards retain the bottom-edge Home gesture.
   // The reader menu remains on its existing top-edge gesture and middle tap.
@@ -148,8 +153,6 @@ class MappedInputManager {
   bool wasTopEdgeDownSwipe() const;
   bool wasBottomEdgeUpSwipe() const;
   bool isEdgeBackSwipe(int sx, int sy, int ex, int ey) const;
-  // Fetch the pending swipe (if any) and map both endpoints to logical screen coords
-  bool decodeSwipe(int& sx, int& sy, int& ex, int& ey) const;
 #if FREEINK_CAP_TOUCH
   bool wasPowerConfirmClick() const;
 #endif
@@ -166,6 +169,7 @@ class MappedInputManager {
   mutable uint16_t longPressFiredButtons = 0;
   mutable uint16_t suppressedReleaseButtons = 0;
   bool backLeavesBook = false;
+  bool swipeClaimed = false;
 #if FREEINK_CAP_TOUCH
   bool powerConfirmClickFrame = false;
 #endif

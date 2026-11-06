@@ -123,9 +123,9 @@ struct ReaderActivity {
 struct ActivityManager {
   MappedInputManager& mappedInput;
   std::unique_ptr<ReaderActivity> currentActivity = std::make_unique<ReaderActivity>();
-  bool context = true, foregroundReader = true;
+  bool context = true, readerInFront = true;
   bool isRemoteReaderContext() const { return context; }
-  bool isForegroundReader() const { return foregroundReader; }
+  ReaderActivity* foregroundReader() const { return readerInFront ? currentActivity.get() : nullptr; }
   bool remoteClick(RemoteButton button) { return mappedInput.injectRemoteClick(button); }
   void requestUpdate() {}
   bool remoteTurn(bool forward, bool chapter);
@@ -137,7 +137,7 @@ void checkRouting(MappedInputManager& input) {
   assert(manager.remoteTurn(true, false));
   assert(manager.currentActivity->pages == 1 && !input.hasRemoteClick());
   for (bool reader : {true, false}) {
-    manager.foregroundReader = reader;
+    manager.readerInFront = reader;
     manager.currentActivity->menu = true;
     for (bool forward : {true, false}) {
       input.update();

@@ -364,7 +364,7 @@ bool MappedInputManager::wasBackGesture() const {
 }
 
 bool MappedInputManager::isEdgeBackSwipe(const int sx, const int sy, const int ex, const int ey) const {
-  return edge_back_swipe::backInScope(SETTINGS.edgeBackSwipe, backLeavesBook) &&
+  return !swipeClaimed && edge_back_swipe::backInScope(SETTINGS.edgeBackSwipe, backLeavesBook) &&
          edge_back_swipe::isBackSwipe(sx, sy, ex, ey, renderer.getScreenWidth());
 }
 

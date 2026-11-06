@@ -23,6 +23,11 @@ class UiListActivity : public Activity, protected UiAppHost {
   void onEnter() override;
   void loop() override;
   void render(RenderLock&&) override;
+#if FREEINK_CAP_TOUCH
+  // Swipe-to-delete keeps its swipes from edge Back: a left swipe from a
+  // deletable row, and a right swipe that closes the open one.
+  bool claimsSwipe(int sx, int sy, int ex, int ey) override;
+#endif
 
  protected:
   // Base-owned row action; subclass-registered actions start at ACTION_USER.
