@@ -2228,10 +2228,8 @@ bool EpubReaderActivity::saveProgress(int spineIndex, int currentPage, int pageC
                  : section->getVisibleTextOffsetForPage(static_cast<uint16_t>(currentPage));
   }
   if (!EpubReaderUtils::saveProgress(*epub, spineIndex, currentPage, pageCount, offset)) return false;
-  if (clearFb2PositionOnSave) {
-    epub->clearFb2Position();
-    clearFb2PositionOnSave = false;
-  }
+  // Kept until removed, so a failed removal is tried again on the next save.
+  if (clearFb2PositionOnSave && epub->clearFb2Position()) clearFb2PositionOnSave = false;
   return true;
 }
 

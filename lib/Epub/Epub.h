@@ -80,7 +80,7 @@ class Epub {
   uint8_t fb2ArchiveVersion() const;
   bool saveFb2Position(float fraction, uint8_t version) const;
   bool peekFb2Position(float& fraction, uint8_t& version) const;
-  void clearFb2Position() const;
+  bool clearFb2Position() const;
   const std::string& getCachePath() const;
   const std::string& getPath() const;
   // Empty unless the encrypted-entry accessor failed to open.

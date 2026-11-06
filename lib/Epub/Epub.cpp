@@ -167,8 +167,12 @@ bool Epub::peekFb2Position(float& fraction, uint8_t& version) const {
   return n > 0 && Fb2Position::parsePending(buf, n, fraction, version);
 }
 
-void Epub::clearFb2Position() const {
-  if (isFb2()) Storage.remove((cachePath + FB2_PENDING).c_str());
+// Removed, or emptied when it cannot be: an empty fb2.pos is no position, so an
+// old fraction is never applied over positions saved since.
+bool Epub::clearFb2Position() const {
+  if (!isFb2()) return true;
+  const std::string path = cachePath + FB2_PENDING;
+  return Storage.remove(path.c_str()) || !Storage.exists(path.c_str()) || writeSmallFile(path, "", 0);
 }
 
 bool Epub::findContentOpfFile(std::string* contentOpfFile, ZipFile* sharedZip) const {
