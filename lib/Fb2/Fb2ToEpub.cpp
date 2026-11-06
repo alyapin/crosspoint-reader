@@ -1613,9 +1613,13 @@ bool Fb2ToEpub::convert(Input& input, Output& out) {
 }
 
 // A book of bold titles (calibre's) has its parts and chapters as sibling sections: its TOC
-// nests each "Глава N" under the "Часть" before it, until a heading of another kind.
+// nests each "Глава N" under the "Часть" before it, until a heading of another kind. Chapters
+// numbered from the start again right after such a heading ("Библиография", then "Глава 1",
+// "Глава 2"...) nest under it, so the chapter list is not repeated at the top level.
 void Fb2ToEpub::shapeBoldToc() {
   uint8_t group = 0;  // depth of the entry the chapters after it nest under, 0: none
+  uint8_t other = 0;  // depth of the heading of another kind just before, 0: none
+  unsigned lastChapter = 0;
   for (TocEntry& e : toc) {
     if (e.depth < group) group = 0;
     if (group && e.depth > group) continue;  // nested already
@@ -1623,10 +1627,15 @@ void Fb2ToEpub::shapeBoldToc() {
     const Heading kind = headingKind(e.label, number);
     if (kind == Heading::Group) {
       group = e.depth;
+      other = 0;
     } else if (kind == Heading::Chapter) {
+      if (!group && other == e.depth && number <= lastChapter) group = other;
       if (group == e.depth) e.depth++;
+      other = 0;
+      lastChapter = number;
     } else {
       group = 0;
+      other = e.depth;
     }
   }
 }

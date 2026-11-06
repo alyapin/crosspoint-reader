@@ -479,6 +479,15 @@ TEST(Fb2ToEpub, NestsTheChaptersOfAFlatBoldTitledBook) {
             "1 ВВЕДЕНИЕ\n1 Часть первая. Первые дни\n2 Глава 1. Первые три дня\n2 Глава 2\n1 Книга II\n2 Глава 3\n"
             "1 ЭПИЛОГ\n1 Глава 4\n1 Part One\n2 Chapter 1\n");
 
+  // Chapters numbered anew after another heading are its own, as a bibliography's per chapter.
+  StringInput notes(boldTitledBook({"Часть 1", "Глава 1", "Глава 2", "БИБЛИОГРАФИЯ", "Глава 1. Первые дни",
+                                    "Глава 2. Дома", "ПРИМЕЧАНИЯ", "Глава 1", "ПОСЛЕСЛОВИЕ", "Глава 3"}));
+  MapOutput notesOut;
+  ASSERT_TRUE(converter.convert(notes, notesOut));
+  EXPECT_EQ(outline(notesOut.files["OEBPS/toc.ncx"]),
+            "1 Часть 1\n2 Глава 1\n2 Глава 2\n1 БИБЛИОГРАФИЯ\n2 Глава 1. Первые дни\n2 Глава 2. Дома\n"
+            "1 ПРИМЕЧАНИЯ\n2 Глава 1\n1 ПОСЛЕСЛОВИЕ\n1 Глава 3\n");
+
   // Real titles keep the book's own structure.
   StringInput titled(
       "<FictionBook><body><section><title><p>Часть первая</p></title><p>т</p></section>"
