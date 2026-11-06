@@ -113,20 +113,16 @@ class Fb2Store final : public Fb2Cache::Store {
       entry.getName(name, sizeof(name));
       const bool isDir = entry.isDirectory();
       entry.close();
-      if (Fb2Cache::archiveVersion(name) != 0 || strcmp(name, Fb2Cache::NEXT) == 0 ||
-          strcmp(name, FB2_PENDING + 1) == 0 || strcmp(name, FB2_PROGRESS + 1) == 0) {
-        continue;
-      }
+      if (Fb2Cache::survivesClear(name)) continue;
       const std::string full = path(name);
       ok = (isDir ? Storage.removeDir(full.c_str()) : Storage.remove(full.c_str())) && ok;
     }
     return ok;
   }
   float savedFraction(const char* archive) override { return fractionOf(cachePath, path(archive)); }
-  bool savePending(const float fraction, const uint8_t version) override {
-    char buf[32];
-    const size_t n = Fb2Position::formatPending(buf, sizeof(buf), fraction, version);
-    return n > 0 && writeSmallFile(cachePath + FB2_PENDING, buf, n);
+  size_t read(const char* name, char* buf, const size_t size) override { return readSmallFile(path(name), buf, size); }
+  bool write(const char* name, const char* data, const size_t len) override {
+    return writeSmallFile(path(name), data, len);
   }
 
  private:
