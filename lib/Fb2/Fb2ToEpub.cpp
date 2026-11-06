@@ -216,6 +216,8 @@ constexpr const char* STYLE_CSS =
     "blockquote.cite{margin-left:1.5em;margin-right:1.5em}"
     "p.annotation{font-style:italic}"
     ".poem{margin-left:1.5em}"
+    // The reader indents every first line unless its CSS indent is negative; -1px lines it up with the next verses.
+    "p.stanza{text-indent:-1px}"
     ".v{text-indent:0}"
     ".text-author{text-align:right;font-style:italic;text-indent:0}"
     ".date{text-align:right;text-indent:0}"
