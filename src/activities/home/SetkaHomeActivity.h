@@ -24,6 +24,8 @@ class SetkaHomeActivity final : public Activity, private UiAppHost {
       : Activity("Home", renderer, mappedInput), UiAppHost(renderer) {}
   void onEnter() override;
   void loop() override;
+  // Back resumes the book here, so an edge swipe stays a plain swipe.
+  bool claimsSwipe(int, int, int, int) override { return true; }
   void render(RenderLock&&) override;
   bool isHomeActivity() const override { return true; }
 

@@ -1514,6 +1514,7 @@ void EpubReaderActivity::toggleAutoPageTurn(const uint8_t selectedPageTurnOption
 
 bool EpubReaderActivity::pageTurn(bool isForwardTurn) {
   if (!section) return false;
+  linkReturnSpine = -1;
   // A "Bluetooth failed" note has been read: the page this turn paints shows the title again.
   bleturner::acknowledgeLinkNote();
   {
@@ -1557,6 +1558,7 @@ bool EpubReaderActivity::pageTurn(bool isForwardTurn) {
 
 bool EpubReaderActivity::skipPages(int amount) {
   if (!section) return false;
+  linkReturnSpine = -1;
   bleturner::acknowledgeLinkNote();
   if (amount > 0) {
     RenderLock lock;
@@ -3380,6 +3382,7 @@ void EpubReaderActivity::navigateToHref(const std::string& hrefStr, const bool s
     const int page = section ? section->currentPage : nextPageNumber;
     savedPositions[footnoteDepth] = {currentSpineIndex, page};
     footnoteDepth++;
+    linkReturnSpine = targetSpineIndex;
     LOG_DBG("ERS", "Saved position [%d]: spine %d, page %d", footnoteDepth, currentSpineIndex, page);
   }
 
@@ -3445,6 +3448,7 @@ void EpubReaderActivity::restoreSavedPosition() {
   if (footnoteDepth <= 0) return;
   footnoteDepth--;
   const auto& pos = savedPositions[footnoteDepth];
+  linkReturnSpine = footnoteDepth > 0 ? pos.spineIndex : -1;
   LOG_DBG("ERS", "Restoring position [%d]: spine %d, page %d", footnoteDepth, pos.spineIndex, pos.pageNumber);
 
   {

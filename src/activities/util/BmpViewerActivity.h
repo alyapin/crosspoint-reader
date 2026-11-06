@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdlib>
 #include <functional>
 #include <string>
 
@@ -13,6 +14,10 @@ class BmpViewerActivity final : public Activity {
   void onEnter() override;
   void onExit() override;
   void loop() override;
+  // Sideways swipes step through the folder's images, from an edge too.
+  bool claimsSwipe(const int sx, const int sy, const int ex, const int ey) override {
+    return siblingImages.size() > 1 && std::abs(ex - sx) >= std::abs(ey - sy);
+  }
 
  private:
   void loadSiblingImages();

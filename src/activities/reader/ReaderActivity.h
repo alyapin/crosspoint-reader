@@ -134,6 +134,7 @@ class ReaderActivity : public Activity {
 #endif
 
   bool isReaderActivity() const final { return true; }
+  ReaderActivity* asReader() final { return this; }
   bool acceptsRemoteInput() const final { return pageRendered.load(std::memory_order_acquire); }
   bool handleForcedRefresh() final;
 
