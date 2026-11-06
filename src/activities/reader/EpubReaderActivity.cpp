@@ -613,6 +613,7 @@ void EpubReaderActivity::startClipSelection(const int initialX, const int initia
     const uint16_t startPage = static_cast<uint16_t>(pageNumber + clipping.startPageOffset);
     const uint16_t endPage = static_cast<uint16_t>(pageNumber + clipping.endPageOffset);
     if (section && currentSpineIndex == spineIndex && endPage < section->pageCount) {
+      linkReturnSpine = -1;
       section->currentPage = endPage;
       currentPageVisibleOffset = section->getVisibleTextOffsetForPage(endPage);
     }
@@ -1128,6 +1129,7 @@ void EpubReaderActivity::applyQueuedTurns() {
 
 void EpubReaderActivity::jumpToPercent(int percent) {
   if (!epub) return;
+  linkReturnSpine = -1;
   const size_t bookSize = epub->getBookSize();
   if (bookSize == 0) return;
 
@@ -1167,6 +1169,7 @@ void EpubReaderActivity::jumpToPercent(int percent) {
 }
 
 void EpubReaderActivity::applyProgressChange(const ProgressChangeResult& sync) {
+  linkReturnSpine = -1;
   if (sync.hasVisibleTextOffset && sync.spineIndex >= 0 && sync.spineIndex < epub->getSpineItemsCount()) {
     RenderLock lock;
     clearDeferredReposition();
@@ -1264,6 +1267,7 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
               return;
             }
             const auto& chapterResult = std::get<ChapterResult>(result.data);
+            linkReturnSpine = -1;
             RenderLock lock;
             clearDeferredReposition();
             currentSpineIndex = chapterResult.spineIndex;
@@ -1520,6 +1524,7 @@ void EpubReaderActivity::toggleAutoPageTurn(const uint8_t selectedPageTurnOption
 
 bool EpubReaderActivity::pageTurn(bool isForwardTurn) {
   if (!section) return false;
+  linkReturnSpine = -1;
   // A "Bluetooth failed" note has been read: the page this turn paints shows the title again.
   bleturner::acknowledgeLinkNote();
   {
@@ -1563,6 +1568,7 @@ bool EpubReaderActivity::pageTurn(bool isForwardTurn) {
 
 bool EpubReaderActivity::skipPages(int amount) {
   if (!section) return false;
+  linkReturnSpine = -1;
   bleturner::acknowledgeLinkNote();
   if (amount > 0) {
     RenderLock lock;
@@ -2920,6 +2926,7 @@ void EpubReaderActivity::handleOverlayInput() {
     const int spineCount = epub->getSpineItemsCount();
     target = std::clamp(target, 0, spineCount - 1);
     if (target != currentSpineIndex) {
+      linkReturnSpine = -1;
       RenderLock lock;
       clearDeferredReposition();
       nextPageNumber = 0;
@@ -2960,12 +2967,13 @@ void EpubReaderActivity::handleOverlayInput() {
       default:
         break;
     }
-    if (routed.routed) return;  // a touch frame the chrome consumed (or dead space)
-
+    // Before the routed-frame return: an edge Back swipe is a routed touch frame too.
     if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
       closeOverlayToPage();
       return;
     }
+    if (routed.routed) return;  // a touch frame the chrome consumed (or dead space)
+
     // Button boards have no hint for the side keys, so they step the tools as in
     // every list; touch boards keep them on the chapter arrows they see.
     const bool sideTools = !mappedInput.hasTouch();
@@ -3035,6 +3043,7 @@ void EpubReaderActivity::handleOverlayInput() {
     } else if (overlay == Overlay::Contents) {
       const auto item = epub->getTocItem(panelIndex);
       if (item.spineIndex != -1) {
+        linkReturnSpine = -1;
         RenderLock lock;
         clearDeferredReposition();
         currentSpineIndex = item.spineIndex;
@@ -3123,12 +3132,12 @@ void EpubReaderActivity::handleOverlayInput() {
     pageList(swipe == MappedInputManager::SwipeDir::Up ? 1 : -1);
     return;
   }
-  if (routed.routed) return;  // consumed by the chrome (title band, dead space)
-
+  // Same for an edge Back swipe.
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     dismissPanel();
     return;
   }
+  if (routed.routed) return;  // consumed by the chrome (title band, dead space)
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     activateRow();
@@ -3385,6 +3394,7 @@ void EpubReaderActivity::navigateToHref(const std::string& hrefStr, const bool s
     const int page = section ? section->currentPage : nextPageNumber;
     savedPositions[footnoteDepth] = {currentSpineIndex, page};
     footnoteDepth++;
+    linkReturnSpine = targetSpineIndex;
     LOG_DBG("ERS", "Saved position [%d]: spine %d, page %d", footnoteDepth, currentSpineIndex, page);
   }
 
@@ -3450,6 +3460,7 @@ void EpubReaderActivity::restoreSavedPosition() {
   if (footnoteDepth <= 0) return;
   footnoteDepth--;
   const auto& pos = savedPositions[footnoteDepth];
+  linkReturnSpine = footnoteDepth > 0 ? pos.spineIndex : -1;
   LOG_DBG("ERS", "Restoring position [%d]: spine %d, page %d", footnoteDepth, pos.spineIndex, pos.pageNumber);
 
   {

@@ -104,6 +104,9 @@ class ReaderActivity : public Activity {
   bool endOfBookMenuActive() const;
   /** True while a toolbar, panel or menu over the page owns the device keys: a remote turn is refused. */
   virtual bool inputOverPage() const { return endOfBookMenuActive(); }
+  /** Edge Swipe Back's Except Reading scope: true on the plain book page, where an edge swipe turns the page; false
+   *  while a menu, panel, link return or auto-turn would take that Back first. */
+  virtual bool backLeavesBook() const { return !inputOverPage(); }
   bool handleEndOfBookMenu(bool suppressConfirmRelease = false);
   bool handleEndOfBookPageTurn(bool prevTriggered, bool nextTriggered);
   void clearEndOfBookOptionsIfNeeded();
@@ -137,6 +140,7 @@ class ReaderActivity : public Activity {
 #endif
 
   bool isReaderActivity() const final { return true; }
+  ReaderActivity* asReader() final { return this; }
   bool acceptsRemoteInput() const final { return pageRendered.load(std::memory_order_acquire); }
   bool handleForcedRefresh() final;
 

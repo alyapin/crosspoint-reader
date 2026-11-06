@@ -15,7 +15,8 @@
 #include "settings/SettingsSection.h"
 #include "util/ScreenshotInfo.h"
 
-class Activity;    // forward declaration
+class Activity;  // forward declaration
+class ReaderActivity;
 class RenderLock;  // forward declaration
 
 enum class HomeMenuItem { NONE, FILE_BROWSER, LIBRARY, OPDS_BROWSER, FILE_TRANSFER, SETTINGS_MENU };
@@ -121,9 +122,9 @@ class ActivityManager {
   bool preventAutoSleep() const;
   bool requiresExclusiveStorageLoop() const;
   bool isReaderActivity() const;
-  // Bluetooth page turner (lib/BlePageTurner): the book in front, whether it has painted a page, and
-  // a page or chapter turn from a remote. False when no book in front took the turn.
-  bool isForegroundReader() const;
+  // Bluetooth page turner (lib/BlePageTurner): the book in front (nullptr otherwise), whether it has
+  // painted a page, and a page or chapter turn from a remote. False when no book in front took the turn.
+  ReaderActivity* foregroundReader() const;
   bool isRemoteReaderContext() const;
   bool remoteClick(RemoteButton button);
   // Home is in front and has painted a frame of its own (not one left from the screen before).

@@ -7,6 +7,7 @@
 
 #include <cstdint>
 
+#include "util/EdgeBackSwipe.h"
 #include "util/HomeButtonInput.h"
 
 class CrossPointSettings : public PersistableStore<CrossPointSettings> {
@@ -411,6 +412,8 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // up-swipe). Only surfaced on home-key boards, where Home is the capacitive
   // key and the bottom edge is free; elsewhere it stays at the Tap default.
   uint8_t showReaderMenu = READER_MENU_TAP;
+  // Where a swipe in from the left or right edge is Back (touch boards).
+  uint8_t edgeBackSwipe = edge_back_swipe::EXCEPT_READING;
   // Frontlight quick-panel state. Category-less SettingsList entries persist
   // these without adding them to the regular Settings screen.
   uint8_t frontlightBrightness = 60;

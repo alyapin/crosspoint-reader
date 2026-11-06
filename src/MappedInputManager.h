@@ -89,13 +89,22 @@ class MappedInputManager {
   // Horizontal variant for side-by-side button pairs (confirmation prompts).
   RowTouch colTouch(int& col, int left, int colStep, int colCount, int yStart, int yEnd, int colWidth = 0) const;
 
+  // Never reports a swipe that wasBackGesture() claims.
   SwipeDir wasSwipe(int* startX = nullptr, int* startY = nullptr) const;
-  // Back = left-to-right swipe anchored at the left edge. Public so swipe-mode
-  // page turns (reader) can exclude it from a plain SwipeDir::Right.
+  // Back = a header back tap, or an inward swipe from the left or right edge
+  // where SETTINGS.edgeBackSwipe allows it.
   bool wasBackGesture() const;
+  // Set by ActivityManager every loop from ReaderActivity::backLeavesBook():
+  // the book page, where Except Reading leaves edge swipes to page turns.
+  void setBackLeavesBook(const bool leaves) { backLeavesBook = leaves; }
+  // Set by ActivityManager every loop: the screen's content uses this frame's
+  // swipe (Activity::claimsSwipe), so it stays a swipe and never edge Back.
+  void setSwipeClaimed(const bool claimed) { swipeClaimed = claimed; }
+  // This frame's swipe in logical px, an edge Back one included.
+  bool decodeSwipe(int& sx, int& sy, int& ex, int& ey) const;
   // Home-key boards use a short Home-key tap to exit; their bottom-edge swipe
   // is intentionally unused. Other boards retain the bottom-edge Home gesture.
-  // The reader menu remains on its existing top-edge gesture and middle tap.
+  // The top-edge swipe is the control center's, never the reader menu's.
   bool wasHomeGesture() const;
   // Configured one-frame action, independent of the gesture that triggered it.
   HomeButtonAction homeButtonAction() const { return homeAction; }
@@ -103,7 +112,6 @@ class MappedInputManager {
     homeButtonInput.reset();
     deferredHomeAction = HomeButtonAction::Ignore;
   }
-  bool wasMenuGesture() const;
   // Bottom-edge up-swipe as the reader-menu gesture (SHOW_READER_MENU's Swipe
   // Up option). Only meaningful on home-key boards, where Home lives on the
   // key and the bottom edge is free; elsewhere the same swipe is the Home
@@ -143,8 +151,7 @@ class MappedInputManager {
   bool wasEdgeSwipe(freeink::ui::ScreenEdge edge) const;
   bool wasTopEdgeDownSwipe() const;
   bool wasBottomEdgeUpSwipe() const;
-  // Fetch the pending swipe (if any) and map both endpoints to logical screen coords
-  bool decodeSwipe(int& sx, int& sy, int& ex, int& ey) const;
+  bool isEdgeBackSwipe(int sx, int sy, int ex, int ey) const;
 #if FREEINK_CAP_TOUCH
   bool wasPowerConfirmClick() const;
 #endif
@@ -160,6 +167,8 @@ class MappedInputManager {
   mutable unsigned long touchHeldOverrideAt = 0;
   mutable uint16_t longPressFiredButtons = 0;
   mutable uint16_t suppressedReleaseButtons = 0;
+  bool backLeavesBook = false;
+  bool swipeClaimed = false;
 #if FREEINK_CAP_TOUCH
   bool powerConfirmClickFrame = false;
 #endif

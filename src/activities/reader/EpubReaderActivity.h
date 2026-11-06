@@ -120,6 +120,9 @@ class EpubReaderActivity final : public ReaderActivity {
   static constexpr int MAX_FOOTNOTE_DEPTH = 3;
   SavedPosition savedPositions[MAX_FOOTNOTE_DEPTH] = {};
   int footnoteDepth = 0;
+  // Spine item a followed link (or a return to an earlier one) led to, until
+  // the next page turn or jump; -1 otherwise. Only the edge-swipe scope reads it.
+  int linkReturnSpine = -1;
   // The back-stack outlives the reader (sleep, home) in links.bin so Back
   // still returns to where a followed link was tapped.
   void saveLinkStack() const;
@@ -179,6 +182,13 @@ class EpubReaderActivity final : public ReaderActivity {
   static constexpr uint32_t BUILD_ROOM_STEP_MS = 50;
   bool inputOverPage() const override { return overlay != Overlay::None || ReaderActivity::inputOverPage(); }
   bool turnsQueued() const override { return pendingTurns.pending(); }
+  // Back first stops auto-turn, closes the load-failure popup or returns from a
+  // followed link (loop()). The link return counts only on the link's target,
+  // before any page turn there, so a later edge swipe still turns the page.
+  bool backLeavesBook() const override {
+    return !(footnoteDepth > 0 && linkReturnSpine == currentSpineIndex) && !automaticPageTurnActive &&
+           !loadFailurePopup.isActive() && ReaderActivity::backLeavesBook();
+  }
 #if CROSSPOINT_BRIGHTNESS_SWIPE
   bool brightnessSwipeAllowed() const override {
     return section && !pageBufferStale && ReaderActivity::brightnessSwipeAllowed();

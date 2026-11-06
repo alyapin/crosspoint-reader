@@ -106,6 +106,14 @@ void ActivityManager::renderTaskLoop() {
 }
 
 void ActivityManager::loop() {
+  const ReaderActivity* reader = foregroundReader();
+  mappedInput.setBackLeavesBook(reader && reader->backLeavesBook());
+  int sx = 0;
+  int sy = 0;
+  int ex = 0;
+  int ey = 0;
+  mappedInput.setSwipeClaimed(currentActivity && mappedInput.decodeSwipe(sx, sy, ex, ey) &&
+                              currentActivity->claimsSwipe(sx, sy, ex, ey));
   if (mappedInput.consumeSuppressedRelease()) return;
 
   if (currentActivity && currentActivity->requiresExclusiveStorageLoop()) {
@@ -117,7 +125,9 @@ void ActivityManager::loop() {
     return;
   }
 
-  if (currentActivity) {
+  // A screen change still waiting (the page turner's radio stopping) keeps
+  // input from the screen it replaces.
+  if (currentActivity && pendingAction == PendingAction::None) {
     if (!currentActivity->isHomeActivity() && mappedInput.wasHomeGesture()) {
       if (currentActivity->handleHomeGesture()) {
         return;
@@ -142,12 +152,12 @@ void ActivityManager::loop() {
     if (mappedInput.hasTouch() && currentActivity->name != "FrontlightPanel" &&
         (statusBarTap || mappedInput.wasLightPanelGesture())) {
       haptic_feedback::touchAction();
+      // Lands below in this pass: the screen underneath gets no more input.
       pushActivity(std::make_unique<FrontlightPanelActivity>(renderer, mappedInput));
-      return;
+    } else {
+      // Note: do not hold a lock here, the loop() method must be responsible for acquire one if needed
+      currentActivity->loop();
     }
-
-    // Note: do not hold a lock here, the loop() method must be responsible for acquire one if needed
-    currentActivity->loop();
   }
 
   while (pendingAction != PendingAction::None) {
@@ -433,8 +443,8 @@ bool ActivityManager::isReaderActivity() const {
          (currentActivity && currentActivity->isReaderActivity());
 }
 
-bool ActivityManager::isForegroundReader() const {
-  return pendingAction == PendingAction::None && currentActivity && currentActivity->isReaderActivity();
+ReaderActivity* ActivityManager::foregroundReader() const {
+  return pendingAction == PendingAction::None && currentActivity ? currentActivity->asReader() : nullptr;
 }
 
 bool ActivityManager::isRemoteReaderContext() const {
@@ -452,8 +462,8 @@ bool ActivityManager::isForegroundHomeShown() const {
 }
 
 bool ActivityManager::remoteShortcut(const bool readerMenu) {
-  if (!isForegroundReader()) return false;
-  auto* reader = static_cast<ReaderActivity*>(currentActivity.get());
+  auto* reader = foregroundReader();
+  if (!reader) return false;
   if (!remoteTurnAccepted(reader->pageRendered.load(std::memory_order_acquire), RenderLock::peek(),
                           reader->inputOverPage())) {
     return false;
@@ -463,7 +473,7 @@ bool ActivityManager::remoteShortcut(const bool readerMenu) {
 
 bool ActivityManager::remoteTurn(const bool forward, const bool chapter) {
   if (!isRemoteReaderContext() || mappedInput.hasRemoteClick()) return false;
-  auto* reader = isForegroundReader() ? static_cast<ReaderActivity*>(currentActivity.get()) : nullptr;
+  auto* reader = foregroundReader();
   if (!reader || reader->inputOverPage()) {
     return !chapter && remoteClick(forward ? RemoteButton::Next : RemoteButton::Previous);
   }

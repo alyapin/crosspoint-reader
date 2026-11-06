@@ -87,7 +87,7 @@ void Game2048Activity::openNewGame() {
 void Game2048Activity::loop() {
   int y = 0;
   const auto swipe = hasGame ? mappedInput.wasSwipe(nullptr, &y) : MappedInputManager::SwipeDir::None;
-  // A swipe on the board is a move, also where the left-edge Back swipe would start: the first column sits there.
+  // A swipe on the board is a move (claimsSwipe keeps the edge ones from Back).
   if (swipe != MappedInputManager::SwipeDir::None && y >= BOARD_TOP && y < barTop()) {
     RenderLock lock(*this);
     slide(swipe == MappedInputManager::SwipeDir::Left    ? Dir::Left

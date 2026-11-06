@@ -18,6 +18,8 @@ class Game2048Activity final : public GameScreen {
   Game2048Activity(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
   void loop() override;
+  // A swipe that starts on the board is a move, also from an edge.
+  bool claimsSwipe(int, int sy, int, int) override { return hasGame && sy >= BOARD_TOP && sy < barTop(); }
 
  private:
   bool restore() override;

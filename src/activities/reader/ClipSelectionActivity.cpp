@@ -342,6 +342,13 @@ void ClipSelectionActivity::selectIndex(const int index) {
   requestUpdate();
 }
 
+bool ClipSelectionActivity::claimsSwipe(const int sx, const int sy, const int ex, const int ey) {
+  // Left or Up = next page, Right or Down = previous, as in loop().
+  const bool next = std::abs(ex - sx) >= std::abs(ey - sy) ? ex < sx : ey < sy;
+  const int target = static_cast<int>(currentPageOffset) + (next ? 1 : -1);
+  return target >= 0 && target < static_cast<int>(pageCount());
+}
+
 void ClipSelectionActivity::moveToPage(const int pageOffset) {
   if (pageOffset < 0 || pageOffset >= static_cast<int>(pageCount()) || pageOffset == currentPageOffset) return;
   for (int i = 0; i < static_cast<int>(wordCount); ++i) {

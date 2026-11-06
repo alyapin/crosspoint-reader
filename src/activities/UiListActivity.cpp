@@ -72,6 +72,16 @@ void UiListActivity::configureSwipeDelete(UiScreen& screen, fui::ListProps& prop
   props.reveal = &swipeReveal;
 }
 
+bool UiListActivity::claimsSwipe(const int sx, const int sy, const int ex, const int ey) {
+  if (!mappedInput.hasTouch()) return false;
+  const auto dir = fui::swipeDirection(sx, sy, ex, ey);
+  if (dir == fui::SwipeDir::Right) return revealedIndex.load() >= 0;
+  if (dir != fui::SwipeDir::Left) return false;
+  fui::Interaction hit;
+  RenderLock lock(*this);
+  return routingReady() && app.hitPublished(sx, sy, ACTION_ROW, hit) && canSwipeDelete(hit.value);
+}
+
 bool UiListActivity::handleSwipeDeleteInput() {
   if (!mappedInput.hasTouch()) return false;
   const int openRow = revealedIndex.load();
