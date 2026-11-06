@@ -476,6 +476,32 @@ TEST(Fb2ToEpub, CapsRunsOfEmptyLines) {
       contains(out.files["OEBPS/s1.xhtml"], "<p>Титул</p>" + blank + blank + "<p>Москва</p>" + blank + "<p>2020</p>"));
 }
 
+TEST(Fb2ToEpub, BoundsPagesForShortSections) {
+  StringInput input("<FictionBook><body>" + repeat("<section><p>x</p></section>", 600) + "</body></FictionBook>",
+                    65536);
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  size_t files = 0;
+  for (const auto& [name, data] : out.files) {
+    if (name.ends_with(".xhtml")) files++;
+  }
+  EXPECT_EQ(files, Fb2ToEpub::MAX_OWN_PAGE_FILES);
+  EXPECT_TRUE(wellFormed(out.files["OEBPS/s512.xhtml"]));
+}
+
+TEST(Fb2ToEpub, SyntheticSectionIdsLeaveTheLinkTableAlone) {
+  // Untitled, id-less sections used to fill the id table and drop real targets after them.
+  StringInput input("<FictionBook xmlns:l=\"x\"><body><section><p><a l:href=\"#late\">ссылка</a></p>" +
+                        repeat("<section><p>.</p></section>", Fb2ToEpub::MAX_IDS) +
+                        "<p id=\"late\">цель</p></section></body></FictionBook>",
+                    65536);
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  EXPECT_TRUE(contains(out.files["OEBPS/s1.xhtml"], "#late\">ссылка</a>"));
+}
+
 TEST(Fb2ToEpub, SplitsAnOversizedSectionBetweenParagraphs) {
   const std::string para = "<p>" + repeat("слово ", 200) + "</p>";  // ~2.4 KB of text
   StringInput input("<FictionBook><body><section><section><title><p>Одна</p></title>" + repeat(para, 100) +

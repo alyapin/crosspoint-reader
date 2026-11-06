@@ -65,6 +65,10 @@ class Fb2ToEpub {
   static constexpr size_t NOTES_SPLIT_BYTES = 32 * 1024;
   // Past this, a file is also split between top-level paragraphs.
   static constexpr size_t MAX_FILE_BYTES = 96 * 1024;
+  // Short top-level sections stop getting a file of their own once the book has
+  // this many, so a book of thousands of them keeps the reader's per-file tables
+  // (spine, ZIP directory) small.
+  static constexpr uint16_t MAX_OWN_PAGE_FILES = 512;
 
   // Bounds on the per-book tables, far above real books. Past MAX_FILES or
   // MAX_DEPTH the book ends there, as at an XML error; ids, images, TOC entries

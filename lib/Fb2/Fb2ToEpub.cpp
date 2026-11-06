@@ -405,7 +405,7 @@ struct Fb2ToEpub::Pass {
   }
 
   // "<tag class="cls" id="id">", recording the id against the file it lands in.
-  void emitOpen(const char* tag, const char* cls, const char* id) {
+  void emitOpen(const char* tag, const char* cls, const char* id, const bool linkable = true) {
     buf = "<";
     buf += tag;
     if (cls) {
@@ -420,7 +420,7 @@ struct Fb2ToEpub::Pass {
     }
     buf += '>';
     if (!fileOpen) openFile();
-    recordId(id);
+    if (linkable) recordId(id);
     writeRaw(buf.data(), buf.size());
   }
 
@@ -589,16 +589,18 @@ struct Fb2ToEpub::Pass {
   void startSection(const char* id) {
     const size_t threshold = notesBody ? NOTES_SPLIT_BYTES : MAIN_SPLIT_BYTES;
     // A top-level section of the main body (chapter, part or front-matter page) opens a page of its own,
-    // titled or not, however short the one before it.
-    const bool ownPage = !notesBody && sectionDepth == 0 && fileHasContent;
+    // titled or not, however short the one before it, until the book has MAX_OWN_PAGE_FILES files.
+    const bool ownPage = !notesBody && sectionDepth == 0 && fileHasContent && self.fileCount < MAX_OWN_PAGE_FILES;
     if (canSplit() && (ownPage || fileText >= threshold)) closeFile();
     const bool startsFile = !fileOpen;
     char synthetic[16];
-    if (!id || !*id) {
+    const bool named = id && *id;
+    if (!named) {
       snprintf(synthetic, sizeof(synthetic), "fb2s%lu", static_cast<unsigned long>(++sectionSerial));
       id = synthetic;
     }
-    emitOpen("div", "section", id);
+    // Only TOC entries point at a synthetic id, and they carry it themselves: no link-table entry.
+    emitOpen("div", "section", id, named);
     sectionDivs++;
     sectionDepth++;
     push(Kind::Section, "</div>");
