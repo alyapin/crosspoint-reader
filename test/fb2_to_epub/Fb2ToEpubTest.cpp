@@ -394,6 +394,62 @@ TEST(Fb2ToEpub, SkipsTheCoverPageWhenTheBodyOpensWithTheCover) {
   EXPECT_TRUE(wellFormed(opf));
 }
 
+std::string coverBook(const std::string& prefix, const std::string& binary, const bool binaryFirst,
+                      const std::string& encoding = "utf-8") {
+  const std::string body = "<body><section><p>текст</p></section></body>";
+  return "<?xml version=\"1.0\" encoding=\"" + encoding + "\"?><FictionBook xmlns:" + prefix +
+         "=\"http://www.w3.org/1999/xlink\"><description><title-info><book-title>T</book-title><coverpage>"
+         "<image " +
+         prefix + ":href=\"#cover.jpg\"/></coverpage></title-info></description>" +
+         (binaryFirst ? binary + body : body + binary) + "</FictionBook>";
+}
+
+const std::string COVER_BINARY = "<binary id=\"cover.jpg\" content-type=\"image/jpeg\">" + COVER_BASE64 + "</binary>";
+
+TEST(Fb2ToEpub, ReadsTheCoverWithoutConverting) {
+  for (const std::string prefix : {"l", "xlink"}) {
+    for (const bool binaryFirst : {false, true}) {
+      const std::string doc = coverBook(
+          prefix, "<binary id=\"other\" content-type=\"image/png\">AAAA</binary>" + COVER_BINARY, binaryFirst);
+      for (const size_t chunk : {size_t{1}, size_t{7}, size_t{4096}}) {
+        StringInput input(doc, chunk);
+        MapOutput out;
+        EXPECT_STREQ(Fb2ToEpub::readCover(input, out), "jpg") << prefix << binaryFirst << chunk;
+        EXPECT_EQ(out.order, std::vector<std::string>{"cover.jpg"});
+        EXPECT_EQ(out.files["cover.jpg"], COVER_BYTES);
+        EXPECT_FALSE(out.open);
+        // It stops after the cover's binary, before the body's text when that comes first.
+        if (binaryFirst && chunk < 4096) EXPECT_LT(input.consumed, doc.find("<p>"));
+      }
+    }
+  }
+}
+
+TEST(Fb2ToEpub, ReadsTheCoverOfAWindows1251Book) {
+  StringInput input(coverBook("l", COVER_BINARY, false, "windows-1251"));
+  MapOutput out;
+  EXPECT_STREQ(Fb2ToEpub::readCover(input, out), "jpg");
+  EXPECT_EQ(out.files["cover.jpg"], COVER_BYTES);
+}
+
+TEST(Fb2ToEpub, ReadsNoCoverWhenThereIsNone) {
+  MapOutput out;
+  StringInput noCoverpage(
+      "<FictionBook><description><title-info><book-title>T</book-title></title-info>"
+      "</description><body><p>т</p></body>" +
+      COVER_BINARY + "</FictionBook>");
+  EXPECT_EQ(Fb2ToEpub::readCover(noCoverpage, out), nullptr);
+  StringInput missingBinary(
+      coverBook("l", "<binary id=\"other.jpg\" content-type=\"image/jpeg\">AAAA</binary>", false));
+  EXPECT_EQ(Fb2ToEpub::readCover(missingBinary, out), nullptr);
+  StringInput gif(coverBook("l", "<binary id=\"cover.jpg\" content-type=\"image/gif\">R0lG</binary>", false));
+  EXPECT_EQ(Fb2ToEpub::readCover(gif, out), nullptr);
+  StringInput truncated(
+      coverBook("l", COVER_BINARY, false).substr(0, coverBook("l", COVER_BINARY, false).find("</binary>")));
+  EXPECT_EQ(Fb2ToEpub::readCover(truncated, out), nullptr);
+  EXPECT_TRUE(out.order.empty() || out.order == std::vector<std::string>{"cover.jpg"});
+}
+
 TEST(Fb2ToEpub, InlineAndBlockImages) {
   StringInput input(
       "<FictionBook xmlns:l=\"x\"><body><section><image l:href=\"#a\"/><p>до <image l:href=\"#a\"/> после</p>"

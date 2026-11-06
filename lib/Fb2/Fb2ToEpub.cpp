@@ -1154,6 +1154,138 @@ struct Fb2ToEpub::Pass {
   }
 };
 
+namespace {
+
+// One pass over the book for its cover: the <coverpage> reference in
+// <title-info>, then the <binary> it names, base64-decoded straight into the
+// output in small chunks.
+struct CoverPass {
+  Fb2ToEpub::Output& out;
+  XML_Parser parser = nullptr;
+  int depth = 0;
+  int titleInfoDepth = 0;  // depth of <title-info>, 0 outside it
+  bool coverpage = false;
+  char coverId[Fb2ToEpub::MAX_ID_BYTES + 1] = {};
+  const char* extension = nullptr;  // set once the cover binary opens
+  bool decoding = false;
+  bool done = false;
+  bool failed = false;
+  uint32_t bits = 0;
+  int bitCount = 0;
+
+  explicit CoverPass(Fb2ToEpub::Output& out) : out(out) {}
+
+  void start(const char* rawName, const XML_Char** atts) {
+    const char* name = localName(rawName);
+    depth++;
+    if (depth == 3 && strcmp(name, "title-info") == 0) {
+      titleInfoDepth = depth;
+    } else if (titleInfoDepth && depth == titleInfoDepth + 1 && strcmp(name, "coverpage") == 0) {
+      coverpage = true;
+    } else if (coverpage && strcmp(name, "image") == 0 && !coverId[0]) {
+      const char* href = attribute(atts, "href");
+      if (href && href[0] == '#' && idFits(href + 1)) snprintf(coverId, sizeof(coverId), "%s", href + 1);
+    } else if (depth == 2 && strcmp(name, "binary") == 0 && coverId[0]) {
+      const char* id = attribute(atts, "id");
+      if (!id || strcmp(id, coverId) != 0) return;
+      extension = imageExtension(attribute(atts, "content-type"));
+      // GIF covers have no thumbnail converter.
+      if (!extension || strcmp(extension, "gif") == 0 ||
+          !out.beginFile(strcmp(extension, "jpg") == 0 ? "cover.jpg" : "cover.png")) {
+        extension = nullptr;
+        stop(true);
+        return;
+      }
+      decoding = true;
+    }
+  }
+
+  void end() {
+    if (decoding) {
+      decoding = false;
+      if (!out.endFile()) failed = true;
+      stop(failed);
+      return;
+    }
+    if (depth == titleInfoDepth) titleInfoDepth = 0;
+    if (titleInfoDepth && depth == titleInfoDepth + 1) coverpage = false;
+    depth--;
+  }
+
+  void text(const XML_Char* s, const int len) {
+    if (!decoding) return;
+    uint8_t chunk[128];
+    size_t n = 0;
+    for (int i = 0; i < len; i++) {
+      const char c = s[i];
+      int v;
+      if (c >= 'A' && c <= 'Z') {
+        v = c - 'A';
+      } else if (c >= 'a' && c <= 'z') {
+        v = c - 'a' + 26;
+      } else if (c >= '0' && c <= '9') {
+        v = c - '0' + 52;
+      } else if (c == '+' || c == '-') {
+        v = 62;
+      } else if (c == '/' || c == '_') {
+        v = 63;
+      } else {
+        continue;  // whitespace and '=' padding
+      }
+      bits = (bits << 6) | static_cast<uint32_t>(v);
+      bitCount += 6;
+      if (bitCount >= 8) {
+        bitCount -= 8;
+        chunk[n++] = static_cast<uint8_t>((bits >> bitCount) & 0xFF);
+        if (n == sizeof(chunk)) {
+          if (!out.write(reinterpret_cast<const char*>(chunk), n)) return stop(true);
+          n = 0;
+        }
+      }
+    }
+    if (n > 0 && !out.write(reinterpret_cast<const char*>(chunk), n)) stop(true);
+  }
+
+  void stop(const bool failure) {
+    failed = failed || failure;
+    done = true;
+    XML_StopParser(parser, XML_FALSE);
+  }
+
+  static void XMLCALL onStart(void* ud, const XML_Char* name, const XML_Char** atts) {
+    static_cast<CoverPass*>(ud)->start(name, atts);
+  }
+  static void XMLCALL onEnd(void* ud, const XML_Char*) { static_cast<CoverPass*>(ud)->end(); }
+  static void XMLCALL onText(void* ud, const XML_Char* s, int len) { static_cast<CoverPass*>(ud)->text(s, len); }
+  static bool feed(void* ctx, const char* data, size_t len) {
+    auto* pass = static_cast<CoverPass*>(ctx);
+    if (pass->done) return false;
+    if (XML_Parse(pass->parser, data, static_cast<int>(len), XML_FALSE) == XML_STATUS_ERROR) {
+      if (!pass->done) pass->stop(true);
+      return false;
+    }
+    return !pass->done;
+  }
+};
+
+}  // namespace
+
+const char* Fb2ToEpub::readCover(Input& input, Output& out) {
+  auto pass = makeUniqueNoThrow<CoverPass>(out);
+  if (!pass) return nullptr;
+  pass->parser = XML_ParserCreate(nullptr);
+  if (!pass->parser) return nullptr;
+  XML_SetUserData(pass->parser, pass.get());
+  XML_SetElementHandler(pass->parser, CoverPass::onStart, CoverPass::onEnd);
+  XML_SetCharacterDataHandler(pass->parser, CoverPass::onText);
+  XML_SetUnknownEncodingHandler(pass->parser, unknownEncoding, nullptr);
+  const bool streamed = input.stream(CoverPass::feed, pass.get());
+  XML_ParserFree(pass->parser);
+  // An unfinished binary (the input ended inside it) is no cover either.
+  const bool complete = streamed && pass->done && !pass->failed && pass->extension && !pass->decoding;
+  return complete ? pass->extension : nullptr;
+}
+
 bool Fb2ToEpub::readMetadata(Input& input, Metadata& out) {
   Fb2ToEpub converter;
   // Passes hold several strings and the element stack: heap, not the reader task's stack.

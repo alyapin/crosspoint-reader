@@ -1123,6 +1123,16 @@ bool Epub::generateThumbBmpFromSource(int height) {
     setupCacheDir();
     return generateThumbBmpForCover(height, companionCover);
   }
+  if (isFb2() && !ensureArchive()) {
+    // Never opened, so never converted: the cover comes straight from the FB2.
+    setupCacheDir();
+    const std::string cover = Fb2Archive::extractCover(filepath, cachePath);
+    if (cover.empty()) return false;
+    const bool converted = Txt::convertCoverImageToBmp(cover, getThumbBmpPath(height), height);
+    Storage.remove(cover.c_str());
+    if (!converted) Storage.remove(getThumbBmpPath(height).c_str());
+    return converted;
+  }
   if (!ensureArchive()) return false;
   // Parser input and metadata outlive parsing but exceed the small task stack budget.
   auto metadata = makeUniqueNoThrow<BookMetadataCache::BookMetadata>();

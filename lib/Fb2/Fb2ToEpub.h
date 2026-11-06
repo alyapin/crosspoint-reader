@@ -56,6 +56,12 @@ class Fb2ToEpub {
   // Reads <description> only and stops after it.
   static bool readMetadata(Input& input, Metadata& out);
 
+  // Writes the <coverpage> image into `out` as one file, "cover.jpg" or
+  // "cover.png", decoding its <binary> as it streams past, and stops there.
+  // Returns the extension, or nullptr without a cover, with an image the reader
+  // cannot draw, or on a read or write error. For covers of books not converted yet.
+  static const char* readCover(Input& input, Output& out);
+
   // Writes the whole EPUB into `out`. False when the input is not a
   // FictionBook with content, or when reading or `out` fails. A document cut
   // short by an XML error converts up to the error.
