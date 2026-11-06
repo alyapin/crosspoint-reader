@@ -17,6 +17,7 @@ class FakeStore : public Fb2Cache::Store {
   std::map<std::string, std::string> files;  // name -> what it was made from, or its text
   int budget = -1;
   bool convertFails = false;
+  bool clearFails = false;
   int conversions = 0;
 
   bool exists(const char* name) override { return files.count(name) != 0; }
@@ -34,6 +35,7 @@ class FakeStore : public Fb2Cache::Store {
     return true;
   }
   bool clearDerived() override {
+    if (clearFails) return false;
     for (auto it = files.begin(); it != files.end();) {
       if (Fb2Cache::survivesClear(it->first.c_str())) {
         ++it;
@@ -203,6 +205,11 @@ TEST(Fb2Cache, ClearsCachesBuiltFromAnotherArchive) {
   // Converted by another board's firmware, then read here from a different archive.
   FakeStore store;
   store.files = {{"fb2.v2.epub", "new"}, {"book.bin", "v3"}, {"sections", "v3"}, {"fb2.src", "fb2.v3.epub"}};
+  // A clear that fails leaves the record as it was, to be tried again.
+  store.clearFails = true;
+  EXPECT_EQ(prepare(store, false), "fb2.v2.epub");
+  EXPECT_EQ(store.files["fb2.src"], "fb2.v3.epub");
+  store.clearFails = false;
   EXPECT_EQ(prepare(store, false), "fb2.v2.epub");
   const std::map<std::string, std::string> expected = {{"fb2.v2.epub", "new"}, {"fb2.src", "fb2.v2.epub"}};
   EXPECT_EQ(store.files, expected);

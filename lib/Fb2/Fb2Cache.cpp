@@ -60,7 +60,8 @@ void claimDerived(Store& store, const char* archive) {
   char source[16] = {};
   const size_t n = store.read(SOURCE, source, sizeof(source) - 1);
   if (n > 0 && strcmp(source, archive) == 0) return;
-  if (n > 0) store.clearDerived();
+  // Recorded only once the caches are gone, so a partial clear is tried again.
+  if (n > 0 && !store.clearDerived()) return;
   store.write(SOURCE, archive, strlen(archive));
 }
 
