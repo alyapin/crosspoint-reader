@@ -469,13 +469,17 @@ TEST(Fb2ToEpub, SetsSubtitlesAsHeadings) {
 
 TEST(Fb2ToEpub, CapsRunsOfEmptyLines) {
   StringInput input("<FictionBook><body><section><p>Титул</p>" + repeat("<empty-line/>", 21) +
-                    "<p>Москва</p><empty-line/><p>2020</p></section></body></FictionBook>");
+                    "<p>Москва</p><empty-line/><p>2020</p><empty-line/><empty-line/></section><section>" +
+                    repeat("<empty-line/>", 3) + "<p>Посвящение</p></section></body></FictionBook>");
   MapOutput out;
   Fb2ToEpub converter;
   ASSERT_TRUE(converter.convert(input, out));
   const std::string blank = "<p class=\"empty-line\">&#160;</p>";
   EXPECT_TRUE(
       contains(out.files["OEBPS/s1.xhtml"], "<p>Титул</p>" + blank + blank + "<p>Москва</p>" + blank + "<p>2020</p>"));
+  // A new page keeps its own top spacing after a run that ended the page before.
+  EXPECT_TRUE(contains(out.files["OEBPS/s2.xhtml"],
+                       "<body><div class=\"section\" id=\"fb2s2\">" + blank + blank + "<p>Посвящение</p>"));
 }
 
 TEST(Fb2ToEpub, BoundsPagesForShortSections) {

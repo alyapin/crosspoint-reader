@@ -382,6 +382,7 @@ struct Fb2ToEpub::Pass {
     fileText = 0;
     fileHasContent = false;
     tocShareable = false;
+    emptyLines = 0;  // a run before the break does not eat the new page's top spacing
     if (out) {
       char name[32];
       snprintf(name, sizeof(name), "OEBPS/s%u.xhtml", static_cast<unsigned>(fileNo));
