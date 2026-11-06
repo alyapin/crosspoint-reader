@@ -219,6 +219,19 @@ TEST(Fb2ToEpub, BuildsNestedTocWithAnchors) {
   EXPECT_FALSE(contains(ncx, "Стих"));
 }
 
+TEST(Fb2ToEpub, LeavesNoteMarkersOutOfTocLabels) {
+  StringInput input(
+      "<FictionBook xmlns:l=\"x\"><body><section><title><p>5. Против академиков<a l:href=\"#n1\" "
+      "type=\"note\">[31]</a></p></title><p>текст</p></section></body><body name=\"notes\">"
+      "<section id=\"n1\"><p>сноска</p></section></body></FictionBook>");
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  EXPECT_TRUE(contains(out.files["OEBPS/toc.ncx"], "<text>5. Против академиков</text>"));
+  // The heading keeps its marker and link.
+  EXPECT_TRUE(contains(out.files["OEBPS/s1.xhtml"], "академиков<a href=\"s2.xhtml#n1\">[31]</a></h2>"));
+}
+
 TEST(Fb2ToEpub, DecodesCoverAndDeclaresIt) {
   StringInput input(sampleBook("x"));
   MapOutput out;

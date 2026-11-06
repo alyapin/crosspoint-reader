@@ -239,6 +239,7 @@ enum class Kind : uint8_t {
   Wrapper,    // epigraph, cite, poem, ... : blocks splitting while open
   TextBlock,  // p, v, subtitle, td, ... : character data is content
   Inline,
+  NoteLink,  // <a type="note">: its marker stays out of TOC labels
   Binary,
 };
 
@@ -598,9 +599,11 @@ struct Fb2ToEpub::Pass {
 
   void startLink(const XML_Char** atts) {
     if (!fileOpen) openFile();
+    const char* type = attribute(atts, "type");
+    const Kind kind = type && strcmp(type, "note") == 0 ? Kind::NoteLink : Kind::Inline;
     const char* href = attribute(atts, "href");
     if (!href || !*href) {
-      push(Kind::Inline);
+      push(kind);
       return;
     }
     buf.clear();
@@ -620,11 +623,11 @@ struct Fb2ToEpub::Pass {
       buf += "\">";
     }
     if (buf.empty()) {
-      push(Kind::Inline);
+      push(kind);
       return;
     }
     emit(buf);
-    push(Kind::Inline, "</a>");
+    push(kind, "</a>");
   }
 
   void startText(const char* tag, const char* cls, const char* id, const char* close) {
@@ -826,7 +829,9 @@ struct Fb2ToEpub::Pass {
     appendEscaped(buf, s, static_cast<size_t>(len));
     emit(buf);
     fileText += static_cast<size_t>(len);
-    if (open(Kind::Title) && tocPending) appendBounded(tocLabel, s, static_cast<size_t>(len), 2 * MAX_LABEL_BYTES);
+    if (open(Kind::Title) && tocPending && !open(Kind::NoteLink)) {
+      appendBounded(tocLabel, s, static_cast<size_t>(len), 2 * MAX_LABEL_BYTES);
+    }
   }
 
   static void XMLCALL onStart(void* ud, const XML_Char* name, const XML_Char** atts) {
