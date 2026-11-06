@@ -184,7 +184,9 @@ TEST(Fb2ToEpub, MapsContentMarkup) {
   // Глава 2 opens a file of its own, re-opening the enclosing section.
   const std::string& s3 = out.files["OEBPS/s3.xhtml"];
   EXPECT_TRUE(contains(s3, "<body><div class=\"section\"><div class=\"section\" id=\"fb2s3\"><h3"));
-  EXPECT_TRUE(contains(s3, "<div class=\"poem\"><h4 class=\"title\">Стих</h4><div class=\"stanza\"><p class=\"v\">"));
+  EXPECT_TRUE(contains(s3,
+                       "<div class=\"poem\"><h4 class=\"title\">Стих</h4><div class=\"stanza\"><p class=\"stanza\">"
+                       "Строка один<br/>Строка два</p></div></div>"));
   EXPECT_TRUE(contains(s3, "<p class=\"empty-line\">"));
   EXPECT_TRUE(contains(s3, "<a href=\"http://example.com/?a=1&amp;b=2\">наружу</a>"));
 }
@@ -345,6 +347,23 @@ TEST(Fb2ToEpub, StartsEveryTopLevelSectionOnANewPage) {
   EXPECT_TRUE(contains(out.files["OEBPS/s3.xhtml"], "<p>Введение</p><div class=\"section\" id=\"fb2s4\"><p>Сцена"));
   EXPECT_TRUE(contains(out.files["OEBPS/s4.xhtml"], "<p>1</p></div><div class=\"section\" id=\"n2\">"));
   EXPECT_EQ(out.files.count("OEBPS/s5.xhtml"), 0u);
+}
+
+TEST(Fb2ToEpub, SetsAStanzaAsOneParagraph) {
+  StringInput input(
+      "<FictionBook><body><section><poem><stanza><title><p>I</p></title><v>Мороз и <emphasis>солнце</emphasis>;"
+      "</v><v id=\"v2\">день чудесный!</v><subtitle>*</subtitle><v>Ещё ты дремлешь</v></stanza>"
+      "<stanza><v>Пора</v></stanza><v>вне строфы</v></poem></section></body></FictionBook>");
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  const std::string& s1 = out.files["OEBPS/s1.xhtml"];
+  EXPECT_TRUE(contains(s1,
+                       "<div class=\"stanza\"><h3 class=\"title\">I</h3><p class=\"stanza\">Мороз и <em>солнце</em>;"
+                       "<br/>день чудесный!</p><p class=\"subtitle\">*</p><p class=\"stanza\">Ещё ты дремлешь</p></div>"
+                       "<div class=\"stanza\"><p class=\"stanza\">Пора</p></div><p class=\"v\">вне строфы</p>"))
+      << s1;
+  EXPECT_TRUE(wellFormed(s1));
 }
 
 TEST(Fb2ToEpub, CapsRunsOfEmptyLines) {

@@ -188,7 +188,8 @@ constexpr const char* STYLE_CSS =
     "p.epigraph{margin-left:30%;font-style:italic;text-indent:0}"
     "p.cite{margin-left:1.5em;margin-right:1.5em}"
     "p.annotation{font-style:italic}"
-    ".v{margin-left:1.5em;text-indent:0}"
+    ".poem{margin-left:1.5em}"
+    ".v{text-indent:0}"
     ".text-author{text-align:right;font-style:italic;text-indent:0}"
     ".date{text-align:right;text-indent:0}"
     ".empty-line{text-indent:0}"
@@ -239,8 +240,9 @@ enum class Kind : uint8_t {
   Body,
   Section,
   Title,
-  TitleLine,
+  Line,       // a title's <p> or a stanza's <v>: text inside a paragraph its parent opened
   Wrapper,    // epigraph, cite, poem, ... : blocks splitting while open
+  Stanza,     // a wrapper whose <v>s are the lines of one paragraph
   TextBlock,  // p, v, subtitle, td, ... : character data is content
   Inline,
   NoteLink,  // <a type="note">: its marker stays out of TOC labels
@@ -287,6 +289,7 @@ struct Fb2ToEpub::Pass {
   uint32_t sectionSerial = 0;
   int textDepth = 0;
   int titleLines = 0;
+  bool verses = false;  // a stanza's paragraph is open
   bool tocPending = false;
   uint8_t tocDepth = 0;
   std::string tocAnchor;
@@ -353,7 +356,8 @@ struct Fb2ToEpub::Pass {
   void emit(const char* s) { emit(s, strlen(s)); }
   void emit(const std::string& s) { emit(s.data(), s.size()); }
 
-  bool canSplit() const { return fileOpen && textDepth == 0 && !open(Kind::Wrapper) && !open(Kind::Title); }
+  bool wrapped() const { return open(Kind::Wrapper) || open(Kind::Stanza); }
+  bool canSplit() const { return fileOpen && textDepth == 0 && !wrapped() && !open(Kind::Title); }
 
   void recordId(const char* id) {
     if (measuring() && id && *id && self.idFile.size() < MAX_IDS && idFits(id))
@@ -571,7 +575,7 @@ struct Fb2ToEpub::Pass {
       push(Kind::Title, "</p>");
     } else {
       // A poem's or stanza's title sits a level below its section's.
-      const int level = sectionDepth + 1 + (open(Kind::Wrapper) ? 1 : 0);
+      const int level = sectionDepth + 1 + (wrapped() ? 1 : 0);
       tag[1] = static_cast<char>('0' + (level > 6 ? 6 : level));
       emitOpen(tag, "title", id);
       static constexpr const char* CLOSE[] = {"</h1>", "</h2>", "</h3>", "</h4>", "</h5>", "</h6>"};
@@ -674,6 +678,26 @@ struct Fb2ToEpub::Pass {
     push(Kind::Wrapper, close, paraClass);
   }
 
+  // A stanza's verses are the lines of one paragraph: as paragraphs of their own each would
+  // get the reader's paragraph spacing, first-line indent and justification.
+  void startVerse(const char* id) {
+    if (verses) {
+      emit("<br/>");
+      recordId(id);
+    } else {
+      emitOpen("p", "stanza", id);
+      verses = true;
+    }
+    textDepth++;
+    push(Kind::Line);
+  }
+
+  void endVerses() {
+    if (!verses) return;
+    emit("</p>");
+    verses = false;
+  }
+
   void startInline(const char* tag, const char* close) {
     emit(tag);
     push(Kind::Inline, close);
@@ -681,6 +705,8 @@ struct Fb2ToEpub::Pass {
 
   void startContent(const char* name, const XML_Char** atts) {
     const char* id = attribute(atts, "id");
+    const bool verse = strcmp(name, "v") == 0;
+    if (verses && textDepth == 0 && !verse) endVerses();  // a title or subtitle among the verses
     if (open(Kind::Title)) {
       if (strcmp(name, "p") == 0) {
         if (titleLines++ > 0) {
@@ -689,7 +715,7 @@ struct Fb2ToEpub::Pass {
         }
         recordId(id);
         textDepth++;
-        push(Kind::TitleLine);
+        push(Kind::Line);
         return;
       }
       if (strcmp(name, "empty-line") == 0) {
@@ -704,8 +730,12 @@ struct Fb2ToEpub::Pass {
       startTitle(id);
     } else if (strcmp(name, "p") == 0) {
       startText("p", nullptr, id, "</p>");
-    } else if (strcmp(name, "v") == 0) {
-      startText("p", "v", id, "</p>");
+    } else if (verse) {
+      if (!stack.empty() && stack.back().kind == Kind::Stanza) {
+        startVerse(id);
+      } else {
+        startText("p", "v", id, "</p>");
+      }
     } else if (strcmp(name, "subtitle") == 0) {
       startText("p", "subtitle", id, "</p>");
     } else if (strcmp(name, "text-author") == 0) {
@@ -725,7 +755,9 @@ struct Fb2ToEpub::Pass {
     } else if (strcmp(name, "poem") == 0) {
       startWrapper("div", "poem", id, "</div>");
     } else if (strcmp(name, "stanza") == 0) {
-      startWrapper("div", "stanza", id, "</div>");
+      tocPending = false;
+      emitOpen("div", "stanza", id);
+      push(Kind::Stanza, "</div>");
     } else if (strcmp(name, "annotation") == 0) {
       startWrapper("div", "annotation", id, "</div>", "annotation");
     } else if (strcmp(name, "table") == 0) {
@@ -788,8 +820,12 @@ struct Fb2ToEpub::Pass {
         // The file may have been split after this section's last paragraph.
         if (fileOpen) writeRaw(frame.close);
         return;
-      case Kind::TitleLine:
+      case Kind::Line:
         textDepth--;
+        return;
+      case Kind::Stanza:
+        endVerses();
+        emit(frame.close);
         return;
       case Kind::Title:
         emit(frame.close);
