@@ -14,9 +14,11 @@ class BmpViewerActivity final : public Activity {
   void onEnter() override;
   void onExit() override;
   void loop() override;
-  // Sideways swipes step through the folder's images, from an edge too.
+  // A sideways swipe that opens a sibling image (loop()) is not edge Back.
   bool claimsSwipe(const int sx, const int sy, const int ex, const int ey) override {
-    return siblingImages.size() > 1 && std::abs(ex - sx) >= std::abs(ey - sy);
+    if (currentImageIndex < 0 || std::abs(ex - sx) < std::abs(ey - sy)) return false;
+    const int target = currentImageIndex + (ex < sx ? 1 : -1);
+    return target >= 0 && target < static_cast<int>(siblingImages.size());
   }
 
  private:

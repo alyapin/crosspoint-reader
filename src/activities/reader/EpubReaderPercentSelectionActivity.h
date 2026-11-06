@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdlib>
+
 #include "MappedInputManager.h"
 #include "activities/Activity.h"
 #include "components/UiAppHost.h"
@@ -15,6 +17,10 @@ class EpubReaderPercentSelectionActivity final : public Activity, private UiAppH
   void onExit() override;
   void loop() override;
   void render(RenderLock&&) override;
+  // Sideways swipes step the percent (loop()), from an edge too.
+  bool claimsSwipe(const int sx, const int sy, const int ex, const int ey) override {
+    return std::abs(ex - sx) >= std::abs(ey - sy);
+  }
 
  private:
   // The UiAppHost app hosts the shared slider dialog popup (capsule slider,

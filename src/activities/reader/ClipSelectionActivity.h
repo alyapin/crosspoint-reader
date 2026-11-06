@@ -40,8 +40,8 @@ class ClipSelectionActivity final : public Activity {
   void loop() override;
   void render(RenderLock&&) override;
   bool isReaderActivity() const override { return true; }
-  // Every swipe turns the selection's page, from an edge too.
-  bool claimsSwipe(int, int, int, int) override { return true; }
+  // A swipe that turns the selection's page (loop()) is not edge Back.
+  bool claimsSwipe(int sx, int sy, int ex, int ey) override;
   bool handleHomeGesture() override;
 
  private:
