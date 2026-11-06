@@ -59,7 +59,8 @@ class Fb2ToEpub {
 
   const Metadata& metadata() const { return meta; }
 
-  // A <section> starts a new file once the current one holds this much text.
+  // A <section> starts a new file once the current one holds this much text;
+  // a top-level section of the main body starts one whenever the current file has content.
   static constexpr size_t MAIN_SPLIT_BYTES = 2 * 1024;
   static constexpr size_t NOTES_SPLIT_BYTES = 32 * 1024;
   // Past this, a file is also split between top-level paragraphs.

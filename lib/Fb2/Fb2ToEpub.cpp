@@ -289,7 +289,8 @@ struct Fb2ToEpub::Pass {
   // Current content file.
   bool fileOpen = false;
   uint16_t fileNo = 0;
-  size_t fileText = 0;  // character data only, so both passes split alike
+  size_t fileText = 0;          // character data only, so both passes split alike
+  bool fileHasContent = false;  // text or an image, not just open section markup
 
   // Binary being decoded.
   bool decoding = false;
@@ -315,6 +316,7 @@ struct Fb2ToEpub::Pass {
     fileNo = ++self.fileCount;
     fileOpen = true;
     fileText = 0;
+    fileHasContent = false;
     if (out) {
       char name[32];
       snprintf(name, sizeof(name), "OEBPS/s%u.xhtml", static_cast<unsigned>(fileNo));
@@ -529,7 +531,10 @@ struct Fb2ToEpub::Pass {
 
   void startSection(const char* id) {
     const size_t threshold = notesBody ? NOTES_SPLIT_BYTES : MAIN_SPLIT_BYTES;
-    if (canSplit() && fileText >= threshold) closeFile();
+    // A top-level section of the main body (chapter, part or front-matter page) opens a page of its own,
+    // titled or not, however short the one before it.
+    const bool ownPage = !notesBody && sectionDepth == 0 && fileHasContent;
+    if (canSplit() && (ownPage || fileText >= threshold)) closeFile();
     const bool startsFile = !fileOpen;
     char synthetic[16];
     if (!id || !*id) {
@@ -576,6 +581,7 @@ struct Fb2ToEpub::Pass {
   void startImage(const XML_Char** atts) {
     // Open the file whether or not the image resolves, so both passes number files alike.
     if (!fileOpen) openFile();
+    fileHasContent = true;
     push(Kind::Other);
     const char* href = attribute(atts, "href");
     const char* id = attribute(atts, "id");
@@ -829,6 +835,7 @@ struct Fb2ToEpub::Pass {
     appendEscaped(buf, s, static_cast<size_t>(len));
     emit(buf);
     fileText += static_cast<size_t>(len);
+    fileHasContent = true;
     if (open(Kind::Title) && tocPending && !open(Kind::NoteLink)) {
       appendBounded(tocLabel, s, static_cast<size_t>(len), 2 * MAX_LABEL_BYTES);
     }
