@@ -428,11 +428,11 @@ TEST(Fb2ToEpub, SetsAStanzaAsOneParagraph) {
   Fb2ToEpub converter;
   ASSERT_TRUE(converter.convert(input, out));
   const std::string& s1 = out.files["OEBPS/s1.xhtml"];
-  EXPECT_TRUE(
-      contains(s1,
-               "<div class=\"stanza\"><h3 class=\"title\">I</h3><p class=\"stanza\">Мороз и <em>солнце</em>;"
-               "<br/>день чудесный!</p><h4 class=\"subtitle\">*</h4><p class=\"stanza\">Ещё ты дремлешь</p></div>"
-               "<div class=\"stanza\"><p class=\"stanza\">Пора</p></div><p class=\"v\">вне строфы</p>"))
+  EXPECT_TRUE(contains(s1,
+                       "<div class=\"stanza\"><h3 class=\"title\">I</h3><p class=\"stanza\">Мороз и <em>солнце</em>;"
+                       "<br/><a id=\"v2\"></a>день чудесный!</p><h4 class=\"subtitle\">*</h4><p class=\"stanza\">Ещё "
+                       "ты дремлешь</p></div>"
+                       "<div class=\"stanza\"><p class=\"stanza\">Пора</p></div><p class=\"v\">вне строфы</p>"))
       << s1;
   EXPECT_TRUE(wellFormed(s1));
 }

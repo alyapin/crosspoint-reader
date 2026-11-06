@@ -730,7 +730,11 @@ struct Fb2ToEpub::Pass {
   void startVerse(const char* id) {
     if (verses) {
       emit("<br/>");
-      recordId(id);
+      if (id && *id) {
+        // The reader keeps no anchor for an id on a <span>.
+        emitOpen("a", nullptr, id);
+        emit("</a>");
+      }
     } else {
       emitOpen("p", "stanza", id);
       verses = true;
