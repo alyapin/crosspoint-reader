@@ -2954,12 +2954,13 @@ void EpubReaderActivity::handleOverlayInput() {
       default:
         break;
     }
-    if (routed.routed) return;  // a touch frame the chrome consumed (or dead space)
-
+    // Before the routed-frame return: an edge Back swipe is a routed touch frame too.
     if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
       closeOverlayToPage();
       return;
     }
+    if (routed.routed) return;  // a touch frame the chrome consumed (or dead space)
+
     // Button boards have no hint for the side keys, so they step the tools as in
     // every list; touch boards keep them on the chapter arrows they see.
     const bool sideTools = !mappedInput.hasTouch();
@@ -3117,12 +3118,12 @@ void EpubReaderActivity::handleOverlayInput() {
     pageList(swipe == MappedInputManager::SwipeDir::Up ? 1 : -1);
     return;
   }
-  if (routed.routed) return;  // consumed by the chrome (title band, dead space)
-
+  // Same for an edge Back swipe.
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     dismissPanel();
     return;
   }
+  if (routed.routed) return;  // consumed by the chrome (title band, dead space)
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     activateRow();

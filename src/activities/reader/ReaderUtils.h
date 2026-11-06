@@ -256,16 +256,8 @@ struct BackNavCallback {
 // - with backShortToFileBrowser: go to file browser.
 inline bool handleBackNavigation(const MappedInputManager& mappedInput, ActivityManager& activityManager,
                                  const char* filePath, BackNavCallback goHome) {
-  // The reading surface deliberately has no left-edge swipe-to-exit path: in
-  // swipe page-turn mode a right swipe must page back instead. Home remains
-  // available through the board's dedicated Home gesture/key. Back swipes stay
-  // available in menus and other activities; only this reader-surface handler
-  // ignores them. Physical Back buttons are unaffected: isPressed() is
-  // button-only, and this guard skips just the gesture's own release frame.
-  if (mappedInput.wasBackGesture()) {
-    return false;
-  }
-
+  // An edge swipe reaches here as Back only with Edge Swipe Back = Everywhere;
+  // otherwise MappedInputManager leaves it to the page turns.
   const bool backTriggered = mappedInput.wasLongPressed(MappedInputManager::Button::Back, GO_BACK_OR_HOME_MS) ||
                              mappedInput.wasReleased(MappedInputManager::Button::Back);
   if (!backTriggered) return false;

@@ -10,16 +10,17 @@
 // Pure geometry and gesture state, so host tests can drive it.
 //
 // Touch zones on the reading surface (logical px, every orientation):
-//   left 25%       right-swipe from the edge = Back (the reader ignores it)
+//   side 40 px     inward swipe = Back, only with Edge Swipe Back = Everywhere
 //   top 14%        down-swipe = control center
 //   bottom 14%     up-swipe = Home, or the reader menu on Home-key boards
 //   center third   tap = reader menu
 //   elsewhere      tap or horizontal swipe = page turn, hold = clipping
 //   right 12% between the top and bottom bands: vertical drag = brightness
-// The strip begins strictly inside the top/bottom bands, so no edge swipe can
-// start in it. Inside it taps, holds and horizontal swipes keep their meaning:
-// a contact only becomes a brightness drag once it has moved kEngagePx and at
-// least twice as far vertically as sideways.
+// The strip begins strictly inside the top/bottom bands, so no top or bottom
+// edge swipe can start in it. Inside it taps, holds and horizontal swipes keep
+// their meaning: a contact only becomes a brightness drag once it has moved
+// kEngagePx and at least twice as far vertically as sideways, and a Back swipe
+// moves at least twice as far sideways as vertically.
 namespace brightness_swipe {
 
 constexpr int kStripWidthPercent = 12;

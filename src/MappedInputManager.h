@@ -89,10 +89,14 @@ class MappedInputManager {
   // Horizontal variant for side-by-side button pairs (confirmation prompts).
   RowTouch colTouch(int& col, int left, int colStep, int colCount, int yStart, int yEnd, int colWidth = 0) const;
 
+  // Never reports a swipe that wasBackGesture() claims.
   SwipeDir wasSwipe(int* startX = nullptr, int* startY = nullptr) const;
-  // Back = left-to-right swipe anchored at the left edge. Public so swipe-mode
-  // page turns (reader) can exclude it from a plain SwipeDir::Right.
+  // Back = a header back tap, or an inward swipe from the left or right edge
+  // where SETTINGS.edgeBackSwipe allows it.
   bool wasBackGesture() const;
+  // Set by ActivityManager every loop: the book page is in front with no
+  // reader menu or panel over it (edgeBackSwipe's Except Reading scope).
+  void setReadingPageShown(const bool shown) { readingPageShown = shown; }
   // Home-key boards use a short Home-key tap to exit; their bottom-edge swipe
   // is intentionally unused. Other boards retain the bottom-edge Home gesture.
   // The reader menu remains on its existing top-edge gesture and middle tap.
@@ -143,6 +147,7 @@ class MappedInputManager {
   bool wasEdgeSwipe(freeink::ui::ScreenEdge edge) const;
   bool wasTopEdgeDownSwipe() const;
   bool wasBottomEdgeUpSwipe() const;
+  bool isEdgeBackSwipe(int sx, int sy, int ex, int ey) const;
   // Fetch the pending swipe (if any) and map both endpoints to logical screen coords
   bool decodeSwipe(int& sx, int& sy, int& ex, int& ey) const;
 #if FREEINK_CAP_TOUCH
@@ -160,6 +165,7 @@ class MappedInputManager {
   mutable unsigned long touchHeldOverrideAt = 0;
   mutable uint16_t longPressFiredButtons = 0;
   mutable uint16_t suppressedReleaseButtons = 0;
+  bool readingPageShown = false;
 #if FREEINK_CAP_TOUCH
   bool powerConfirmClickFrame = false;
 #endif

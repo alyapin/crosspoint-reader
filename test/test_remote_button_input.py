@@ -56,7 +56,7 @@ bool MappedInputManager::mapButton(Button b, bool (HalGPIO::*fn)(uint8_t) const)
   return (gpio.*fn)(static_cast<uint8_t>(b));
 }
 bool MappedInputManager::wasBackGesture() const { return false; }
-MappedInputManager::SwipeDir MappedInputManager::wasSwipe(int*, int*) const { return SwipeDir::None; }
+bool MappedInputManager::decodeSwipe(int&, int&, int&, int&) const { return false; }
 """ + "\n".join(methods) + r"""
 int main() {
   HalGPIO gpio;

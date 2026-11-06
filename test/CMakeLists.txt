@@ -69,6 +69,7 @@ add_subdirectory(chapter_position)
 add_subdirectory(book_metadata_cache)
 add_subdirectory(home_button)
 add_subdirectory(brightness_swipe)
+add_subdirectory(edge_back_swipe)
 add_subdirectory(button_press_navigation)
 add_subdirectory(keyboard_layouts)
 

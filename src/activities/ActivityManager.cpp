@@ -106,6 +106,8 @@ void ActivityManager::renderTaskLoop() {
 }
 
 void ActivityManager::loop() {
+  mappedInput.setReadingPageShown(isForegroundReader() &&
+                                  !static_cast<ReaderActivity*>(currentActivity.get())->inputOverPage());
   if (mappedInput.consumeSuppressedRelease()) return;
 
   if (currentActivity && currentActivity->requiresExclusiveStorageLoop()) {

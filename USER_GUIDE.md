@@ -341,6 +341,11 @@ Settings are grouped into **System**, **Display**, **Reader**, **Controls**, **L
 
 - **Side Button Layout (reader)**: Swap the order of the up and down side buttons from "Prev/Next" (default) to "Next/Prev". You can also disable them entirely. This change is only in effect when reading.
 
+- **Edge Swipe Back** (touch devices): A quick swipe that starts at the left or right edge of the screen and moves inward acts as Back.
+  - "Except Reading" (default) - On every screen except the book page itself, where such swipes still turn pages. Reader menus and panels over the page keep it.
+  - "Everywhere" - The book page too, where it leaves the book like Back.
+  - "Off" - Edge swipes never act as Back.
+
 - **Long-press Chapter Skip**: Set whether long-pressing page turn buttons skips to the next/previous chapter:
   
   - "Chapter Skip" (default) - Long-pressing skips to next/previous chapter

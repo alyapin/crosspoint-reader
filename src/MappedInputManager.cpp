@@ -11,6 +11,7 @@
 #include "CrossPointSettings.h"
 #include "components/HeaderBackTapTarget.h"
 #include "components/UITheme.h"
+#include "util/EdgeBackSwipe.h"
 
 namespace fui = freeink::ui;
 
@@ -22,11 +23,17 @@ void MappedInputManager::update(const bool deferHomeButtonAction) const {
   HalHaptics::feedback(SETTINGS.vibration != CrossPointSettings::VIBRATION_OFF, pagePressed, SETTINGS.hapticIntensity);
   homeAction = HomeButtonAction::Ignore;
   if (gpio.hasHomeKey()) {
-    homeAction = homeButtonInput.update(millis(), gpio.wasHomeKeyTapped(), gpio.wasHomeKeyLongPressed(),
-                                        wasSwipe() != SwipeDir::None, gpio.wasHomeKeyPressed(),
-                                        static_cast<HomeButtonAction>(SETTINGS.homeButtonTapAction),
-                                        static_cast<HomeButtonAction>(SETTINGS.homeButtonDoubleTapAction),
-                                        static_cast<HomeButtonAction>(SETTINGS.homeButtonLongPressAction));
+    int sx = 0;
+    int sy = 0;
+    int ex = 0;
+    int ey = 0;
+    // Every swipe cancels a pending Home tap, an edge Back swipe included.
+    const bool swiped = decodeSwipe(sx, sy, ex, ey);
+    homeAction =
+        homeButtonInput.update(millis(), gpio.wasHomeKeyTapped(), gpio.wasHomeKeyLongPressed(), swiped,
+                               gpio.wasHomeKeyPressed(), static_cast<HomeButtonAction>(SETTINGS.homeButtonTapAction),
+                               static_cast<HomeButtonAction>(SETTINGS.homeButtonDoubleTapAction),
+                               static_cast<HomeButtonAction>(SETTINGS.homeButtonLongPressAction));
     if (gpio.wasHomeKeyLongPressed() && homeAction != HomeButtonAction::Ignore) {
       HalHaptics::longPress(SETTINGS.vibration != CrossPointSettings::VIBRATION_OFF, SETTINGS.hapticIntensity);
     } else if (homeAction != HomeButtonAction::Ignore) {
@@ -301,7 +308,7 @@ MappedInputManager::SwipeDir MappedInputManager::wasSwipe(int* startX, int* star
   int sy = 0;
   int ex = 0;
   int ey = 0;
-  if (!decodeSwipe(sx, sy, ex, ey)) return SwipeDir::None;
+  if (!decodeSwipe(sx, sy, ex, ey) || isEdgeBackSwipe(sx, sy, ex, ey)) return SwipeDir::None;
   if (startX) *startX = sx;
   if (startY) *startY = sy;
   switch (fui::swipeDirection(sx, sy, ex, ey)) {
@@ -319,7 +326,7 @@ MappedInputManager::SwipeDir MappedInputManager::wasSwipe(int* startX, int* star
 }
 
 // Edge classification (which swipe counts as an edge gesture) lives in the
-// SDK; only the MEANING of each edge — back, menu, home, light panel, and the
+// SDK; only the MEANING of each edge — menu, home, light panel, and the
 // home-key remap — is decided here.
 bool MappedInputManager::wasEdgeSwipe(const freeink::ui::ScreenEdge edge) const {
   int sx = 0;
@@ -347,10 +354,22 @@ bool MappedInputManager::wasBackGesture() const {
       return true;
     }
   }
-  // Back = left-to-right swipe starting near the left edge. Edge-anchored so that
-  // mid-screen horizontal swipes stay available to activities that consume
-  // SwipeDir::Left/Right (e.g. percent selection, image viewer).
-  return wasEdgeSwipe(fui::ScreenEdge::Left);
+  int sx = 0;
+  int sy = 0;
+  int ex = 0;
+  int ey = 0;
+  if (!decodeSwipe(sx, sy, ex, ey) || !isEdgeBackSwipe(sx, sy, ex, ey)) return false;
+  rememberTouchHeldTime();
+  return true;
+}
+
+bool MappedInputManager::isEdgeBackSwipe(const int sx, const int sy, const int ex, const int ey) const {
+  const uint8_t scope = SETTINGS.edgeBackSwipe;
+  if (scope == CrossPointSettings::EDGE_BACK_OFF ||
+      (scope == CrossPointSettings::EDGE_BACK_EXCEPT_READING && readingPageShown)) {
+    return false;
+  }
+  return edge_back_swipe::isBackSwipe(sx, sy, ex, ey, renderer.getScreenWidth());
 }
 
 bool MappedInputManager::wasTopEdgeDownSwipe() const { return wasEdgeSwipe(fui::ScreenEdge::Top); }

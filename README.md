@@ -54,6 +54,7 @@ Three crashes in a row during start-up do the same on their own. The user guide 
 - Battery in the reader footer: Settings → Reader → Customise Status Bar → Battery, off by default.
 - FB2 and FB2.ZIP books, converted once into an EPUB inside the book's cache.
 - A right-edge swipe sets the frontlight brightness while reading (X4 Pro, Edge Swipe Brightness setting).
+- A swipe in from the left or right edge is Back (X4 Pro, Edge Swipe Back setting): everywhere except the book page by default, or everywhere, or off.
 
 ### Library and statistics
 
