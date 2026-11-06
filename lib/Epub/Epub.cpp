@@ -1124,13 +1124,22 @@ bool Epub::generateThumbBmpFromSource(int height) {
     return generateThumbBmpForCover(height, companionCover);
   }
   if (isFb2() && !ensureArchive()) {
-    // Never opened, so never converted: the cover comes straight from the FB2.
+    // Never opened, so never converted: the cover comes straight from the FB2. A book
+    // without one the reader can draw is marked, as finding that out may mean reading
+    // all of a large book again on each visit; deleting the cache removes the mark.
+    const std::string noCover = cachePath + "/fb2.nocover";
+    if (Storage.exists(noCover.c_str())) return false;
     setupCacheDir();
+    LOG_DBG("EBP", "Reading the cover of %s", filepath.c_str());
     const std::string cover = Fb2Archive::extractCover(filepath, cachePath);
-    if (cover.empty()) return false;
-    const bool converted = Txt::convertCoverImageToBmp(cover, getThumbBmpPath(height), height);
-    Storage.remove(cover.c_str());
-    if (!converted) Storage.remove(getThumbBmpPath(height).c_str());
+    bool converted = false;
+    if (!cover.empty()) {
+      converted = Txt::convertCoverImageToBmp(cover, getThumbBmpPath(height), height);
+      Storage.remove(cover.c_str());
+      if (!converted) Storage.remove(getThumbBmpPath(height).c_str());
+    }
+    if (!converted && !writeSmallFile(noCover, "", 0))
+      LOG_ERR("EBP", "Could not mark %s as coverless", filepath.c_str());
     return converted;
   }
   if (!ensureArchive()) return false;

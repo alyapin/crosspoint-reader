@@ -434,11 +434,14 @@ TEST(Fb2ToEpub, ReadsTheCoverOfAWindows1251Book) {
 
 TEST(Fb2ToEpub, ReadsNoCoverWhenThereIsNone) {
   MapOutput out;
-  StringInput noCoverpage(
+  const std::string noCoverpageDoc =
       "<FictionBook><description><title-info><book-title>T</book-title></title-info>"
-      "</description><body><p>т</p></body>" +
-      COVER_BINARY + "</FictionBook>");
+      "</description><body>" +
+      repeat("<p>текст</p>", 1000) + "</body>" + COVER_BINARY + "</FictionBook>";
+  StringInput noCoverpage(noCoverpageDoc);
   EXPECT_EQ(Fb2ToEpub::readCover(noCoverpage, out), nullptr);
+  // Without a <coverpage> it stops at the end of the header.
+  EXPECT_LT(noCoverpage.consumed, noCoverpageDoc.find("<body>") + 16);
   StringInput missingBinary(
       coverBook("l", "<binary id=\"other.jpg\" content-type=\"image/jpeg\">AAAA</binary>", false));
   EXPECT_EQ(Fb2ToEpub::readCover(missingBinary, out), nullptr);

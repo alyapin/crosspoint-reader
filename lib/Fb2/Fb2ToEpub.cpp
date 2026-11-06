@@ -1163,6 +1163,7 @@ struct CoverPass {
   Fb2ToEpub::Output& out;
   XML_Parser parser = nullptr;
   int depth = 0;
+  bool description = false;
   int titleInfoDepth = 0;  // depth of <title-info>, 0 outside it
   bool coverpage = false;
   char coverId[Fb2ToEpub::MAX_ID_BYTES + 1] = {};
@@ -1178,7 +1179,9 @@ struct CoverPass {
   void start(const char* rawName, const XML_Char** atts) {
     const char* name = localName(rawName);
     depth++;
-    if (depth == 3 && strcmp(name, "title-info") == 0) {
+    if (depth == 2 && strcmp(name, "description") == 0) {
+      description = true;
+    } else if (depth == 3 && strcmp(name, "title-info") == 0) {
       titleInfoDepth = depth;
     } else if (titleInfoDepth && depth == titleInfoDepth + 1 && strcmp(name, "coverpage") == 0) {
       coverpage = true;
@@ -1209,6 +1212,11 @@ struct CoverPass {
     }
     if (depth == titleInfoDepth) titleInfoDepth = 0;
     if (titleInfoDepth && depth == titleInfoDepth + 1) coverpage = false;
+    // No <coverpage> in the header: no cover, and the rest of the book need not be read.
+    if (depth == 2 && description) {
+      description = false;
+      if (!coverId[0]) stop(false);
+    }
     depth--;
   }
 
