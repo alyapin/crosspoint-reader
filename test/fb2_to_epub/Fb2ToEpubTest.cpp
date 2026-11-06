@@ -207,7 +207,7 @@ TEST(Fb2ToEpub, ResolvesNoteLinksIntoTheNotesFile) {
 
 TEST(Fb2ToEpub, RaisesNoteMarkers) {
   StringInput input(
-      "<FictionBook xmlns:l=\"x\"><body><section><p>слово<a l:href=\"#n1\" type=\"note\">2</a>, "
+      "<FictionBook xmlns:l=\"x\"><body><section><p>слово<a l:href=\"#n1\" l:type=\"simple\" type=\"note\">2</a>, "
       "<sup><a l:href=\"#n1\" type=\"note\">3</a></sup>, <a l:href=\"#nx\" type=\"note\">4</a>, "
       "<a l:href=\"#n1\">ссылка</a></p></section></body><body name=\"notes\"><section id=\"n1\"><p>сноска</p>"
       "</section></body></FictionBook>");

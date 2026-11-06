@@ -93,6 +93,16 @@ const char* attribute(const XML_Char** atts, const char* name) {
   return nullptr;
 }
 
+// Attribute by its full name: FB2 marks notes with a plain type="note", while
+// xlink:type="simple" on the same link must not hide it.
+const char* exactAttribute(const XML_Char** atts, const char* name) {
+  if (!atts) return nullptr;
+  for (int i = 0; atts[i]; i += 2) {
+    if (strcmp(atts[i], name) == 0) return atts[i + 1];
+  }
+  return nullptr;
+}
+
 const char* imageExtension(const char* contentType) {
   if (!contentType) return nullptr;
   if (iequals(contentType, "image/jpeg") || iequals(contentType, "image/jpg")) return "jpg";
@@ -674,7 +684,7 @@ struct Fb2ToEpub::Pass {
 
   void startLink(const XML_Char** atts) {
     if (!fileOpen) openFile();
-    const char* type = attribute(atts, "type");
+    const char* type = exactAttribute(atts, "type");
     const bool note = type && strcmp(type, "note") == 0;
     // Note markers are raised, as in print: at the baseline "word2" reads as one word.
     const bool raise = note && !inSup();
