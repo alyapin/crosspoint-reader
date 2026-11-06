@@ -342,6 +342,144 @@ TEST(Fb2ToEpub, KeepsDeepTitlesAtTextSize) {
   EXPECT_TRUE(wellFormed(s1));
 }
 
+// As calibre writes an FB2: no <title>s, sections opening with bold lines instead.
+const std::string BOLD_HEADED =
+    "<FictionBook><body>"
+    "<section><p><strong>ВВЕДЕНИЕ</strong></p><p>текст</p></section>"
+    "<section><empty-line/><p><strong>Часть первая</strong></p><p><strong>ПЕРВЫЕ ДНИ</strong></p><p>о части</p>"
+    "<section><p><strong>Глава 1</strong></p><p><strong>«ПЕРВЫЕ» ТРИ ДНЯ?..</strong></p><p>текст</p></section>"
+    "<section><p><strong>Глава 2</strong></p><p><strong>Дома</strong></p><p>текст</p></section>"
+    "<section><p><strong>Глава 3?</strong></p><p><strong>ДА? НЕТ!</strong></p><p>текст</p></section></section>"
+    "<section><p><strong>Часть вторая</strong></p>"
+    "<section><p><strong>Глава 4</strong></p><p>текст</p></section></section>"
+    "<section><p><strong>Не заголовок.</strong></p><p>текст</p></section>"
+    "<section><p><strong>Не</strong> заголовок</p></section>"
+    "<section><p><strong>Со <a l:href=\"#n1\" type=\"note\">сноской</a></strong></p></section>"
+    "<section><p><strong>Один</strong></p><p><strong>Два</strong></p><p><strong>Три</strong></p></section>"
+    "</body><body name=\"notes\"><section id=\"n1\"><p><strong>Сноска</strong></p><p>текст</p></section></body>"
+    "</FictionBook>";
+
+TEST(Fb2ToEpub, TakesBoldOpeningLinesForMissingTitles) {
+  StringInput input(BOLD_HEADED);
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  EXPECT_EQ(out.files["OEBPS/toc.ncx"].substr(out.files["OEBPS/toc.ncx"].find("<navMap>")),
+            "<navMap><navPoint id=\"n1\" playOrder=\"1\"><navLabel><text>ВВЕДЕНИЕ</text></navLabel>"
+            "<content src=\"s1.xhtml\"/></navPoint>"
+            "<navPoint id=\"n2\" playOrder=\"2\"><navLabel><text>Часть первая. Первые дни</text></navLabel>"
+            "<content src=\"s2.xhtml\"/>"
+            "<navPoint id=\"n3\" playOrder=\"3\"><navLabel><text>Глава 1. «Первые» три дня?..</text></navLabel>"
+            "<content src=\"s2.xhtml#fb2s3\"/></navPoint>"
+            "<navPoint id=\"n4\" playOrder=\"4\"><navLabel><text>Глава 2 · Дома</text></navLabel>"
+            "<content src=\"s2.xhtml#fb2s4\"/></navPoint>"
+            "<navPoint id=\"n5\" playOrder=\"5\"><navLabel><text>Глава 3? Да? Нет!</text></navLabel>"
+            "<content src=\"s2.xhtml#fb2s5\"/></navPoint></navPoint>"
+            "<navPoint id=\"n6\" playOrder=\"6\"><navLabel><text>Часть вторая</text></navLabel>"
+            "<content src=\"s3.xhtml\"/>"
+            // Right under its part's title, as with real titles: no page break between them.
+            "<navPoint id=\"n7\" playOrder=\"7\"><navLabel><text>Глава 4</text></navLabel>"
+            "<content src=\"s3.xhtml\"/></navPoint></navPoint></navMap></ncx>");
+  // Set as titles are, centred by the heading style.
+  EXPECT_TRUE(contains(out.files["OEBPS/s2.xhtml"],
+                       "<p class=\"empty-line\">&#160;</p><h2 class=\"title\"><strong>Часть первая</strong><br/>"
+                       "<strong>ПЕРВЫЕ ДНИ</strong></h2><p>о части</p>"));
+  EXPECT_TRUE(contains(out.files["OEBPS/s2.xhtml"],
+                       "<h3 class=\"title\"><strong>Глава 1</strong><br/><strong>«ПЕРВЫЕ» ТРИ ДНЯ?..</strong></h3>"));
+  // A sentence, a line part bold, a line with a link, a list of bold lines and a note stay text.
+  EXPECT_TRUE(contains(out.files["OEBPS/s4.xhtml"], "<p><strong>Не заголовок.</strong></p>"));
+  EXPECT_TRUE(contains(out.files["OEBPS/s5.xhtml"], "<p><strong>Не</strong> заголовок</p>"));
+  EXPECT_TRUE(contains(out.files["OEBPS/s6.xhtml"], "<p><strong>Со "));
+  EXPECT_TRUE(contains(out.files["OEBPS/s7.xhtml"],
+                       "<p><strong>Один</strong></p><p><strong>Два</strong></p><p><strong>Три</strong></p>"));
+  EXPECT_TRUE(contains(out.files["OEBPS/s8.xhtml"], "<p><strong>Сноска</strong></p>"));
+  for (const auto& file : out.files) {
+    if (file.first.find(".xhtml") != std::string::npos) EXPECT_TRUE(wellFormed(file.second)) << file.first;
+  }
+}
+
+TEST(Fb2ToEpub, LeavesABoldTableOfContentsAlone) {
+  // The book's own contents page: only its heading opens it in bold.
+  StringInput input(
+      "<FictionBook><body><section><p><strong>ОГЛАВЛЕНИЕ</strong></p><p>Введение</p><empty-line/>"
+      "<p><strong>Часть первая</strong></p><p><strong>ПЕРВЫЕ ДНИ</strong></p><p>Глава 1</p><p>Глава 2</p>"
+      "<p><strong>Часть вторая</strong></p><p>Глава 3</p></section>"
+      "<section><p><strong>ВВЕДЕНИЕ</strong></p><p>текст</p></section></body></FictionBook>");
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  const std::string& ncx = out.files["OEBPS/toc.ncx"];
+  EXPECT_TRUE(contains(ncx,
+                       "<text>ОГЛАВЛЕНИЕ</text></navLabel><content src=\"s1.xhtml\"/></navPoint>"
+                       "<navPoint id=\"n2\" playOrder=\"2\"><navLabel><text>ВВЕДЕНИЕ</text>"))
+      << ncx;
+  EXPECT_FALSE(contains(ncx, "Часть"));
+  EXPECT_TRUE(contains(out.files["OEBPS/s1.xhtml"],
+                       "<h2 class=\"title\"><strong>ОГЛАВЛЕНИЕ</strong></h2><p>Введение</p>"
+                       "<p class=\"empty-line\">&#160;</p><p><strong>Часть первая</strong></p>"
+                       "<p><strong>ПЕРВЫЕ ДНИ</strong></p>"));
+}
+
+TEST(Fb2ToEpub, NamesThePagesBeforeTheFirstBoldTitle) {
+  StringInput input(
+      "<FictionBook><description><title-info><book-title>Книга</book-title></title-info></description><body>"
+      "<section><p>Автор</p></section><section><p><strong>ВВЕДЕНИЕ</strong></p><p>текст</p></section></body>"
+      "</FictionBook>");
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  EXPECT_TRUE(contains(out.files["OEBPS/toc.ncx"],
+                       "<navMap><navPoint id=\"n1\" playOrder=\"1\"><navLabel><text>Книга</text></navLabel>"
+                       "<content src=\"s1.xhtml\"/></navPoint><navPoint id=\"n2\" playOrder=\"2\"><navLabel>"
+                       "<text>ВВЕДЕНИЕ</text></navLabel><content src=\"s2.xhtml\"/></navPoint></navMap>"))
+      << out.files["OEBPS/toc.ncx"];
+}
+
+TEST(Fb2ToEpub, KeepsBoldLinesAsTextInBooksWithTitles) {
+  // One title anywhere and no bold line is a title: the book converts as if they were not bold.
+  const std::string book =
+      "<FictionBook><body><section><p><strong>Часть</strong></p><section id=\"ch1\"><title><p>Глава 1</p>"
+      "</title><p>текст</p></section></section><section><p><strong>ПРОЛОГ</strong></p><p>текст</p></section>"
+      "<section><title><p>Глава 2</p></title><p><strong>Жирный</strong></p><p>текст</p></section></body>"
+      "</FictionBook>";
+  std::string plain = book;
+  for (size_t at; (at = plain.find("strong>")) != std::string::npos;) plain.replace(at, 6, "emphasis");
+  StringInput boldInput(book), plainInput(plain);
+  MapOutput bold, expected;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(boldInput, bold));
+  ASSERT_TRUE(converter.convert(plainInput, expected));
+  for (auto& file : expected.files) {
+    for (size_t at; (at = file.second.find("em>")) != std::string::npos;) file.second.replace(at, 2, "strong");
+  }
+  EXPECT_EQ(bold.files, expected.files);
+  EXPECT_TRUE(contains(bold.files["OEBPS/toc.ncx"], "<text>Глава 1</text></navLabel><content src=\"s1.xhtml#ch1\"/>"));
+}
+
+TEST(Fb2ToEpub, SplitsBoldTitledBooksAlikeInBothPasses) {
+  // Long chapters and nested sections split the files; a mismatch fails the conversion.
+  std::string book = "<FictionBook><body>";
+  for (int part = 1; part <= 3; part++) {
+    book += "<section><p><strong>Часть " + std::to_string(part) + "</strong></p>";
+    for (int chapter = 1; chapter <= 4; chapter++) {
+      book += "<section><p><strong>Глава " + std::to_string(chapter) + "</strong></p><p><strong>НАЗВАНИЕ</strong></p>";
+      for (int i = 0; i < 4; i++) book += "<p>" + LONG_TEXT + "</p>";
+      book += "</section>";
+    }
+    book += "</section>";
+  }
+  book += "</body></FictionBook>";
+  StringInput input(book);
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  const std::string& ncx = out.files["OEBPS/toc.ncx"];
+  size_t entries = 0;
+  for (size_t at = 0; (at = ncx.find("<navPoint ", at)) != std::string::npos; at++) entries++;
+  EXPECT_EQ(entries, 15u);
+  EXPECT_TRUE(contains(ncx, "<text>Глава 4. Название</text>"));
+}
+
 TEST(Fb2ToEpub, LeavesNoteMarkersOutOfTocLabels) {
   StringInput input(
       "<FictionBook xmlns:l=\"x\"><body><section><title><p>5. Против академиков<a l:href=\"#n1\" "
