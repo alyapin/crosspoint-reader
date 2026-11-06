@@ -285,6 +285,11 @@ struct Fb2ToEpub::Pass {
   uint8_t tocDepth = 0;
   std::string tocAnchor;
   std::string tocLabel;
+  // The last TOC entry's anchor while only titles follow it in its file. A section opening
+  // there takes the same anchor, so the reader keeps "Part" and "Chapter 1" on one page
+  // instead of breaking before each.
+  bool tocShareable = false;
+  std::string lastTocAnchor;
 
   // Current content file.
   bool fileOpen = false;
@@ -317,6 +322,7 @@ struct Fb2ToEpub::Pass {
     fileOpen = true;
     fileText = 0;
     fileHasContent = false;
+    tocShareable = false;
     if (out) {
       char name[32];
       snprintf(name, sizeof(name), "OEBPS/s%u.xhtml", static_cast<unsigned>(fileNo));
@@ -548,7 +554,7 @@ struct Fb2ToEpub::Pass {
     if (!notesBody) {
       tocPending = true;
       tocDepth = sectionDepth;
-      tocAnchor = startsFile ? "" : id;
+      tocAnchor = tocShareable ? lastTocAnchor : (startsFile ? "" : id);
     }
   }
 
@@ -576,12 +582,15 @@ struct Fb2ToEpub::Pass {
     if (!measuring() || tocLabel.empty() || self.toc.size() >= MAX_TOC_ENTRIES) return;
     truncateUtf8(tocLabel, MAX_LABEL_BYTES);
     self.toc.push_back({fileNo, tocDepth, tocAnchor, tocLabel});
+    tocShareable = true;
+    lastTocAnchor = tocAnchor;
   }
 
   void startImage(const XML_Char** atts) {
     // Open the file whether or not the image resolves, so both passes number files alike.
     if (!fileOpen) openFile();
     fileHasContent = true;
+    tocShareable = false;
     push(Kind::Other);
     const char* href = attribute(atts, "href");
     const char* id = attribute(atts, "id");
@@ -836,6 +845,7 @@ struct Fb2ToEpub::Pass {
     emit(buf);
     fileText += static_cast<size_t>(len);
     fileHasContent = true;
+    if (!open(Kind::Title)) tocShareable = false;
     if (open(Kind::Title) && tocPending && !open(Kind::NoteLink)) {
       appendBounded(tocLabel, s, static_cast<size_t>(len), 2 * MAX_LABEL_BYTES);
     }

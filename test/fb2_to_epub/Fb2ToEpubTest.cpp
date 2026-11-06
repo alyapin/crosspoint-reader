@@ -213,7 +213,7 @@ TEST(Fb2ToEpub, BuildsNestedTocWithAnchors) {
                        "<navPoint id=\"n2\" playOrder=\"2\"><navLabel><text>Часть первая</text></navLabel>"
                        "<content src=\"s2.xhtml\"/>"
                        "<navPoint id=\"n3\" playOrder=\"3\"><navLabel><text>Глава 1</text></navLabel>"
-                       "<content src=\"s2.xhtml#fb2s2\"/></navPoint>"
+                       "<content src=\"s2.xhtml\"/></navPoint>"
                        "<navPoint id=\"n4\" playOrder=\"4\"><navLabel><text>Глава 2</text></navLabel>"
                        "<content src=\"s3.xhtml\"/></navPoint></navPoint>"
                        "<navPoint id=\"n5\" playOrder=\"5\"><navLabel><text>Примечания</text></navLabel>"
@@ -221,6 +221,28 @@ TEST(Fb2ToEpub, BuildsNestedTocWithAnchors) {
       << ncx;
   // The poem's title is not a chapter.
   EXPECT_FALSE(contains(ncx, "Стих"));
+}
+
+TEST(Fb2ToEpub, KeepsConsecutiveTitlesOnOnePage) {
+  // The reader breaks the page before every TOC anchor: a chapter opening right under its part's
+  // title shares the part's anchor, while a chapter after text keeps its own.
+  StringInput input(
+      "<FictionBook><body><section><p>до</p></section><section id=\"part\"><title><p>Часть</p></title>"
+      "<section id=\"book\"><title><p>Книга</p></title><section id=\"ch1\"><title><p>Глава 1</p></title>"
+      "<p>текст</p></section><section id=\"ch2\"><title><p>Глава 2</p></title><p>текст</p></section>"
+      "</section></section><section id=\"next\"><epigraph><p>эпиграф</p></epigraph>"
+      "<section id=\"ch3\"><title><p>Глава 3</p></title><p>текст</p></section></section></body></FictionBook>");
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  const std::string& ncx = out.files["OEBPS/toc.ncx"];
+  EXPECT_TRUE(contains(ncx, "<text>Часть</text></navLabel><content src=\"s2.xhtml\"/>")) << ncx;
+  EXPECT_TRUE(contains(ncx, "<text>Книга</text></navLabel><content src=\"s2.xhtml\"/>"));
+  EXPECT_TRUE(contains(ncx, "<text>Глава 1</text></navLabel><content src=\"s2.xhtml\"/>"));
+  EXPECT_TRUE(contains(ncx, "<text>Глава 2</text></navLabel><content src=\"s2.xhtml#ch2\"/>"));
+  EXPECT_TRUE(contains(ncx, "<text>Глава 3</text></navLabel><content src=\"s3.xhtml#ch3\"/>"));
+  // Ids stay in place for links.
+  EXPECT_TRUE(contains(out.files["OEBPS/s2.xhtml"], "<div class=\"section\" id=\"ch1\">"));
 }
 
 TEST(Fb2ToEpub, LeavesNoteMarkersOutOfTocLabels) {
