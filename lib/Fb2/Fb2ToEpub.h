@@ -100,6 +100,8 @@ class Fb2ToEpub {
   std::vector<TocEntry> toc;
   uint16_t fileCount = 0;
   const Binary* cover = nullptr;
+  bool coverInBody = false;  // the main body opens with the cover image
+  bool coverPage() const { return cover && !coverInBody; }
 
   bool writeOpf(Output& out) const;
   bool writeNcx(Output& out) const;

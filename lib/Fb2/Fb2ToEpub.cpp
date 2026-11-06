@@ -135,12 +135,14 @@ void appendEscaped(std::string& out, const std::string& s, bool attr = false) {
   appendEscaped(out, s.data(), s.size(), attr);
 }
 
+bool isXmlSpace(const char c) { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
+
 void collapseSpaces(std::string& s) {
   std::string out;
   out.reserve(s.size());
   bool space = false;
   for (const char c : s) {
-    if (c == ' ' || c == '\n' || c == '\r' || c == '\t') {
+    if (isXmlSpace(c)) {
       space = !out.empty();
     } else {
       if (space) out += ' ';
@@ -276,6 +278,7 @@ struct Fb2ToEpub::Pass {
 
   // Bodies.
   bool notesBody = false;
+  bool bodyContent = false;  // text or an image seen in a body
   uint8_t sectionDepth = 0;
   uint8_t sectionDivs = 0;  // section <div>s open in the output
   uint32_t sectionSerial = 0;
@@ -595,6 +598,11 @@ struct Fb2ToEpub::Pass {
     const char* href = attribute(atts, "href");
     const char* id = attribute(atts, "id");
     if (!href || href[0] != '#') return;
+    // Converters such as calibre repeat the <coverpage> image as the body's first content.
+    if (!bodyContent && !notesBody && !self.meta.coverId.empty() && self.meta.coverId == href + 1) {
+      self.coverInBody = true;
+    }
+    bodyContent = true;
     const auto it = self.binaries.find(href + 1);
     if (measuring() || it == self.binaries.end() || !it->second.extension) {
       recordId(id);
@@ -845,6 +853,7 @@ struct Fb2ToEpub::Pass {
     emit(buf);
     fileText += static_cast<size_t>(len);
     fileHasContent = true;
+    bodyContent = bodyContent || std::any_of(s, s + len, [](const char c) { return !isXmlSpace(c); });
     if (!open(Kind::Title)) tocShareable = false;
     if (open(Kind::Title) && tocPending && !open(Kind::NoteLink)) {
       appendBounded(tocLabel, s, static_cast<size_t>(len), 2 * MAX_LABEL_BYTES);
@@ -908,6 +917,7 @@ bool Fb2ToEpub::convert(Input& input, Output& out) {
   binaries.clear();
   toc.clear();
   cover = nullptr;
+  coverInBody = false;
 
   {
     fileCount = 0;
@@ -925,7 +935,7 @@ bool Fb2ToEpub::convert(Input& input, Output& out) {
       !writeWhole(out, "OEBPS/style.css", STYLE_CSS, strlen(STYLE_CSS))) {
     return false;
   }
-  if (cover) {
+  if (coverPage()) {
     std::string page = XHTML_HEAD;
     char img[64];
     snprintf(img, sizeof(img), "<div class=\"cover\"><img src=\"img%u.%s\" alt=\"\"/></div>",
@@ -968,7 +978,9 @@ bool Fb2ToEpub::writeOpf(Output& out) const {
       "</metadata><manifest>"
       "<item id=\"ncx\" href=\"toc.ncx\" media-type=\"application/x-dtbncx+xml\"/>"
       "<item id=\"css\" href=\"style.css\" media-type=\"text/css\"/>");
-  if (cover) w.put("<item id=\"cover\" href=\"cover.xhtml\" media-type=\"application/xhtml+xml\"/>");
+  if (coverPage()) {
+    w.put("<item id=\"cover\" href=\"cover.xhtml\" media-type=\"application/xhtml+xml\"/>");
+  }
   for (unsigned i = 1; i <= fileCount; i++) {
     snprintf(line, sizeof(line), "<item id=\"s%u\" href=\"s%u.xhtml\" media-type=\"application/xhtml+xml\"/>", i, i);
     w.put(line);
@@ -981,7 +993,7 @@ bool Fb2ToEpub::writeOpf(Output& out) const {
     w.put(line);
   }
   w.put("</manifest><spine toc=\"ncx\">");
-  if (cover) w.put("<itemref idref=\"cover\"/>");
+  if (coverPage()) w.put("<itemref idref=\"cover\"/>");
   for (unsigned i = 1; i <= fileCount; i++) {
     snprintf(line, sizeof(line), "<itemref idref=\"s%u\"/>", i);
     w.put(line);
@@ -1029,7 +1041,7 @@ bool Fb2ToEpub::writeNcx(Output& out) const {
   // File 0 is the cover page, titled with the book so the status bar has a name for it.
   const std::string noAnchor;
   const std::string bookLabel = meta.title.empty() ? std::string("1") : meta.title;
-  if (cover) navPoint(0, 1, noAnchor, bookLabel);
+  if (coverPage()) navPoint(0, 1, noAnchor, bookLabel);
   if (toc.empty()) navPoint(1, 1, noAnchor, bookLabel);
   for (const TocEntry& e : toc) navPoint(e.file, e.depth, e.anchor, e.label);
   for (; openDepth > 0; openDepth--) w.put("</navPoint>");

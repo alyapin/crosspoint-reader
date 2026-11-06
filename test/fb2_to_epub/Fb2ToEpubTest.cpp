@@ -276,6 +276,27 @@ TEST(Fb2ToEpub, DecodesCoverAndDeclaresIt) {
   EXPECT_TRUE(contains(out.files["OEBPS/cover.xhtml"], "<img src=\"img0.jpg\" alt=\"\"/>"));
 }
 
+TEST(Fb2ToEpub, SkipsTheCoverPageWhenTheBodyOpensWithTheCover) {
+  // calibre's output: the <coverpage> image again as the body's first content.
+  StringInput input(
+      "<FictionBook xmlns:l=\"x\"><description><title-info><book-title>К</book-title>"
+      "<coverpage><image l:href=\"#c.jpg\"/></coverpage></title-info></description>"
+      "<body><section><p>\n    <image l:href=\"#c.jpg\"/></p></section><section><p>текст</p></section></body>"
+      "<binary id=\"c.jpg\" content-type=\"image/jpeg\">" +
+      COVER_BASE64 + "</binary></FictionBook>");
+  MapOutput out;
+  Fb2ToEpub converter;
+  ASSERT_TRUE(converter.convert(input, out));
+  EXPECT_EQ(out.files.count("OEBPS/cover.xhtml"), 0u);
+  EXPECT_TRUE(contains(out.files["OEBPS/s1.xhtml"], "<img src=\"img0.jpg\" alt=\"\"/>"));
+  const std::string& opf = out.files["OEBPS/content.opf"];
+  EXPECT_TRUE(contains(opf, "<meta name=\"cover\" content=\"img0\"/>"));
+  EXPECT_FALSE(contains(opf, "cover.xhtml"));
+  EXPECT_TRUE(contains(opf, "<spine toc=\"ncx\"><itemref idref=\"s1\"/>"));
+  EXPECT_FALSE(contains(out.files["OEBPS/toc.ncx"], "cover.xhtml"));
+  EXPECT_TRUE(wellFormed(opf));
+}
+
 TEST(Fb2ToEpub, InlineAndBlockImages) {
   StringInput input(
       "<FictionBook xmlns:l=\"x\"><body><section><image l:href=\"#a\"/><p>до <image l:href=\"#a\"/> после</p>"
