@@ -18,6 +18,7 @@
 #include "ClipSelectionActivity.h"
 #include "EpubReaderMenuActivity.h"
 #include "LinkNoteTitle.h"
+#include "PageTurnQueue.h"
 #include "ProgressMapper.h"
 #include "ReaderActivity.h"
 #include "ReaderToolbarUi.h"
@@ -37,7 +38,7 @@ class EpubReaderActivity final : public ReaderActivity {
   std::optional<uint32_t> pendingOffsetJump;
   unsigned long lastPageTurnTime = 0UL;
   unsigned long pageTurnDuration = 0UL;
-  int8_t pendingManualTurn = 0;
+  PageTurnQueue pendingTurns;
   bool pendingManualTurnTouch = false;
   bool pendingPercentJump = false;
   float pendingSpineProgress = 0.0f;
@@ -154,10 +155,18 @@ class EpubReaderActivity final : public ReaderActivity {
   uint32_t pagerLayoutKey = 0;
   // Layout the open chapter's section was loaded or built for.
   uint32_t sectionLayoutKey = 0;
+#if BOARD_HAS_PSRAM
   static constexpr unsigned long PAGER_IDLE_MS = 3000;
+#else
+  // On the C3 (no PSRAM) a pager chapter start or end can outlast a click and does not stop for a
+  // press: quick paging never meets one.
+  static constexpr unsigned long PAGER_IDLE_MS = 10000;
+#endif
   // At the last pager tick some chapter was still uncounted for this layout.
   bool pagerHasWork = true;
   void bookPagerTick();
+  // Makes the queued page turns, all before the next render; a new chapter is laid out first.
+  void applyQueuedTurns();
   void stopBookPager();
   // A background build failed in this spine. The error would likely recur, so from then on the
   // spine is built only as far as the reader goes; pages from earlier build steps stay readable.
@@ -169,6 +178,7 @@ class EpubReaderActivity final : public ReaderActivity {
   static constexpr uint32_t BUILD_ROOM_WAIT_MS = 5000;
   static constexpr uint32_t BUILD_ROOM_STEP_MS = 50;
   bool inputOverPage() const override { return overlay != Overlay::None || ReaderActivity::inputOverPage(); }
+  bool turnsQueued() const override { return pendingTurns.pending(); }
 #if CROSSPOINT_BRIGHTNESS_SWIPE
   bool brightnessSwipeAllowed() const override {
     return section && !pageBufferStale && ReaderActivity::brightnessSwipeAllowed();

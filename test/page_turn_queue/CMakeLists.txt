@@ -1,0 +1,10 @@
+add_executable(PageTurnQueueTest PageTurnQueueTest.cpp)
+
+target_include_directories(PageTurnQueueTest PRIVATE ../../src)
+
+target_link_libraries(PageTurnQueueTest PRIVATE
+  crosspoint_test_common
+  GTest::gtest_main
+)
+
+gtest_discover_tests(PageTurnQueueTest)

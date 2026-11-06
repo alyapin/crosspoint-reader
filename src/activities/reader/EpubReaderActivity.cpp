@@ -9,6 +9,7 @@
 #include <HalDisplay.h>
 #include <HalFrontlight.h>
 #include <HalGPIO.h>
+#include <HalPowerManager.h>
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Logging.h>
@@ -334,7 +335,7 @@ int EpubReaderActivity::bookPercentFor(const ChapterPosition& position) const {
 }
 
 void EpubReaderActivity::openReaderMenu() {
-  pendingManualTurn = 0;
+  pendingTurns.clear();
   if (usesToolbarMenu()) {
     // Reached from a child activity's result handler (footnotes, bookmarks,
     // go-to-percent... cancelled back to the menu), so the framebuffer holds
@@ -430,7 +431,7 @@ void EpubReaderActivity::backgroundBuildTick() {
   // Not under an open toolbar or panel: those repaint straight onto the page in the framebuffer.
   if (!lock.ownsLock() || overlay != Overlay::None || !backgroundBuildWanted()) return;
   // A button is down or a page turn is queued: the next loop frames act on it first.
-  if (buttonContactClosed() || anyButtonPressed() || pendingManualTurn != 0 || !buildTickHeapGate()) return;
+  if (buttonContactClosed() || anyButtonPressed() || pendingTurns.pending() || !buildTickHeapGate()) return;
   // A build step can lend the framebuffer (image probes), which hands it back white while the
   // panel still shows the page; redraw so nothing is later painted over the blank buffer.
   const uint32_t loansBefore = renderer.frameBufferLoanCount();
@@ -482,7 +483,11 @@ void EpubReaderActivity::bookPagerTick() {
   if (pagerSection && (activityManager.visit() != pagerVisit || pagerLayoutKey != layoutKey)) stopBookPager();
   pagerHasWork = pagerSection || bookFooter.nextSpineToPaginate(currentSpineIndex) >= 0;
   if (millis() - lastRenderCompleteMs < PAGER_IDLE_MS) return;
-  if (buttonContactClosed() || anyButtonPressed() || pendingManualTurn != 0 || !buildTickHeapGate()) return;
+  if (buttonContactClosed() || anyButtonPressed() || pendingTurns.pending() || !buildTickHeapGate()) return;
+  if (!pagerHasWork) return;
+  // Input is read between parse steps only. At the C3's 10 MHz idle clock one step outlasts a click,
+  // which then goes unseen.
+  HalPowerManager::Lock fullSpeed;
 
   if (!pagerSection) {
     const int spine = bookFooter.nextSpineToPaginate(currentSpineIndex);
@@ -761,10 +766,11 @@ void EpubReaderActivity::loop() {
 
   {
     RenderLock lock(RenderLock::Mode::Try);
+    // Not while a contact is closed: a click let go during the prewarm is never debounced.
     if (lock.ownsLock() && section && !section->isBuilding() && renderer.hasFrameBuffer() &&
         lastRenderCompleteMs != 0 && millis() - lastRenderCompleteMs > IDLE_PREWARM_DEBOUNCE_MS &&
         ESP.getFreeHeap() > RENDER_MIN_FREE_HEAP && ESP.getMaxAllocHeap() > BACKGROUND_BUILD_MIN_MAX_ALLOC &&
-        (idlePrewarmSpine != currentSpineIndex || idlePrewarmPage != section->currentPage)) {
+        (idlePrewarmSpine != currentSpineIndex || idlePrewarmPage != section->currentPage) && !buttonContactClosed()) {
       idlePrewarmSpine = currentSpineIndex;
       idlePrewarmPage = section->currentPage;
       const int nextPage = section->currentPage + 1;
@@ -859,7 +865,7 @@ void EpubReaderActivity::loop() {
   int selectionY = 0;
   if (!atEndOfBook && SETTINGS.touchReaderControls && mappedInput.wasScreenLongPress(selectionX, selectionY)) {
     automaticPageTurnActive = false;
-    pendingManualTurn = 0;
+    pendingTurns.clear();
     startClipSelection(selectionX, selectionY);
     return;
   }
@@ -1010,7 +1016,7 @@ void EpubReaderActivity::loop() {
     // Toolbar style: the page is on screen and in the framebuffer, so paint the
     // toolbar over it (one refresh) instead of pushing a full-screen menu.
     if (usesToolbarMenu() && section) {
-      pendingManualTurn = 0;
+      pendingTurns.clear();
       openOverlay(Overlay::Toolbar);
     } else {
       openReaderMenu();
@@ -1049,25 +1055,14 @@ void EpubReaderActivity::loop() {
 
   constexpr unsigned long kMinManualTurnGapMs = 200;
   const bool turnGuardActive = RenderLock::peek() || (millis() - lastPageTurnTime) < kMinManualTurnGapMs;
-  if (pendingManualTurn != 0 && !turnGuardActive) {
-    if (!section) {
-      pendingManualTurn = 0;
-      return;
-    }
-    const bool forward = pendingManualTurn > 0;
-    pendingManualTurn = 0;
-    const bool succeeded = pageTurn(forward);
-    notePageTurn(forward, succeeded);
-    if (succeeded && pendingManualTurnTouch) haptic_feedback::touchAction();
-    pendingManualTurnTouch = false;
-    requestUpdate();
-    return;
-  }
-
   auto [prevTriggered, nextTriggered, fromTilt] = ReaderUtils::detectPageTurn(mappedInput);
   prevTriggered = prevTriggered || touch.prev;
   nextTriggered = nextTriggered || touch.next;
   if (!prevTriggered && !nextTriggered) {
+    if (pendingTurns.pending() && !turnGuardActive) {
+      applyQueuedTurns();
+      return;
+    }
     // Nothing to act on in this frame: build more of the chapter, or of the book's page counts.
     backgroundBuildTick();
     bookPagerTick();
@@ -1108,16 +1103,27 @@ void EpubReaderActivity::loop() {
     return;
   }
 
-  if (turnGuardActive) {
-    pendingManualTurn = prevTriggered ? -1 : 1;
-    pendingManualTurnTouch = touch.prev || touch.next;
-    return;
-  }
+  pendingTurns.push(!prevTriggered);
+  pendingManualTurnTouch = touch.prev || touch.next;
+  if (!turnGuardActive) applyQueuedTurns();
+}
 
-  const bool succeeded = pageTurn(!prevTriggered);
-  notePageTurn(!prevTriggered, succeeded);
-  if (succeeded && (touch.prev || touch.next)) haptic_feedback::touchAction();
-  requestUpdate();
+void EpubReaderActivity::applyQueuedTurns() {
+  if (!section || isAtEndOfBook()) pendingTurns.clear();
+  int steps = 0;
+  bool turned = false;
+  // A partial chapter takes one turn per frame: the loop starts its extension build near the end.
+  while (section && pendingTurns.pending() && (steps == 0 || !section->isPartial() || section->isBuilding())) {
+    steps++;
+    const bool forward = pendingTurns.pop() > 0;
+    const bool succeeded = pageTurn(forward);
+    notePageTurn(forward, succeeded);
+    turned = turned || succeeded;
+    if (!succeeded || isAtEndOfBook()) pendingTurns.clear();
+  }
+  if (turned && pendingManualTurnTouch) haptic_feedback::touchAction();
+  pendingManualTurnTouch = false;
+  if (steps > 0) requestUpdate();
 }
 
 void EpubReaderActivity::jumpToPercent(int percent) {
