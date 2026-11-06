@@ -372,8 +372,6 @@ bool MappedInputManager::wasTopEdgeDownSwipe() const { return wasEdgeSwipe(fui::
 
 bool MappedInputManager::wasBottomEdgeUpSwipe() const { return wasEdgeSwipe(fui::ScreenEdge::Bottom); }
 
-bool MappedInputManager::wasMenuGesture() const { return wasTopEdgeDownSwipe(); }
-
 bool MappedInputManager::wasReaderMenuSwipeUp() const { return gpio.hasHomeKey() && wasBottomEdgeUpSwipe(); }
 
 bool MappedInputManager::wasHomeGesture() const {

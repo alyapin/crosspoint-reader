@@ -158,13 +158,14 @@ inline bool isTouchMenuTap(const GfxRenderer& renderer, const MappedInputManager
   return x >= zoneWidth && x < width - zoneWidth && y >= zoneHeight && y < height - zoneHeight;
 }
 
-// Reader menu opens on the menu edge-swipe or a center-third tap. Home-key
+// Reader menu opens on the gesture showReaderMenu names: a center-third tap,
+// or the bottom-edge up-swipe on home-key boards. The top-edge down-swipe is
+// never one: it always opens the control center (ActivityManager). Home-key
 // actions are configured separately from screen gestures.
 // Menu gestures honor showReaderMenu independently of touchReaderControls,
 // which only gates page-turn touch zones in detectTouchPageTurn().
 inline bool isTouchMenuGesture(const GfxRenderer& renderer, const MappedInputManager& input) {
   if (!input.hasTouch()) return false;
-  if (input.wasMenuGesture()) return true;
   // Bottom-edge up-swipe variant: only selectable on home-key boards, where
   // Home is the capacitive key and the bottom edge is otherwise unused.
   if (SETTINGS.showReaderMenu == CrossPointSettings::READER_MENU_SWIPE_UP && input.wasReaderMenuSwipeUp()) {

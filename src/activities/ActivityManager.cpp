@@ -119,7 +119,9 @@ void ActivityManager::loop() {
     return;
   }
 
-  if (currentActivity) {
+  // A screen change still waiting (the page turner's radio stopping) keeps
+  // input from the screen it replaces.
+  if (currentActivity && pendingAction == PendingAction::None) {
     if (!currentActivity->isHomeActivity() && mappedInput.wasHomeGesture()) {
       if (currentActivity->handleHomeGesture()) {
         return;
@@ -144,12 +146,12 @@ void ActivityManager::loop() {
     if (mappedInput.hasTouch() && currentActivity->name != "FrontlightPanel" &&
         (statusBarTap || mappedInput.wasLightPanelGesture())) {
       haptic_feedback::touchAction();
+      // Lands below in this pass: the screen underneath gets no more input.
       pushActivity(std::make_unique<FrontlightPanelActivity>(renderer, mappedInput));
-      return;
+    } else {
+      // Note: do not hold a lock here, the loop() method must be responsible for acquire one if needed
+      currentActivity->loop();
     }
-
-    // Note: do not hold a lock here, the loop() method must be responsible for acquire one if needed
-    currentActivity->loop();
   }
 
   while (pendingAction != PendingAction::None) {

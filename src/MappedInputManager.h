@@ -99,7 +99,7 @@ class MappedInputManager {
   void setBackLeavesBook(const bool leaves) { backLeavesBook = leaves; }
   // Home-key boards use a short Home-key tap to exit; their bottom-edge swipe
   // is intentionally unused. Other boards retain the bottom-edge Home gesture.
-  // The reader menu remains on its existing top-edge gesture and middle tap.
+  // The top-edge swipe is the control center's, never the reader menu's.
   bool wasHomeGesture() const;
   // Configured one-frame action, independent of the gesture that triggered it.
   HomeButtonAction homeButtonAction() const { return homeAction; }
@@ -107,7 +107,6 @@ class MappedInputManager {
     homeButtonInput.reset();
     deferredHomeAction = HomeButtonAction::Ignore;
   }
-  bool wasMenuGesture() const;
   // Bottom-edge up-swipe as the reader-menu gesture (SHOW_READER_MENU's Swipe
   // Up option). Only meaningful on home-key boards, where Home lives on the
   // key and the bottom edge is free; elsewhere the same swipe is the Home
