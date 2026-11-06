@@ -120,7 +120,7 @@ class EpubReaderActivity final : public ReaderActivity {
   SavedPosition savedPositions[MAX_FOOTNOTE_DEPTH] = {};
   int footnoteDepth = 0;
   // Spine item a followed link (or a return to an earlier one) led to, until
-  // the next page turn; -1 otherwise. Only the edge-swipe scope reads it.
+  // the next page turn or jump; -1 otherwise. Only the edge-swipe scope reads it.
   int linkReturnSpine = -1;
   // The back-stack outlives the reader (sleep, home) in links.bin so Back
   // still returns to where a followed link was tapped.

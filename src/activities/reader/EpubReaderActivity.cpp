@@ -608,6 +608,7 @@ void EpubReaderActivity::startClipSelection(const int initialX, const int initia
     const uint16_t startPage = static_cast<uint16_t>(pageNumber + clipping.startPageOffset);
     const uint16_t endPage = static_cast<uint16_t>(pageNumber + clipping.endPageOffset);
     if (section && currentSpineIndex == spineIndex && endPage < section->pageCount) {
+      linkReturnSpine = -1;
       section->currentPage = endPage;
       currentPageVisibleOffset = section->getVisibleTextOffsetForPage(endPage);
     }
@@ -1122,6 +1123,7 @@ void EpubReaderActivity::loop() {
 
 void EpubReaderActivity::jumpToPercent(int percent) {
   if (!epub) return;
+  linkReturnSpine = -1;
   const size_t bookSize = epub->getBookSize();
   if (bookSize == 0) return;
 
@@ -1161,6 +1163,7 @@ void EpubReaderActivity::jumpToPercent(int percent) {
 }
 
 void EpubReaderActivity::applyProgressChange(const ProgressChangeResult& sync) {
+  linkReturnSpine = -1;
   if (sync.hasVisibleTextOffset && sync.spineIndex >= 0 && sync.spineIndex < epub->getSpineItemsCount()) {
     RenderLock lock;
     clearDeferredReposition();
@@ -1258,6 +1261,7 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
               return;
             }
             const auto& chapterResult = std::get<ChapterResult>(result.data);
+            linkReturnSpine = -1;
             RenderLock lock;
             clearDeferredReposition();
             currentSpineIndex = chapterResult.spineIndex;
@@ -2916,6 +2920,7 @@ void EpubReaderActivity::handleOverlayInput() {
     const int spineCount = epub->getSpineItemsCount();
     target = std::clamp(target, 0, spineCount - 1);
     if (target != currentSpineIndex) {
+      linkReturnSpine = -1;
       RenderLock lock;
       clearDeferredReposition();
       nextPageNumber = 0;
@@ -3032,6 +3037,7 @@ void EpubReaderActivity::handleOverlayInput() {
     } else if (overlay == Overlay::Contents) {
       const auto item = epub->getTocItem(panelIndex);
       if (item.spineIndex != -1) {
+        linkReturnSpine = -1;
         RenderLock lock;
         clearDeferredReposition();
         currentSpineIndex = item.spineIndex;
