@@ -1070,8 +1070,8 @@ struct Fb2ToEpub::Pass {
     }
     emit(buf);
     fileText += static_cast<size_t>(len);
-    fileHasContent = true;
     if (std::any_of(s, s + len, [](const char c) { return !isXmlSpace(c); })) {
+      fileHasContent = true;
       bodyContent = true;
       emptyLines = 0;
     }

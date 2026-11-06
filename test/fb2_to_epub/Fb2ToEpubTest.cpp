@@ -402,9 +402,11 @@ TEST(Fb2ToEpub, DecodesWindows1251) {
 }
 
 TEST(Fb2ToEpub, StartsEveryTopLevelSectionOnANewPage) {
-  // Short untitled front matter, as calibre writes it: each top-level section is a page of its own.
+  // Short untitled front matter, as calibre writes it: each top-level section is a page of its own,
+  // while one holding only whitespace is no page.
   StringInput input(
-      "<FictionBook><body><section><p>Титул</p></section><section><p>Посвящение</p></section>"
+      "<FictionBook><body><section><p> "
+      "</p></section><section><p>Титул</p></section><section><p>Посвящение</p></section>"
       "<section><p>Введение</p><section><p>Сцена</p></section></section></body>"
       "<body name=\"notes\"><section id=\"n1\"><p>1</p></section><section id=\"n2\"><p>2</p></section></body>"
       "</FictionBook>");
@@ -414,7 +416,7 @@ TEST(Fb2ToEpub, StartsEveryTopLevelSectionOnANewPage) {
   EXPECT_TRUE(contains(out.files["OEBPS/s1.xhtml"], "Титул"));
   EXPECT_TRUE(contains(out.files["OEBPS/s2.xhtml"], "Посвящение"));
   // A short nested section and short notes still share a file.
-  EXPECT_TRUE(contains(out.files["OEBPS/s3.xhtml"], "<p>Введение</p><div class=\"section\" id=\"fb2s4\"><p>Сцена"));
+  EXPECT_TRUE(contains(out.files["OEBPS/s3.xhtml"], "<p>Введение</p><div class=\"section\" id=\"fb2s5\"><p>Сцена"));
   EXPECT_TRUE(contains(out.files["OEBPS/s4.xhtml"], "<p>1</p></div><div class=\"section\" id=\"n2\">"));
   EXPECT_EQ(out.files.count("OEBPS/s5.xhtml"), 0u);
 }
