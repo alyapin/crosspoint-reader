@@ -99,7 +99,8 @@ class ReaderActivity : public Activity {
   bool endOfBookMenuActive() const;
   /** True while a toolbar, panel or menu over the page owns the device keys: a remote turn is refused. */
   virtual bool inputOverPage() const { return endOfBookMenuActive(); }
-  /** True when Back would close the book, with nothing to end or close first. */
+  /** Edge Swipe Back's Except Reading scope: true on the plain book page, where an edge swipe turns the page; false
+   *  while a menu, panel, link return or auto-turn would take that Back first. */
   virtual bool backLeavesBook() const { return !inputOverPage(); }
   bool handleEndOfBookMenu(bool suppressConfirmRelease = false);
   bool handleEndOfBookPageTurn(bool prevTriggered, bool nextTriggered);

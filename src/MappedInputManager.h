@@ -94,8 +94,8 @@ class MappedInputManager {
   // Back = a header back tap, or an inward swipe from the left or right edge
   // where SETTINGS.edgeBackSwipe allows it.
   bool wasBackGesture() const;
-  // Set by ActivityManager every loop: Back on the screen in front would close
-  // the open book (edgeBackSwipe's Except Reading scope).
+  // Set by ActivityManager every loop from ReaderActivity::backLeavesBook():
+  // the book page, where Except Reading leaves edge swipes to page turns.
   void setBackLeavesBook(const bool leaves) { backLeavesBook = leaves; }
   // Set by ActivityManager every loop: the screen's content uses this frame's
   // swipe (Activity::claimsSwipe), so it stays a swipe and never edge Back.
