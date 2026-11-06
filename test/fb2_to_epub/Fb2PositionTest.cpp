@@ -37,18 +37,6 @@ TEST(Fb2Position, BookFractionMatchesTheReader) {
   EXPECT_FLOAT_EQ(Fb2Position::bookFraction({0, 0, 0}, 0, sizes), 0.0f);
 }
 
-TEST(Fb2Position, StampDecidesReconversion) {
-  char buf[8];
-  const size_t n = Fb2Position::formatStamp(buf, sizeof(buf));
-  ASSERT_GT(n, 0u);
-  EXPECT_EQ(Fb2Position::parseStamp(buf, n), Fb2ToEpub::FORMAT_VERSION);
-  EXPECT_FALSE(Fb2Position::reconvert(Fb2Position::parseStamp(buf, n)));
-  // Archives from before the stamp, or with a damaged one, are converted again.
-  EXPECT_TRUE(Fb2Position::reconvert(Fb2Position::parseStamp("", 0)));
-  EXPECT_TRUE(Fb2Position::reconvert(Fb2Position::parseStamp("x", 1)));
-  EXPECT_TRUE(Fb2Position::reconvert(Fb2Position::parseStamp("1\n", 2)));
-}
-
 TEST(Fb2Position, PendingFractionRoundTrips) {
   char buf[32];
   const size_t n = Fb2Position::formatPending(buf, sizeof(buf), 0.4123456f, 1);

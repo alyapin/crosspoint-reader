@@ -4,6 +4,7 @@
 #include <Epub/Page.h>
 #include <Epub/blocks/TextBlock.h>
 #include <Fb2Position.h>
+#include <Fb2ToEpub.h>
 #include <FontCacheManager.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
@@ -253,7 +254,7 @@ bool EpubReaderActivity::loadBook() {
   }
 
   const bool uncached =
-      !Storage.exists((loadedEpub->getCachePath() + "/book.bin").c_str()) || loadedEpub->fb2Outdated();
+      !Storage.exists((loadedEpub->getCachePath() + "/book.bin").c_str()) || loadedEpub->fb2NeedsConversion();
   if (uncached) {
     disableFastInitialRefresh();
     GUI.drawPopup(renderer, tr(STR_INDEXING));
@@ -263,7 +264,7 @@ bool EpubReaderActivity::loadBook() {
   {
     std::optional<GfxRenderer::FrameBufferLoan> loan;
     if (uncached) loan.emplace(renderer);
-    loaded = loadedEpub->load(true, SETTINGS.embeddedStyle == 0);
+    loaded = loadedEpub->load(true, SETTINGS.embeddedStyle == 0, /*mayConvertFb2=*/true);
   }
   if (!loaded) {
     // Surfaced by handleLoadFailure() as a dialog; loadedEpub dies with this
@@ -1177,11 +1178,14 @@ bool EpubReaderActivity::locateBookBytes(const size_t targetSize, int& spineInde
 // An FB2 converted again (by a newer converter, or after its cache was deleted) left its
 // reading position as a book fraction: open there, and move the bookmarks, whose spine
 // and page fields belonged to the old files. Clippings keep spine-relative anchors and
-// cannot follow.
+// cannot follow. The fraction stays until a position is saved in the new layout, so a
+// power loss before that applies it again; a book still read from its old archive (the
+// conversion failed) keeps it for the next attempt.
 void EpubReaderActivity::restoreFb2Position(const bool progressLoaded) {
   float fraction;
   uint8_t version;
-  if (!epub->takeFb2Position(fraction, version)) return;
+  if (epub->fb2ArchiveVersion() != Fb2ToEpub::FORMAT_VERSION || !epub->peekFb2Position(fraction, version)) return;
+  clearFb2PositionOnSave = true;
   const size_t bookSize = epub->getBookSize();
   if (bookSize == 0) return;
   const auto bytesAt = [bookSize](const float f) {
@@ -1406,7 +1410,7 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
                   : 0.0f;
           const uint8_t fb2Version = fb2 ? epub->fb2ArchiveVersion() : 0;
           section.reset();
-          epub->clearCache();
+          if (!epub->clearCache()) LOG_ERR("ERS", "Cache clear incomplete");
           epub->setupCacheDir();
           if (!saveProgress(backupSpine, backupPage, backupPageCount)) {
             LOG_ERR("ERS", "Failed to save progress before cache clear");
@@ -2223,7 +2227,12 @@ bool EpubReaderActivity::saveProgress(int spineIndex, int currentPage, int pageC
                  ? currentPageVisibleOffset
                  : section->getVisibleTextOffsetForPage(static_cast<uint16_t>(currentPage));
   }
-  return EpubReaderUtils::saveProgress(*epub, spineIndex, currentPage, pageCount, offset);
+  if (!EpubReaderUtils::saveProgress(*epub, spineIndex, currentPage, pageCount, offset)) return false;
+  if (clearFb2PositionOnSave) {
+    epub->clearFb2Position();
+    clearFb2PositionOnSave = false;
+  }
+  return true;
 }
 
 void EpubReaderActivity::rememberCurrentContentOffset() {

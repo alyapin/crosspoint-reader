@@ -17,20 +17,6 @@ bool parseProgress(const uint8_t* data, const size_t size, Saved& out) {
   return true;
 }
 
-uint8_t parseStamp(const char* text, const size_t len) {
-  const std::string s(text, len);
-  char* end = nullptr;
-  const unsigned long v = strtoul(s.c_str(), &end, 10);
-  return end != s.c_str() && v > 0 && v <= UINT8_MAX ? static_cast<uint8_t>(v) : 0;
-}
-
-size_t formatStamp(char* out, const size_t size) {
-  const int n = snprintf(out, size, "%u\n", static_cast<unsigned>(Fb2ToEpub::FORMAT_VERSION));
-  return n > 0 && static_cast<size_t>(n) < size ? static_cast<size_t>(n) : 0;
-}
-
-bool reconvert(const uint8_t stamp) { return stamp != Fb2ToEpub::FORMAT_VERSION; }
-
 size_t formatPending(char* out, const size_t size, const float fraction, const uint8_t version) {
   const int n = snprintf(out, size, "%.6f %u\n", static_cast<double>(std::clamp(fraction, 0.0f, 1.0f)),
                          static_cast<unsigned>(version));

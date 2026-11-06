@@ -37,13 +37,6 @@ float bookFraction(const Saved& pos, const int spineCount, Cumulative cumulative
   return std::clamp((before + chapter * size) / total, 0.0f, 1.0f);
 }
 
-// fb2.ver holds the converter version an archive was written by. 0: missing or unreadable.
-uint8_t parseStamp(const char* text, size_t len);
-size_t formatStamp(char* out, size_t size);
-
-// An archive another converter version wrote is converted again when the reader opens the book.
-bool reconvert(uint8_t stamp);
-
 // fb2.pos: a book fraction to reopen at and the converter version whose files the
 // saved position (and bookmarks) refer to.
 size_t formatPending(char* out, size_t size, float fraction, uint8_t version);

@@ -40,6 +40,8 @@ class EpubReaderActivity final : public ReaderActivity {
   int8_t pendingManualTurn = 0;
   bool pendingManualTurnTouch = false;
   bool pendingPercentJump = false;
+  // A pending FB2 position (fb2.pos) applied at open; removed by the first saved position.
+  bool clearFb2PositionOnSave = false;
   float pendingSpineProgress = 0.0f;
   bool pendingScreenshot = false;
   bool pendingSyncSaveError = false;
