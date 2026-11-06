@@ -364,12 +364,8 @@ bool MappedInputManager::wasBackGesture() const {
 }
 
 bool MappedInputManager::isEdgeBackSwipe(const int sx, const int sy, const int ex, const int ey) const {
-  const uint8_t scope = SETTINGS.edgeBackSwipe;
-  if (scope == CrossPointSettings::EDGE_BACK_OFF ||
-      (scope == CrossPointSettings::EDGE_BACK_EXCEPT_READING && readingPageShown)) {
-    return false;
-  }
-  return edge_back_swipe::isBackSwipe(sx, sy, ex, ey, renderer.getScreenWidth());
+  return edge_back_swipe::backInScope(SETTINGS.edgeBackSwipe, backLeavesBook) &&
+         edge_back_swipe::isBackSwipe(sx, sy, ex, ey, renderer.getScreenWidth());
 }
 
 bool MappedInputManager::wasTopEdgeDownSwipe() const { return wasEdgeSwipe(fui::ScreenEdge::Top); }

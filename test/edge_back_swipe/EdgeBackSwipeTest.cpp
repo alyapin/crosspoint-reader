@@ -116,6 +116,17 @@ TEST(EdgeBackSwipe, OffOnThisScreenLeavesEdgeFlicksToPageTurns) {
   EXPECT_EQ(classify(line({475, 400}, {280, 420}, 15), false), Outcome::Left);
 }
 
+// Except Reading gives the swipe up only where Back would close the book; a
+// footnote return or an auto-turn stop on the page is still Back.
+TEST(EdgeBackSwipe, ExceptReadingKeepsBackThatStaysInTheBook) {
+  EXPECT_TRUE(eb::backInScope(eb::EXCEPT_READING, false));
+  EXPECT_FALSE(eb::backInScope(eb::EXCEPT_READING, true));
+  EXPECT_TRUE(eb::backInScope(eb::EVERYWHERE, false));
+  EXPECT_TRUE(eb::backInScope(eb::EVERYWHERE, true));
+  EXPECT_FALSE(eb::backInScope(eb::OFF, false));
+  EXPECT_FALSE(eb::backInScope(eb::OFF, true));
+}
+
 TEST(EdgeBackSwipe, VerticalRightEdgeDragStaysBrightness) {
   EXPECT_EQ(classify(line({470, 500}, {470, 250}, 25)), Outcome::Brightness);
   EXPECT_EQ(classify(line({470, 300}, {465, 650}, 25)), Outcome::Brightness);

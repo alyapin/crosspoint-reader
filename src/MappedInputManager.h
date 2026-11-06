@@ -94,9 +94,9 @@ class MappedInputManager {
   // Back = a header back tap, or an inward swipe from the left or right edge
   // where SETTINGS.edgeBackSwipe allows it.
   bool wasBackGesture() const;
-  // Set by ActivityManager every loop: the book page is in front with no
-  // reader menu or panel over it (edgeBackSwipe's Except Reading scope).
-  void setReadingPageShown(const bool shown) { readingPageShown = shown; }
+  // Set by ActivityManager every loop: Back on the screen in front would close
+  // the open book (edgeBackSwipe's Except Reading scope).
+  void setBackLeavesBook(const bool leaves) { backLeavesBook = leaves; }
   // Home-key boards use a short Home-key tap to exit; their bottom-edge swipe
   // is intentionally unused. Other boards retain the bottom-edge Home gesture.
   // The reader menu remains on its existing top-edge gesture and middle tap.
@@ -165,7 +165,7 @@ class MappedInputManager {
   mutable unsigned long touchHeldOverrideAt = 0;
   mutable uint16_t longPressFiredButtons = 0;
   mutable uint16_t suppressedReleaseButtons = 0;
-  bool readingPageShown = false;
+  bool backLeavesBook = false;
 #if FREEINK_CAP_TOUCH
   bool powerConfirmClickFrame = false;
 #endif

@@ -10,7 +10,8 @@
 // Pure geometry and gesture state, so host tests can drive it.
 //
 // Touch zones on the reading surface (logical px, every orientation):
-//   side 40 px     inward swipe = Back, only with Edge Swipe Back = Everywhere
+//   side 40 px     inward swipe = Back with Edge Swipe Back = Everywhere, or
+//                  to return from a footnote or stop auto-turn
 //   top 14%        down-swipe = control center
 //   bottom 14%     up-swipe = Home, or the reader menu on Home-key boards
 //   center third   tap = reader menu

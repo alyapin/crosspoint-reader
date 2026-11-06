@@ -256,8 +256,8 @@ struct BackNavCallback {
 // - with backShortToFileBrowser: go to file browser.
 inline bool handleBackNavigation(const MappedInputManager& mappedInput, ActivityManager& activityManager,
                                  const char* filePath, BackNavCallback goHome) {
-  // An edge swipe reaches here as Back only with Edge Swipe Back = Everywhere;
-  // otherwise MappedInputManager leaves it to the page turns.
+  // An edge swipe that would close the book is Back only with Edge Swipe Back =
+  // Everywhere; otherwise MappedInputManager leaves it to the page turns.
   const bool backTriggered = mappedInput.wasLongPressed(MappedInputManager::Button::Back, GO_BACK_OR_HOME_MS) ||
                              mappedInput.wasReleased(MappedInputManager::Button::Back);
   if (!backTriggered) return false;

@@ -99,6 +99,8 @@ class ReaderActivity : public Activity {
   bool endOfBookMenuActive() const;
   /** True while a toolbar, panel or menu over the page owns the device keys: a remote turn is refused. */
   virtual bool inputOverPage() const { return endOfBookMenuActive(); }
+  /** True when Back would close the book, with nothing to end or close first. */
+  virtual bool backLeavesBook() const { return !inputOverPage(); }
   bool handleEndOfBookMenu(bool suppressConfirmRelease = false);
   bool handleEndOfBookPageTurn(bool prevTriggered, bool nextTriggered);
   void clearEndOfBookOptionsIfNeeded();

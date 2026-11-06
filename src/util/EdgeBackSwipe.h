@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <cstdlib>
 
 // Android-style Back: a flick that starts at the left or right edge and moves
@@ -20,6 +21,16 @@ inline bool isBackSwipe(const int sx, const int sy, const int ex, const int ey, 
   const bool fromLeft = sx < kEdgeBandPx && dx > 0;
   const bool fromRight = sx >= screenW - kEdgeBandPx && dx < 0;
   return (fromLeft || fromRight) && adx >= kMinTravelPx && adx > 2 * std::abs(ey - sy);
+}
+
+// The Edge Swipe Back setting (CrossPointSettings::edgeBackSwipe).
+enum Mode : uint8_t { EXCEPT_READING = 0, EVERYWHERE = 1, OFF = 2 };
+
+// Whether the swipe is Back on the screen in front. backLeavesBook: Back there
+// would close the open book. Except Reading leaves only those swipes to page
+// turns; returning from a footnote or stopping auto-turn stays Back.
+inline bool backInScope(const uint8_t mode, const bool backLeavesBook) {
+  return mode == EVERYWHERE || (mode == EXCEPT_READING && !backLeavesBook);
 }
 
 }  // namespace edge_back_swipe

@@ -169,6 +169,10 @@ class EpubReaderActivity final : public ReaderActivity {
   static constexpr uint32_t BUILD_ROOM_WAIT_MS = 5000;
   static constexpr uint32_t BUILD_ROOM_STEP_MS = 50;
   bool inputOverPage() const override { return overlay != Overlay::None || ReaderActivity::inputOverPage(); }
+  // Back first returns from a footnote or stops auto-turn (loop()).
+  bool backLeavesBook() const override {
+    return footnoteDepth == 0 && !automaticPageTurnActive && ReaderActivity::backLeavesBook();
+  }
 #if CROSSPOINT_BRIGHTNESS_SWIPE
   bool brightnessSwipeAllowed() const override {
     return section && !pageBufferStale && ReaderActivity::brightnessSwipeAllowed();
