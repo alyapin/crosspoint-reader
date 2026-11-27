@@ -752,6 +752,8 @@ Press **Back** at any time to close the menu and return to your current page.
 
 Accessible by selecting **Chapters** from the Reader Menu.
 
+Nested entries sit indented under the entry they belong to, as chapters under their part.
+
 1. Use **Left** (or **Side Up**), or **Right** (or **Side Down**) to highlight the desired chapter.
 2. Press **Confirm** to jump to that chapter.
 3. *Alternatively, press **Back** to cancel and return to your current page.*
