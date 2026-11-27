@@ -38,7 +38,8 @@ class ReaderToolbarUi : public UiAppHost {
     int selectedIndex = -1;  // row the buttons' cursor sits on; -1 = none shown
     std::function<std::string(int)> rowText;
     std::function<std::string(int)> rowValue;
-    std::function<uint8_t(int)> rowIndent;
+    // Instead of rowText for a nested list: the label, its inset set from the same entry.
+    std::function<std::string(int, uint8_t& indent)> rowNested;
     void (*rowCheckbox)(void* ctx, int index, freeink::ui::ListItem& item) = nullptr;
     void* rowCheckboxContext = nullptr;
     int currentIndex = -1;  // row marked as the current one while no cursor is shown
