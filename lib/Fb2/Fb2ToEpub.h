@@ -25,7 +25,7 @@ class Fb2ToEpub {
  public:
   // Bump when the output changes the book's files: books converted before are
   // converted again on their next open, and the reading position moves over.
-  static constexpr uint8_t FORMAT_VERSION = 3;
+  static constexpr uint8_t FORMAT_VERSION = 4;
 
   // Receives the EPUB's files one at a time, in package order.
   class Output {
