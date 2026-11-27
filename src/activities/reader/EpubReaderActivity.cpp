@@ -2953,10 +2953,10 @@ void EpubReaderActivity::renderOverlay() {
     model.panelTitle = tr(STR_TOOL_CONTENTS);
     model.itemCount = epub->getTocItemsCount();
     model.currentIndex = contentsCurrentIndex;
-    model.rowText = [this](int i) {
-      const auto item = epub->getTocItem(i);
-      const int depth = item.level > 1 ? (item.level - 1) * 2 : 0;
-      return std::string(depth, ' ') + item.title;
+    model.rowNested = [this](int i, uint8_t& indent) {
+      auto item = epub->getTocItem(i);
+      indent = EpubReaderUtils::tocRowIndent(item.level);
+      return std::move(item.title);
     };
   } else if (overlay == Overlay::Text) {
     model.panelTitle = tr(STR_TOOL_TEXT);

@@ -342,11 +342,15 @@ void ReaderToolbarUi::buildPanel(UiScreen& screen) {
   const int windowCount = std::min({nav_.visibleRows, count - nav_.top, kMaxWindow});
   for (int i = 0; i < windowCount; ++i) {
     const int index = nav_.top + i;
-    windowLabels_[i] = model_.rowText ? model_.rowText(index) : std::string();
+    uint8_t indent = 0;
+    windowLabels_[i] = model_.rowNested ? model_.rowNested(index, indent)
+                       : model_.rowText ? model_.rowText(index)
+                                        : std::string();
     windowValues_[i] = model_.rowValue ? model_.rowValue(index) : std::string();
     fui::ListItem item;
     item.label = windowLabels_[i].c_str();
     item.value = windowValues_[i].empty() ? nullptr : windowValues_[i].c_str();
+    item.indent = indent;
     if (model_.rowCheckbox) model_.rowCheckbox(model_.rowCheckboxContext, index, item);
     item.actionValue = static_cast<int16_t>(index);
     windowItems_[i] = item;

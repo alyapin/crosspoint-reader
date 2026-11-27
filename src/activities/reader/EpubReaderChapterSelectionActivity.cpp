@@ -6,6 +6,7 @@
 
 #include <string>
 
+#include "EpubReaderUtils.h"
 #include "MappedInputManager.h"
 #include "components/UIScale.h"
 #include "components/UITheme.h"
@@ -58,10 +59,10 @@ void EpubReaderChapterSelectionActivity::refreshTocWindow(const int start) {
   windowCount = total - clamped < TOC_WINDOW ? total - clamped : TOC_WINDOW;
   for (int i = 0; i < windowCount; i++) {
     const auto tocItem = epub->getTocItem(clamped + i);
-    std::string indent(tocItem.level > 0 ? (tocItem.level - 1) * 2 : 0, ' ');
-    windowLabels[i] = indent + tocItem.title;
+    windowLabels[i] = tocItem.title;
     fui::ListItem item;
     item.label = windowLabels[i].c_str();
+    item.indent = EpubReaderUtils::tocRowIndent(tocItem.level);
     item.actionValue = static_cast<int16_t>(clamped + i);
     windowItems[i] = item;
   }
