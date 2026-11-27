@@ -11,6 +11,12 @@
 
 namespace EpubReaderUtils {
 
+// Label inset of a contents entry: chapters sit under their part, three levels at most.
+inline uint8_t tocRowIndent(const int level) {
+  const int depth = level < 2 ? 0 : level > 4 ? 3 : level - 1;
+  return static_cast<uint8_t>(depth * 16);
+}
+
 // Persists reader progress for an EPUB to its cache directory. Returns true on success.
 inline bool saveProgress(const Epub& epub, int spineIndex, int pageNumber, int pageCount,
                          std::optional<uint32_t> visibleTextOffset = std::nullopt) {

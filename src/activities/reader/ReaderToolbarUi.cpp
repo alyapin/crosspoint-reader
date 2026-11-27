@@ -347,6 +347,7 @@ void ReaderToolbarUi::buildPanel(UiScreen& screen) {
     fui::ListItem item;
     item.label = windowLabels_[i].c_str();
     item.value = windowValues_[i].empty() ? nullptr : windowValues_[i].c_str();
+    if (model_.rowIndent) item.indent = model_.rowIndent(index);
     if (model_.rowCheckbox) model_.rowCheckbox(model_.rowCheckboxContext, index, item);
     item.actionValue = static_cast<int16_t>(index);
     windowItems_[i] = item;
