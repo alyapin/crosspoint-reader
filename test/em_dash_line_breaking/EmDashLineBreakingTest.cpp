@@ -205,3 +205,26 @@ TEST(PartialLineLayout, FollowingTextCanAbsorbRubyOverhang) {
     }
   }
 }
+
+TEST(NoBreakGroup, HyphenatesTheWordGluedToAnOverflowingDash) {
+  // "hyphenation — next": the parser glues the no-break space and the dash to the word. When
+  // only the dash overflows, the word splits instead of the whole group leaving "word" alone.
+  Hyphenator::setPreferredLanguage("en");
+  GfxRenderer renderer;
+  BlockStyle style;
+  style.alignment = CssTextAlign::Justify;
+  style.textIndentDefined = true;
+  ParsedText text(/*hyphenationEnabled=*/true, false, style, 0);
+  text.addWord("word", EpdFontFamily::REGULAR);
+  text.addWord("hyphenation", EpdFontFamily::REGULAR);
+  text.addWord(" ", EpdFontFamily::REGULAR, false, /*attachToPrevious=*/true);
+  text.addWord("—", EpdFontFamily::REGULAR, false, /*attachToPrevious=*/true);
+  text.addWord("next", EpdFontFamily::REGULAR);
+  std::vector<std::vector<std::string>> lines;
+  text.layoutAndExtractLines(renderer, 0, 126, [&](std::unique_ptr<TextBlock> block, auto) {
+    auto& line = lines.emplace_back();
+    for (uint16_t i = 0; i < block->wordCount(); ++i) line.emplace_back(block->wordText(i));
+  });
+  const std::vector<std::vector<std::string>> expected{{"word", "hyphen-"}, {"ation", " ", "—", "next"}};
+  EXPECT_EQ(lines, expected);
+}

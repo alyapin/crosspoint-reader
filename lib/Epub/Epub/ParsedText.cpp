@@ -1231,23 +1231,23 @@ std::vector<size_t> ParsedText::computeHyphenatedLineBreaks(const GfxRenderer& r
     // First line has reduced width due to text-indent
     const int effectivePageWidth = isFirstLine ? pageWidth - firstLineIndent : pageWidth;
 
+    const auto gapBefore = [&](const size_t idx) -> int {
+      if (idx == lineStart) return 0;
+      if (continuesVec[idx]) {
+        // Attached and breakable-attached boundaries both use kerning when kept on one line.
+        return renderer.getKerning(fontId, lastCodepoint(wordAt(idx - 1)), firstCodepoint(wordAt(idx)),
+                                   getWordStyleAt(idx - 1), blockStyle.characterSpacing);
+      }
+      if (noSpaceBeforeVec[idx]) return blockStyle.characterSpacing;
+      return scaleSpace(renderer.getSpaceAdvance(fontId, lastCodepoint(wordAt(idx - 1)), firstCodepoint(wordAt(idx)),
+                                                 getWordStyleAt(idx - 1)),
+                        wordSpacingPercent);
+    };
+
     // Consume as many words as possible for current line, splitting when prefixes fit
     while (currentIndex < wordWidths.size()) {
       const bool isFirstWord = currentIndex == lineStart;
-      int spacing = 0;
-      if (!isFirstWord && continuesVec[currentIndex]) {
-        // Attached and breakable-attached boundaries both use kerning when kept on one line.
-        spacing =
-            renderer.getKerning(fontId, lastCodepoint(wordAt(currentIndex - 1)), firstCodepoint(wordAt(currentIndex)),
-                                getWordStyleAt(currentIndex - 1), blockStyle.characterSpacing);
-      } else if (!isFirstWord && noSpaceBeforeVec[currentIndex]) {
-        spacing = blockStyle.characterSpacing;
-      } else if (!isFirstWord) {
-        spacing =
-            scaleSpace(renderer.getSpaceAdvance(fontId, lastCodepoint(wordAt(currentIndex - 1)),
-                                                firstCodepoint(wordAt(currentIndex)), getWordStyleAt(currentIndex - 1)),
-                       wordSpacingPercent);
-      }
+      const int spacing = gapBefore(currentIndex);
       const int candidateWidth = spacing + wordWidths[currentIndex];
 
       // Word fits on current line
@@ -1274,6 +1274,24 @@ std::vector<size_t> ParsedText::computeHyphenatedLineBreaks(const GfxRenderer& r
         ++currentIndex;
         lastFittingBreak = currentIndex;
         break;
+      }
+
+      // What overflows is glued to the words before it, as "купания" to the dash after a no-break
+      // space: split the last of them that hyphenates, so only the group's tail moves on.
+      if (hyphenationEnabled && lastFittingBreak < currentIndex &&
+          !TokenBoundary::allowsBreak(continuesVec[currentIndex], noSpaceBeforeVec[currentIndex])) {
+        bool splitInGroup = false;
+        int width = lineWidth;
+        for (size_t k = currentIndex; k-- > lastFittingBreak;) {
+          const int gap = gapBefore(k);
+          width -= wordWidths[k] + gap;
+          if (hyphenateWordAtIndex(k, effectivePageWidth - width - gap, renderer, fontId, wordWidths, false)) {
+            currentIndex = lastFittingBreak = k + 1;
+            splitInGroup = true;
+            break;
+          }
+        }
+        if (splitInGroup) break;
       }
 
       // Could not split: force at least one word per line to avoid infinite loop
