@@ -1730,19 +1730,20 @@ bool Fb2ToEpub::convert(Input& input, Output& out) {
 // A book of bold titles (calibre's) has its parts and chapters as sibling sections: its TOC
 // nests each "Глава N" under the "Часть" before it, until a heading of another kind. Chapters
 // numbered from the start again right after such a heading ("Библиография", then "Глава 1",
-// "Глава 2"...) nest under it, so the chapter list is not repeated at the top level. Labels in
-// capitals take the case of the book's contents page where it lists them.
+// "Глава 2"...) repeat the chapter list inside back matter, as the book's contents page does
+// not, and are left out. Labels in capitals take the case of the contents page where it lists them.
 void Fb2ToEpub::shapeBoldToc() {
   for (const BoldTitle& title : boldTitles) {
     if (title.capitals != NO_CAPITALS) caseAsContents(toc[title.entry].label, title.capitals, contents);
   }
-  uint8_t group = 0;  // depth of the entry the chapters after it nest under, 0: none
-  uint8_t other = 0;  // depth of the heading of another kind just before, 0: none
-  uint8_t moved = 0;  // depth a chapter was moved in from: its sections, deeper, follow it
+  uint8_t group = 0;     // depth of the entry the chapters after it nest under, 0: none
+  bool repeats = false;  // the group's chapters repeat the book's and are left out
+  uint8_t other = 0;     // depth of the heading of another kind just before, 0: none
+  uint8_t moved = 0;     // depth a chapter was moved in from: its sections, deeper, follow it
   unsigned lastChapter = 0;
   for (TocEntry& e : toc) {
     if (moved && e.depth > moved) {
-      e.depth++;
+      e.depth = repeats ? 0 : e.depth + 1;
       continue;
     }
     moved = 0;
@@ -1752,10 +1753,17 @@ void Fb2ToEpub::shapeBoldToc() {
     const Heading kind = headingKind(e.label, number);
     if (kind == Heading::Group) {
       group = e.depth;
+      repeats = false;
       other = 0;
     } else if (kind == Heading::Chapter) {
-      if (!group && other == e.depth && number <= lastChapter) group = other;
-      if (group == e.depth) moved = e.depth++;
+      if (!group && other == e.depth && number <= lastChapter) {
+        group = other;
+        repeats = true;
+      }
+      if (group == e.depth) {
+        moved = e.depth;
+        e.depth = repeats ? 0 : e.depth + 1;
+      }
       other = 0;
       lastChapter = number;
     } else {
@@ -1763,6 +1771,7 @@ void Fb2ToEpub::shapeBoldToc() {
       other = e.depth;
     }
   }
+  toc.erase(std::remove_if(toc.begin(), toc.end(), [](const TocEntry& e) { return e.depth == 0; }), toc.end());
 }
 
 bool Fb2ToEpub::writeOpf(Output& out) const {

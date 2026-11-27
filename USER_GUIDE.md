@@ -309,7 +309,7 @@ Settings are grouped into **System**, **Display**, **Reader**, **Controls**, **L
 
 - **Embedded Style**: Whether to use the EPUB file's embedded HTML and CSS stylisation and formatting; options are "ON" or "OFF".
 
-- **Hyphenation**: Whether to hyphenate text in Reading Mode; options are "ON" or "OFF". Korean text wraps only at spaces when "OFF"; when "ON", a Korean word may also wrap at the end of a line between syllables or where it meets digits, Latin letters, or brackets (no hyphen is drawn).
+- **Hyphenation**: Whether to hyphenate text in Reading Mode; options are "ON" (default) or "OFF". Justified text keeps even word gaps only with hyphenation on. Korean text wraps only at spaces when "OFF"; when "ON", a Korean word may also wrap at the end of a line between syllables or where it meets digits, Latin letters, or brackets (no hyphen is drawn).
 
 - **Reading Orientation**: Set the screen orientation for reading EPUB files:
   

@@ -479,14 +479,24 @@ TEST(Fb2ToEpub, NestsTheChaptersOfAFlatBoldTitledBook) {
             "1 ВВЕДЕНИЕ\n1 Часть первая. Первые дни\n2 Глава 1. Первые три дня\n2 Глава 2\n1 Книга II\n2 Глава 3\n"
             "1 ЭПИЛОГ\n1 Глава 4\n1 Part One\n2 Chapter 1\n");
 
-  // Chapters numbered anew after another heading are its own, as a bibliography's per chapter.
+  // Chapters numbered anew after another heading repeat the list inside it, as a bibliography by
+  // chapter does: left out with their sections, the files themselves stay in the book.
   StringInput notes(boldTitledBook({"Часть 1", "Глава 1", "Глава 2", "БИБЛИОГРАФИЯ", "Глава 1. Первые дни",
                                     "Глава 2. Дома", "ПРИМЕЧАНИЯ", "Глава 1", "ПОСЛЕСЛОВИЕ", "Глава 3"}));
   MapOutput notesOut;
   ASSERT_TRUE(converter.convert(notes, notesOut));
-  EXPECT_EQ(outline(notesOut.files["OEBPS/toc.ncx"]),
-            "1 Часть 1\n2 Глава 1\n2 Глава 2\n1 БИБЛИОГРАФИЯ\n2 Глава 1. Первые дни\n2 Глава 2. Дома\n"
-            "1 ПРИМЕЧАНИЯ\n2 Глава 1\n1 ПОСЛЕСЛОВИЕ\n1 Глава 3\n");
+  const std::string& notesNcx = notesOut.files["OEBPS/toc.ncx"];
+  EXPECT_EQ(outline(notesNcx), "1 Часть 1\n2 Глава 1\n2 Глава 2\n1 БИБЛИОГРАФИЯ\n1 ПРИМЕЧАНИЯ\n1 ПОСЛЕСЛОВИЕ\n1 Глава 3\n");
+  EXPECT_TRUE(contains(notesNcx, "playOrder=\"7\"><navLabel><text>Глава 3</text>"));
+  EXPECT_EQ(notesOut.files.count("OEBPS/s5.xhtml"), 1u);
+  StringInput sectioned(
+      "<FictionBook><body><section><p><strong>Глава 1</strong></p><p>т</p></section>"
+      "<section><p><strong>Библиография</strong></p><p>т</p></section><section><p><strong>Глава 1</strong></p>"
+      "<p>т</p><section><p><strong>Статьи</strong></p><p>т</p></section></section>"
+      "<section><p><strong>Благодарности</strong></p><p>т</p></section></body></FictionBook>");
+  MapOutput sectionedOut;
+  ASSERT_TRUE(converter.convert(sectioned, sectionedOut));
+  EXPECT_EQ(outline(sectionedOut.files["OEBPS/toc.ncx"]), "1 Глава 1\n1 Библиография\n1 Благодарности\n");
 
   // A chapter moved in takes its own sections along.
   StringInput sections(
