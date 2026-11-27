@@ -52,7 +52,8 @@ Three crashes in a row during start-up do the same on their own. The user guide 
 
 - Reader footer with the page number in the whole book and the reading time left. Pages not laid out yet are estimated and marked with `~`; reading speed is learned from your page turns.
 - Battery in the reader footer: Settings → Reader → Customise Status Bar → Battery, off by default.
-- FB2 and FB2.ZIP books, converted once into an EPUB inside the book's cache. Poems, epigraphs, subtitles and note markers are laid out as in other readers, and books without chapter titles (common in calibre exports) get a table of contents from their bold chapter headings. When a new release converts FB2 differently, a book is converted again on its first open and reopens at the same place.
+- FB2 and FB2.ZIP books, converted once into an EPUB inside the book's cache. Poems, epigraphs, subtitles and note markers are laid out as in other readers, and books without chapter titles (common in calibre exports) get a table of contents from their bold chapter headings, without the chapter list repeated in a bibliography or notes grouped by chapter. When a new release converts FB2 differently, a book is converted again on its first open and reopens at the same place.
+- Hyphenation is on by default on a fresh install, so justified text keeps even word gaps, including words a publisher glued to a dash with a no-break space.
 - A right-edge swipe sets the frontlight brightness while reading (X4 Pro, Edge Swipe Brightness setting).
 - A swipe in from the left or right edge is Back (X4 Pro, Edge Swipe Back setting): everywhere except the book page by default, or everywhere, or off.
 - A swipe down from the top edge opens the quick panel (X4 Pro); a tap in the middle of the page opens the reading menu.
